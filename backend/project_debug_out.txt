@@ -1,0 +1,16 @@
+Analyzing Project: PRJ-2026-007 - Perbaikan Koneksi Jaringan LAN PE dan GSE
+SO: SO-2026-002 - 3000000
+WO: WO-2026-0007, Status: COMPLETED
+ - WO Item: BELDEN Kabel Lan STP, Type: MATERIAL, Released: false, Source: CASH, Cost: 2098200
+ - Stock Movement: SOUT-2026-0007, Type: OUT, Status: CONFIRMED
+   * SMI: Qty: 200, Cost: 12000, Total: 2400000
+PO: PO-2026-007, Status: SENT, Total: 3660000
+ - PO Item: PROD-844550-SKU-002, Qty: 305, Price: 12000, Total: 3660000
+Expense (Linked to PO, Skipped): Cash Purchase - 3660000
+--- SUMMARY ---
+Total Revenue: 3000000
+COGS from Stock: 0
+COGS from PO: 3660000
+Total COGS: 3660000
+Op Expenses: 0
+Total Profit: -660000

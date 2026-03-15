@@ -1,0 +1,664 @@
+{
+  "systemAccounts": [
+    {
+      "key": "CASH_BANK",
+      "code": "1-10001",
+      "name": "Kas Peti Cash"
+    },
+    {
+      "key": "BANK_MANDIRI_JABABEKA",
+      "code": "1-10002",
+      "name": "BANK  MANDIRI CABANG JABABEKA"
+    },
+    {
+      "key": "BANK_BCA_TAMBUN",
+      "code": "1-10003",
+      "name": "BANK BCA CABANG TAMBUN"
+    },
+    {
+      "key": "CASH",
+      "code": "1-10001",
+      "name": "Kas Peti Cash"
+    },
+    {
+      "key": "PETTY_CASH",
+      "code": "1-10001",
+      "name": "Kas Peti Cash"
+    },
+    {
+      "key": "PROJECT_MOBILIZATION",
+      "code": "5-10102",
+      "name": "Beban Mobilisasi"
+    },
+    {
+      "key": "PROJECT_WIP",
+      "code": "1-10205",
+      "name": "Persediaan On WIP"
+    },
+    {
+      "key": "PURCHASE_EXPENSE",
+      "code": "5-10101",
+      "name": "Biaya Material Proyek"
+    },
+    {
+      "key": "SALES_REVENUE",
+      "code": "4-10101",
+      "name": "Pendapatan Jasa IT"
+    },
+    {
+      "key": "STAFF_ADVANCE",
+      "code": "1-10302",
+      "name": "Uang Muka Kerja (Staff)"
+    },
+    {
+      "key": "VAT_IN",
+      "code": "1-10401",
+      "name": "PPN Masukan"
+    },
+    {
+      "key": "VAT_OUT",
+      "code": "2-10301",
+      "name": "PPN Pengeluaran"
+    },
+    {
+      "key": "PAYMENT_RECEIVABLE_ACCOUNT",
+      "code": "1-10101",
+      "name": "Piutang Usaha"
+    },
+    {
+      "key": "PAYMENT_BANK_CHARGE_EXPENSE",
+      "code": "6-10102",
+      "name": "Beban Admin Bank"
+    },
+    {
+      "key": "INVENTORY_WIP",
+      "code": "1-10205",
+      "name": "Persediaan On WIP"
+    },
+    {
+      "key": "UNBILLED_RECEIPT",
+      "code": "2-10102",
+      "name": "Penerimaan Barang Belum Ditagih"
+    },
+    {
+      "key": "EXPENSE_SALARY",
+      "code": "6-10101",
+      "name": "Beban Gaji Karyawan"
+    },
+    {
+      "key": "EXPENSE_UTILITIES",
+      "code": "6-10202",
+      "name": "Beban Listrik"
+    },
+    {
+      "key": "EXPENSE_WATER",
+      "code": "6-10206",
+      "name": "Beban Air"
+    },
+    {
+      "key": "EXPENSE_OFFICE_SUPPLIES",
+      "code": "6-10202",
+      "name": "Beban Listrik"
+    },
+    {
+      "key": "EXPENSE_SOFTWARE_SAAS",
+      "code": "6-10301",
+      "name": "Beban Notaris & Hukum"
+    },
+    {
+      "key": "EXPENSE_RENT",
+      "code": "6-10201",
+      "name": "Beban Sewa Gedung/Kantor"
+    },
+    {
+      "key": "INVENTORY_ADJUSTMENT_ACCOUNT",
+      "code": "6-10501",
+      "name": "Beban Penyusutan Kendaraan"
+    },
+    {
+      "key": "CASH_SHORTAGE_ACCOUNT",
+      "code": "3-10101",
+      "name": "Saldo Awal Ekuitas"
+    },
+    {
+      "key": "CASH_OVERAGE_ACCOUNT",
+      "code": "3-10101",
+      "name": "Saldo Awal Ekuitas"
+    },
+    {
+      "key": "ACCOUNTS_RECEIVABLE",
+      "code": "1-10101",
+      "name": "Piutang Usaha"
+    },
+    {
+      "key": "OFFICE_SALARY",
+      "code": "6-10101",
+      "name": "Beban Gaji Karyawan"
+    },
+    {
+      "key": "ACCOUNTS_PAYABLE",
+      "code": "2-10101",
+      "name": "Utang Usaha (Supplier)"
+    },
+    {
+      "key": "BANK_BRI_CIKARANG",
+      "code": "1-10002",
+      "name": "BANK  MANDIRI CABANG JABABEKA"
+    },
+    {
+      "key": "BANK_BRI_HARAPAN_INDAH",
+      "code": "1-10003",
+      "name": "BANK BCA CABANG TAMBUN"
+    },
+    {
+      "key": "EQUITY_OPENING_BALANCE",
+      "code": "3-10101",
+      "name": "Saldo Awal Ekuitas"
+    },
+    {
+      "key": "EXPENSE",
+      "code": "6-10206",
+      "name": "Beban Air"
+    },
+    {
+      "key": "COGS",
+      "code": "5-10101",
+      "name": "Biaya Material Proyek"
+    },
+    {
+      "key": "INVENTORY_PUSAT",
+      "code": "1-10202",
+      "name": "Persediaan - Gudang Pusat "
+    }
+  ],
+  "coas": [
+    {
+      "code": "1-00000",
+      "name": "ASET"
+    },
+    {
+      "code": "1-10000",
+      "name": "Kas & Bank"
+    },
+    {
+      "code": "1-10001",
+      "name": "Kas Peti Cash"
+    },
+    {
+      "code": "1-10002",
+      "name": "BANK  MANDIRI CABANG JABABEKA"
+    },
+    {
+      "code": "1-10003",
+      "name": "BANK BCA CABANG TAMBUN"
+    },
+    {
+      "code": "1-10100",
+      "name": "Piutang"
+    },
+    {
+      "code": "1-10101",
+      "name": "Piutang Usaha"
+    },
+    {
+      "code": "1-10102",
+      "name": "Piutang Belum Ditagih"
+    },
+    {
+      "code": "1-10200",
+      "name": "Persediaan"
+    },
+    {
+      "code": "1-10201",
+      "name": "Persediaan Barang Dagang"
+    },
+    {
+      "code": "1-10202",
+      "name": "Persediaan - Gudang Pusat "
+    },
+    {
+      "code": "1-10205",
+      "name": "Persediaan On WIP"
+    },
+    {
+      "code": "1-10300",
+      "name": "Piutang Lain-lain"
+    },
+    {
+      "code": "1-10301",
+      "name": "Pinjaman Karyawan"
+    },
+    {
+      "code": "1-10302",
+      "name": "Uang Muka Kerja (Staff)"
+    },
+    {
+      "code": "1-10303",
+      "name": "Piutang Karyawan Lainnya"
+    },
+    {
+      "code": "1-10400",
+      "name": "Pajak Dibayar di Muka"
+    },
+    {
+      "code": "1-10401",
+      "name": "PPN Masukan"
+    },
+    {
+      "code": "1-10402",
+      "name": "Pajak Dibayar di Muka Lainnya"
+    },
+    {
+      "code": "1-20000",
+      "name": "Aset Tetap"
+    },
+    {
+      "code": "1-20100",
+      "name": "Kendaraan"
+    },
+    {
+      "code": "1-20101",
+      "name": "Kendaraan Operasional"
+    },
+    {
+      "code": "1-20102",
+      "name": "Akumulasi Penyusutan Kendaraan"
+    },
+    {
+      "code": "1-20103",
+      "name": "Kendaraan Non-Produksi"
+    },
+    {
+      "code": "1-20104",
+      "name": "Akumulasi Penyusutan Kendaraan Non-Produksi"
+    },
+    {
+      "code": "1-20200",
+      "name": "Tanah dan Bangunan"
+    },
+    {
+      "code": "1-20201",
+      "name": "Tanah"
+    },
+    {
+      "code": "1-20202",
+      "name": "Bangunan"
+    },
+    {
+      "code": "1-20203",
+      "name": "Akumulasi Penyusutan Bangunan"
+    },
+    {
+      "code": "1-20300",
+      "name": "Peralatan Kantor"
+    },
+    {
+      "code": "1-20301",
+      "name": "Peralatan Kantor - Elektronik"
+    },
+    {
+      "code": "1-20302",
+      "name": "Peralatan Kantor - Furniture"
+    },
+    {
+      "code": "1-20303",
+      "name": "Akumulasi Penyusutan Peralatan Kantor"
+    },
+    {
+      "code": "1-20400",
+      "name": "Peralatan Teknis/Proyek"
+    },
+    {
+      "code": "1-20401",
+      "name": "Peralatan Konstruksi"
+    },
+    {
+      "code": "1-20402",
+      "name": "Peralatan Teknis"
+    },
+    {
+      "code": "1-20403",
+      "name": "Akumulasi Penyusutan Peralatan Teknis"
+    },
+    {
+      "code": "1-20500",
+      "name": "Aset Tidak Berwujud"
+    },
+    {
+      "code": "1-20501",
+      "name": "Hak Cipta/Merek Dagang"
+    },
+    {
+      "code": "1-20502",
+      "name": "Goodwill"
+    },
+    {
+      "code": "1-20503",
+      "name": "Amortisasi Aset Tidak Berwujud"
+    },
+    {
+      "code": "5-00000",
+      "name": "BEBAN POKOK PENDAPATAN"
+    },
+    {
+      "code": "5-10000",
+      "name": "BEBAN POKOK PENDAPATAN"
+    },
+    {
+      "code": "5-10101",
+      "name": "Biaya Material Proyek"
+    },
+    {
+      "code": "5-10102",
+      "name": "Beban Mobilisasi"
+    },
+    {
+      "code": "6-00000",
+      "name": "BEBAN OPERASIONAL"
+    },
+    {
+      "code": "6-10000",
+      "name": "Beban Operasional & Admin"
+    },
+    {
+      "code": "6-10100",
+      "name": "Beban SDM & Administrasi Umum"
+    },
+    {
+      "code": "6-10101",
+      "name": "Beban Gaji Karyawan"
+    },
+    {
+      "code": "6-10102",
+      "name": "Beban Admin Bank"
+    },
+    {
+      "code": "6-10200",
+      "name": "Beban Sewa & Utilities"
+    },
+    {
+      "code": "6-10201",
+      "name": "Beban Sewa Gedung/Kantor"
+    },
+    {
+      "code": "6-10202",
+      "name": "Beban Listrik"
+    },
+    {
+      "code": "6-10203",
+      "name": "Beban Telekomunikasi"
+    },
+    {
+      "code": "6-10204",
+      "name": "Beban Perlengkapan Office"
+    },
+    {
+      "code": "6-10204-01",
+      "name": "Perlengkapan Kantor Kecil"
+    },
+    {
+      "code": "6-10205",
+      "name": "Beban Kebersihan & Pemeliharaan Kantor"
+    },
+    {
+      "code": "6-10205-01",
+      "name": "Kebersihan Kantor"
+    },
+    {
+      "code": "6-10206",
+      "name": "Beban Air"
+    },
+    {
+      "code": "6-10300",
+      "name": "Beban Legal & Perizinan"
+    },
+    {
+      "code": "6-10301",
+      "name": "Beban Notaris & Hukum"
+    },
+    {
+      "code": "6-10302",
+      "name": "Beban Perizinan Usaha"
+    },
+    {
+      "code": "6-10303",
+      "name": "Beban Lisensi Software"
+    },
+    {
+      "code": "6-10400",
+      "name": "Beban Teknologi Informasi"
+    },
+    {
+      "code": "6-10401",
+      "name": "Beban Software & Subscription"
+    },
+    {
+      "code": "6-10402",
+      "name": "Beban Maintenance Hardware"
+    },
+    {
+      "code": "6-10403",
+      "name": "Beban Cloud Services"
+    },
+    {
+      "code": "6-10404",
+      "name": "Beban IT Support"
+    },
+    {
+      "code": "6-10500",
+      "name": "Beban Penyusutan"
+    },
+    {
+      "code": "6-10501",
+      "name": "Beban Penyusutan Kendaraan"
+    },
+    {
+      "code": "6-10502",
+      "name": "Beban Penyusutan Bangunan"
+    },
+    {
+      "code": "6-10503",
+      "name": "Beban Penyusutan Peralatan Kantor"
+    },
+    {
+      "code": "6-10504",
+      "name": "Beban Penyusutan Peralatan Teknis"
+    },
+    {
+      "code": "6-10505",
+      "name": "Beban Amortisasi"
+    },
+    {
+      "code": "6-10600",
+      "name": "Beban Pemasaran & Promosi"
+    },
+    {
+      "code": "6-10601",
+      "name": "Beban Iklan & Digital Marketing"
+    },
+    {
+      "code": "6-10602",
+      "name": "Beban Event & Pameran"
+    },
+    {
+      "code": "6-10603",
+      "name": "Beban Promosi & Sponsorship"
+    },
+    {
+      "code": "6-10604",
+      "name": "Beban Souvenir & Merchandise"
+    },
+    {
+      "code": "6-10700",
+      "name": "Beban Penjualan"
+    },
+    {
+      "code": "6-10701",
+      "name": "Beban Komisi Penjualan"
+    },
+    {
+      "code": "6-10702",
+      "name": "Beban Perjalanan Dinas Sales"
+    },
+    {
+      "code": "6-10703",
+      "name": "Beban Entertainment Klien"
+    },
+    {
+      "code": "6-10800",
+      "name": "Beban Transportasi Operasional"
+    },
+    {
+      "code": "6-10801",
+      "name": "Beban Bahan Bakar Kendaraan"
+    },
+    {
+      "code": "6-10801-01",
+      "name": "Bensin Keperluan Kantor"
+    },
+    {
+      "code": "6-10802",
+      "name": "Beban Maintenance Kendaraan"
+    },
+    {
+      "code": "6-10803",
+      "name": "Beban Parkir & Tol"
+    },
+    {
+      "code": "6-10803-01",
+      "name": "Parkir & Tol"
+    },
+    {
+      "code": "6-10804",
+      "name": "Beban Pengiriman & Kurir"
+    },
+    {
+      "code": "6-10804-01",
+      "name": "Transportasi Lokal"
+    },
+    {
+      "code": "6-10900",
+      "name": "Beban Sumber Daya Manusia"
+    },
+    {
+      "code": "6-10901",
+      "name": "Beban Pelatihan & Development"
+    },
+    {
+      "code": "6-10902",
+      "name": "Beban Rekrutmen & Seleksi"
+    },
+    {
+      "code": "6-10903",
+      "name": "Beban Membership & Asosiasi"
+    },
+    {
+      "code": "6-11000",
+      "name": "Beban Fasilitas & Kesejahteraan"
+    },
+    {
+      "code": "6-11001",
+      "name": "Beban Katering & Konsumsi"
+    },
+    {
+      "code": "6-11001-01",
+      "name": "Belanja Kebutuhan Pantry"
+    },
+    {
+      "code": "6-11001-02",
+      "name": "Makan Siang Rapat"
+    },
+    {
+      "code": "6-11002",
+      "name": "Beban Medical Check-up"
+    },
+    {
+      "code": "6-11003",
+      "name": "Beban Acara Karyawan"
+    },
+    {
+      "code": "6-11004",
+      "name": "Beban Sumbangan & Sosial"
+    },
+    {
+      "code": "6-11100",
+      "name": "Beban Keuangan & Bank"
+    },
+    {
+      "code": "6-11101",
+      "name": "Beban Administrasi Bank (Internal)"
+    },
+    {
+      "code": "6-11102",
+      "name": "Beban Bunga Pinjaman"
+    },
+    {
+      "code": "6-11103",
+      "name": "Beban Provisi & Biaya Lain Bank"
+    },
+    {
+      "code": "6-11200",
+      "name": "Beban Pajak"
+    },
+    {
+      "code": "6-11201",
+      "name": "Beban Pajak Penghasilan Badan"
+    },
+    {
+      "code": "6-11202",
+      "name": "Beban Pajak Kendaraan"
+    },
+    {
+      "code": "6-11203",
+      "name": "Beban Pajak Lain-lain"
+    },
+    {
+      "code": "6-11300",
+      "name": "Beban Asuransi"
+    },
+    {
+      "code": "6-11301",
+      "name": "Beban Asuransi Kendaraan"
+    },
+    {
+      "code": "6-11302",
+      "name": "Beban Asuransi Kesehatan"
+    },
+    {
+      "code": "6-11303",
+      "name": "Beban Asuransi Properti"
+    },
+    {
+      "code": "6-11304",
+      "name": "Beban Asuransi Lainnya"
+    },
+    {
+      "code": "6-11400",
+      "name": "Beban Lain-lain Operasional"
+    },
+    {
+      "code": "6-11401",
+      "name": "Beban Entertainment & Relasi Bisnis"
+    },
+    {
+      "code": "6-11402",
+      "name": "Beban Sumbangan & Hadiah"
+    },
+    {
+      "code": "6-11403",
+      "name": "Beban Kerugian Piutang Tak Tertagih"
+    },
+    {
+      "code": "6-11404",
+      "name": "Beban Kehilangan/Perampokan"
+    },
+    {
+      "code": "6-11405",
+      "name": "Beban Tidak Terduga"
+    },
+    {
+      "code": "6-11405-01",
+      "name": "Kebutuhan Darurat"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+﻿src/app/dashboard/management/products/page.tsx(820,17): error TS2657: JSX expressions must have one parent element.
+src/app/dashboard/management/products/page.tsx(828,22): error TS17008: JSX element 'motion.div' has no corresponding closing tag.
+src/app/dashboard/management/products/page.tsx(896,46): error TS17008: JSX element 'div' has no corresponding closing tag.
+src/app/dashboard/management/products/page.tsx(1182,43): error TS17002: Expected corresponding JSX closing tag for 'motion.form'.
+src/app/dashboard/management/products/page.tsx(1183,37): error TS1005: ')' expected.
+src/app/dashboard/management/products/page.tsx(1183,39): error TS17002: Expected corresponding JSX closing tag for 'AnimatePresence'.
+src/app/dashboard/management/products/page.tsx(1268,34): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/app/dashboard/management/products/page.tsx(1269,31): error TS17002: Expected corresponding JSX closing tag for 'div'.
+src/app/dashboard/management/products/page.tsx(1284,21): error TS1005: ')' expected.
+src/app/dashboard/management/products/page.tsx(1284,23): error TS17002: Expected corresponding JSX closing tag for 'AnimatePresence'.
+src/app/dashboard/management/products/page.tsx(1285,17): error TS1005: ')' expected.
+src/app/dashboard/management/products/page.tsx(1286,13): error TS1109: Expression expected.
+src/app/dashboard/management/products/page.tsx(1288,9): error TS1128: Declaration or statement expected.
+src/app/dashboard/management/products/page.tsx(1289,5): error TS1109: Expression expected.
+src/app/dashboard/management/products/page.tsx(1290,1): error TS1128: Declaration or statement expected.
