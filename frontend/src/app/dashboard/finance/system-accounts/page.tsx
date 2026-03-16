@@ -47,8 +47,8 @@ export default function SystemAccountsPage() {
         setLoading(true)
         try {
             const [saRes, coaRes] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/system-accounts'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/coa')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/system-accounts`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coa`)
             ])
             setAccounts(await saRes.json())
             const allCoa = await coaRes.json()
@@ -85,7 +85,7 @@ export default function SystemAccountsPage() {
         e.preventDefault()
         const url = editingAccount
             ? `${process.env.NEXT_PUBLIC_API_URL}/api/system-accounts/${editingAccount.id}`
-            : '${process.env.NEXT_PUBLIC_API_URL}/api/system-accounts'
+            : `${process.env.NEXT_PUBLIC_API_URL}/api/system-accounts`
         const method = editingAccount ? 'PUT' : 'POST'
 
         try {

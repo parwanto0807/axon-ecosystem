@@ -31,7 +31,7 @@ export default function VendorBillsPage() {
     const fetchInvoices = async () => {
         setLoading(true)
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/purchase-invoices')
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-invoices`)
             const data = await res.json()
             setInvoices(Array.isArray(data) ? data : [])
         } catch (e) {

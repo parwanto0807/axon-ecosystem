@@ -19,7 +19,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-const API_BASE = "${process.env.NEXT_PUBLIC_API_URL}/api"
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api`
 
 export default function NewEmployeePage() {
     const router = useRouter()

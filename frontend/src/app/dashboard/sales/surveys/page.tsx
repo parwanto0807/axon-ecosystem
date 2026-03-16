@@ -214,9 +214,9 @@ export default function SurveysPage() {
         setLoading(true)
         try {
             const [sR, cR, pR] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/surveys'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/surveys`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`)
             ])
             setSurveys(await sR.json())
             setCustomers(await cR.json())
@@ -427,7 +427,7 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
         if (!form.customerId || !form.location) return
         setSaving(true)
         try {
-            const url = isEdit ? `${process.env.NEXT_PUBLIC_API_URL}/api/surveys/${survey!.id}` : '${process.env.NEXT_PUBLIC_API_URL}/api/surveys'
+            const url = isEdit ? `${process.env.NEXT_PUBLIC_API_URL}/api/surveys/${survey!.id}` : `${process.env.NEXT_PUBLIC_API_URL}/api/surveys`
             const res = await fetch(url, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },

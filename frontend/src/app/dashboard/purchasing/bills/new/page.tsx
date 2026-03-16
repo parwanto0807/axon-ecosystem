@@ -36,8 +36,8 @@ function NewVendorBillForm() {
         const fetchData = async () => {
             try {
                 const [venRes, poRes] = await Promise.all([
-                    fetch('${process.env.NEXT_PUBLIC_API_URL}/api/vendors'),
-                    fetch('${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders')
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`),
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders`)
                 ])
                 const venData = await venRes.json()
                 const poData = await poRes.json()
@@ -163,7 +163,7 @@ function NewVendorBillForm() {
                 }))
             }
 
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/purchase-invoices', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-invoices`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -399,7 +399,7 @@ function NewVendorBillForm() {
                                             const formData = new FormData()
                                             formData.append('file', file)
                                             try {
-                                                const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/upload', {
+                                                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, {
                                                     method: 'POST',
                                                     body: formData
                                                 })

@@ -942,7 +942,7 @@ function ProjectFormModal({ project, customers, onClose, onSuccess }: {
         try {
             const url = isEdit
                 ? `${process.env.NEXT_PUBLIC_API_URL}/api/projects/${project!.id}`
-                : '${process.env.NEXT_PUBLIC_API_URL}/api/projects'
+                : `${process.env.NEXT_PUBLIC_API_URL}/api/projects`
             const res = await fetch(url, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },

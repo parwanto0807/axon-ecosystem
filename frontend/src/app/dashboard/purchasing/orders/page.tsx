@@ -40,8 +40,8 @@ export default function PurchaseOrdersPage() {
         setLoading(true)
         try {
             const [poRes, wRes] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/warehouses')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`)
             ])
             const poData = await poRes.json()
             const wData = await wRes.json()
@@ -55,7 +55,7 @@ export default function PurchaseOrdersPage() {
     useEffect(() => {
         fetchOrders()
         // Fetch company info for PDF
-        fetch('${process.env.NEXT_PUBLIC_API_URL}/api/settings/company')
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/settings/company`)
             .then(res => res.json())
             .then(data => setCompanyInfo(data))
             .catch(e => console.error(e))

@@ -47,7 +47,7 @@ export default function ReportsPage() {
     const fetchReports = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/reports')
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports`)
             if (res.ok) {
                 const data = await res.json()
                 setReports(data)

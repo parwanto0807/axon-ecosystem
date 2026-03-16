@@ -32,8 +32,8 @@ export default function BeginningStockPage() {
         setLoading(true)
         try {
             const [wRes, sRes] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/warehouses'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock`)
             ])
             setWarehouses((await wRes.json()).filter((w: Warehouse & { isActive: boolean }) => w.isActive))
             setSkus(await sRes.json())
@@ -63,7 +63,7 @@ export default function BeginningStockPage() {
         if (!selectedWh || itemsWithQty.length === 0) { showToast('error', 'Pilih gudang dan masukkan minimal 1 item stok'); return }
         setSaving(true)
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

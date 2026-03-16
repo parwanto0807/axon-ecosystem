@@ -65,7 +65,7 @@ export default function COAPage() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/coa')
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coa`)
             const data = await res.json()
             setAccounts(data)
         } catch (e) {
@@ -130,7 +130,7 @@ export default function COAPage() {
         e.preventDefault()
         const url = editingAccount
             ? `${process.env.NEXT_PUBLIC_API_URL}/api/coa/${editingAccount.id}`
-            : '${process.env.NEXT_PUBLIC_API_URL}/api/coa'
+            : `${process.env.NEXT_PUBLIC_API_URL}/api/coa`
         const method = editingAccount ? 'PUT' : 'POST'
 
         try {

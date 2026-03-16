@@ -46,8 +46,8 @@ export default function InventoryPage() {
         setLoading(true)
         try {
             const [sRes, wRes] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/warehouses')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`)
             ])
             setSkus(await sRes.json())
             setWarehouses(await wRes.json())

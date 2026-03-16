@@ -65,7 +65,7 @@ export default function LedgerPage() {
             const query = new URLSearchParams(filters).toString()
             const [itemsRes, coaRes] = await Promise.all([
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/ledger?${query}&_t=${Date.now()}`),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/coa')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coa`)
             ])
             setItems(await itemsRes.json())
             const allCoa = await coaRes.json()

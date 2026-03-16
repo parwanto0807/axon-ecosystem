@@ -1006,8 +1006,8 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
     const fetchOptions = async () => {
         try {
             const [catRes, unitRes] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/categories'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/units')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/categories`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/units`)
             ])
             const [catData, unitData] = await Promise.all([
                 catRes.json(),
@@ -1054,7 +1054,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
         const method = product ? 'PUT' : 'POST'
         const url = product
             ? `${process.env.NEXT_PUBLIC_API_URL}/api/products/${product.id}`
-            : '${process.env.NEXT_PUBLIC_API_URL}/api/products'
+            : `${process.env.NEXT_PUBLIC_API_URL}/api/products`
 
         const formDataPayload = new FormData();
         Object.entries(formData).forEach(([key, value]) => {

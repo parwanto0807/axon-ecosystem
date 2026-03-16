@@ -79,8 +79,8 @@ export default function ContractListPage() {
         setLoading(true)
         try {
             const [cRes, sRes] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/contracts'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/company')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`)
             ])
             if (cRes.ok) setContracts(await cRes.json())
             if (sRes.ok) setCompany(await sRes.json())

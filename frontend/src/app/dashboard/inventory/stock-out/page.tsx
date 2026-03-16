@@ -66,10 +66,10 @@ export default function StockOutPage() {
         setLoading(true)
         try {
             const [mRes, wRes, sRes, woRes] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements?type=OUT'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/warehouses'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/work-orders')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements?type=OUT`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders`)
             ])
             setMovements(await mRes.json())
             setWarehouses((await wRes.json()).filter((w: Warehouse & { isActive: boolean }) => w.isActive))
@@ -132,7 +132,7 @@ export default function StockOutPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); setSaving(true)
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

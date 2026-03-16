@@ -68,10 +68,10 @@ export default function ProposalsPage() {
         setLoading(true)
         try {
             const [propRes, custRes, projRes, compRes] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/proposals'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/company')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/proposals`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`)
             ])
             setProposals(await propRes.json())
             setCustomers(await custRes.json())
@@ -270,7 +270,7 @@ function ProposalFormModal({ proposal, customers, projects, onClose, onSuccess }
         e.preventDefault()
         setLoading(true)
         try {
-            const url = isEdit ? `${process.env.NEXT_PUBLIC_API_URL}/api/proposals/${proposal!.id}` : '${process.env.NEXT_PUBLIC_API_URL}/api/proposals'
+            const url = isEdit ? `${process.env.NEXT_PUBLIC_API_URL}/api/proposals/${proposal!.id}` : `${process.env.NEXT_PUBLIC_API_URL}/api/proposals`
             const res = await fetch(url, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },

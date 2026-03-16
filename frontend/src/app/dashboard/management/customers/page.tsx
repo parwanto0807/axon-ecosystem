@@ -64,7 +64,7 @@ export default function CustomersPage() {
 
     const fetchCustomers = async () => {
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers')
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`)
             const data = await res.json()
             setCustomers(data)
         } catch (error) {
@@ -423,7 +423,7 @@ function CustomerModal({ isOpen, onClose, customer, onSuccess }: { isOpen: boole
         e.preventDefault()
         setLoading(true)
         const method = customer ? 'PUT' : 'POST'
-        const url = customer ? `${process.env.NEXT_PUBLIC_API_URL}/api/customers/${customer.id}` : '${process.env.NEXT_PUBLIC_API_URL}/api/customers'
+        const url = customer ? `${process.env.NEXT_PUBLIC_API_URL}/api/customers/${customer.id}` : `${process.env.NEXT_PUBLIC_API_URL}/api/customers`
 
         try {
             console.log(`[FRONTEND] Submitting ${method} to ${url}`, formData)

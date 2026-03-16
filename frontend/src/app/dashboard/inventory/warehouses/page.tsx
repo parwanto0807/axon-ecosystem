@@ -39,7 +39,7 @@ export default function WarehousesPage() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/warehouses')
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`)
             setWarehouses(await res.json())
         } catch { showToast('error', 'Gagal memuat data') }
         finally { setLoading(false) }
@@ -53,7 +53,7 @@ export default function WarehousesPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); setSaving(true)
         try {
-            const url = editing ? `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/${editing.id}` : '${process.env.NEXT_PUBLIC_API_URL}/api/warehouses'
+            const url = editing ? `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/${editing.id}` : `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`
             const res = await fetch(url, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
             if (res.ok) { setModalOpen(false); showToast('success', editing ? 'Gudang diperbarui' : 'Gudang dibuat'); load() }
         } finally { setSaving(false) }

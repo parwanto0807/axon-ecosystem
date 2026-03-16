@@ -45,9 +45,9 @@ export default function TransferPage() {
         setLoading(true)
         try {
             const [mRes, wRes, sRes] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements?type=TRANSFER'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/warehouses'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements?type=TRANSFER`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock`)
             ])
             setMovements(await mRes.json())
             setWarehouses((await wRes.json()).filter((w: Warehouse & { isActive: boolean }) => w.isActive))
@@ -81,7 +81,7 @@ export default function TransferPage() {
         if (form.warehouseId === form.toWarehouseId) { showToast('error', 'Gudang asal dan tujuan tidak boleh sama'); return }
         setSaving(true)
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...form, type: 'TRANSFER', items: items.map(i => ({ skuId: i.skuId, qty: i.qty, unitCost: i.unitCost })) })

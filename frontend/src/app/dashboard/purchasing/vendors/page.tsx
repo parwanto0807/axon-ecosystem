@@ -34,7 +34,7 @@ export default function VendorsPage() {
     const fetchVendors = async () => {
         setLoading(true)
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/vendors')
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`)
             const data = await res.json()
             setVendors(Array.isArray(data) ? data : [])
         } catch (e) {
@@ -67,7 +67,7 @@ export default function VendorsPage() {
         try {
             const url = editingId
                 ? `${process.env.NEXT_PUBLIC_API_URL}/api/vendors/${editingId}`
-                : '${process.env.NEXT_PUBLIC_API_URL}/api/vendors'
+                : `${process.env.NEXT_PUBLIC_API_URL}/api/vendors`
 
             const method = editingId ? 'PUT' : 'POST'
 

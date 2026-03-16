@@ -61,7 +61,7 @@ export default function BankAccountsPage() {
 
     const fetchBanks = async () => {
         try {
-            const res = await fetch("${process.env.NEXT_PUBLIC_API_URL}/api/bank-accounts")
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bank-accounts`)
             setBanks(await res.json())
         } catch (e) { console.error(e) }
         finally { setLoading(false) }
@@ -69,7 +69,7 @@ export default function BankAccountsPage() {
 
     const fetchCoas = async () => {
         try {
-            const res = await fetch("${process.env.NEXT_PUBLIC_API_URL}/api/coa")
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coa`)
             const data = await res.json()
             // Filter only cash/bank type accounts if possible, or just all
             setCoas(data.filter((a: any) => a.postingType === 'POSTING'))
@@ -81,7 +81,7 @@ export default function BankAccountsPage() {
         const method = editingBank ? "PUT" : "POST"
         const url = editingBank
             ? `${process.env.NEXT_PUBLIC_API_URL}/api/bank-accounts/${editingBank.id}`
-            : "${process.env.NEXT_PUBLIC_API_URL}/api/bank-accounts"
+            : `${process.env.NEXT_PUBLIC_API_URL}/api/bank-accounts`
 
         try {
             const res = await fetch(url, {

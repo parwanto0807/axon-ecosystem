@@ -115,7 +115,7 @@ export default function CashFlowForecastPage() {
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/reports/cash-flow-forecast')
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/cash-flow-forecast`)
             if (res.ok) setData(await res.json())
         } catch (e) {
             console.error("Failed to fetch forecast:", e)

@@ -45,7 +45,7 @@ export default function OpeningBalancePage() {
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/opening-balances')
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/opening-balances`)
             const data = await res.json()
             setAllAccounts(data.balances)
             // Initial draft entries are those with existing balances
@@ -77,7 +77,7 @@ export default function OpeningBalancePage() {
                 return draft ? { ...acc, debit: draft.debit, credit: draft.credit } : { ...acc, debit: 0, credit: 0 }
             })
 
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/opening-balances', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/opening-balances`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ date, balances: payloadBalances })

@@ -81,12 +81,12 @@ export default function SalesOrdersPage() {
         setLoading(true)
         try {
             const [oR, cR, pR, coR, qR, prR] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/orders'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/products'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/company'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/quotations'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects'),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`),
             ])
             setOrders(await oR.json())
             setCustomers(await cR.json())
@@ -530,7 +530,7 @@ function OrderFormModal({ order, customers, products, quotations, projects, onCl
         e.preventDefault(); setSaving(true)
         try {
             const body = { ...form, items, subtotal, discountAmt, taxAmt, grandTotal }
-            const url = isEdit ? `${process.env.NEXT_PUBLIC_API_URL}/api/orders/${order!.id}` : '${process.env.NEXT_PUBLIC_API_URL}/api/orders'
+            const url = isEdit ? `${process.env.NEXT_PUBLIC_API_URL}/api/orders/${order!.id}` : `${process.env.NEXT_PUBLIC_API_URL}/api/orders`
             const res = await fetch(url, { method: isEdit ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
             if (res.ok) { onSuccess() } else { const e = await res.json(); alert(e.message) }
         } finally { setSaving(false) }
@@ -618,7 +618,7 @@ function OrderFormModal({ order, customers, products, quotations, projects, onCl
                                         const formData = new FormData()
                                         formData.append('file', file)
                                         try {
-                                            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/orders/upload', { method: 'POST', body: formData })
+                                            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders/upload`, { method: 'POST', body: formData })
                                             if (res.ok) {
                                                 const { url } = await res.json()
                                                 setForm({ ...form, poProof: url })

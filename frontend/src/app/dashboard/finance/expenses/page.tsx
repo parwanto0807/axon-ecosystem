@@ -115,8 +115,8 @@ export default function ExpenseReportsPage() {
         setLoading(true)
         try {
             const [expRes, coaRes] = await Promise.all([
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/expenses'),
-                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/coa')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/expenses`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coa`)
             ])
 
             if (expRes.ok) {
@@ -202,7 +202,7 @@ export default function ExpenseReportsPage() {
             if (form.parentExpenseId) formData.append('parentExpenseId', form.parentExpenseId)
             if (file) formData.append('receipt', file)
 
-            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/expenses', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/expenses`, {
                 method: 'POST',
                 body: formData
             })
