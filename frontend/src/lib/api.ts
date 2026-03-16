@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { format } from 'date-fns';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5003';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''; // Default to empty to avoid localhost leakage in prod if missing
 
 const api = axios.create({
   baseURL: API_BASE_URL,

@@ -20,6 +20,8 @@ import {
   Tooltip as ChartTooltip,
   Legend,
   Filler,
+  LineController,
+  BarController,
 } from "chart.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -155,7 +157,9 @@ ChartJS.register(
   Title,
   ChartTooltip,
   Legend,
-  Filler
+  Filler,
+  LineController,
+  BarController
 );
 
 const DATE_FORMAT = "yyyy-MM-dd";

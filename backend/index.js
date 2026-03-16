@@ -101,7 +101,7 @@ app.get('/', (req, res) => {
   res.send('API AXON ECOSYSTEM RUNNING...');
 });
 
-app.post('/auth/login', async (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -114,6 +114,7 @@ app.post('/auth/login', async (req, res) => {
     });
 
     if (!user) {
+      console.log(`[AUTH] User not found: ${email}`);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
@@ -125,7 +126,6 @@ app.post('/auth/login', async (req, res) => {
     try {
       isMatch = await bcrypt.compare(password, user.password);
     } catch (e) {
-      // If bcrypt.compare fails (e.g., if user.password is not a hash), it might be legacy
       isMatch = false;
     }
 
@@ -135,7 +135,10 @@ app.post('/auth/login', async (req, res) => {
       isLegacy = true;
     }
 
+    console.log(`[AUTH] Login attempt for: ${email}, Match: ${isMatch}`);
+
     if (isMatch) {
+      console.log(`[AUTH] Login success for: ${email}`);
       // If it was a legacy plain-text password, migrate it to hashed now
       if (isLegacy) {
         try {

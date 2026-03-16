@@ -21,7 +21,7 @@ const nextConfig = {
       },
     ],
   },
-  async headers() {
+  /* async headers() {
     return [
       {
         source: '/(.*)',
@@ -45,7 +45,7 @@ const nextConfig = {
         ]
       }
     ]
-  }
+  } */
 };
 
 export default withPWA(nextConfig);
