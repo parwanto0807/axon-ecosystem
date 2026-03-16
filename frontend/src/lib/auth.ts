@@ -13,6 +13,7 @@ export const authOptions: NextAuthOptions = {
                 if (!credentials?.email || !credentials?.password) return null
 
                 try {
+
                     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/login`, {
                         method: 'POST',
                         body: JSON.stringify(credentials),
