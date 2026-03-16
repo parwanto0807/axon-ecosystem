@@ -62,11 +62,11 @@ export default function QuotationsPage() {
         setLoading(true)
         try {
             const [qR, cR, pR, coR, prR] = await Promise.all([
-                fetch('http://localhost:5000/api/quotations'),
-                fetch('http://localhost:5000/api/customers'),
-                fetch('http://localhost:5000/api/products'),
-                fetch('http://localhost:5000/api/company'),
-                fetch('http://localhost:5000/api/projects'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/quotations'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/products'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/company'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects'),
             ])
             setQuotations(await qR.json())
             setCustomers(await cR.json())
@@ -81,12 +81,12 @@ export default function QuotationsPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm('Delete this quotation?')) return
-        await fetch(`http://localhost:5000/api/quotations/${id}`, { method: 'DELETE' })
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations/${id}`, { method: 'DELETE' })
         showToast('success', 'Quotation deleted'); load()
     }
 
     const handleStatus = async (id: string, status: string) => {
-        await fetch(`http://localhost:5000/api/quotations/${id}/status`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations/${id}/status`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status })
         })
         load()
@@ -446,7 +446,7 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
         e.preventDefault(); setSaving(true)
         try {
             const body = { ...form, items, subtotal, discountAmt, taxAmt, grandTotal }
-            const url = isEdit ? `http://localhost:5000/api/quotations/${quotation!.id}` : 'http://localhost:5000/api/quotations'
+            const url = isEdit ? `${process.env.NEXT_PUBLIC_API_URL}/api/quotations/${quotation!.id}` : '${process.env.NEXT_PUBLIC_API_URL}/api/quotations'
             const res = await fetch(url, { method: isEdit ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
             if (res.ok) { onSuccess() } else { const e = await res.json(); alert(e.message) }
         } finally { setSaving(false) }

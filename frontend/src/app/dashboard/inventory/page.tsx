@@ -46,8 +46,8 @@ export default function InventoryPage() {
         setLoading(true)
         try {
             const [sRes, wRes] = await Promise.all([
-                fetch('http://localhost:5000/api/inventory/stock'),
-                fetch('http://localhost:5000/api/warehouses')
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/warehouses')
             ])
             setSkus(await sRes.json())
             setWarehouses(await wRes.json())
@@ -62,7 +62,7 @@ export default function InventoryPage() {
         setHistoryOpen(true)
         setLoadingHistory(true)
         try {
-            const r = await fetch(`http://localhost:5000/api/inventory/stock/${sku.id}/movements`)
+            const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock/${sku.id}/movements`)
             if (r.ok) setMovements(await r.json())
         } catch (e) { console.error(e) }
         finally { setLoadingHistory(false) }

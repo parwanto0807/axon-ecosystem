@@ -58,9 +58,9 @@ export default function StockInPage() {
         setLoading(true)
         try {
             const [mRes, wRes, sRes] = await Promise.all([
-                fetch('http://localhost:5000/api/stock-movements?type=IN'),
-                fetch('http://localhost:5000/api/warehouses'),
-                fetch('http://localhost:5000/api/inventory/stock')
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements?type=IN'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/warehouses'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock')
             ])
             setMovements(await mRes.json())
             setWarehouses((await wRes.json()).filter((w: Warehouse & { isActive: boolean }) => w.isActive))
@@ -88,7 +88,7 @@ export default function StockInPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); setSaving(true)
         try {
-            const res = await fetch('http://localhost:5000/api/stock-movements', {
+            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...form, type: 'IN', referenceType: 'MANUAL', items: items.map(i => ({ skuId: i.skuId, qty: i.qty, unitCost: i.unitCost, notes: i.notes })) })
@@ -99,14 +99,14 @@ export default function StockInPage() {
     }
 
     const handleConfirm = async (id: string) => {
-        const res = await fetch(`http://localhost:5000/api/stock-movements/${id}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmedBy: 'Admin' }) })
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements/${id}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmedBy: 'Admin' }) })
         if (res.ok) { showToast('success', 'Stok masuk dikonfirmasi!'); load() }
         else { const d = await res.json(); showToast('error', d.message) }
     }
 
     const handleCancel = async (id: string) => {
         if (!confirm('Batalkan penerimaan ini?')) return
-        await fetch(`http://localhost:5000/api/stock-movements/${id}/cancel`, { method: 'PATCH' })
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements/${id}/cancel`, { method: 'PATCH' })
         showToast('success', 'Dibatalkan'); load()
     }
 

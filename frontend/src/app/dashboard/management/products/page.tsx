@@ -138,7 +138,7 @@ export default function ProductsPage() {
 
     const fetchProducts = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/products')
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products`)
             const data = await res.json()
             setProducts(data)
         } catch (error) {
@@ -166,7 +166,7 @@ export default function ProductsPage() {
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this product?")) return
         try {
-            await fetch(`http://localhost:5000/api/products/${id}`, { method: 'DELETE' })
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products/${id}`, { method: 'DELETE' })
             fetchProducts()
         } catch (error) {
             console.error("Error deleting product:", error)
@@ -276,12 +276,12 @@ export default function ProductsPage() {
                                                     <td className="px-4 py-4">
                                                         <div className="flex items-center gap-3">
                                                             <div
-                                                                onClick={() => p.image && setEnlargedImage(`http://localhost:5000${p.image}`)}
+                                                                onClick={() => p.image && setEnlargedImage(`${process.env.NEXT_PUBLIC_API_URL}${p.image}`)}
                                                                 className={`w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500 overflow-hidden border border-indigo-100 flex-shrink-0 ${p.image ? 'cursor-zoom-in hover:scale-105 transition-all' : ''
                                                                     }`}
                                                             >
                                                                 {p.image ? (
-                                                                    <img src={`http://localhost:5000${p.image}`} alt={p.name} className="w-full h-full object-cover" />
+                                                                    <img src={`${process.env.NEXT_PUBLIC_API_URL}${p.image}`} alt={p.name} className="w-full h-full object-cover" />
                                                                 ) : (
                                                                     <Box size={18} />
                                                                 )}
@@ -428,11 +428,11 @@ export default function ProductsPage() {
                                     >
                                         <div className="p-4 flex gap-4">
                                             <div
-                                                onClick={() => p.image && setEnlargedImage(`http://localhost:5000${p.image}`)}
+                                                onClick={() => p.image && setEnlargedImage(`${process.env.NEXT_PUBLIC_API_URL}${p.image}`)}
                                                 className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-200 flex-shrink-0 overflow-hidden flex items-center justify-center p-1"
                                             >
                                                 {p.image ? (
-                                                    <img src={`http://localhost:5000${p.image}`} className="w-full h-full object-cover rounded-lg" />
+                                                    <img src={`${process.env.NEXT_PUBLIC_API_URL}${p.image}`} className="w-full h-full object-cover rounded-lg" />
                                                 ) : (
                                                     <Box size={24} className="text-slate-300" />
                                                 )}
@@ -592,7 +592,7 @@ function ProductViewModal({ isOpen, onClose, product, onEnlargeImage }: { isOpen
     const fetchHistory = async (id: string) => {
         setLoadingHistory(true)
         try {
-            const res = await fetch(`http://localhost:5000/api/products/${id}/price-history`)
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products/${id}/price-history`)
             const data = await res.json()
             setHistory(data)
         } catch (error) {
@@ -692,12 +692,12 @@ function ProductViewModal({ isOpen, onClose, product, onEnlargeImage }: { isOpen
                                             {/* Left Column: Image & Basic Info */}
                                             <div className="md:col-span-1 space-y-6">
                                                 <div
-                                                    onClick={() => product.image && onEnlargeImage(`http://localhost:5000${product.image}`)}
+                                                    onClick={() => product.image && onEnlargeImage(`${process.env.NEXT_PUBLIC_API_URL}${product.image}`)}
                                                     className={`aspect-square rounded-[2rem] bg-indigo-50 border-2 border-slate-100 flex items-center justify-center overflow-hidden shadow-inner group relative ${product.image ? 'cursor-zoom-in' : ''}`}
                                                 >
                                                     {product.image ? (
                                                         <>
-                                                            <img src={`http://localhost:5000${product.image}`} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                                            <img src={`${process.env.NEXT_PUBLIC_API_URL}${product.image}`} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                                             <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                                 <Search size={32} className="text-white drop-shadow-lg" />
                                                             </div>
@@ -986,7 +986,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                 categoryId: product.categoryId || '',
                 skus: product.skus ? [...product.skus] : []
             });
-            setImagePreview(product.image ? `http://localhost:5000${product.image}` : null);
+            setImagePreview(product.image ? `${process.env.NEXT_PUBLIC_API_URL}${product.image}` : null);
             setActiveTab('DETAILS');
         } else {
             const autoCode = `PROD-${Date.now().toString().slice(-6)}`;
@@ -1006,8 +1006,8 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
     const fetchOptions = async () => {
         try {
             const [catRes, unitRes] = await Promise.all([
-                fetch('http://localhost:5000/api/categories'),
-                fetch('http://localhost:5000/api/units')
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/categories'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/units')
             ])
             const [catData, unitData] = await Promise.all([
                 catRes.json(),
@@ -1039,7 +1039,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
     const fetchHistory = async (id: string) => {
         setLoadingHistory(true)
         try {
-            const res = await fetch(`http://localhost:5000/api/products/${id}/price-history`)
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products/${id}/price-history`)
             const data = await res.json()
             setHistory(data)
         } catch (error) {
@@ -1053,8 +1053,8 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
         e.preventDefault()
         const method = product ? 'PUT' : 'POST'
         const url = product
-            ? `http://localhost:5000/api/products/${product.id}`
-            : 'http://localhost:5000/api/products'
+            ? `${process.env.NEXT_PUBLIC_API_URL}/api/products/${product.id}`
+            : '${process.env.NEXT_PUBLIC_API_URL}/api/products'
 
         const formDataPayload = new FormData();
         Object.entries(formData).forEach(([key, value]) => {

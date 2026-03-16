@@ -115,14 +115,14 @@ export default function InvoicesPage() {
         setLoading(true)
         try {
             const [invRes, prjRes, soRes, doRes, custRes, cntRes, coRes, bankRes] = await Promise.all([
-                fetch('http://localhost:5000/api/invoices').then(r => r.json()),
-                fetch('http://localhost:5000/api/projects').then(r => r.json()),
-                fetch('http://localhost:5000/api/orders').then(r => r.json()),
-                fetch('http://localhost:5000/api/delivery-orders').then(r => r.json()),
-                fetch('http://localhost:5000/api/customers').then(r => r.json()),
-                fetch('http://localhost:5000/api/contracts').then(r => r.json()),
-                fetch('http://localhost:5000/api/company', { headers: { 'x-user-role': userRole } }).then(r => r.json()),
-                fetch('http://localhost:5000/api/banks').then(r => r.json())
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/invoices').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/orders').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/delivery-orders').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/contracts').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/company', { headers: { 'x-user-role': userRole } }).then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/banks').then(r => r.json())
             ])
             setInvoices(invRes)
             setProjects(prjRes)
@@ -160,7 +160,7 @@ export default function InvoicesPage() {
                 signerName: form.signerName || null,
                 signerPosition: form.signerPosition || null,
             }
-            const url = editMode ? `http://localhost:5000/api/invoices/${selectedId}` : 'http://localhost:5000/api/invoices'
+            const url = editMode ? `${process.env.NEXT_PUBLIC_API_URL}/api/invoices/${selectedId}` : '${process.env.NEXT_PUBLIC_API_URL}/api/invoices'
             const method = editMode ? 'PUT' : 'POST'
             const res = await fetch(url, {
                 method,
@@ -183,7 +183,7 @@ export default function InvoicesPage() {
 
     const handleAction = async (id: string, action: 'post' | 'pay', extraData: any = {}) => {
         try {
-            const res = await fetch(`http://localhost:5000/api/invoices/${id}/${action}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/invoices/${id}/${action}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(extraData)
@@ -868,7 +868,7 @@ export default function InvoicesPage() {
                                         <Button variant="outline" className="flex-1 rounded-xl font-bold h-11" onClick={() => setShowBankForm(false)}>Batal</Button>
                                         <Button className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold h-11" onClick={async () => {
                                             if (!bankForm.bankName || !bankForm.accountNumber || !bankForm.accountHolder) return showToast('error', 'Semua field wajib diisi');
-                                            const res = await fetch('http://localhost:5000/api/banks', {
+                                            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/banks', {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify(bankForm)

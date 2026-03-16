@@ -214,9 +214,9 @@ export default function SurveysPage() {
         setLoading(true)
         try {
             const [sR, cR, pR] = await Promise.all([
-                fetch('http://localhost:5000/api/surveys'),
-                fetch('http://localhost:5000/api/customers'),
-                fetch('http://localhost:5000/api/projects')
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/surveys'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects')
             ])
             setSurveys(await sR.json())
             setCustomers(await cR.json())
@@ -229,7 +229,7 @@ export default function SurveysPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm('Hapus Field Survey ini?')) return
-        await fetch(`http://localhost:5000/api/surveys/${id}`, { method: 'DELETE' })
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/surveys/${id}`, { method: 'DELETE' })
         showToast('success', 'Survey dihapus'); load()
     }
 
@@ -427,7 +427,7 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
         if (!form.customerId || !form.location) return
         setSaving(true)
         try {
-            const url = isEdit ? `http://localhost:5000/api/surveys/${survey!.id}` : 'http://localhost:5000/api/surveys'
+            const url = isEdit ? `${process.env.NEXT_PUBLIC_API_URL}/api/surveys/${survey!.id}` : '${process.env.NEXT_PUBLIC_API_URL}/api/surveys'
             const res = await fetch(url, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },

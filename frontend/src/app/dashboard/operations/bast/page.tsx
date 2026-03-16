@@ -88,12 +88,12 @@ export default function BASTPage() {
         setLoading(true)
         try {
             const [bastRes, prjRes, soRes, woRes, custRes, coRes] = await Promise.all([
-                fetch('http://localhost:5000/api/basts').then(r => r.json()),
-                fetch('http://localhost:5000/api/projects').then(r => r.json()),
-                fetch('http://localhost:5000/api/orders').then(r => r.json()),
-                fetch('http://localhost:5000/api/work-orders').then(r => r.json()),
-                fetch('http://localhost:5000/api/customers').then(r => r.json()),
-                fetch('http://localhost:5000/api/company').then(r => r.json())
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/basts').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/orders').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/work-orders').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/company').then(r => r.json())
             ])
             setBasts(bastRes)
             setProjects(prjRes)
@@ -117,7 +117,7 @@ export default function BASTPage() {
                 salesOrderId: form.salesOrderId || null,
                 workOrderId: form.workOrderId || null,
             }
-            const url = editMode ? `http://localhost:5000/api/basts/${selectedId}` : 'http://localhost:5000/api/basts'
+            const url = editMode ? `${process.env.NEXT_PUBLIC_API_URL}/api/basts/${selectedId}` : '${process.env.NEXT_PUBLIC_API_URL}/api/basts'
             const method = editMode ? 'PUT' : 'POST'
             const res = await fetch(url, {
                 method,

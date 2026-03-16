@@ -29,7 +29,7 @@ export default function TrialBalancePage() {
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch(`http://127.0.0.1:5000/api/reports/trial-balance?date=${date}`)
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/trial-balance?date=${date}`)
             setReport(await res.json())
         } catch (e) {
             console.error(e)

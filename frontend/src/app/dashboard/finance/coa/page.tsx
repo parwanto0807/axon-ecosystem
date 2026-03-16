@@ -65,7 +65,7 @@ export default function COAPage() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('http://localhost:5000/api/coa')
+            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/coa')
             const data = await res.json()
             setAccounts(data)
         } catch (e) {
@@ -115,7 +115,7 @@ export default function COAPage() {
     const handleDelete = async (id: string) => {
         if (!confirm('Yakin ingin menghapus akun ini?')) return
         try {
-            const res = await fetch(`http://localhost:5000/api/coa/${id}`, { method: 'DELETE' })
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coa/${id}`, { method: 'DELETE' })
             if (res.ok) load()
             else {
                 const err = await res.json()
@@ -129,8 +129,8 @@ export default function COAPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         const url = editingAccount
-            ? `http://localhost:5000/api/coa/${editingAccount.id}`
-            : 'http://localhost:5000/api/coa'
+            ? `${process.env.NEXT_PUBLIC_API_URL}/api/coa/${editingAccount.id}`
+            : '${process.env.NEXT_PUBLIC_API_URL}/api/coa'
         const method = editingAccount ? 'PUT' : 'POST'
 
         try {

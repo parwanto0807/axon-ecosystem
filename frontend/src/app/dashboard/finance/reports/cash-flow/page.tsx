@@ -46,7 +46,7 @@ export default function CashFlowPage() {
         setLoading(true)
         try {
             const query = new URLSearchParams(filters).toString()
-            const res = await fetch(`http://127.0.0.1:5000/api/reports/cash-flow?${query}`)
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/cash-flow?${query}`)
             setData(await res.json())
         } catch (e) {
             console.error(e)

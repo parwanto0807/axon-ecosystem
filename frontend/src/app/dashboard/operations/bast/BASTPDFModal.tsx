@@ -50,7 +50,7 @@ export default function BASTPDFModal({ bastData, company, onClose }:
             if (company.logo) {
                 try {
                     const img = new Image(); img.crossOrigin = 'anonymous'
-                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `http://localhost:5000${company.logo}` })
+                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `${process.env.NEXT_PUBLIC_API_URL}${company.logo}` })
                     if (img.complete && img.naturalWidth > 0) {
                         const cv = document.createElement('canvas')
                         cv.width = img.naturalWidth; cv.height = img.naturalHeight
@@ -227,7 +227,7 @@ export default function BASTPDFModal({ bastData, company, onClose }:
                         {/* Company Header (Preview) */}
                         <div className="flex items-center gap-4 mb-8 border-b border-slate-50 pb-6">
                             {company.logo && (
-                                <img src={`http://localhost:5000${company.logo}`} alt="Logo" className="h-10 w-auto" />
+                                <img src={`${process.env.NEXT_PUBLIC_API_URL}${company.logo}`} alt="Logo" className="h-10 w-auto" />
                             )}
                             <div>
                                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight leading-none">{company.name}</h3>

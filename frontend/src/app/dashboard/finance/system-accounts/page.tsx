@@ -47,8 +47,8 @@ export default function SystemAccountsPage() {
         setLoading(true)
         try {
             const [saRes, coaRes] = await Promise.all([
-                fetch('http://localhost:5000/api/system-accounts'),
-                fetch('http://localhost:5000/api/coa')
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/system-accounts'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/coa')
             ])
             setAccounts(await saRes.json())
             const allCoa = await coaRes.json()
@@ -84,8 +84,8 @@ export default function SystemAccountsPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         const url = editingAccount
-            ? `http://localhost:5000/api/system-accounts/${editingAccount.id}`
-            : 'http://localhost:5000/api/system-accounts'
+            ? `${process.env.NEXT_PUBLIC_API_URL}/api/system-accounts/${editingAccount.id}`
+            : '${process.env.NEXT_PUBLIC_API_URL}/api/system-accounts'
         const method = editingAccount ? 'PUT' : 'POST'
 
         try {
@@ -106,7 +106,7 @@ export default function SystemAccountsPage() {
     const handleDelete = async (id: string) => {
         if (!confirm('Yakin ingin menghapus mapping sistem ini? Tindakan ini dapat mengganggu proses otomatis.')) return
         try {
-            const res = await fetch(`http://localhost:5000/api/system-accounts/${id}`, { method: 'DELETE' })
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/system-accounts/${id}`, { method: 'DELETE' })
             if (res.ok) load()
         } catch (e) {
             console.error(e)

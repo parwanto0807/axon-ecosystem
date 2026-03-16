@@ -26,7 +26,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 
-const API_BASE = "http://localhost:5000/api"
+const API_BASE = "${process.env.NEXT_PUBLIC_API_URL}/api"
 const MONTHS = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember"
@@ -329,7 +329,7 @@ export default function OperationalExpensesPage() {
                                                 <span className="text-xs font-black text-slate-800 uppercase">{expense.name}</span>
                                                 {expense.attachment && (
                                                     <button
-                                                        onClick={() => setSelectedImage(`http://localhost:5000${expense.attachment}`)}
+                                                        onClick={() => setSelectedImage(`${process.env.NEXT_PUBLIC_API_URL}${expense.attachment}`)}
                                                         className="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase flex items-center gap-1"
                                                     >
                                                         <div className="w-1 h-1 rounded-full bg-indigo-400" />
@@ -435,7 +435,7 @@ export default function OperationalExpensesPage() {
                                         {expense.status}
                                     </div>
                                     {expense.attachment && (
-                                        <button onClick={() => setSelectedImage(`http://localhost:5000${expense.attachment}`)} className="text-[10px] font-black text-indigo-600 uppercase flex items-center gap-1">
+                                        <button onClick={() => setSelectedImage(`${process.env.NEXT_PUBLIC_API_URL}${expense.attachment}`)} className="text-[10px] font-black text-indigo-600 uppercase flex items-center gap-1">
                                             <Image size={12} className="text-indigo-500" /> Lihat Bukti
                                         </button>
                                     )}

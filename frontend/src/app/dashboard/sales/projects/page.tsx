@@ -214,9 +214,9 @@ export default function ProjectsPage() {
         setLoading(true)
         try {
             const [pR, cR, compR] = await Promise.all([
-                fetch('http://localhost:5000/api/projects'),
-                fetch('http://localhost:5000/api/customers'),
-                fetch('http://localhost:5000/api/company')
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`)
             ])
             setProjects(await pR.json())
             setCustomers(await cR.json())
@@ -233,7 +233,7 @@ export default function ProjectsPage() {
 
     const handleStatus = async (id: string, status: string) => {
         try {
-            await fetch(`http://localhost:5000/api/projects/${id}/status`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/${id}/status`, {
                 method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status })
             })
             showToast('success', 'Status updated')
@@ -246,7 +246,7 @@ export default function ProjectsPage() {
     const handleDelete = async (id: string, name: string) => {
         if (!window.confirm(`Delete project "${name}"? This action cannot be undone.`)) return
         try {
-            const res = await fetch(`http://localhost:5000/api/projects/${id}`, { method: 'DELETE' })
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/${id}`, { method: 'DELETE' })
             if (res.ok) {
                 showToast('success', 'Project deleted successfully')
                 load()
@@ -941,8 +941,8 @@ function ProjectFormModal({ project, customers, onClose, onSuccess }: {
         setSaving(true)
         try {
             const url = isEdit
-                ? `http://localhost:5000/api/projects/${project!.id}`
-                : 'http://localhost:5000/api/projects'
+                ? `${process.env.NEXT_PUBLIC_API_URL}/api/projects/${project!.id}`
+                : '${process.env.NEXT_PUBLIC_API_URL}/api/projects'
             const res = await fetch(url, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },

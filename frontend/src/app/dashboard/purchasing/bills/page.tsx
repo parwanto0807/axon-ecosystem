@@ -31,7 +31,7 @@ export default function VendorBillsPage() {
     const fetchInvoices = async () => {
         setLoading(true)
         try {
-            const res = await fetch('http://localhost:5000/api/purchase-invoices')
+            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/purchase-invoices')
             const data = await res.json()
             setInvoices(Array.isArray(data) ? data : [])
         } catch (e) {
@@ -50,7 +50,7 @@ export default function VendorBillsPage() {
 
         setPostingId(id)
         try {
-            const res = await fetch(`http://localhost:5000/api/purchase-invoices/${id}/post`, { method: 'PATCH' })
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-invoices/${id}/post`, { method: 'PATCH' })
             if (!res.ok) throw new Error('Failed to post invoice')
             fetchInvoices()
         } catch (e) {

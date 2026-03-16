@@ -37,9 +37,9 @@ export default function NewPurchaseOrderPage() {
         const fetchData = async () => {
             try {
                 const [venRes, skuRes, woRes] = await Promise.all([
-                    fetch('http://localhost:5000/api/vendors'),
-                    fetch('http://localhost:5000/api/product-skus'),
-                    fetch('http://localhost:5000/api/work-orders')
+                    fetch('${process.env.NEXT_PUBLIC_API_URL}/api/vendors'),
+                    fetch('${process.env.NEXT_PUBLIC_API_URL}/api/product-skus'),
+                    fetch('${process.env.NEXT_PUBLIC_API_URL}/api/work-orders')
                 ])
                 const venData = await venRes.json()
                 const skuData = await skuRes.json()
@@ -127,7 +127,7 @@ export default function NewPurchaseOrderPage() {
                 }))
             }
 
-            const res = await fetch('http://localhost:5000/api/purchase-orders', {
+            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

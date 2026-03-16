@@ -81,12 +81,12 @@ export default function SalesOrdersPage() {
         setLoading(true)
         try {
             const [oR, cR, pR, coR, qR, prR] = await Promise.all([
-                fetch('http://localhost:5000/api/orders'),
-                fetch('http://localhost:5000/api/customers'),
-                fetch('http://localhost:5000/api/products'),
-                fetch('http://localhost:5000/api/company'),
-                fetch('http://localhost:5000/api/quotations'),
-                fetch('http://localhost:5000/api/projects'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/orders'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/products'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/company'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/quotations'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects'),
             ])
             setOrders(await oR.json())
             setCustomers(await cR.json())
@@ -102,12 +102,12 @@ export default function SalesOrdersPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm('Delete this Sales Order?')) return
-        await fetch(`http://localhost:5000/api/orders/${id}`, { method: 'DELETE' })
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders/${id}`, { method: 'DELETE' })
         showToast('success', 'Sales Order deleted'); load()
     }
 
     const handleStatus = async (id: string, status: string) => {
-        await fetch(`http://localhost:5000/api/orders/${id}/status`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders/${id}/status`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status })
         })
         load()
@@ -281,9 +281,9 @@ export default function SalesOrdersPage() {
                                                 className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
                                                 <td className="px-6 py-4">
                                                     {o.poProof ? (
-                                                        <button onClick={() => setPreviewImage(`http://localhost:5000${o.poProof}`)}
+                                                        <button onClick={() => setPreviewImage(`${process.env.NEXT_PUBLIC_API_URL}${o.poProof}`)}
                                                             className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shadow-sm hover:shadow-md hover:scale-105 transition-all duration-300 active:scale-95 group/thumb">
-                                                            <img src={`http://localhost:5000${o.poProof}`} alt="PO Proof" className="w-full h-full object-cover grayscale group-hover/thumb:grayscale-0 transition-all" />
+                                                            <img src={`${process.env.NEXT_PUBLIC_API_URL}${o.poProof}`} alt="PO Proof" className="w-full h-full object-cover grayscale group-hover/thumb:grayscale-0 transition-all" />
                                                         </button>
                                                     ) : (
                                                         <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
@@ -304,7 +304,7 @@ export default function SalesOrdersPage() {
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">PO: {o.poNumber || '-'}</p>
                                                         {o.poProof && (
-                                                            <button onClick={() => setPreviewImage(`http://localhost:5000${o.poProof}`)}
+                                                            <button onClick={() => setPreviewImage(`${process.env.NEXT_PUBLIC_API_URL}${o.poProof}`)}
                                                                 className="flex items-center gap-1 text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded hover:bg-indigo-100 transition-colors">
                                                                 <ImageIcon size={8} /> Preview
                                                             </button>
@@ -378,7 +378,7 @@ export default function SalesOrdersPage() {
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{o.number}</p>
                                                     {o.poProof && (
-                                                        <button onClick={() => setPreviewImage(`http://localhost:5000${o.poProof}`)}
+                                                        <button onClick={() => setPreviewImage(`${process.env.NEXT_PUBLIC_API_URL}${o.poProof}`)}
                                                             className="text-indigo-500 hover:text-indigo-700">
                                                             <ImageIcon size={12} />
                                                         </button>
@@ -530,7 +530,7 @@ function OrderFormModal({ order, customers, products, quotations, projects, onCl
         e.preventDefault(); setSaving(true)
         try {
             const body = { ...form, items, subtotal, discountAmt, taxAmt, grandTotal }
-            const url = isEdit ? `http://localhost:5000/api/orders/${order!.id}` : 'http://localhost:5000/api/orders'
+            const url = isEdit ? `${process.env.NEXT_PUBLIC_API_URL}/api/orders/${order!.id}` : '${process.env.NEXT_PUBLIC_API_URL}/api/orders'
             const res = await fetch(url, { method: isEdit ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
             if (res.ok) { onSuccess() } else { const e = await res.json(); alert(e.message) }
         } finally { setSaving(false) }
@@ -596,9 +596,9 @@ function OrderFormModal({ order, customers, products, quotations, projects, onCl
                             <label className={lc}>Upload Bukti PO</label>
                             <div className="flex items-center gap-3 p-2.5 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50">
                                 {form.poProof ? (
-                                    <button type="button" onClick={() => onPreview(`http://localhost:5000${form.poProof}`)}
+                                    <button type="button" onClick={() => onPreview(`${process.env.NEXT_PUBLIC_API_URL}${form.poProof}`)}
                                         className="w-12 h-12 rounded-lg bg-indigo-600 overflow-hidden shadow-lg shadow-indigo-600/20 active:scale-95 transition-transform">
-                                        <img src={`http://localhost:5000${form.poProof}`} alt="PO Proof" className="w-full h-full object-cover" />
+                                        <img src={`${process.env.NEXT_PUBLIC_API_URL}${form.poProof}`} alt="PO Proof" className="w-full h-full object-cover" />
                                     </button>
                                 ) : (
                                     <div className="w-12 h-12 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-300">
@@ -618,7 +618,7 @@ function OrderFormModal({ order, customers, products, quotations, projects, onCl
                                         const formData = new FormData()
                                         formData.append('file', file)
                                         try {
-                                            const res = await fetch('http://localhost:5000/api/orders/upload', { method: 'POST', body: formData })
+                                            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/orders/upload', { method: 'POST', body: formData })
                                             if (res.ok) {
                                                 const { url } = await res.json()
                                                 setForm({ ...form, poProof: url })

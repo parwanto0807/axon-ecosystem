@@ -76,12 +76,12 @@ export default function DeliveryOrdersPage() {
         setLoading(true)
         try {
             const [doRes, prjRes, soRes, woRes, custRes, coRes] = await Promise.all([
-                fetch('http://localhost:5000/api/delivery-orders').then(r => r.json()),
-                fetch('http://localhost:5000/api/projects').then(r => r.json()),
-                fetch('http://localhost:5000/api/orders').then(r => r.json()),
-                fetch('http://localhost:5000/api/work-orders').then(r => r.json()),
-                fetch('http://localhost:5000/api/customers').then(r => r.json()),
-                fetch('http://localhost:5000/api/company').then(r => r.json())
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/delivery-orders').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/orders').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/work-orders').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers').then(r => r.json()),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/company').then(r => r.json())
             ])
             setDos(doRes)
             setProjects(prjRes)
@@ -105,7 +105,7 @@ export default function DeliveryOrdersPage() {
                 salesOrderId: form.salesOrderId || null,
                 workOrderId: form.workOrderId || null,
             }
-            const url = editMode ? `http://localhost:5000/api/delivery-orders/${selectedId}` : 'http://localhost:5000/api/delivery-orders'
+            const url = editMode ? `${process.env.NEXT_PUBLIC_API_URL}/api/delivery-orders/${selectedId}` : '${process.env.NEXT_PUBLIC_API_URL}/api/delivery-orders'
             const method = editMode ? 'PUT' : 'POST'
             const res = await fetch(url, {
                 method,

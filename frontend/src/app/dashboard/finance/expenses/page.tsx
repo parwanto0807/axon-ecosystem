@@ -115,8 +115,8 @@ export default function ExpenseReportsPage() {
         setLoading(true)
         try {
             const [expRes, coaRes] = await Promise.all([
-                fetch('http://localhost:5000/api/expenses'),
-                fetch('http://localhost:5000/api/coa')
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/expenses'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/coa')
             ])
 
             if (expRes.ok) {
@@ -202,7 +202,7 @@ export default function ExpenseReportsPage() {
             if (form.parentExpenseId) formData.append('parentExpenseId', form.parentExpenseId)
             if (file) formData.append('receipt', file)
 
-            const res = await fetch('http://localhost:5000/api/expenses', {
+            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/expenses', {
                 method: 'POST',
                 body: formData
             })
@@ -223,7 +223,7 @@ export default function ExpenseReportsPage() {
 
     const handleStatusUpdate = async (id: string, status: 'APPROVED' | 'REJECTED') => {
         try {
-            const res = await fetch(`http://localhost:5000/api/expenses/${id}/status`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/expenses/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status, approvedBy: 'Finance Admin' })
@@ -240,7 +240,7 @@ export default function ExpenseReportsPage() {
     const handlePost = async () => {
         if (!postingExpense) return;
         try {
-            const res = await fetch(`http://localhost:5000/api/expenses/${postingExpense.id}/post`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/expenses/${postingExpense.id}/post`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sourceAccountId: selectedAccount })
@@ -381,7 +381,7 @@ export default function ExpenseReportsPage() {
                                             <td className="px-6 py-5 text-right">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0">
                                                     {e.receiptImage && (
-                                                        <Button size="icon" variant="outline" onClick={() => setPreviewImg(`http://localhost:5000${e.receiptImage}`)} className="w-8 h-8 rounded-lg border-slate-200 text-slate-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all">
+                                                        <Button size="icon" variant="outline" onClick={() => setPreviewImg(`${process.env.NEXT_PUBLIC_API_URL}${e.receiptImage}`)} className="w-8 h-8 rounded-lg border-slate-200 text-slate-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all">
                                                             <ImageIcon size={14} />
                                                         </Button>
                                                     )}
@@ -444,7 +444,7 @@ export default function ExpenseReportsPage() {
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex items-center justify-end gap-2">
                                                             {c.receiptImage && (
-                                                                <Button size="icon" variant="outline" onClick={() => setPreviewImg(`http://localhost:5000${c.receiptImage}`)} className="w-7 h-7 rounded-md border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-200">
+                                                                <Button size="icon" variant="outline" onClick={() => setPreviewImg(`${process.env.NEXT_PUBLIC_API_URL}${c.receiptImage}`)} className="w-7 h-7 rounded-md border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-200">
                                                                     <ImageIcon size={12} />
                                                                 </Button>
                                                             )}
@@ -520,7 +520,7 @@ export default function ExpenseReportsPage() {
                                 </span>
                                 <div className="flex items-center gap-2">
                                     {e.receiptImage && (
-                                        <Button size="icon" variant="outline" onClick={() => setPreviewImg(`http://localhost:5000${e.receiptImage}`)} className="w-8 h-8 rounded-lg border-slate-200 text-slate-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all">
+                                        <Button size="icon" variant="outline" onClick={() => setPreviewImg(`${process.env.NEXT_PUBLIC_API_URL}${e.receiptImage}`)} className="w-8 h-8 rounded-lg border-slate-200 text-slate-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 transition-all">
                                             <ImageIcon size={14} />
                                         </Button>
                                     )}
@@ -586,7 +586,7 @@ export default function ExpenseReportsPage() {
                                                         </span>
                                                         <div className="flex gap-2">
                                                             {c.receiptImage && (
-                                                                <Button size="icon" variant="outline" onClick={() => setPreviewImg(`http://localhost:5000${c.receiptImage}`)} className="w-7 h-7 rounded-md border-slate-200 text-slate-500">
+                                                                <Button size="icon" variant="outline" onClick={() => setPreviewImg(`${process.env.NEXT_PUBLIC_API_URL}${c.receiptImage}`)} className="w-7 h-7 rounded-md border-slate-200 text-slate-500">
                                                                     <ImageIcon size={12} />
                                                                 </Button>
                                                             )}

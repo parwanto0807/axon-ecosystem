@@ -65,9 +65,9 @@ export default function NewContractPage() {
         const fetchRefs = async () => {
             try {
                 const [p, c, v] = await Promise.all([
-                    fetch('http://127.0.0.1:5000/api/projects').then(r => r.json()),
-                    fetch('http://127.0.0.1:5000/api/customers').then(r => r.json()),
-                    fetch('http://127.0.0.1:5000/api/vendors').then(r => r.json())
+                    fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects').then(r => r.json()),
+                    fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers').then(r => r.json()),
+                    fetch('${process.env.NEXT_PUBLIC_API_URL}/api/vendors').then(r => r.json())
                 ])
                 setProjects(p)
                 setCustomers(c)
@@ -168,7 +168,7 @@ export default function NewContractPage() {
                 vendorId: formData.vendorId || null,
             }
 
-            const res = await fetch('http://127.0.0.1:5000/api/contracts', {
+            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/contracts', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)

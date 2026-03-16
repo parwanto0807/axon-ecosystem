@@ -81,8 +81,8 @@ export default function ApprovalsPage() {
         setLoading(true)
         try {
             const [expRes, coaRes] = await Promise.all([
-                fetch('http://localhost:5000/api/expenses'),
-                fetch('http://localhost:5000/api/coa')
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/expenses'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/coa')
             ])
 
             if (expRes.ok) setExpenses(await expRes.json())
@@ -106,7 +106,7 @@ export default function ApprovalsPage() {
     const handlePost = async () => {
         if (!postingExpense) return;
         try {
-            const res = await fetch(`http://localhost:5000/api/expenses/${postingExpense.id}/post`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/expenses/${postingExpense.id}/post`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sourceAccountId: selectedAccount })
@@ -125,7 +125,7 @@ export default function ApprovalsPage() {
 
     const handleStatus = async (id: string, status: string) => {
         try {
-            const res = await fetch(`http://localhost:5000/api/expenses/${id}/status`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/expenses/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status, approvedBy: 'Finance Dept' })

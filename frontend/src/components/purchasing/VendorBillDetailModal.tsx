@@ -149,7 +149,7 @@ export default function VendorBillDetailModal({ invoice, isOpen, onClose }: Vend
                                         </div>
                                         {invoice.receiptImage && (
                                             <button
-                                                onClick={() => window.open(`http://localhost:5000${invoice.receiptImage}`, '_blank')}
+                                                onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}${invoice.receiptImage}`, '_blank')}
                                                 className="p-2 hover:bg-slate-50 rounded-xl transition-all text-slate-400 hover:text-rose-600"
                                             >
                                                 <ExternalLink size={16} />
@@ -159,7 +159,7 @@ export default function VendorBillDetailModal({ invoice, isOpen, onClose }: Vend
                                     <div className="aspect-[3/4] rounded-[2.5rem] bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden group/receipt">
                                         {invoice.receiptImage ? (
                                             <img
-                                                src={`http://localhost:5000${invoice.receiptImage}`}
+                                                src={`${process.env.NEXT_PUBLIC_API_URL}${invoice.receiptImage}`}
                                                 alt="Receipt"
                                                 className="w-full h-full object-cover transition-transform duration-700 group-hover/receipt:scale-110"
                                             />

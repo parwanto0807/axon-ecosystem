@@ -68,10 +68,10 @@ export default function ProposalsPage() {
         setLoading(true)
         try {
             const [propRes, custRes, projRes, compRes] = await Promise.all([
-                fetch('http://localhost:5000/api/proposals'),
-                fetch('http://localhost:5000/api/customers'),
-                fetch('http://localhost:5000/api/projects'),
-                fetch('http://localhost:5000/api/company')
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/proposals'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/customers'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/projects'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/company')
             ])
             setProposals(await propRes.json())
             setCustomers(await custRes.json())
@@ -90,7 +90,7 @@ export default function ProposalsPage() {
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this proposal?')) return
         try {
-            const res = await fetch(`http://localhost:5000/api/proposals/${id}`, { method: 'DELETE' })
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/proposals/${id}`, { method: 'DELETE' })
             if (res.ok) {
                 showToast('success', 'Proposal deleted')
                 loadData()
@@ -270,7 +270,7 @@ function ProposalFormModal({ proposal, customers, projects, onClose, onSuccess }
         e.preventDefault()
         setLoading(true)
         try {
-            const url = isEdit ? `http://localhost:5000/api/proposals/${proposal!.id}` : 'http://localhost:5000/api/proposals'
+            const url = isEdit ? `${process.env.NEXT_PUBLIC_API_URL}/api/proposals/${proposal!.id}` : '${process.env.NEXT_PUBLIC_API_URL}/api/proposals'
             const res = await fetch(url, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -536,7 +536,7 @@ function ProposalPreviewModal({ proposal, company, onClose }: { proposal: Propos
             if (comp.logo) {
                 try {
                     const img = new Image(); img.crossOrigin = 'anonymous'
-                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `http://localhost:5000${comp.logo}` })
+                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `${process.env.NEXT_PUBLIC_API_URL}${comp.logo}` })
                     if (img.complete && img.naturalWidth > 0) {
                         const cv = document.createElement('canvas')
                         cv.width = img.naturalWidth; cv.height = img.naturalHeight
@@ -730,7 +730,7 @@ function ProposalPreviewModal({ proposal, company, onClose }: { proposal: Propos
                         {/* Professional Header - Quotation Style */}
                         <div className="flex justify-between items-start border-b-[3px] border-indigo-600 pb-6 mb-0">
                             <div className="flex gap-6 items-start">
-                                {comp.logo && <img src={`http://localhost:5000${comp.logo}`} alt="logo" className="h-16 w-auto object-contain" />}
+                                {comp.logo && <img src={`${process.env.NEXT_PUBLIC_API_URL}${comp.logo}`} alt="logo" className="h-16 w-auto object-contain" />}
                                 <div>
                                     <div className="font-black text-xl text-slate-900 mb-1 tracking-tight uppercase">{comp.name || 'PT. Axon Ecosystem'}</div>
                                     <div className="text-[10px] text-slate-500 max-w-[300px] leading-relaxed">

@@ -88,12 +88,12 @@ export default function CompanySettingsPage() {
     const fetchProfile = async () => {
         if (!userRole) return
         try {
-            const res = await fetch('http://localhost:5000/api/company', {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`, {
                 headers: { 'x-user-role': userRole }
             })
             const data = await res.json()
             setForm(data)
-            if (data.logo) setLogoPreview(`http://localhost:5000${data.logo}`)
+            if (data.logo) setLogoPreview(`${process.env.NEXT_PUBLIC_API_URL}${data.logo}`)
         } catch { showToast('error', 'Failed to load company profile') }
         finally { setLoading(false) }
     }
@@ -123,7 +123,7 @@ export default function CompanySettingsPage() {
             })
             if (logoFile) payload.append('logo', logoFile)
 
-            const res = await fetch('http://localhost:5000/api/company', { 
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`, { 
                 method: 'PUT', 
                 headers: { 'x-user-role': userRole },
                 body: payload 
@@ -131,7 +131,7 @@ export default function CompanySettingsPage() {
             if (res.ok) {
                 const updated = await res.json()
                 setForm(updated)
-                if (updated.logo) setLogoPreview(`http://localhost:5000${updated.logo}`)
+                if (updated.logo) setLogoPreview(`${process.env.NEXT_PUBLIC_API_URL}${updated.logo}`)
                 setLogoFile(null)
                 showToast('success', 'Company profile saved successfully')
             } else {

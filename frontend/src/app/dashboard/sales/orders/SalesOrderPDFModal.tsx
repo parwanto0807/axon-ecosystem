@@ -52,7 +52,7 @@ export default function SalesOrderPDFModal({ order, company, onClose }:
             if (company.logo) {
                 try {
                     const img = new Image(); img.crossOrigin = 'anonymous'
-                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `http://localhost:5000${company.logo}` })
+                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `${process.env.NEXT_PUBLIC_API_URL}${company.logo}` })
                     if (img.complete && img.naturalWidth > 0) {
                         const cv = document.createElement('canvas')
                         cv.width = img.naturalWidth; cv.height = img.naturalHeight
@@ -214,7 +214,7 @@ export default function SalesOrderPDFModal({ order, company, onClose }:
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #4f46e5', paddingBottom: 18, marginBottom: 0 }}>
                             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                                {company.logo && <img src={`http://localhost:5000${company.logo}`} alt="logo" style={{ height: 60, width: 'auto', objectFit: 'contain' }} />}
+                                {company.logo && <img src={`${process.env.NEXT_PUBLIC_API_URL}${company.logo}`} alt="logo" style={{ height: 60, width: 'auto', objectFit: 'contain' }} />}
                                 <div>
                                     <div style={{ fontWeight: 900, fontSize: 17, color: '#0f172a', marginBottom: 3, letterSpacing: 0.3 }}>{company.name || 'PT. Axon Ecosystem'}</div>
                                     <div style={{ fontSize: 9, color: '#64748b', marginTop: 3, lineHeight: 1.5 }}>

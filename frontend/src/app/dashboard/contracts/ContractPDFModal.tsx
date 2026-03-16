@@ -70,7 +70,7 @@ export default function ContractPDFModal({ contract, company, onClose }: { contr
             if (company.logo) {
                 try {
                     const img = new Image(); img.crossOrigin = 'anonymous'
-                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `http://localhost:5000${company.logo}` })
+                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `${process.env.NEXT_PUBLIC_API_URL}${company.logo}` })
                     if (img.complete && img.naturalWidth > 0) {
                         const cv = document.createElement('canvas')
                         cv.width = img.naturalWidth; cv.height = img.naturalHeight
@@ -206,7 +206,7 @@ export default function ContractPDFModal({ contract, company, onClose }: { contr
                         {/* Letterhead */}
                         <div className="flex justify-between items-start border-b-[3px] border-indigo-600 pb-6 mb-10">
                             <div className="flex gap-6 items-start">
-                                {company.logo && <img src={`http://localhost:5000${company.logo}`} className="h-20 w-auto object-contain" alt="logo" />}
+                                {company.logo && <img src={`${process.env.NEXT_PUBLIC_API_URL}${company.logo}`} className="h-20 w-auto object-contain" alt="logo" />}
                                 <div>
                                     <div className="font-black text-2xl text-slate-900 tracking-tight leading-none mb-2">{company.name || "PT. Axon Ecosystem"}</div>
                                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">

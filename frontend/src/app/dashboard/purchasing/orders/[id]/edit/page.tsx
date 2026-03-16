@@ -41,10 +41,10 @@ export default function EditPurchaseOrderPage() {
         const fetchData = async () => {
             try {
                 const [venRes, skuRes, poRes, woRes] = await Promise.all([
-                    fetch('http://localhost:5000/api/vendors'),
-                    fetch('http://localhost:5000/api/product-skus'),
-                    fetch(`http://localhost:5000/api/purchase-orders/${id}`),
-                    fetch('http://localhost:5000/api/work-orders')
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`),
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/product-skus`),
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${id}`),
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders`)
                 ])
                 const venData = await venRes.json()
                 const skuData = await skuRes.json()
@@ -168,7 +168,7 @@ export default function EditPurchaseOrderPage() {
                 }))
             }
 
-            const res = await fetch(`http://localhost:5000/api/purchase-orders/${id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -186,7 +186,7 @@ export default function EditPurchaseOrderPage() {
 
     const handleCreateExpense = async (amount: number, description: string, category: string) => {
         try {
-            const res = await fetch(`http://localhost:5000/api/purchase-orders/${id}/expenses`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${id}/expenses`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 

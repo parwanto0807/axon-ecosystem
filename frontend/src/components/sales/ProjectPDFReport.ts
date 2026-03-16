@@ -34,7 +34,7 @@ export const generateProjectPDF = async (project: any, stats: any, company: any,
     if (company?.logo) {
         try {
             const img = new Image(); img.crossOrigin = 'anonymous'
-            await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `http://localhost:5000${company.logo}` })
+            await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `${process.env.NEXT_PUBLIC_API_URL}${company.logo}` })
             if (img.complete && img.naturalWidth > 0) {
                 const cv = document.createElement('canvas')
                 cv.width = img.naturalWidth; cv.height = img.naturalHeight

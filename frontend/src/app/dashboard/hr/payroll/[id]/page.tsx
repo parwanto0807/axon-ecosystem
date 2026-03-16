@@ -22,7 +22,7 @@ import {
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 
-const API_BASE = "http://localhost:5000/api"
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api`
 
 const MONTHS = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",

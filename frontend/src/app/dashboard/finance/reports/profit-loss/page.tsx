@@ -54,7 +54,7 @@ export default function ProfitLossPage() {
         setLoading(true)
         try {
             const query = new URLSearchParams(filters).toString()
-            const res = await fetch(`http://127.0.0.1:5000/api/reports/profit-loss?${query}`)
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/profit-loss?${query}`)
             setData(await res.json())
         } catch (e) {
             console.error(e)

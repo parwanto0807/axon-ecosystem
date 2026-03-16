@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 import { useSession } from "next-auth/react"
 
-const API_BASE = "http://localhost:5000/api"
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api`
 
 const ROLES = ["SUPER_ADMIN", "ADMIN", "MANAGER", "STAFF", "OPERATIONAL"]
 const DEPARTMENTS = ["SALES", "LOGISTIC", "FINANCE", "HR", "NONE"]

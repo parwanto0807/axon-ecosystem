@@ -58,7 +58,7 @@ export default function EditVendorBillModal({ invoice, isOpen, onClose, onSucces
 
     const fetchVendors = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/vendors')
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`)
             const data = await res.json()
             setVendors(Array.isArray(data) ? data : [])
         } catch (e) {
@@ -129,7 +129,7 @@ export default function EditVendorBillModal({ invoice, isOpen, onClose, onSucces
                 }))
             }
 
-            const res = await fetch(`http://localhost:5000/api/purchase-invoices/${invoice.id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-invoices/${invoice.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -349,7 +349,7 @@ export default function EditVendorBillModal({ invoice, isOpen, onClose, onSucces
                                                         const formData = new FormData()
                                                         formData.append('file', file)
                                                         try {
-                                                            const res = await fetch('http://localhost:5000/api/upload', {
+                                                            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, {
                                                                 method: 'POST',
                                                                 body: formData
                                                             })
@@ -369,7 +369,7 @@ export default function EditVendorBillModal({ invoice, isOpen, onClose, onSucces
                                             >
                                                 {billData.receiptImage ? (
                                                     <div className="relative w-full h-full">
-                                                        <img src={`http://localhost:5000${billData.receiptImage}`} alt="Receipt" className="w-full h-full object-cover rounded-2xl" />
+                                                        <img src={`${process.env.NEXT_PUBLIC_API_URL}${billData.receiptImage}`} alt="Receipt" className="w-full h-full object-cover rounded-2xl" />
                                                         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
                                                             <span className="text-white text-[10px] font-black uppercase tracking-widest bg-rose-600 px-3 py-1 rounded-lg shadow-lg">Ganti Foto</span>
                                                         </div>

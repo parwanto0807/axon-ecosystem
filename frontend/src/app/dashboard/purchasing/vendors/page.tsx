@@ -34,7 +34,7 @@ export default function VendorsPage() {
     const fetchVendors = async () => {
         setLoading(true)
         try {
-            const res = await fetch('http://localhost:5000/api/vendors')
+            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/vendors')
             const data = await res.json()
             setVendors(Array.isArray(data) ? data : [])
         } catch (e) {
@@ -66,8 +66,8 @@ export default function VendorsPage() {
         setError(null)
         try {
             const url = editingId
-                ? `http://localhost:5000/api/vendors/${editingId}`
-                : 'http://localhost:5000/api/vendors'
+                ? `${process.env.NEXT_PUBLIC_API_URL}/api/vendors/${editingId}`
+                : '${process.env.NEXT_PUBLIC_API_URL}/api/vendors'
 
             const method = editingId ? 'PUT' : 'POST'
 
@@ -91,7 +91,7 @@ export default function VendorsPage() {
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this vendor?')) return
         try {
-            await fetch(`http://localhost:5000/api/vendors/${id}`, { method: 'DELETE' })
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors/${id}`, { method: 'DELETE' })
             fetchVendors()
         } catch (e) {
             console.error(e)

@@ -47,7 +47,7 @@ export default function ReportsPage() {
     const fetchReports = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('http://localhost:5000/api/reports')
+            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/reports')
             if (res.ok) {
                 const data = await res.json()
                 setReports(data)
@@ -206,11 +206,11 @@ export default function ReportsPage() {
                                             {report.photos.map((photo) => (
                                                 <button
                                                     key={photo.id}
-                                                    onClick={() => setSelectedPhoto(`http://localhost:5000${photo.url}`)}
+                                                    onClick={() => setSelectedPhoto(`${process.env.NEXT_PUBLIC_API_URL}${photo.url}`)}
                                                     className="aspect-square rounded-xl overflow-hidden border border-slate-200 hover:border-indigo-400 transition-all shadow-sm group/photo"
                                                 >
                                                     <img
-                                                        src={`http://localhost:5000${photo.url}`}
+                                                        src={`${process.env.NEXT_PUBLIC_API_URL}${photo.url}`}
                                                         alt="Progress"
                                                         className="w-full h-full object-cover group-hover/photo:scale-110 transition-transform duration-500"
                                                     />

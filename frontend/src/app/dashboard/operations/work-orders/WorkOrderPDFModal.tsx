@@ -59,7 +59,7 @@ export default function WorkOrderPDFModal({ workOrder, company, onClose }:
             if (company.logo) {
                 try {
                     const img = new Image(); img.crossOrigin = 'anonymous'
-                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `http://localhost:5000${company.logo}` })
+                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `${process.env.NEXT_PUBLIC_API_URL}${company.logo}` })
                     if (img.complete && img.naturalWidth > 0) {
                         const cv = document.createElement('canvas')
                         cv.width = img.naturalWidth; cv.height = img.naturalHeight
@@ -261,7 +261,7 @@ export default function WorkOrderPDFModal({ workOrder, company, onClose }:
                         {/* Header */}
                         <div className="flex justify-between items-start border-b-[3px] border-amber-600 pb-4 mb-5">
                             <div className="flex gap-4 items-start">
-                                {company.logo && <img src={`http://localhost:5000${company.logo}`} alt="logo" className="h-16 w-auto object-contain" />}
+                                {company.logo && <img src={`${process.env.NEXT_PUBLIC_API_URL}${company.logo}`} alt="logo" className="h-16 w-auto object-contain" />}
                                 <div>
                                     <p className="font-extrabold text-slate-900 text-lg tracking-wide">{company.name || 'PT. Axon Ecosystem'}</p>
                                     <div className="text-[10px] text-slate-500 mt-1 leading-relaxed">

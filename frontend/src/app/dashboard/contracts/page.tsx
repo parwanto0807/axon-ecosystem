@@ -79,8 +79,8 @@ export default function ContractListPage() {
         setLoading(true)
         try {
             const [cRes, sRes] = await Promise.all([
-                fetch('http://localhost:5000/api/contracts'),
-                fetch('http://localhost:5000/api/company')
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/contracts'),
+                fetch('${process.env.NEXT_PUBLIC_API_URL}/api/company')
             ])
             if (cRes.ok) setContracts(await cRes.json())
             if (sRes.ok) setCompany(await sRes.json())
@@ -114,7 +114,7 @@ export default function ContractListPage() {
 
     const handleStatusChange = async (id: string, newStatus: string) => {
         try {
-            const res = await fetch(`http://localhost:5000/api/contracts/${id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
@@ -139,7 +139,7 @@ export default function ContractListPage() {
         if (!confirm("Buat penagihan/biaya untuk bulan ini?")) return
         setLoading(true)
         try {
-            const res = await fetch(`http://localhost:5000/api/contracts/${id}/generate-bill`, { method: 'POST' })
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/${id}/generate-bill`, { method: 'POST' })
             if (res.ok) {
                 alert("Penagihan berhasil dibuat sebagai DRAFT")
                 loadData()

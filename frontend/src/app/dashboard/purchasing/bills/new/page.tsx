@@ -36,8 +36,8 @@ function NewVendorBillForm() {
         const fetchData = async () => {
             try {
                 const [venRes, poRes] = await Promise.all([
-                    fetch('http://localhost:5000/api/vendors'),
-                    fetch('http://localhost:5000/api/purchase-orders')
+                    fetch('${process.env.NEXT_PUBLIC_API_URL}/api/vendors'),
+                    fetch('${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders')
                 ])
                 const venData = await venRes.json()
                 const poData = await poRes.json()
@@ -69,7 +69,7 @@ function NewVendorBillForm() {
                 }))
 
                 // 2. Fetch specific received items from backend
-                const res = await fetch(`http://localhost:5000/api/purchase-orders/${billData.purchaseOrderId}/receivable-items`)
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${billData.purchaseOrderId}/receivable-items`)
                 const receivableItems = await res.json()
 
                 if (Array.isArray(receivableItems) && receivableItems.length > 0) {
@@ -163,7 +163,7 @@ function NewVendorBillForm() {
                 }))
             }
 
-            const res = await fetch('http://localhost:5000/api/purchase-invoices', {
+            const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/purchase-invoices', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -399,7 +399,7 @@ function NewVendorBillForm() {
                                             const formData = new FormData()
                                             formData.append('file', file)
                                             try {
-                                                const res = await fetch('http://localhost:5000/api/upload', {
+                                                const res = await fetch('${process.env.NEXT_PUBLIC_API_URL}/api/upload', {
                                                     method: 'POST',
                                                     body: formData
                                                 })
@@ -419,7 +419,7 @@ function NewVendorBillForm() {
                                 >
                                     {billData.receiptImage ? (
                                         <div className="relative w-full h-full">
-                                            <img src={`http://localhost:5000${billData.receiptImage}`} alt="Receipt" className="w-full h-full object-cover rounded-lg" />
+                                            <img src={`${process.env.NEXT_PUBLIC_API_URL}${billData.receiptImage}`} alt="Receipt" className="w-full h-full object-cover rounded-lg" />
                                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-lg">
                                                 <span className="text-white text-xs font-bold">Ganti Foto</span>
                                             </div>

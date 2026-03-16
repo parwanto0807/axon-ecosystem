@@ -178,13 +178,13 @@ export default function WorkOrdersPage() {
             if (filterType) params.set('type', filterType)
 
             const endpoints = [
-                { name: 'work-orders', url: `http://localhost:5000/api/work-orders?${params}` },
-                { name: 'projects', url: 'http://localhost:5000/api/projects' },
-                { name: 'orders', url: 'http://localhost:5000/api/orders' },
-                { name: 'customers', url: 'http://localhost:5000/api/customers' },
-                { name: 'stock', url: 'http://localhost:5000/api/inventory/stock' },
-                { name: 'warehouses', url: 'http://localhost:5000/api/warehouses' },
-                { name: 'company', url: 'http://localhost:5000/api/settings/company' }
+                { name: 'work-orders', url: `${process.env.NEXT_PUBLIC_API_URL}/api/work-orders?${params}` },
+                { name: 'projects', url: `${process.env.NEXT_PUBLIC_API_URL}/api/projects` },
+                { name: 'orders', url: `${process.env.NEXT_PUBLIC_API_URL}/api/orders` },
+                { name: 'customers', url: `${process.env.NEXT_PUBLIC_API_URL}/api/customers` },
+                { name: 'stock', url: `${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock` },
+                { name: 'warehouses', url: `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses` },
+                { name: 'company', url: `${process.env.NEXT_PUBLIC_API_URL}/api/settings/company` }
             ]
 
             const results = await Promise.all(
@@ -256,7 +256,7 @@ export default function WorkOrdersPage() {
     const openDetail = async (wo: WO) => {
         setLoading(true)
         try {
-            const res = await fetch(`http://localhost:5000/api/work-orders/${wo.id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders/${wo.id}`, {
                 headers: { 'x-user-role': userRole }
             })
             if (res.ok) {
@@ -288,7 +288,7 @@ export default function WorkOrdersPage() {
                 items: items.map(i => ({ ...i, totalCost: i.qty * i.unitCost })),
                 tasks: tasks.map(t => ({ ...t }))
             }
-            const url = editing ? `http://localhost:5000/api/work-orders/${editing.id}` : 'http://localhost:5000/api/work-orders'
+            const url = editing ? `${process.env.NEXT_PUBLIC_API_URL}/api/work-orders/${editing.id}` : `${process.env.NEXT_PUBLIC_API_URL}/api/work-orders`
             const res = await fetch(url, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json', 'x-user-role': userRole }, body: JSON.stringify(payload) })
             if (res.ok) { setModalOpen(false); showToast('success', editing ? 'Work Order diperbarui' : 'Work Order dibuat'); load() }
             else { const d = await res.json(); showToast('error', d.message) }
@@ -299,7 +299,7 @@ export default function WorkOrdersPage() {
         if (!releaseWarehouse) return showToast('error', 'Pilih gudang asal material')
         setReleasing(true)
         try {
-            const r = await fetch(`http://localhost:5000/api/work-orders/${woId}/release-materials`, {
+            const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders/${woId}/release-materials`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-user-role': userRole },
                 body: JSON.stringify({ warehouseId: releaseWarehouse })
@@ -321,7 +321,7 @@ export default function WorkOrdersPage() {
         if (!viewing) return;
         setSubmittingExpense(true)
         try {
-            const res = await fetch(`http://localhost:5000/api/work-orders/${viewing.id}/expenses`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders/${viewing.id}/expenses`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-user-role': userRole },
                 body: JSON.stringify(expenseForm)
@@ -352,7 +352,7 @@ export default function WorkOrdersPage() {
             if (reportForm.taskId) formData.append('taskId', reportForm.taskId)
             reportPhotos.forEach(file => formData.append('photos', file))
 
-            const res = await fetch(`http://localhost:5000/api/work-orders/${viewing.id}/reports`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders/${viewing.id}/reports`, {
                 method: 'POST',
                 headers: { 'x-user-role': userRole },
                 body: formData
@@ -377,7 +377,7 @@ export default function WorkOrdersPage() {
     const handleDeleteReport = async (reportId: string) => {
         if (!confirm('Hapus laporan ini?')) return
         try {
-            const res = await fetch(`http://localhost:5000/api/reports/${reportId}`, { method: 'DELETE', headers: { 'x-user-role': userRole } })
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/${reportId}`, { method: 'DELETE', headers: { 'x-user-role': userRole } })
             if (res.ok) {
                 showToast('success', 'Laporan dihapus')
                 if (viewing) openDetail(viewing)
@@ -387,7 +387,7 @@ export default function WorkOrdersPage() {
     }
 
     const handleStatusChange = async (wo: WO, nextStatus: string) => {
-        const res = await fetch(`http://localhost:5000/api/work-orders/${wo.id}/status`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders/${wo.id}/status`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-user-role': userRole }, body: JSON.stringify({ status: nextStatus })
         })
         if (res.ok) { showToast('success', `Status berubah ke ${WO_STATUS[nextStatus].label}`); load() }
@@ -395,7 +395,7 @@ export default function WorkOrdersPage() {
     }
 
     const handleTaskToggle = async (woId: string, taskId: string, isDone: boolean) => {
-        await fetch(`http://localhost:5000/api/work-orders/${woId}/tasks/${taskId}`, {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders/${woId}/tasks/${taskId}`, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json', 'x-user-role': userRole }, body: JSON.stringify({ isDone })
         })
         if (viewing) {
@@ -406,7 +406,7 @@ export default function WorkOrdersPage() {
 
     const handleDelete = async (wo: WO) => {
         if (!confirm(`Hapus WO "${wo.number}"?`)) return
-        const res = await fetch(`http://localhost:5000/api/work-orders/${wo.id}`, { method: 'DELETE', headers: { 'x-user-role': userRole } })
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders/${wo.id}`, { method: 'DELETE', headers: { 'x-user-role': userRole } })
         if (res.ok) { showToast('success', 'Work Order dihapus'); load() }
         else { const d = await res.json(); showToast('error', d.message) }
     }
@@ -874,7 +874,7 @@ export default function WorkOrdersPage() {
                                                             <div className="grid grid-cols-2 gap-2">
                                                                 {report.photos.map(p => (
                                                                     <div key={p.id} className="aspect-video rounded-xl overflow-hidden border border-slate-200">
-                                                                        <img src={`http://localhost:5000${p.url}`} alt="Progress" className="w-full h-full object-cover cursor-zoom-in" onClick={() => window.open(`http://localhost:5000${p.url}`, '_blank')} />
+                                                                        <img src={`${process.env.NEXT_PUBLIC_API_URL}${p.url}`} alt="Progress" className="w-full h-full object-cover cursor-zoom-in" onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL}${p.url}`, '_blank')} />
                                                                     </div>
                                                                 ))}
                                                             </div>
