@@ -15,7 +15,7 @@ const app = express();
 const prisma = new PrismaClient();
 const cron = require('node-cron');
 const { postJournalFromSystemKey } = require('./utils/accountingUtils');
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5003;
 
 app.use(cors());
 app.use(express.json());
