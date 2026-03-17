@@ -3,9 +3,8 @@
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-    TrendingUp, Printer, Download, Search,
-    RefreshCw, Calendar, ArrowRight, TrendingDown,
-    DollarSign, Percent, FileText, Filter, ChevronRight
+    TrendingUp, Printer, Download, RefreshCw, TrendingDown,
+    DollarSign, Percent, FileText, Filter
 } from "lucide-react"
 
 interface Account {
@@ -81,13 +80,13 @@ export default function ProfitLossPage() {
             initial="hidden"
             animate="visible"
             variants={containerVariants}
-            className="p-4 md:px-8 md:py-10 space-y-6 md:space-y-10 font-inter max-w-7xl mx-auto pb-32 md:pb-12 bg-slate-50/50"
+            className="p-4 md:px-8 md:py-10 space-y-6 md:space-y-10 font-inter max-w-full mx-auto pb-32 md:pb-12 bg-slate-50/50"
         >
             <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div className="flex items-center gap-4 md:gap-6">
                     <motion.div 
                         whileHover={{ scale: 1.05, rotate: 5 }}
-                        className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center shadow-2xl shadow-indigo-500/30 shrink-0"
+                        className="w-14 h-14 md:w-16 md:h-16 rounded-2xl from-indigo-600 to-violet-700 flex items-center justify-center shadow-2xl shadow-indigo-500/30 shrink-0"
                     >
                         <TrendingUp size={28} className="text-white md:w-8 md:h-8" />
                     </motion.div>
@@ -108,7 +107,7 @@ export default function ProfitLossPage() {
                     </motion.button>
                     <motion.button 
                         whileTap={{ scale: 0.95 }}
-                        className="flex-[3] lg:flex-none flex items-center justify-center gap-2 px-8 h-12 bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-black transition-all shadow-xl shadow-slate-900/10"
+                        className="flex-3 lg:flex-none flex items-center justify-center gap-2 px-8 h-12 bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:bg-black transition-all shadow-xl shadow-slate-900/10"
                     >
                         <Download size={18} /> Export Report
                     </motion.button>
@@ -143,7 +142,7 @@ export default function ProfitLossPage() {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={loadData} 
-                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-indigo-600/20"
+                        className="w-full py-4 bg-linear-to-r from-indigo-600 to-violet-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-lg shadow-indigo-600/20"
                     >
                         Apply Filters
                     </motion.button>
@@ -213,9 +212,9 @@ export default function ProfitLossPage() {
 
             <motion.div 
                 variants={itemVariants}
-                className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] border border-white shadow-2xl shadow-slate-200/50 overflow-hidden"
+                className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] border border-white shadow-2xl shadow-slate-200/50"
             >
-                <div className="overflow-x-auto">
+                <div>
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
@@ -336,7 +335,7 @@ export default function ProfitLossPage() {
                             </tr>
 
                             {/* Net Profit */}
-                            <tr className={`font-black overflow-hidden relative ${netProfit >= 0 ? 'bg-gradient-to-r from-indigo-600 to-violet-700 text-white' : 'bg-gradient-to-r from-rose-600 to-red-700 text-white'}`}>
+                            <tr className={`font-black overflow-hidden relative ${netProfit >= 0 ? 'bg-linear-to-r from-indigo-600 to-violet-700 text-white' : 'bg-linear-to-r from-rose-600 to-red-700 text-white'}`}>
                                 <td className="px-8 py-10 uppercase tracking-[0.4em] text-[12px] md:text-sm z-10 relative">
                                     {netProfit >= 0 ? 'Laba Bersih (Net Profit)' : 'Rugi Bersih (Net Loss)'}
                                 </td>
@@ -360,7 +359,7 @@ export default function ProfitLossPage() {
                 variants={itemVariants}
                 className="grid grid-cols-1 md:grid-cols-2 gap-6"
             >
-                <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 flex items-start gap-4">
+                <div className="bg-indigo-50/50 p-6 rounded-4xl border border-indigo-100 flex items-start gap-4">
                     <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
                         <FileText size={18} className="text-indigo-600" />
                     </div>
@@ -369,7 +368,7 @@ export default function ProfitLossPage() {
                         <p className="text-sm text-indigo-800 leading-relaxed font-medium">Laporan ini disusun berdasarkan data transaksi yang telah disetujui untuk periode terpilih. Margin kotor menunjukkan efisiensi operasional langsung.</p>
                     </div>
                 </div>
-                <div className="bg-slate-100/50 p-6 rounded-[2rem] border border-slate-200 flex items-start gap-4 group">
+                <div className="bg-slate-100/50 p-6 rounded-4xl border border-slate-200 flex items-start gap-4 group">
                     <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 shadow-sm">
                         <RefreshCw size={18} className="text-slate-600" />
                     </div>
