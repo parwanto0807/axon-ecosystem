@@ -31,7 +31,7 @@ async function main() {
         amount: item.amount,
         month: currentMonth,
         year: currentYear,
-        status: 'APPROVED',
+        status: 'POSTED',
         coaId: coa.id,
         date: new Date(2026, 2, 25) // Approx end of month
       }

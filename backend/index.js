@@ -4731,7 +4731,7 @@ app.post('/api/finance/operational-expenses/:id/pay', async (req, res) => {
     });
 
     if (!expense) return res.status(404).json({ message: 'Expense not found' });
-    if (expense.status !== 'POSTED') return res.status(400).json({ message: 'Must be posted first' });
+    if (expense.status !== 'POSTED' && expense.status !== 'APPROVED') return res.status(400).json({ message: 'Must be posted or approved first' });
 
     // Payable account
     let payableAcc = await prisma.systemAccount.findUnique({

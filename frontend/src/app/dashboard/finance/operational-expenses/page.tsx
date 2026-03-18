@@ -356,10 +356,10 @@ export default function OperationalExpensesPage() {
                                     </td>
                                     <td className="p-4">
                                         <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase ${expense.status === 'PAID' ? 'bg-indigo-50 text-indigo-600' :
-                                            expense.status === 'POSTED' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                                            expense.status === 'POSTED' || expense.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
                                             }`}>
                                             <div className={`w-1.5 h-1.5 rounded-full ${expense.status === 'PAID' ? 'bg-indigo-500' :
-                                                expense.status === 'POSTED' ? 'bg-emerald-500' : 'bg-amber-500'
+                                                expense.status === 'POSTED' || expense.status === 'APPROVED' ? 'bg-emerald-500' : 'bg-amber-500'
                                                 }`} />
                                             {expense.status}
                                         </div>
@@ -382,7 +382,7 @@ export default function OperationalExpensesPage() {
                                                 </button>
                                             </>
                                         )}
-                                        {expense.status === 'POSTED' && (
+                                        {(expense.status === 'POSTED' || expense.status === 'APPROVED') && (
                                             <button
                                                 onClick={() => { setSelectedExpense(expense); setShowPayModal(true); }}
                                                 className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-md shadow-indigo-600/20"
@@ -427,10 +427,10 @@ export default function OperationalExpensesPage() {
                             <div className="flex flex-col gap-3 z-10">
                                 <div className="flex items-center justify-between">
                                     <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase border ${expense.status === 'PAID' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
-                                        expense.status === 'POSTED' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'
+                                        expense.status === 'POSTED' || expense.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'
                                         }`}>
                                         <div className={`w-1.5 h-1.5 rounded-full ${expense.status === 'PAID' ? 'bg-indigo-500' :
-                                            expense.status === 'POSTED' ? 'bg-emerald-500' : 'bg-amber-500'
+                                            expense.status === 'POSTED' || expense.status === 'APPROVED' ? 'bg-emerald-500' : 'bg-amber-500'
                                             }`} />
                                         {expense.status}
                                     </div>
@@ -454,7 +454,7 @@ export default function OperationalExpensesPage() {
                                                 </button>
                                             </>
                                         )}
-                                        {expense.status === 'POSTED' && (
+                                        {(expense.status === 'POSTED' || expense.status === 'APPROVED') && (
                                             <button onClick={() => { setSelectedExpense(expense); setShowPayModal(true); }} className="flex-1 h-10 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-500/20">
                                                 Pelunasan
                                             </button>
