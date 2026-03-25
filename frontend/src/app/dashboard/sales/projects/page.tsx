@@ -24,6 +24,7 @@ import { generateProjectPDF } from "@/components/sales/ProjectPDFReport"
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 interface Customer { id: string; name: string; code: string; email?: string; phone?: string; address?: string }
+interface BusinessCategory { id: string; name: string }
 interface PreSalesProject {
     id: string; number: string; name: string; status: string; customerId: string; customer: Customer;
     surveys: (FieldSurvey & { expenses: any[] })[];
@@ -33,6 +34,8 @@ interface PreSalesProject {
     workOrders: (WorkOrder & { items: any[]; surveyExpenses: any[] })[];
     surveyExpenses: any[];
     createdAt: string; updatedAt?: string; deadline?: string; priority?: 'HIGH' | 'MEDIUM' | 'LOW';
+    businessCategoryId?: string | null;
+    businessCategory?: BusinessCategory | null;
 }
 
 interface FieldSurvey { id: string; number: string; date: string; location: string }
@@ -202,6 +205,8 @@ export default function ProjectsPage() {
     const [activePage, setActivePage] = useState('projects')
     const [showFilters, setShowFilters] = useState(false)
     const [selectedPriority, setSelectedPriority] = useState<string>('ALL')
+    const [selectedBusinessCategoryId, setSelectedBusinessCategoryId] = useState<string>('')
+    const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
     const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'all'>('all')
     const [sortBy, setSortBy] = useState<'date' | 'name' | 'revenue' | 'progress'>('date')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -213,21 +218,27 @@ export default function ProjectsPage() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const [pR, cR, compR] = await Promise.all([
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`),
+            const projectsUrl = selectedBusinessCategoryId 
+                ? `${process.env.NEXT_PUBLIC_API_URL}/api/projects?businessCategoryId=${selectedBusinessCategoryId}`
+                : `${process.env.NEXT_PUBLIC_API_URL}/api/projects`
+
+            const [pR, cR, compR, bizR] = await Promise.all([
+                fetch(projectsUrl),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`)
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`)
             ])
             setProjects(await pR.json())
             setCustomers(await cR.json())
             setCompanyProfile(await compR.json())
+            setBusinessCategories(await bizR.json())
             showToast('success', 'Data refreshed successfully')
         } catch {
             showToast('error', 'Failed to load data')
         } finally {
             setLoading(false)
         }
-    }, [showToast])
+    }, [showToast, selectedBusinessCategoryId])
 
     useEffect(() => { load() }, [load])
 
@@ -395,6 +406,16 @@ export default function ProjectsPage() {
                                     className="w-full pl-11 pr-4 py-3.5 text-sm bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm"
                                 />
                             </div>
+                            <select
+                                value={selectedBusinessCategoryId}
+                                onChange={e => setSelectedBusinessCategoryId(e.target.value)}
+                                className="h-[52px] px-4 rounded-2xl border border-slate-200 bg-white text-xs font-black uppercase tracking-widest focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm"
+                            >
+                                <option value="">All Units</option>
+                                {businessCategories.map(biz => (
+                                    <option key={biz.id} value={biz.id}>{biz.name}</option>
+                                ))}
+                            </select>
                             <button
                                 onClick={() => setShowFilters(!showFilters)}
                                 className={`h-[52px] px-4 rounded-2xl border transition-all flex items-center gap-2 ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600'
@@ -600,6 +621,11 @@ export default function ProjectsPage() {
                                                         <Building2 size={12} className="shrink-0" />
                                                         <span className="text-[10px] font-semibold truncate">{p.customer?.name || 'Unknown'}</span>
                                                     </div>
+                                                    <div className="mt-1 flex items-center gap-1">
+                                                        <span className="text-[8px] font-black text-rose-500 uppercase tracking-tighter bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
+                                                            {p.businessCategory?.name || 'GENERIC'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                                 <div className={`flex items-center gap-1.5 px-2 py-1 rounded-xl text-[8px] font-black uppercase tracking-wider border ${sc.color}`}>
                                                     <StatusIcon size={10} />
@@ -791,6 +817,11 @@ export default function ProjectsPage() {
                                                         <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-1">
                                                             <Calendar size={10} /> {fmtDate(p.createdAt)}
                                                         </span>
+                                                        <div className="mt-1">
+                                                            <span className="text-[8px] font-black text-rose-500 uppercase tracking-tighter bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
+                                                                {p.businessCategory?.name || 'GENERIC'}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
@@ -882,6 +913,7 @@ export default function ProjectsPage() {
                     <ProjectFormModal
                         project={editing}
                         customers={customers}
+                        businessCategories={businessCategories}
                         onClose={() => setModalOpen(false)}
                         onSuccess={() => {
                             setModalOpen(false);
@@ -919,9 +951,10 @@ export default function ProjectsPage() {
 }
 
 // ─── PROJECT FORM MODAL ───────────────────────────────────────────────────────
-function ProjectFormModal({ project, customers, onClose, onSuccess }: {
+function ProjectFormModal({ project, customers, businessCategories, onClose, onSuccess }: {
     project: PreSalesProject | null;
     customers: Customer[];
+    businessCategories: BusinessCategory[];
     onClose: () => void;
     onSuccess: () => void;
 }) {
@@ -932,6 +965,7 @@ function ProjectFormModal({ project, customers, onClose, onSuccess }: {
         status: project?.status || 'PROSPECTING',
         priority: project?.priority || 'MEDIUM',
         deadline: project?.deadline || '',
+        businessCategoryId: project?.businessCategoryId || '',
     })
     const [saving, setSaving] = useState(false)
     const [step, setStep] = useState(1)
@@ -963,10 +997,8 @@ function ProjectFormModal({ project, customers, onClose, onSuccess }: {
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
                 className="bg-white rounded-t-3xl md:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
             >
-                {/* Drag indicator for mobile */}
                 <div className="md:hidden w-12 h-1.5 bg-slate-300 rounded-full mx-auto mt-4" />
 
-                {/* Header */}
                 <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
                     <div>
                         <h2 className="font-bold text-slate-900 text-lg">
@@ -984,15 +1016,13 @@ function ProjectFormModal({ project, customers, onClose, onSuccess }: {
                     </button>
                 </div>
 
-                {/* Stepper for multi-step form */}
                 {!isEdit && (
                     <div className="px-6 pt-6">
                         <div className="flex items-center gap-2">
                             {[1, 2, 3].map((s) => (
                                 <div key={s} className="flex-1">
                                     <div
-                                        className={`h-1 rounded-full transition-all ${s <= step ? 'bg-indigo-600' : 'bg-slate-200'
-                                            }`}
+                                        className={`h-1 rounded-full transition-all ${s <= step ? 'bg-indigo-600' : 'bg-slate-200'}`}
                                     />
                                 </div>
                             ))}
@@ -1004,43 +1034,55 @@ function ProjectFormModal({ project, customers, onClose, onSuccess }: {
                 )}
 
                 <form onSubmit={handleSubmit}>
-                    <div className="px-6 py-6 max-h-[70vh] overflow-y-auto">
-                        <div className="space-y-5">
-                            {/* Project Name */}
-                            <div>
-                                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
-                                    Project Name <span className="text-rose-500">*</span>
-                                </label>
-                                <input
-                                    required
-                                    value={form.name}
-                                    onChange={e => setForm({ ...form, name: e.target.value })}
-                                    placeholder="e.g., Network Upgrade - PT. ABC"
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all"
-                                />
-                            </div>
+                    <div className="px-6 py-6 max-h-[70vh] overflow-y-auto space-y-5">
+                        <div>
+                            <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
+                                Project Name <span className="text-rose-500">*</span>
+                            </label>
+                            <input
+                                required
+                                value={form.name}
+                                onChange={e => setForm({ ...form, name: e.target.value })}
+                                placeholder="e.g., Network Upgrade - PT. ABC"
+                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all"
+                            />
+                        </div>
 
-                            {/* Customer */}
-                            <div>
-                                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
-                                    Customer <span className="text-rose-500">*</span>
-                                </label>
-                                <select
-                                    required
-                                    value={form.customerId}
-                                    onChange={e => setForm({ ...form, customerId: e.target.value })}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:16px_16px] bg-[right:16px_center] bg-no-repeat pr-10"
-                                >
-                                    <option value="">Select customer</option>
-                                    {customers.map(c => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.code} - {c.name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                        <div>
+                            <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
+                                Customer <span className="text-rose-500">*</span>
+                            </label>
+                            <select
+                                required
+                                value={form.customerId}
+                                onChange={e => setForm({ ...form, customerId: e.target.value })}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all appearance-none"
+                            >
+                                <option value="">Select customer</option>
+                                {customers.map(c => (
+                                    <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                                ))}
+                            </select>
+                        </div>
 
-                            {/* Status */}
+                        <div>
+                            <label className="text-[9px] font-bold uppercase tracking-wider text-rose-500 mb-2 block">
+                                Business Unit <span className="text-rose-500">*</span>
+                            </label>
+                            <select
+                                required
+                                value={form.businessCategoryId}
+                                onChange={e => setForm({ ...form, businessCategoryId: e.target.value })}
+                                className="w-full bg-rose-50/30 border border-slate-200 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all appearance-none"
+                            >
+                                <option value="">Select business unit</option>
+                                {businessCategories.map(biz => (
+                                    <option key={biz.id} value={biz.id}>{biz.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
                                     Project Status
@@ -1049,43 +1091,14 @@ function ProjectFormModal({ project, customers, onClose, onSuccess }: {
                                     required
                                     value={form.status}
                                     onChange={e => setForm({ ...form, status: e.target.value })}
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[length:16px_16px] bg-[right:16px_center] bg-no-repeat pr-10"
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all appearance-none"
                                 >
                                     {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                                        <option key={key} value={key}>
-                                            {config.label}
-                                        </option>
+                                        <option key={key} value={key}>{config.label}</option>
                                     ))}
                                 </select>
                             </div>
 
-                            {/* Priority */}
-                            <div>
-                                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
-                                    Priority Level
-                                </label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {([
-                                        { value: 'HIGH' as const, label: 'High', color: 'rose' },
-                                        { value: 'MEDIUM' as const, label: 'Medium', color: 'amber' },
-                                        { value: 'LOW' as const, label: 'Low', color: 'emerald' },
-                                    ]).map(p => (
-                                        <button
-                                            key={p.value}
-                                            type="button"
-                                            onClick={() => setForm({ ...form, priority: p.value })}
-                                            className={`py-3 rounded-xl border text-[9px] font-bold uppercase tracking-wider transition-all ${form.priority === p.value
-                                                ? `bg-${p.color}-600 text-white border-${p.color}-600`
-                                                : `bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100`
-                                                }`}
-                                        >
-                                            {p.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Deadline */}
                             <div>
                                 <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
                                     Target Deadline
@@ -1098,9 +1111,32 @@ function ProjectFormModal({ project, customers, onClose, onSuccess }: {
                                 />
                             </div>
                         </div>
+
+                        <div>
+                            <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-2 block">
+                                Priority Level
+                            </label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {([
+                                    { value: 'HIGH' as const, label: 'High', color: 'rose' },
+                                    { value: 'MEDIUM' as const, label: 'Medium', color: 'amber' },
+                                    { value: 'LOW' as const, label: 'Low', color: 'emerald' },
+                                ]).map(p => (
+                                    <button
+                                        key={p.value}
+                                        type="button"
+                                        onClick={() => setForm({ ...form, priority: p.value })}
+                                        className={`py-3 rounded-xl border text-[9px] font-bold uppercase tracking-wider transition-all ${form.priority === p.value
+                                            ? `bg-${p.color}-600 text-white border-${p.color}-600`
+                                            : `bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100`}`}
+                                    >
+                                        {p.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Footer Actions */}
                     <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50">
                         <div className="flex gap-3">
                             <Button
@@ -1116,17 +1152,7 @@ function ProjectFormModal({ project, customers, onClose, onSuccess }: {
                                 disabled={saving}
                                 className="flex-1 rounded-xl h-12 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20 disabled:opacity-50"
                             >
-                                {saving ? (
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        Saving...
-                                    </div>
-                                ) : (
-                                    <>
-                                        <Save size={16} className="mr-2" />
-                                        {isEdit ? 'Update' : 'Create'} Project
-                                    </>
-                                )}
+                                {saving ? 'Saving...' : (isEdit ? 'Update Project' : 'Create Project')}
                             </Button>
                         </div>
                     </div>

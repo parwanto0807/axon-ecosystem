@@ -24,9 +24,18 @@ app.use('/public', express.static(path.join(__dirname, 'public')));
 // --- RBAC MIDDLEWARE ---
 const checkRole = (allowedRoles) => (req, res, next) => {
   const userRole = req.headers['x-user-role'];
+  const userDept = req.headers['x-user-dept'];
+  const userName = req.headers['x-user-name'];
+  
   if (!userRole) {
     return res.status(401).json({ message: 'Unauthorized: No role provided' });
   }
+  
+  // Attach contexts to req for later use in route handlers
+  req.userRole = userRole;
+  req.userDept = userDept;
+  req.userName = userName;
+
   if (!allowedRoles.includes(userRole)) {
     return res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
   }
@@ -170,9 +179,15 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/products', async (req, res) => {
   try {
+    const { businessCategoryId, categoryId } = req.query;
     const products = await prisma.product.findMany({
+      where: {
+        ...(businessCategoryId ? { businessCategoryId } : {}),
+        ...(categoryId ? { categoryId } : {})
+      },
       include: {
         category: true,
+        businessCategory: true,
         skus: {
           include: {
             unit: true,
@@ -232,7 +247,7 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
     console.log(`[BACKEND] POST /api/products - Received body:`, Object.keys(req.body));
     if (req.file) console.log(`[BACKEND] Received file:`, req.file.originalname);
     
-    const { category, priceHistory, skus: skusRaw, ...masterData } = req.body;
+    const { category, businessCategory, priceHistory, skus: skusRaw, ...masterData } = req.body;
     
     let skus = [];
     if (skusRaw) {
@@ -250,6 +265,7 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
       brand: masterData.brand || null,
       type: masterData.type,
       categoryId: masterData.categoryId || null,
+      businessCategoryId: masterData.businessCategoryId || null,
       image: masterData.image || null
     };
 
@@ -277,6 +293,7 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
       },
       include: {
         category: true,
+        businessCategory: true,
         skus: {
           include: {
             unit: true,
@@ -316,6 +333,7 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     if (masterData.brand !== undefined) cleanMasterData.brand = masterData.brand || null;
     if (masterData.type !== undefined) cleanMasterData.type = masterData.type;
     if (masterData.categoryId !== undefined) cleanMasterData.categoryId = masterData.categoryId || null;
+    if (masterData.businessCategoryId !== undefined) cleanMasterData.businessCategoryId = masterData.businessCategoryId || null;
     if (masterData.image !== undefined) cleanMasterData.image = masterData.image;
 
     const original = await prisma.product.findUnique({
@@ -418,6 +436,7 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
         where: { id },
         include: {
           category: true,
+          businessCategory: true,
           skus: {
             include: {
               unit: true,
@@ -588,12 +607,49 @@ cron.schedule('1 0 * * *', async () => {
   }
 });
 
+// --- CRON JOB: ASSET SERVICE REMINDER (DAILY AT 01:00) ---
+cron.schedule('0 1 * * *', async () => {
+  console.log(`[CRON] Starting Asset Service Reminder Check`);
+  try {
+    const today = new Date();
+    const reminderThreshold = new Date();
+    reminderThreshold.setDate(today.getDate() + 7); // 7 days notice
+
+    const assetsDue = await prisma.customerAsset.findMany({
+      where: {
+        status: 'ACTIVE',
+        nextServiceDate: {
+          lte: reminderThreshold,
+          gte: today // Not yet overdue or just due
+        }
+      },
+      include: { customer: true }
+    });
+
+    console.log(`[CRON] Found ${assetsDue.length} assets due for service soon`);
+    
+    // In a real system, you might send emails here. 
+    // For now, we'll log it or create a "Notification" if such a model exists.
+    // Based on the schema, we don't have a Notification model yet, 
+    // so we'll just log it for now.
+    for (const asset of assetsDue) {
+      console.log(`[REMINDER] Asset ${asset.name} (SN: ${asset.serialNumber}) for ${asset.customer.name} is due on ${asset.nextServiceDate}`);
+    }
+  } catch (e) {
+    console.error('[CRON] Error in asset reminder job:', e);
+  }
+});
+
 // --- CUSTOMER ROUTES ---
 
 app.get('/api/customers', async (req, res) => {
   try {
+    const { businessCategoryId } = req.query;
     const customers = await prisma.customer.findMany({
-      include: { pics: true },
+      where: {
+        ...(businessCategoryId ? { businessCategoryId } : {})
+      },
+      include: { pics: true, businessCategory: true },
       orderBy: { createdAt: 'desc' }
     });
     res.json(customers);
@@ -604,7 +660,7 @@ app.get('/api/customers', async (req, res) => {
 
 app.post('/api/customers', async (req, res) => {
   try {
-    const { pics, ...data } = req.body;
+    const { pics, businessCategory, ...data } = req.body;
     const customer = await prisma.customer.create({
       data: {
         ...data,
@@ -628,7 +684,7 @@ app.post('/api/customers', async (req, res) => {
 app.put('/api/customers/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { pics, id: _, createdAt, updatedAt, ...data } = req.body;
+    const { pics, businessCategory, id: _, createdAt, updatedAt, ...data } = req.body;
 
     const customer = await prisma.customer.update({
       where: { id },
@@ -660,6 +716,86 @@ app.delete('/api/customers/:id', async (req, res) => {
     res.json({ message: 'Customer deleted' });
   } catch (error) {
     res.status(400).json({ message: 'Error deleting customer' });
+  }
+});
+
+// --- CUSTOMER ASSET ROUTES ---
+
+app.get('/api/customer-assets', async (req, res) => {
+  try {
+    const { customerId, category, businessCategoryId } = req.query;
+    const assets = await prisma.customerAsset.findMany({
+      where: {
+        ...(customerId ? { customerId } : {}),
+        ...(category ? { category } : {}),
+        ...(businessCategoryId ? { businessCategoryId } : {})
+      },
+      include: { customer: true, businessCategory: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(assets);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching assets' });
+  }
+});
+
+app.get('/api/customer-assets/:id', async (req, res) => {
+  try {
+    const asset = await prisma.customerAsset.findUnique({
+      where: { id: req.params.id },
+      include: { customer: true, businessCategory: true, workOrders: { orderBy: { createdAt: 'desc' }, take: 5 } }
+    });
+    if (!asset) return res.status(404).json({ message: 'Asset not found' });
+    res.json(asset);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching asset' });
+  }
+});
+
+app.post('/api/customer-assets', async (req, res) => {
+  try {
+    const { businessCategory, ...data } = req.body;
+    const asset = await prisma.customerAsset.create({
+      data: {
+        ...data,
+        installationDate: data.installationDate ? new Date(data.installationDate) : null,
+        lastServiceDate: data.lastServiceDate ? new Date(data.lastServiceDate) : null,
+        nextServiceDate: data.nextServiceDate ? new Date(data.nextServiceDate) : null,
+      },
+      include: { customer: true, businessCategory: true }
+    });
+    res.status(201).json(asset);
+  } catch (error) {
+    res.status(400).json({ message: 'Error creating asset', error: error.message });
+  }
+});
+
+app.put('/api/customer-assets/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { id: _, createdAt, updatedAt, customer, businessCategory, ...data } = req.body;
+    const asset = await prisma.customerAsset.update({
+      where: { id },
+      data: {
+        ...data,
+        installationDate: data.installationDate ? new Date(data.installationDate) : undefined,
+        lastServiceDate: data.lastServiceDate ? new Date(data.lastServiceDate) : undefined,
+        nextServiceDate: data.nextServiceDate ? new Date(data.nextServiceDate) : undefined,
+      },
+      include: { customer: true, businessCategory: true }
+    });
+    res.json(asset);
+  } catch (error) {
+    res.status(400).json({ message: 'Error updating asset' });
+  }
+});
+
+app.delete('/api/customer-assets/:id', async (req, res) => {
+  try {
+    await prisma.customerAsset.delete({ where: { id: req.params.id } });
+    res.json({ message: 'Asset deleted' });
+  } catch (error) {
+    res.status(400).json({ message: 'Error deleting asset' });
   }
 });
 
@@ -991,9 +1127,14 @@ async function generateSurveyNumber() {
 
 app.get('/api/projects', async (req, res) => {
   try {
+    const { businessCategoryId } = req.query;
     const projects = await prisma.preSalesProject.findMany({
+      where: {
+        ...(businessCategoryId ? { businessCategoryId } : {})
+      },
       include: { 
         customer: true, 
+        businessCategory: true,
         surveys: { include: { expenses: true } }, 
         quotations: true, 
         salesOrders: true,
@@ -1035,7 +1176,7 @@ app.post('/api/projects', async (req, res) => {
 
     const project = await prisma.preSalesProject.create({
       data: { ...data, number },
-      include: { customer: true }
+      include: { customer: true, businessCategory: true }
     });
     res.status(201).json(project);
   } catch (e) { res.status(400).json({ message: e.message }); }
@@ -1057,7 +1198,7 @@ app.put('/api/projects/:id', async (req, res) => {
     const project = await prisma.preSalesProject.update({
       where: { id },
       data: data,
-      include: { customer: true }
+      include: { customer: true, businessCategory: true }
     });
     res.json(project);
   } catch (e) {
@@ -1082,6 +1223,7 @@ app.get('/api/projects/:id', async (req, res) => {
       where: { id: req.params.id },
       include: { 
         customer: true, 
+        businessCategory: true,
         surveys: { include: { expenses: true } }, 
         quotations: true, 
         salesOrders: true,
@@ -1925,8 +2067,10 @@ const generateWONumber = async () => {
 
 const WO_INCLUDE = {
   project: true,
+  businessCategory: true,
   salesOrder: { include: { customer: true } },
   customer: true,
+  asset: true,
   items: { 
     include: { sku: { include: { product: true } } }, 
     orderBy: { sortOrder: 'asc' } 
@@ -1939,20 +2083,29 @@ const WO_INCLUDE = {
 
 app.get('/api/work-orders', async (req, res) => {
   try {
-    const { type, status, priority, search } = req.query;
+    const { type, status, priority, search, businessCategoryId } = req.query;
+    const userRole = req.headers['x-user-role'];
+    const userDept = req.headers['x-user-dept'];
+    const userName = req.headers['x-user-name'];
+
+    const whereClause = {
+      ...(type ? { type } : {}),
+      ...(status ? { status } : {}),
+      ...(priority ? { priority } : {}),
+      ...(search ? {
+        OR: [
+          { number: { contains: search, mode: 'insensitive' } },
+          { title: { contains: search, mode: 'insensitive' } },
+          { assignedTo: { contains: search, mode: 'insensitive' } },
+        ]
+      } : {}),
+      ...(businessCategoryId ? { businessCategoryId } : {}),
+      // Restriction: Operational department users only see their own assigned work orders
+      ...(userDept === 'OPERATIONAL' ? { assignedTo: userName } : {})
+    };
+
     const workOrders = await prisma.workOrder.findMany({
-      where: {
-        ...(type ? { type } : {}),
-        ...(status ? { status } : {}),
-        ...(priority ? { priority } : {}),
-        ...(search ? {
-          OR: [
-            { number: { contains: search, mode: 'insensitive' } },
-            { title: { contains: search, mode: 'insensitive' } },
-            { assignedTo: { contains: search, mode: 'insensitive' } },
-          ]
-        } : {})
-      },
+      where: whereClause,
       include: WO_INCLUDE,
       orderBy: { createdAt: 'desc' }
     });
@@ -1978,15 +2131,72 @@ app.get('/api/work-orders/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+app.get('/api/operator/dashboard', async (req, res) => {
+  try {
+    const { user } = req.query;
+    if (!user) return res.status(400).json({ message: 'User parameter is required' });
+
+    const stats = await prisma.workOrder.groupBy({
+      by: ['status'],
+      where: { assignedTo: user },
+      _count: { _all: true }
+    });
+
+    const myTasks = await prisma.workOrder.findMany({
+      where: { 
+        assignedTo: user,
+        status: { in: ['CONFIRMED', 'IN_PROGRESS', 'ON_HOLD'] }
+      },
+      include: WO_INCLUDE,
+      orderBy: { priority: 'asc' },
+      take: 10
+    });
+
+    const today = new Date();
+    const nextWeek = new Date();
+    nextWeek.setDate(today.getDate() + 7);
+
+    const serviceReminders = await prisma.customerAsset.findMany({
+      where: {
+        nextServiceDate: { lte: nextWeek },
+        status: 'ACTIVE'
+      },
+      include: { customer: true },
+      take: 10
+    });
+
+    const recentReports = await prisma.workOrderReport.findMany({
+      where: { reportedBy: user },
+      include: { workOrder: true },
+      orderBy: { date: 'desc' },
+      take: 5
+    });
+
+    // Add formatted mapped tasks for consistency
+    const mappedTasks = myTasks.map(wo => {
+      const { surveyExpenses, ...rest } = wo;
+      return { ...rest, expenses: surveyExpenses };
+    });
+
+    res.json({
+      stats: stats.reduce((acc, curr) => ({ ...acc, [curr.status]: curr._count._all }), {}),
+      myTasks: mappedTasks,
+      serviceReminders,
+      recentReports
+    });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 app.post('/api/work-orders', async (req, res) => {
   try {
-    const { items = [], tasks = [], ...data } = req.body;
+    const { items = [], tasks = [], assetId, businessCategory, ...data } = req.body;
     const number = await generateWONumber();
     const result = await prisma.$transaction(async (tx) => {
       const wo = await tx.workOrder.create({
         data: {
           ...data,
           number,
+          assetId,
           scheduledStart: data.scheduledStart ? new Date(data.scheduledStart) : null,
           scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd) : null,
           items: {
@@ -2032,7 +2242,7 @@ app.post('/api/work-orders', async (req, res) => {
 app.put('/api/work-orders/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { items = [], tasks = [], ...data } = req.body;
+    const { items = [], tasks = [], businessCategory, ...data } = req.body;
     const wo = await prisma.$transaction(async (tx) => {
       await tx.workOrder.update({
         where: { id },
@@ -2123,6 +2333,21 @@ app.patch('/api/work-orders/:id/status', async (req, res) => {
           data: { status: 'PROCESSING' }
         });
       }
+
+      // If WO is COMPLETED and linked to an asset, update asset service dates
+      if ((status === 'COMPLETED' || status === 'CLOSED') && updatedWo.assetId) {
+        const nextDate = new Date();
+        nextDate.setMonth(nextDate.getMonth() + 3); // Default to 3 months for AC/General
+        
+        await tx.customerAsset.update({
+          where: { id: updatedWo.assetId },
+          data: {
+            lastServiceDate: new Date(),
+            nextServiceDate: nextDate
+          }
+        });
+      }
+
       return updatedWo;
     });
 
@@ -2222,7 +2447,14 @@ app.post('/api/work-orders/:id/release-materials', async (req, res) => {
 
 app.get('/api/reports', async (req, res) => {
   try {
+    const userRole = req.headers['x-user-role'];
+    const userDept = req.headers['x-user-dept'];
+    const userName = req.headers['x-user-name'];
+
     const reports = await prisma.workOrderReport.findMany({
+      where: {
+        ...((userRole === 'OPERATIONAL' || userDept === 'OPERATIONAL') ? { reportedBy: userName } : {})
+      },
       include: { 
         photos: true,
         task: { select: { id: true, title: true } },
@@ -2255,7 +2487,12 @@ app.get('/api/work-orders/:id/reports', async (req, res) => {
 app.post('/api/work-orders/:id/reports', upload.array('photos', 10), async (req, res) => {
   try {
     const { id } = req.params;
-    const { description, progress, reportedBy, date, taskId } = req.body;
+    const { description, progress, reportedBy, date, taskId, checklist: checklistRaw } = req.body;
+    
+    let checklist = null;
+    if (checklistRaw) {
+      checklist = typeof checklistRaw === 'string' ? JSON.parse(checklistRaw) : checklistRaw;
+    }
     
     const photoUrls = [];
     if (req.files && req.files.length > 0) {
@@ -2274,6 +2511,7 @@ app.post('/api/work-orders/:id/reports', upload.array('photos', 10), async (req,
           progress: Number(progress) || 0,
           reportedBy: reportedBy || null,
           date: date ? new Date(date) : new Date(),
+          checklist: checklist || undefined,
           photos: {
             create: photoUrls.map(url => ({ url }))
           }
@@ -2324,12 +2562,16 @@ const DO_INCLUDE = {
 
 app.get('/api/delivery-orders', async (req, res) => {
   try {
+    const userRole = req.headers['x-user-role'];
+    const userName = req.headers['x-user-name'];
     const { status, projectId, customerId } = req.query;
+
     const dos = await prisma.deliveryOrder.findMany({
       where: {
         ...(status ? { status } : {}),
         ...(projectId ? { projectId } : {}),
-        ...(customerId ? { customerId } : {})
+        ...(customerId ? { customerId } : {}),
+        ...(userRole === 'OPERATIONAL' ? { workOrder: { assignedTo: userName } } : {})
       },
       include: DO_INCLUDE,
       orderBy: { createdAt: 'desc' }
@@ -3574,7 +3816,12 @@ app.post('/api/opening-balances', async (req, res) => {
 
 app.get('/api/vendors', async (req, res) => {
   try {
+    const { businessCategoryId } = req.query;
     const vendors = await prisma.vendor.findMany({
+      where: {
+        ...(businessCategoryId ? { businessCategoryId } : {})
+      },
+      include: { businessCategory: true },
       orderBy: { name: 'asc' }
     });
     res.json(vendors);
@@ -3583,25 +3830,41 @@ app.get('/api/vendors', async (req, res) => {
 
 app.post('/api/vendors', async (req, res) => {
   try {
-    const data = req.body;
+    const { id, businessCategory, ...data } = req.body;
     const count = await prisma.vendor.count();
     const code = data.code || `VND-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
     
     const vendor = await prisma.vendor.create({
-      data: { ...data, code }
+      data: { 
+        ...data, 
+        code,
+        businessCategoryId: data.businessCategoryId || null
+      },
+      include: { businessCategory: true }
     });
     res.json(vendor);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { 
+    console.error('SERVER_ERROR [POST /api/vendors]:', e);
+    res.status(500).json({ message: e.message }); 
+  }
 });
 
 app.put('/api/vendors/:id', async (req, res) => {
   try {
+    const { id: _, businessCategory, createdAt, updatedAt, ...data } = req.body;
     const vendor = await prisma.vendor.update({
       where: { id: req.params.id },
-      data: req.body
+      data: {
+        ...data,
+        businessCategoryId: data.businessCategoryId || null
+      },
+      include: { businessCategory: true }
     });
     res.json(vendor);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { 
+    console.error(`SERVER_ERROR [PUT /api/vendors/${req.params.id}]:`, e);
+    res.status(500).json({ message: e.message }); 
+  }
 });
 
 app.delete('/api/vendors/:id', async (req, res) => {
@@ -4250,12 +4513,99 @@ app.delete('/api/contracts/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+// --- BUSINESS CATEGORIES ---
+
+app.get('/api/business-categories', async (req, res) => {
+  try {
+    const categories = await prisma.businessCategory.findMany({
+      orderBy: { name: 'asc' },
+      include: {
+        _count: {
+          select: {
+            products: true,
+            customers: true,
+            vendors: true,
+            employees: true,
+            assets: true,
+            projects: true,
+            workOrders: true,
+          }
+        }
+      }
+    });
+    res.json(categories);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/business-categories', async (req, res) => {
+  try {
+    const category = await prisma.businessCategory.create({ data: req.body });
+    res.json(category);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.put('/api/business-categories/:id', async (req, res) => {
+  try {
+    const category = await prisma.businessCategory.update({
+      where: { id: req.params.id },
+      data: req.body
+    });
+    res.json(category);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.delete('/api/business-categories/:id', async (req, res) => {
+  try {
+    await prisma.businessCategory.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// --- HR / EMPLOYEE CATEGORIES ---
+
+app.get('/api/hr/employee-categories', async (req, res) => {
+  try {
+    const categories = await prisma.employeeCategory.findMany({
+      orderBy: { name: 'asc' }
+    });
+    res.json(categories);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/hr/employee-categories', async (req, res) => {
+  try {
+    const category = await prisma.employeeCategory.create({ data: req.body });
+    res.json(category);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.put('/api/hr/employee-categories/:id', async (req, res) => {
+  try {
+    const category = await prisma.employeeCategory.update({
+      where: { id: req.params.id },
+      data: req.body
+    });
+    res.json(category);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.delete('/api/hr/employee-categories/:id', async (req, res) => {
+  try {
+    await prisma.employeeCategory.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 // --- HR / EMPLOYEES ---
 
 app.get('/api/hr/employees', async (req, res) => {
   try {
+    const { businessCategoryId } = req.query;
     const employees = await prisma.employee.findMany({
-      include: { vendor: true },
+      where: {
+        ...(businessCategoryId ? { businessCategoryId } : {})
+      },
+      include: { vendor: true, category: true, businessCategory: true },
       orderBy: { name: 'asc' }
     });
     res.json(employees);
@@ -4266,7 +4616,7 @@ app.get('/api/hr/employees/:id', async (req, res) => {
   try {
     const employee = await prisma.employee.findUnique({
       where: { id: req.params.id },
-      include: { vendor: true }
+      include: { vendor: true, category: true, businessCategory: true }
     });
     res.json(employee);
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -4295,6 +4645,7 @@ app.post('/api/hr/employees', async (req, res) => {
 
     const employee = await prisma.employee.create({
       data: {
+        ...data,
         nik: data.nik || null,
         name: data.name,
         type: data.type || 'TETAP',
@@ -4309,8 +4660,11 @@ app.post('/api/hr/employees', async (req, res) => {
         phone: data.phone || null,
         address: data.address || null,
         email: data.email || null,
-        vendorId: vendorId || null
-      }
+        vendorId: vendorId || null,
+        categoryId: data.categoryId || null,
+        businessCategoryId: data.businessCategoryId || null
+      },
+      include: { vendor: true, category: true, businessCategory: true }
     });
     res.json(employee);
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -4319,7 +4673,7 @@ app.post('/api/hr/employees', async (req, res) => {
 app.put('/api/hr/employees/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { id: _id, createdAt, updatedAt, vendor, ...data } = req.body;
+    const { id: _id, createdAt, updatedAt, vendor, category, payrollItems, ...data } = req.body;
     
     const employee = await prisma.employee.update({
       where: { id },
@@ -4327,8 +4681,10 @@ app.put('/api/hr/employees/:id', async (req, res) => {
         ...data,
         joinDate: data.joinDate ? new Date(data.joinDate) : undefined,
         baseSalary: data.baseSalary !== undefined ? Number(data.baseSalary) : undefined,
-        dailyWage: data.dailyWage !== undefined ? Number(data.dailyWage) : undefined
-      }
+        dailyWage: data.dailyWage !== undefined ? Number(data.dailyWage) : undefined,
+        businessCategoryId: data.businessCategoryId || null
+      },
+      include: { vendor: true, category: true, businessCategory: true }
     });
     res.json(employee);
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -4791,17 +5147,25 @@ app.post('/api/finance/operational-expenses/:id/pay', async (req, res) => {
 
 // --- USER MANAGEMENT ---
 
-app.get('/api/users', checkRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
+app.get('/api/users', checkRole(['SUPER_ADMIN', 'ADMIN', 'OPERATIONAL']), async (req, res) => {
   try {
+    const userRole = req.headers['x-user-role'];
+    const userName = req.headers['x-user-name'];
+    const { businessCategoryId } = req.query;
     const users = await prisma.user.findMany({
+      where: {
+        ...(userRole === 'OPERATIONAL' ? { name: userName } : {}),
+        ...(businessCategoryId ? { businessCategoryId } : {})
+      },
+      include: { businessCategory: true },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
         department: true,
+        businessCategoryId: true,
       },
-      // Removed orderBy createdAt because it doesn't exist in the schema
     });
     res.json(users);
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -4809,7 +5173,7 @@ app.get('/api/users', checkRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
 
 app.post('/api/users', checkRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
   try {
-    const { name, email, password, role, department } = req.body;
+    const { name, email, password, role, department, businessCategoryId } = req.body;
     
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
@@ -4828,7 +5192,8 @@ app.post('/api/users', checkRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => 
         email,
         password: hashedPassword,
         role: role || 'USER',
-        department: department || 'NONE'
+        department: department || 'NONE',
+        businessCategoryId: businessCategoryId || null
       }
     });
 
@@ -4839,10 +5204,10 @@ app.post('/api/users', checkRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => 
 
 app.put('/api/users/:id', checkRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
   try {
-    const { role, department, name } = req.body;
+    const { role, department, name, businessCategoryId } = req.body;
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: { role, department, name }
+      data: { role, department, name, businessCategoryId: businessCategoryId || null }
     });
     const { password: _, ...userWithoutPassword } = user;
     res.json(userWithoutPassword);

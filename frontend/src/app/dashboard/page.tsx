@@ -43,6 +43,9 @@ import { format } from "date-fns";
 import { useMemo } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const translations: any = {
   ID: {
@@ -250,6 +253,29 @@ const DashboardCard = ({ title, value, icon: Icon, description, trend, trendType
 export default function DashboardPage() {
   const { lang } = useLanguage();
   const t = translations[lang] || translations.EN;
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'authenticated' && (session?.user as any)?.department === 'OPERATIONAL') {
+      router.push('/dashboard/operations');
+    }
+  }, [session, status, router]);
+
+  if (status === 'loading' || (status === 'authenticated' && (session?.user as any)?.department === 'OPERATIONAL')) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 animate-pulse">
+            <TrendingUp size={24} className="text-white" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 max-w-[120px] text-center uppercase tracking-widest leading-loose">
+            Syncing Experience...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Fetch data for the dashboard
   const { data: salesData, isLoading: isLoadingSales, refetch: refetchSales } = useQuery<SalesData>({ queryKey: ['salesData'], queryFn: getSalesData });

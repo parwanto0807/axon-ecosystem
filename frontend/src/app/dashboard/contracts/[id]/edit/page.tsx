@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
 import {
     FileText, Save, ArrowLeft, Plus, Trash2, 
     User, Building2, Calendar, DollarSign,
@@ -17,8 +17,8 @@ interface Clause {
     content: string;
 }
 
-export default function EditContractPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = use(params)
+export default function EditContractPage() {
+    const { id } = useParams()
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [fetching, setFetching] = useState(true)

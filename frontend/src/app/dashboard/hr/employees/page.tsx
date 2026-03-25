@@ -19,7 +19,9 @@ import {
     Mail,
     ChevronDown,
     Download,
-    DollarSign
+    DollarSign,
+    Tag,
+    LayoutGrid
 } from "lucide-react"
 import Link from "next/link"
 
@@ -32,6 +34,10 @@ export default function EmployeeListPage() {
     const [filterType, setFilterType] = useState("ALL")
     const [filterStatus, setFilterStatus] = useState("ALL")
     const [isMobile, setIsMobile] = useState(false)
+    const [categories, setCategories] = useState<any[]>([])
+    const [businessCategories, setBusinessCategories] = useState<any[]>([])
+    const [filterCategory, setFilterCategory] = useState("ALL")
+    const [filterBusinessCategory, setFilterBusinessCategory] = useState("ALL")
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768)
@@ -42,7 +48,29 @@ export default function EmployeeListPage() {
 
     useEffect(() => {
         fetchEmployees()
+        fetchCategories()
+        fetchBusinessCategories()
     }, [])
+
+    const fetchBusinessCategories = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/business-categories`)
+            const data = await res.json()
+            setBusinessCategories(data)
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
+    const fetchCategories = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/hr/employee-categories`)
+            const data = await res.json()
+            setCategories(data)
+        } catch (e) {
+            console.error(e)
+        }
+    }
 
     const fetchEmployees = async () => {
         try {
@@ -71,7 +99,9 @@ export default function EmployeeListPage() {
                              (emp.nik && emp.nik.includes(searchQuery))
         const matchesType = filterType === "ALL" || emp.type === filterType
         const matchesStatus = filterStatus === "ALL" || emp.status === filterStatus
-        return matchesSearch && matchesType && matchesStatus
+        const matchesCategory = filterCategory === "ALL" || emp.categoryId === filterCategory
+        const matchesBusinessCategory = filterBusinessCategory === "ALL" || emp.businessCategoryId === filterBusinessCategory
+        return matchesSearch && matchesType && matchesStatus && matchesCategory && matchesBusinessCategory
     })
 
     return (
@@ -89,6 +119,12 @@ export default function EmployeeListPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <Link href="/dashboard/hr/employee-categories">
+                        <button className="flex-1 md:flex-none px-4 py-3 md:py-2.5 bg-white border border-indigo-100 rounded-xl text-[10px] md:text-xs font-black text-indigo-600 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
+                            <Tag size={16} />
+                            MANAGE KATEGORI
+                        </button>
+                    </Link>
                     <button className="flex-1 md:flex-none px-4 py-3 md:py-2.5 bg-white border border-slate-200 rounded-xl text-[10px] md:text-xs font-black text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
                         <Download size={16} />
                         EXPORT
@@ -156,9 +192,30 @@ export default function EmployeeListPage() {
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
                     >
-                        <option value="ALL">Semua Status</option>
                         <option value="ACTIVE">Aktif</option>
                         <option value="INACTIVE">Non-Aktif</option>
+                    </select>
+
+                    <select 
+                        className="bg-slate-50 px-4 py-3 md:py-3.5 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black border-none focus:ring-2 ring-indigo-500/10 outline-none shrink-0"
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                    >
+                        <option value="ALL">Semua Kategori</option>
+                        {categories.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                    </select>
+
+                    <select 
+                        className="bg-rose-50 px-4 py-3 md:py-3.5 rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black border-rose-100 text-rose-600 focus:ring-2 ring-rose-500/10 outline-none shrink-0"
+                        value={filterBusinessCategory}
+                        onChange={(e) => setFilterBusinessCategory(e.target.value)}
+                    >
+                        <option value="ALL">Semua Unit Bisnis</option>
+                        {businessCategories.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
                     </select>
                 </div>
             </div>
@@ -197,6 +254,14 @@ export default function EmployeeListPage() {
                                         <div>
                                             <p className="text-sm font-black text-slate-800">{emp.name}</p>
                                             <p className="text-[10px] font-bold text-slate-400 uppercase">{emp.nik || 'N/A'}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <div className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[8px] font-black uppercase tracking-tighter">
+                                                    {emp.category?.name || 'UMUM'}
+                                                </div>
+                                                <div className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded text-[8px] font-black uppercase tracking-tighter">
+                                                    {emp.businessCategory?.name || 'GENERIC'}
+                                                </div>
+                                            </div>
                                             <div className="flex items-center gap-3 mt-1.5">
                                                 <Phone size={10} className="text-slate-300" />
                                                 <span className="text-[10px] font-bold text-slate-400">{emp.phone || '-'}</span>

@@ -57,6 +57,8 @@ const translations: any = {
         masterData: 'Data Master',
         products: 'Produk',
         customers: 'Pelanggan',
+        assets: 'Master Asset',
+        operationsOverview: 'Ringkasan',
         vendors: 'Vendor',
         salesPipeline: 'Pipeline Penjualan',
         projects: 'Proyek',
@@ -100,6 +102,7 @@ const translations: any = {
         payrollSystem: 'Sistem Payroll',
         preferences: 'Preferensi',
         userManagement: 'Manajemen Pengguna',
+        businessCategories: 'Kategori Bisnis',
         signOut: 'Keluar'
     },
     EN: {
@@ -107,6 +110,8 @@ const translations: any = {
         masterData: 'Master Data',
         products: 'Products',
         customers: 'Customers',
+        assets: 'Master Assets',
+        operationsOverview: 'Operations Overview',
         vendors: 'Vendors',
         salesPipeline: 'Sales Pipeline',
         projects: 'Projects',
@@ -150,6 +155,7 @@ const translations: any = {
         payrollSystem: 'Payroll System',
         preferences: 'Preferences',
         userManagement: 'User Management',
+        businessCategories: 'Business Categories',
         signOut: 'Sign Out'
     }
 }
@@ -157,15 +163,18 @@ const translations: any = {
 const getMenuItems = (t: any) => [
     {
         id: 'core',
-        label: 'Core Ecosystem',
-        isHeader: true
+        label: t.overview,
+        isHeader: true,
+        requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE', 'HR']
     },
-    { id: 'dashboard', icon: LayoutDashboard, label: t.overview, path: '/dashboard' },
+    { id: 'dashboard', icon: LayoutDashboard, label: t.overview, path: '/dashboard', requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE', 'HR'] },
     {
-        id: 'master', icon: Database, label: t.masterData, children: [
-            { id: 'products', label: t.products, path: '/dashboard/management/products', icon: Package },
+        id: 'master', icon: Database, label: t.masterData, requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE', 'HR', 'OPERATIONAL'], children: [
+            { id: 'business-categories', label: t.businessCategories, path: '/dashboard/management/business-categories', icon: LayoutGrid, requiredRoles: ['ADMIN', 'SUPER_ADMIN'] },
+            { id: 'products', label: t.products, path: '/dashboard/management/products', icon: Package, requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE'] },
             { id: 'customers', label: t.customers, path: '/dashboard/management/customers', icon: Users },
-            { id: 'vendors', label: t.vendors, path: '/dashboard/purchasing/vendors', icon: Building2 },
+            { id: 'assets', label: t.assets, path: '/dashboard/management/assets', icon: Box },
+            { id: 'vendors', label: t.vendors, path: '/dashboard/purchasing/vendors', icon: Building2, requiredDepartment: ['LOGISTIC', 'FINANCE'] },
         ]
     },
 
@@ -225,18 +234,19 @@ const getMenuItems = (t: any) => [
         id: 'operation-group',
         label: 'OPERATION',
         isHeader: true,
-        requiredDepartment: ['LOGISTIC']
+        requiredDepartment: ['LOGISTIC', 'OPERATIONAL']
     },
     {
         id: 'operations',
         icon: HardHat,
         label: t.operations,
-        requiredDepartment: ['LOGISTIC'],
+        requiredDepartment: ['LOGISTIC', 'OPERATIONAL'],
         children: [
-            { id: 'work-orders', icon: Wrench, label: t.workOrders, path: '/dashboard/operations/work-orders' },
+            { id: 'op-overview', icon: LayoutGrid, label: t.operationsOverview, path: '/dashboard/operations' },
+            { id: 'work-orders', icon: Wrench, label: t.workOrders, path: '/dashboard/operations/work-orders', requiredDepartment: ['LOGISTIC'] },
             { id: 'reports', icon: Activity, label: t.progressReports, path: '/dashboard/operations/reports' },
             { id: 'delivery-orders', icon: PackageCheck, label: t.deliveryOrders, path: '/dashboard/operations/delivery-orders' },
-            { id: 'bast', icon: ClipboardCheck, label: t.beritaAcara, path: '/dashboard/operations/bast' },
+            { id: 'bast', icon: ClipboardCheck, label: t.beritaAcara, path: '/dashboard/operations/bast', requiredDepartment: ['LOGISTIC'] },
         ]
     },
 
@@ -304,7 +314,7 @@ export function Sidebar() {
 
     const isLoading = status === 'loading'
 
-    const filteredMenuItems = menuItems.filter(item => {
+    const filteredMenuItems = menuItems.filter((item: any) => {
         // If loading, show only items with no restrictions
         if (isLoading) {
             return !item.requiredRoles && !item.requiredDepartment
@@ -313,12 +323,27 @@ export function Sidebar() {
         // Super Admin and Admin see everything
         if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') return true
 
-        // Check Roles
-        if (item.requiredRoles && !item.requiredRoles.includes(userRole)) return false
-
-        // Check Department
+        // Check Dept for top-level
         if (item.requiredDepartment && !item.requiredDepartment.includes(userDept)) return false
 
+        // Check Roles for top-level
+        if (item.requiredRoles && !item.requiredRoles.includes(userRole)) return false
+
+        return true
+    }).map((item: any) => {
+        if (!item.children) return item
+        return {
+            ...item,
+            children: item.children.filter((child: any) => {
+                if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') return true
+                if (child.requiredRoles && !child.requiredRoles.includes(userRole)) return false
+                if (child.requiredDepartment && !child.requiredDepartment.includes(userDept)) return false
+                return true
+            })
+        }
+    }).filter((item: any) => {
+        // Hide headers or groups if they become empty after child filtering (except 'core' & 'dashboard')
+        if (item.children && item.children.length === 0 && !['core', 'dashboard'].includes(item.id)) return false
         return true
     })
 

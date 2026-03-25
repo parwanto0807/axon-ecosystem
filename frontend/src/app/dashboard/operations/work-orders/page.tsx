@@ -2,13 +2,7 @@
 
 import { useState, useEffect, useCallback, Fragment } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import {
-    Wrench, Plus, Search, Edit, Trash2, X, Save,
-    CheckCircle2, AlertCircle, RefreshCw, ChevronDown,
-    Clock, MapPin, User, Calendar, DollarSign, Package,
-    ClipboardList, Play, Pause, Check, Ban, XCircle, HardHat,
-    AlertTriangle, ChevronRight, SquareCheckBig, Circle, Printer
-} from "lucide-react"
+import { Wrench, Plus, Search, Edit, Trash2, X, Save, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, Clock, MapPin, User, Calendar, DollarSign, Package, ClipboardList, Play, Pause, Check, Ban, XCircle, HardHat, AlertTriangle, ChevronRight, SquareCheckBig, Circle, Printer, Box, Wind, Monitor } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import WorkOrderPDFModal from "./WorkOrderPDFModal"
 import { useSession } from "next-auth/react"
@@ -20,7 +14,8 @@ interface WO {
     type: string; status: string; priority: string
     projectId?: string; project?: { number: string; name: string }
     salesOrderId?: string; salesOrder?: { number: string }
-    customerId?: string; customer?: { name: string; code: string; address?: string | null }
+    customerId?: string; customer?: { id: string; name: string; code: string; address?: string | null }
+    assetId?: string; asset?: { id: string; name: string; category: string; brand?: string; model?: string; serialNumber?: string }
     assignedTo?: string; location?: string
     scheduledStart?: string; scheduledEnd?: string
     actualStart?: string; actualEnd?: string
@@ -31,8 +26,11 @@ interface WO {
     expenses: any[]
     reports: WorkOrderReport[]
     _count?: { items: number; tasks: number; reports: number }
+    businessCategoryId?: string
+    businessCategory?: { id: string; name: string }
     createdAt: string
 }
+interface BusinessCategory { id: string; name: string; description?: string }
 interface WorkOrderReport {
     id: string
     workOrderId: string
@@ -41,6 +39,7 @@ interface WorkOrderReport {
     date: string
     description: string
     progress: number
+    checklist?: any
     reportedBy?: string
     createdAt: string
     photos: WorkOrderReportPhoto[]
@@ -77,6 +76,12 @@ const WO_STATUS: Record<string, { label: string; color: string }> = {
     CLOSED: { label: 'Closed', color: 'bg-slate-50 text-slate-500 border-slate-200' },
     CANCELLED: { label: 'Cancelled', color: 'bg-slate-50 text-slate-400 border-slate-200 line-through' },
 }
+
+const CHECKLIST_TEMPLATES: Record<string, string[]> = {
+    AC: ['Cuci Filter / Indoor', 'Pembersihan Outdoor', 'Cek Tekanan Freon', 'Cek Drainase Lendir', 'Cek Arus Listrik (Ampere)', 'Cek Kebocoran Pipa', 'Tes Fungsi Remote'],
+    IT: ['Cek Koneksi Jaringan', 'Update Patch / Software', 'Backup Data Konfigurasi', 'Pembersihan Fisik (Dusting)', 'Cek Log Error System', 'Pengetesan Performa'],
+    GENERAL: ['Pemeriksaan Kondisi Fisik', 'Pembersihan Unit', 'Pengetesan Fungsi Utama', 'Pelumasan Komponen Bergerak', 'Update Status Label']
+}
 const WO_PRIORITY: Record<string, string> = {
     LOW: 'bg-slate-100 text-slate-500',
     NORMAL: 'bg-blue-100 text-blue-700',
@@ -112,7 +117,7 @@ const STATUS_TRANSITIONS: Record<string, { next: string; label: string; icon: Re
 
 const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
-const defaultForm = { title: '', description: '', type: 'SERVICE', priority: 'NORMAL', projectId: '', salesOrderId: '', customerId: '', assignedTo: '', location: '', scheduledStart: '', scheduledEnd: '', estimatedHours: '', notes: '' }
+const defaultForm = { title: '', description: '', type: 'SERVICE', priority: 'NORMAL', projectId: '', salesOrderId: '', customerId: '', assetId: '', assignedTo: '', location: '', scheduledStart: '', scheduledEnd: '', estimatedHours: '', notes: '', businessCategoryId: '' }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
@@ -124,6 +129,7 @@ export default function WorkOrdersPage() {
     const [projects, setProjects] = useState<Ref[]>([])
     const [salesOrders, setSalesOrders] = useState<Ref[]>([])
     const [customers, setCustomers] = useState<{ id: string; name: string; code: string }[]>([])
+    const [assets, setAssets] = useState<{ id: string; name: string; customerId: string; category: string; brand?: string; model?: string; serialNumber?: string }[]>([])
     const [skus, setSkus] = useState<SKU[]>([])
     const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([])
     const [companyInfo, setCompanyInfo] = useState<Record<string, string>>({})
@@ -138,6 +144,8 @@ export default function WorkOrdersPage() {
     const [search, setSearch] = useState('')
     const [filterStatus, setFilterStatus] = useState('')
     const [filterType, setFilterType] = useState('')
+    const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
+    const [filterBusinessCategoryId, setFilterBusinessCategoryId] = useState('')
 
     // Form state
     const [form, setForm] = useState(defaultForm)
@@ -153,7 +161,7 @@ export default function WorkOrdersPage() {
 
     // Report Form State
     const [reportModalOpen, setReportModalOpen] = useState(false)
-    const [reportForm, setReportForm] = useState({ description: '', progress: '0', reportedBy: '', taskId: '' })
+    const [reportForm, setReportForm] = useState({ description: '', progress: '0', reportedBy: '', taskId: '', checklist: {} as any })
     const [reportPhotos, setReportPhotos] = useState<File[]>([])
     const [submittingReport, setSubmittingReport] = useState(false)
     const [activeTab, setActiveTab] = useState<'INFO' | 'REPORTS'>('INFO')
@@ -176,19 +184,28 @@ export default function WorkOrdersPage() {
             if (search) params.set('search', search)
             if (filterStatus) params.set('status', filterStatus)
             if (filterType) params.set('type', filterType)
+            if (filterBusinessCategoryId) params.set('businessCategoryId', filterBusinessCategoryId)
 
             const endpoints = [
                 { name: 'work-orders', url: `${process.env.NEXT_PUBLIC_API_URL}/api/work-orders?${params}` },
                 { name: 'projects', url: `${process.env.NEXT_PUBLIC_API_URL}/api/projects` },
                 { name: 'orders', url: `${process.env.NEXT_PUBLIC_API_URL}/api/orders` },
                 { name: 'customers', url: `${process.env.NEXT_PUBLIC_API_URL}/api/customers` },
+                { name: 'assets', url: `${process.env.NEXT_PUBLIC_API_URL}/api/customer-assets` },
                 { name: 'stock', url: `${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock` },
                 { name: 'warehouses', url: `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses` },
-                { name: 'company', url: `${process.env.NEXT_PUBLIC_API_URL}/api/settings/company` }
+                { name: 'company', url: `${process.env.NEXT_PUBLIC_API_URL}/api/settings/company` },
+                { name: 'business-categories', url: `${process.env.NEXT_PUBLIC_API_URL}/api/business-categories` }
             ]
 
             const results = await Promise.all(
-                endpoints.map(e => fetch(e.url, { headers: { 'x-user-role': userRole } }).then(async r => {
+                endpoints.map(e => fetch(e.url, { 
+                    headers: { 
+                        'x-user-role': userRole || '',
+                        'x-user-dept': (session?.user as any)?.department || '',
+                        'x-user-name': session?.user?.name || ''
+                    } 
+                }).then(async r => {
                     if (!r.ok) throw new Error(`Endpoint ${e.name} failed with status ${r.status}`)
                     const ct = r.headers.get('content-type')
                     if (!ct || !ct.includes('application/json')) {
@@ -204,9 +221,11 @@ export default function WorkOrdersPage() {
             setProjects(results[1])
             setSalesOrders(results[2])
             setCustomers(results[3])
-            setSkus(results[4])
-            setWarehouses(results[5])
-            setCompanyInfo(results[6] || {})
+            setAssets(results[4])
+            setSkus(results[5])
+            setWarehouses(results[6])
+            setCompanyInfo(results[7] || {})
+            setBusinessCategories(results[8] || [])
         } catch (e: any) {
             console.error('Work Order load error:', e)
             showToast('error', e.message || 'Gagal memuat data')
@@ -239,10 +258,12 @@ export default function WorkOrdersPage() {
             projectId: wo.projectId || '',
             salesOrderId: wo.salesOrderId || '',
             customerId: wo.customerId || '',
+            assetId: wo.assetId || '',
             assignedTo: wo.assignedTo || '', location: wo.location || '',
             scheduledStart: wo.scheduledStart ? wo.scheduledStart.split('T')[0] : '',
             scheduledEnd: wo.scheduledEnd ? wo.scheduledEnd.split('T')[0] : '',
-            estimatedHours: wo.estimatedHours?.toString() || '', notes: wo.notes || ''
+            estimatedHours: wo.estimatedHours?.toString() || '', notes: wo.notes || '',
+            businessCategoryId: wo.businessCategoryId || ''
         })
         setItems((wo.items || []).map(i => ({
             id: i.id, type: i.type, source: (i as any).source || 'STOCK', description: i.description, skuId: i.skuId,
@@ -281,10 +302,12 @@ export default function WorkOrdersPage() {
                 projectId: form.projectId || null,
                 salesOrderId: form.salesOrderId || null,
                 customerId: form.customerId || null,
+                assetId: form.assetId || null,
                 assignedTo: form.assignedTo, location: form.location,
                 scheduledStart: form.scheduledStart || null, scheduledEnd: form.scheduledEnd || null,
                 estimatedHours: form.estimatedHours ? parseFloat(form.estimatedHours) : null,
                 notes: form.notes,
+                businessCategoryId: form.businessCategoryId || null,
                 items: items.map(i => ({ ...i, totalCost: i.qty * i.unitCost })),
                 tasks: tasks.map(t => ({ ...t }))
             }
@@ -350,6 +373,7 @@ export default function WorkOrdersPage() {
             formData.append('progress', reportForm.progress)
             formData.append('reportedBy', reportForm.reportedBy)
             if (reportForm.taskId) formData.append('taskId', reportForm.taskId)
+            formData.append('checklist', JSON.stringify(reportForm.checklist))
             reportPhotos.forEach(file => formData.append('photos', file))
 
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders/${viewing.id}/reports`, {
@@ -365,7 +389,7 @@ export default function WorkOrdersPage() {
 
             showToast('success', 'Laporan progress berhasil dikirim')
             setReportModalOpen(false)
-            setReportForm({ description: '', progress: '0', reportedBy: '', taskId: '' })
+            setReportForm({ description: '', progress: '0', reportedBy: '', taskId: '', checklist: {} })
             setReportPhotos([])
             openDetail(viewing)
             load()
@@ -475,7 +499,7 @@ export default function WorkOrdersPage() {
     const lc = "text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block"
 
     return (
-        <div className="max-w-screen-2xl mx-auto px-4 md:px-6 py-5 md:py-6 space-y-5 md:space-y-6 font-inter w-full bg-slate-50/30 min-h-screen pb-24 md:pb-8">
+        <div className="max-w-screen mx-auto px-4 md:px-6 py-5 md:py-6 space-y-5 md:space-y-6 font-inter w-full bg-slate-50/30 min-h-screen pb-24 md:pb-8">
             <AnimatePresence>
                 {toast && (
                     <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -494,9 +518,11 @@ export default function WorkOrdersPage() {
                     </div>
                 </div>
                 <div className="flex gap-2 w-full md:w-auto">
-                    <Button onClick={openCreate} className="hidden md:flex rounded-xl bg-amber-600 hover:bg-amber-700 text-white h-10 px-5 text-xs font-bold uppercase tracking-wider shadow-lg shadow-amber-600/20 active:scale-95 transition-all">
-                        <Plus size={14} className="mr-2" /> Work Order Baru
-                    </Button>
+                    {userRole !== 'OPERATIONAL' && (
+                        <Button onClick={openCreate} className="hidden md:flex rounded-xl bg-amber-600 hover:bg-amber-700 text-white h-10 px-5 text-xs font-bold uppercase tracking-wider shadow-lg shadow-amber-600/20 active:scale-95 transition-all">
+                            <Plus size={14} className="mr-2" /> Work Order Baru
+                        </Button>
+                    )}
                     <Button variant="outline" onClick={load} className="flex-1 md:flex-none rounded-xl border-slate-200 text-slate-600 h-10 px-4 md:w-10 md:px-0 flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider">
                         <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
                         <span className="md:hidden">Refresh</span>
@@ -505,12 +531,14 @@ export default function WorkOrdersPage() {
             </header>
 
             {/* Mobile FAB */}
-            <button
-                onClick={openCreate}
-                className="md:hidden fixed bottom-24 right-6 z-[100] w-14 h-14 bg-amber-600 text-white rounded-full shadow-[0_8px_30px_rgb(217,119,6,0.4)] flex items-center justify-center active:scale-90 transition-all border-4 border-white"
-            >
-                <Plus size={28} strokeWidth={3} />
-            </button>
+            {userRole !== 'OPERATIONAL' && (
+                <button
+                    onClick={openCreate}
+                    className="md:hidden fixed bottom-24 right-6 z-[100] w-14 h-14 bg-amber-600 text-white rounded-full shadow-[0_8px_30px_rgb(217,119,6,0.4)] flex items-center justify-center active:scale-90 transition-all border-4 border-white"
+                >
+                    <Plus size={28} strokeWidth={3} />
+                </button>
+            )}
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 {[
@@ -539,7 +567,7 @@ export default function WorkOrdersPage() {
                 <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
                     <div className="relative shrink-0">
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none md:hidden"><ChevronDown size={14} /></div>
-                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} 
+                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
                             className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider outline-none shadow-sm focus:border-amber-500 whitespace-nowrap appearance-none md:appearance-auto pl-8 md:pl-3">
                             <option value="">Status</option>
                             {Object.entries(WO_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -547,10 +575,18 @@ export default function WorkOrdersPage() {
                     </div>
                     <div className="relative shrink-0">
                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none md:hidden"><ChevronDown size={14} /></div>
-                        <select value={filterType} onChange={e => setFilterType(e.target.value)} 
+                        <select value={filterType} onChange={e => setFilterType(e.target.value)}
                             className="bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider outline-none shadow-sm focus:border-amber-500 whitespace-nowrap appearance-none md:appearance-auto pl-8 md:pl-3">
                             <option value="">Tipe</option>
                             {Object.entries(WO_TYPE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                        </select>
+                    </div>
+                    <div className="relative shrink-0">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-400 pointer-events-none md:hidden"><ChevronDown size={14} /></div>
+                        <select value={filterBusinessCategoryId} onChange={e => setFilterBusinessCategoryId(e.target.value)}
+                            className="bg-rose-50/30 border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-rose-600 uppercase tracking-wider outline-none shadow-sm focus:border-rose-500 whitespace-nowrap appearance-none md:appearance-auto pl-8 md:pl-3">
+                            <option value="">All Units</option>
+                            {businessCategories.map(biz => <option key={biz.id} value={biz.id}>{biz.name}</option>)}
                         </select>
                     </div>
                 </div>
@@ -560,170 +596,187 @@ export default function WorkOrdersPage() {
                 <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600" /></div>
             ) : (
                 <>
-                {/* Desktop Table */}
-                <div className="hidden md:block bg-white rounded-3xl border border-slate-100 shadow-sm overflow-x-auto">
-                    <table className="w-full text-sm min-w-[800px]">
-                        <thead>
-                            <tr className="border-b border-slate-100">
-                                <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Nomor / Judul</th>
-                                <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipe</th>
-                                <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Referensi</th>
-                                <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">PIC / Lokasi</th>
-                                <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Jadwal</th>
-                                <th className="px-5 py-3.5 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Progress</th>
-                                <th className="px-5 py-3.5 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                                <th className="px-5 py-3.5"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                            {wos.map(wo => {
-                                const doneTasks = wo.tasks?.filter(t => t.isDone).length || 0
-                                const totalTasks = wo.tasks?.length || 0
-                                const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : null
-                                return (
-                                    <tr key={wo.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => openDetail(wo)}>
-                                        <td className="px-5 py-4">
-                                            <div className="flex items-center gap-2 mb-0.5">
-                                                <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${WO_PRIORITY[wo.priority]}`}>{wo.priority}</span>
-                                            </div>
-                                            <p className="font-black text-xs text-amber-600">{wo.number}</p>
-                                            <p className="font-semibold text-slate-800 text-sm leading-tight">{wo.title}</p>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${WO_TYPE[wo.type]?.color}`}>
-                                                {WO_TYPE[wo.type]?.icon} {wo.type}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-4 text-xs text-slate-500">
-                                            {wo.project && <p className="font-semibold text-indigo-600">{wo.project.number}</p>}
-                                            {wo.customer && <p>{wo.customer.name}</p>}
-                                        </td>
-                                        <td className="px-5 py-4 text-xs text-slate-500">
-                                            {wo.assignedTo && <p className="flex items-center gap-1"><User size={10} /> {wo.assignedTo}</p>}
-                                            {wo.location && <p className="flex items-center gap-1"><MapPin size={10} /> {wo.location}</p>}
-                                        </td>
-                                        <td className="px-5 py-4 text-xs text-slate-500">
-                                            {wo.scheduledStart && <p>{fmtDate(wo.scheduledStart)}</p>}
-                                        </td>
-                                        <td className="px-5 py-4 text-center">
-                                            {pct !== null ? (
-                                                <div>
-                                                    <div className="w-16 h-1.5 bg-slate-100 rounded-full mx-auto"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${pct}%` }} /></div>
-                                                    <p className="text-[9px] font-bold text-slate-400 mt-1">{doneTasks}/{totalTasks}</p>
+                    {/* Desktop Table */}
+                    <div className="hidden md:block bg-white rounded-3xl border border-slate-100 shadow-sm overflow-x-auto">
+                        <table className="w-full text-sm min-w-[800px]">
+                            <thead>
+                                <tr className="border-b border-slate-100">
+                                    <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Nomor / Judul</th>
+                                    <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Tipe</th>
+                                    <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Referensi</th>
+                                    <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">PIC / Lokasi</th>
+                                    <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest text-nowrap">Business Unit</th>
+                                    <th className="px-5 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Jadwal</th>
+                                    <th className="px-5 py-3.5 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Progress</th>
+                                    <th className="px-5 py-3.5 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                                    <th className="px-5 py-3.5"></th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {wos.map(wo => {
+                                    const doneTasks = wo.tasks?.filter(t => t.isDone).length || 0
+                                    const totalTasks = wo.tasks?.length || 0
+                                    const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : null
+                                    return (
+                                        <tr key={wo.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer" onClick={() => openDetail(wo)}>
+                                            <td className="px-5 py-4">
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase ${WO_PRIORITY[wo.priority]}`}>{wo.priority}</span>
                                                 </div>
-                                            ) : <span className="text-[9px] text-slate-300">—</span>}
-                                        </td>
-                                        <td className="px-5 py-4 text-center">
-                                            <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider border ${WO_STATUS[wo.status]?.color}`}>{WO_STATUS[wo.status]?.label}</span>
-                                        </td>
-                                        <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                                            <div className="flex gap-1 justify-end">
-                                                <button onClick={() => { openEdit(wo); }} className="w-7 h-7 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors"><Edit size={13} /></button>
-                                                {['DRAFT', 'CANCELLED'].includes(wo.status) && (
-                                                    <button onClick={() => handleDelete(wo)} className="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"><Trash2 size={13} /></button>
+                                                <p className="font-black text-xs text-amber-600">{wo.number}</p>
+                                                <p className="font-semibold text-slate-800 text-sm leading-tight">{wo.title}</p>
+                                            </td>
+                                            <td className="px-5 py-4">
+                                                <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${WO_TYPE[wo.type]?.color}`}>
+                                                    {WO_TYPE[wo.type]?.icon} {wo.type}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-4 text-xs text-slate-500">
+                                                {wo.project && <p className="font-semibold text-indigo-600">{wo.project.number}</p>}
+                                                {wo.customer && <p>{wo.customer.name}</p>}
+                                            </td>
+                                            <td className="px-5 py-4 text-xs text-slate-500">
+                                                {wo.assignedTo && <p className="flex items-center gap-1"><User size={10} /> {wo.assignedTo}</p>}
+                                                {wo.location && <p className="flex items-center gap-1"><MapPin size={10} /> {wo.location}</p>}
+                                            </td>
+                                            <td className="px-5 py-4">
+                                                {wo.businessCategory ? (
+                                                    <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-rose-50 text-rose-600 border border-rose-100">
+                                                        {wo.businessCategory.name}
+                                                    </span>
+                                                ) : <span className="text-[9px] text-slate-300">—</span>}
+                                            </td>
+                                            <td className="px-5 py-4 text-xs text-slate-500">
+                                                {wo.scheduledStart && <p>{fmtDate(wo.scheduledStart)}</p>}
+                                            </td>
+                                            <td className="px-5 py-4 text-center">
+                                                {pct !== null ? (
+                                                    <div>
+                                                        <div className="w-16 h-1.5 bg-slate-100 rounded-full mx-auto"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${pct}%` }} /></div>
+                                                        <p className="text-[9px] font-bold text-slate-400 mt-1">{doneTasks}/{totalTasks}</p>
+                                                    </div>
+                                                ) : <span className="text-[9px] text-slate-300">—</span>}
+                                            </td>
+                                            <td className="px-5 py-4 text-center">
+                                                <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider border ${WO_STATUS[wo.status]?.color}`}>{WO_STATUS[wo.status]?.label}</span>
+                                            </td>
+                                            <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                                                {userRole !== 'OPERATIONAL' && (
+                                                    <div className="flex gap-1 justify-end">
+                                                        <button onClick={() => { openEdit(wo); }} className="w-7 h-7 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors"><Edit size={13} /></button>
+                                                        {['DRAFT', 'CANCELLED'].includes(wo.status) && (
+                                                            <button onClick={() => handleDelete(wo)} className="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"><Trash2 size={13} /></button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile Card List */}
+                    <div className="md:hidden space-y-4">
+                        {wos.length === 0 ? (
+                            <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-slate-200">
+                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <HardHat size={32} className="text-slate-300" />
+                                </div>
+                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-10">Belum ada Work Order yang tersedia</p>
+                            </div>
+                        ) : wos.map(wo => {
+                            const doneTasks = wo.tasks?.filter(t => t.isDone).length || 0
+                            const totalTasks = wo.tasks?.length || 0
+                            const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : null
+                            const statusCfg = WO_STATUS[wo.status]
+                            const typeCfg = WO_TYPE[wo.type]
+                            return (
+                                <motion.div key={wo.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                                    onClick={() => openDetail(wo)}
+                                    className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4 relative overflow-hidden active:scale-[0.98] transition-all cursor-pointer">
+                                    <div className={`absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 rounded-full opacity-[0.03] pointer-events-none ${statusCfg?.color?.split(' ')[0]}`} />
+
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${WO_PRIORITY[wo.priority]}`}>{wo.priority}</span>
+                                                <span className="text-[11px] font-black text-amber-600 tracking-tighter">{wo.number}</span>
+                                            </div>
+                                            <h3 className="text-[15px] font-black text-slate-900 leading-tight mb-1">{wo.title}</h3>
+                                            <div className="flex items-center gap-1.5 text-slate-500">
+                                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${typeCfg?.color}`}>{typeCfg?.label}</span>
+                                                {wo.businessCategory && (
+                                                    <span className="px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest bg-rose-50 text-rose-600 border border-rose-100">
+                                                        {wo.businessCategory.name}
+                                                    </span>
                                                 )}
                                             </div>
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Mobile Card List */}
-                <div className="md:hidden space-y-4">
-                    {wos.length === 0 ? (
-                        <div className="py-20 text-center bg-white rounded-3xl border border-dashed border-slate-200">
-                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <HardHat size={32} className="text-slate-300" />
-                            </div>
-                            <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-10">Belum ada Work Order yang tersedia</p>
-                        </div>
-                    ) : wos.map(wo => {
-                        const doneTasks = wo.tasks?.filter(t => t.isDone).length || 0
-                        const totalTasks = wo.tasks?.length || 0
-                        const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : null
-                        const statusCfg = WO_STATUS[wo.status]
-                        const typeCfg = WO_TYPE[wo.type]
-                        return (
-                            <motion.div key={wo.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                                onClick={() => openDetail(wo)}
-                                className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4 relative overflow-hidden active:scale-[0.98] transition-all cursor-pointer">
-                                <div className={`absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 rounded-full opacity-[0.03] pointer-events-none ${statusCfg?.color?.split(' ')[0]}`} />
-                                
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${WO_PRIORITY[wo.priority]}`}>{wo.priority}</span>
-                                            <span className="text-[11px] font-black text-amber-600 tracking-tighter">{wo.number}</span>
                                         </div>
-                                        <h3 className="text-[15px] font-black text-slate-900 leading-tight mb-1">{wo.title}</h3>
-                                        <div className="flex items-center gap-1.5 text-slate-500">
-                                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${typeCfg?.color}`}>{typeCfg?.label}</span>
-                                        </div>
+                                        <span className={`shrink-0 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border shadow-sm ${statusCfg?.color}`}>{statusCfg?.label}</span>
                                     </div>
-                                    <span className={`shrink-0 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border shadow-sm ${statusCfg?.color}`}>{statusCfg?.label}</span>
-                                </div>
 
-                                <div className="grid grid-cols-2 gap-3 pt-1">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 bg-slate-50 rounded-lg flex items-center justify-center shrink-0"><User size={12} className="text-slate-400" /></div>
-                                        <div className="min-w-0">
-                                            <p className="text-[8px] font-black text-slate-400 uppercase leading-none mb-0.5">Assigned To</p>
-                                            <p className="text-[11px] font-bold text-slate-700 truncate">{wo.assignedTo || 'Unassigned'}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 bg-slate-50 rounded-lg flex items-center justify-center shrink-0"><Calendar size={12} className="text-slate-400" /></div>
-                                        <div className="min-w-0">
-                                            <p className="text-[8px] font-black text-slate-400 uppercase leading-none mb-0.5">Schedule</p>
-                                            <p className="text-[11px] font-bold text-slate-700 truncate">{fmtDate(wo.scheduledStart)}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {pct !== null && (
-                                    <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100/50">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Job Progress</span>
+                                    <div className="grid grid-cols-2 gap-3 pt-1">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 bg-slate-50 rounded-lg flex items-center justify-center shrink-0"><User size={12} className="text-slate-400" /></div>
+                                            <div className="min-w-0">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase leading-none mb-0.5">Assigned To</p>
+                                                <p className="text-[11px] font-bold text-slate-700 truncate">{wo.assignedTo || 'Unassigned'}</p>
                                             </div>
-                                            <span className="text-[10px] font-black text-amber-600">{doneTasks}/{totalTasks} Task</span>
                                         </div>
-                                        <div className="h-2 bg-slate-200/50 rounded-full overflow-hidden">
-                                            <motion.div 
-                                                initial={{ width: 0 }} 
-                                                animate={{ width: `${pct}%` }} 
-                                                className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all shadow-[0_0_8px_rgba(245,158,11,0.3)]" 
-                                            />
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 bg-slate-50 rounded-lg flex items-center justify-center shrink-0"><Calendar size={12} className="text-slate-400" /></div>
+                                            <div className="min-w-0">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase leading-none mb-0.5">Schedule</p>
+                                                <p className="text-[11px] font-bold text-slate-700 truncate">{fmtDate(wo.scheduledStart)}</p>
+                                            </div>
                                         </div>
                                     </div>
-                                )}
 
-                                <div className="flex items-center justify-between pt-1 border-t border-slate-50">
-                                    <div className="flex -space-x-1.5">
-                                        {/* Avatar stack or just a placeholder */}
-                                        <div className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-slate-400 uppercase">{wo.assignedTo?.substring(0, 1) || '?'}</div>
-                                    </div>
-                                    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                        <button onClick={() => openEdit(wo)}
-                                            className="h-9 px-3 rounded-xl bg-indigo-50 text-indigo-600 flex items-center gap-1.5 border border-indigo-100 active:scale-95 transition-all text-[10px] font-black uppercase tracking-wider">
-                                            <Edit size={14} /> Edit
-                                        </button>
-                                        {['DRAFT', 'CANCELLED'].includes(wo.status) && (
-                                            <button onClick={() => handleDelete(wo)}
-                                                className="h-9 px-3 rounded-xl bg-rose-50 text-rose-600 flex items-center gap-1.5 border border-rose-100 active:scale-95 transition-all text-[10px] font-black uppercase tracking-wider">
-                                                <Trash2 size={14} /> Hapus
-                                            </button>
+                                    {pct !== null && (
+                                        <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100/50">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Job Progress</span>
+                                                </div>
+                                                <span className="text-[10px] font-black text-amber-600">{doneTasks}/{totalTasks} Task</span>
+                                            </div>
+                                            <div className="h-2 bg-slate-200/50 rounded-full overflow-hidden">
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${pct}%` }}
+                                                    className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all shadow-[0_0_8px_rgba(245,158,11,0.3)]"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center justify-between pt-1 border-t border-slate-50">
+                                        <div className="flex -space-x-1.5">
+                                            {/* Avatar stack or just a placeholder */}
+                                            <div className="w-6 h-6 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-slate-400 uppercase">{wo.assignedTo?.substring(0, 1) || '?'}</div>
+                                        </div>
+                                        {userRole !== 'OPERATIONAL' && (
+                                            <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                                <button onClick={() => openEdit(wo)}
+                                                    className="h-9 px-3 rounded-xl bg-indigo-50 text-indigo-600 flex items-center gap-1.5 border border-indigo-100 active:scale-95 transition-all text-[10px] font-black uppercase tracking-wider">
+                                                    <Edit size={14} /> Edit
+                                                </button>
+                                                {['DRAFT', 'CANCELLED'].includes(wo.status) && (
+                                                    <button onClick={() => handleDelete(wo)}
+                                                        className="h-9 px-3 rounded-xl bg-rose-50 text-rose-600 flex items-center gap-1.5 border border-rose-100 active:scale-95 transition-all text-[10px] font-black uppercase tracking-wider">
+                                                        <Trash2 size={14} /> Hapus
+                                                    </button>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
-                                </div>
-                            </motion.div>
-                        )
-                    })}
-                </div>
+                                </motion.div>
+                            )
+                        })}
+                    </div>
                 </>
             )}
 
@@ -732,10 +785,10 @@ export default function WorkOrdersPage() {
                 {detailOpen && viewing && (
                     <div className="fixed inset-0 z-[150] flex items-end md:items-stretch md:justify-end text-slate-900">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDetailOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-                        <motion.div 
-                            initial={isMobile ? { y: '100%' } : { x: '100%' }} 
-                            animate={isMobile ? { y: 0 } : { x: 0 }} 
-                            exit={isMobile ? { y: '100%' } : { x: '100%' }} 
+                        <motion.div
+                            initial={isMobile ? { y: '100%' } : { x: '100%' }}
+                            animate={isMobile ? { y: 0 } : { x: 0 }}
+                            exit={isMobile ? { y: '100%' } : { x: '100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                             className="relative w-full md:max-w-2xl bg-white h-[92vh] md:h-full overflow-y-auto shadow-2xl flex flex-col rounded-t-[2.5rem] md:rounded-none">
 
@@ -771,11 +824,13 @@ export default function WorkOrdersPage() {
                                     <>
                                         <div className="grid grid-cols-2 gap-4">
                                             <InfoBlock label="Pelanggan" value={viewing.customer?.name} />
+                                            <InfoBlock label="Aset / Unit" value={viewing.asset ? `[${viewing.asset.category}] ${viewing.asset.name} ${viewing.asset.serialNumber ? `(${viewing.asset.serialNumber})` : ''}` : undefined} icon={<Box size={11} className="text-indigo-600" />} />
                                             <InfoBlock label="PIC / Teknisi" value={viewing.assignedTo} />
                                             <InfoBlock label="Lokasi" value={viewing.location} icon={<MapPin size={11} className="text-slate-400" />} />
                                             <InfoBlock label="Project" value={viewing.project ? `${viewing.project.number} — ${viewing.project.name}` : undefined} />
                                             <InfoBlock label="Jadwal Mulai" value={fmtDate(viewing.scheduledStart)} />
                                             <InfoBlock label="Jadwal Selesai" value={fmtDate(viewing.scheduledEnd)} />
+                                            <InfoBlock label="Business Unit" value={viewing.businessCategory?.name} icon={<Wind size={11} className="text-rose-600" />} />
                                         </div>
 
                                         {viewing.description && (
@@ -870,6 +925,24 @@ export default function WorkOrdersPage() {
                                                             </button>
                                                         </div>
                                                         <p className="text-xs text-slate-600 leading-relaxed font-medium mb-4 whitespace-pre-wrap">{report.description}</p>
+
+                                                        {report.checklist && typeof report.checklist === 'object' && Object.keys(report.checklist).length > 0 && (
+                                                            <div className="mb-4 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                {Object.entries(report.checklist).map(([k, v]) => (
+                                                                    <div key={k} className="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                                                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight leading-tight flex-1">{k}</span>
+                                                                        <div className="shrink-0">
+                                                                            {typeof v === 'boolean' ? (
+                                                                                v ? <CheckCircle2 size={14} className="text-emerald-500" /> : <XCircle size={14} className="text-slate-200" />
+                                                                            ) : (
+                                                                                <span className="text-[10px] font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded uppercase">{v as string}</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
                                                         {report.photos && report.photos.length > 0 && (
                                                             <div className="grid grid-cols-2 gap-2">
                                                                 {report.photos.map(p => (
@@ -900,12 +973,12 @@ export default function WorkOrdersPage() {
             <AnimatePresence>
                 {modalOpen && (
                     <div className="fixed inset-0 z-[200] flex items-end md:items-start justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto pt-0 md:pt-6 text-slate-900">
-                        <motion.div 
-                            initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }} 
-                            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }} 
+                        <motion.div
+                            initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }}
+                            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }}
                             exit={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }}
                             className="bg-white rounded-t-[2.5rem] md:rounded-3xl shadow-2xl w-full max-w-4xl min-h-[90vh] md:min-h-0 md:my-4 overflow-hidden flex flex-col">
-                            
+
                             {/* Mobile Drag Handle for Modal */}
                             <div className="md:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-1 shrink-0" />
                             <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 sticky top-0 bg-white z-10 rounded-t-3xl">
@@ -919,6 +992,13 @@ export default function WorkOrdersPage() {
                                 <Section title="Informasi Dasar" icon={<Wrench size={14} className="text-amber-500" />}>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="md:col-span-2"><label className={lc}>Judul Pekerjaan <span className="text-rose-500">*</span></label><input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Instalasi CCTV Gedung A Lt.3" className={ic} /></div>
+                                        <div>
+                                            <label className={lc}>Business Unit <span className="text-rose-500">*</span></label>
+                                            <select required value={form.businessCategoryId} onChange={e => setForm({ ...form, businessCategoryId: e.target.value })} className={ic + " bg-rose-50/30 border-rose-200 text-rose-700"}>
+                                                <option value="">— Pilih Unit Bisnis —</option>
+                                                {businessCategories.map(biz => <option key={biz.id} value={biz.id}>{biz.name}</option>)}
+                                            </select>
+                                        </div>
                                         <div>
                                             <label className={lc}>Tipe Pekerjaan</label>
                                             <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className={ic}>
@@ -953,6 +1033,18 @@ export default function WorkOrdersPage() {
                                             <select required value={form.customerId} onChange={e => handleCustomerChange(e.target.value)} className={ic}>
                                                 <option value="">— Pilih Pelanggan —</option>
                                                 {customers.map(c => <option key={c.id} value={c.id}>[{c.code}] {c.name}</option>)}
+                                            </select>
+                                        </div>
+                                        <div><label className={lc}>Aset / Unit (Opsional)</label>
+                                            <select value={form.assetId} onChange={e => {
+                                                const assetId = e.target.value
+                                                const asset = assets.find(a => a.id === assetId)
+                                                setForm({ ...form, assetId, location: asset?.brand ? `${asset.brand} ${asset.model || ''}` : form.location })
+                                            }} className={ic}>
+                                                <option value="">— Pilih Unit Aset —</option>
+                                                {assets.filter(a => a.customerId === form.customerId).map(a => (
+                                                    <option key={a.id} value={a.id}>[{a.category}] {a.name} — {a.serialNumber || 'No SN'}</option>
+                                                ))}
                                             </select>
                                         </div>
                                         <div><label className={lc}>PIC / Teknisi</label><input value={form.assignedTo} onChange={e => setForm({ ...form, assignedTo: e.target.value })} placeholder="Nama teknisi" className={ic} /></div>
@@ -1061,15 +1153,15 @@ export default function WorkOrdersPage() {
             <AnimatePresence>
                 {expenseModalOpen && viewing && (
                     <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm text-slate-900">
-                        <motion.div 
-                            initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }} 
-                            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }} 
+                        <motion.div
+                            initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }}
+                            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }}
                             exit={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }}
                             className="bg-white rounded-t-[2rem] md:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden pb-8 md:pb-0">
-                            
+
                             {/* Mobile Drag Handle */}
                             <div className="md:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-1 shrink-0" />
-                            
+
                             <div className="flex items-center justify-between px-6 py-4 border-b border-indigo-100 bg-indigo-50/50">
                                 <h2 className="font-extrabold text-slate-900 text-sm uppercase">Request Biaya</h2>
                                 <button onClick={() => setExpenseModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-700" /></button>
@@ -1091,12 +1183,12 @@ export default function WorkOrdersPage() {
             <AnimatePresence>
                 {reportModalOpen && viewing && (
                     <div className="fixed inset-0 z-[250] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm text-slate-900">
-                        <motion.div 
-                            initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }} 
-                            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }} 
+                        <motion.div
+                            initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }}
+                            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }}
                             exit={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }}
                             className="bg-white rounded-t-[2.5rem] md:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col h-[90vh] md:h-auto md:max-h-[90vh]">
-                            
+
                             {/* Mobile Drag Handle */}
                             <div className="md:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-1 shrink-0" />
 
@@ -1122,6 +1214,47 @@ export default function WorkOrdersPage() {
                                     <div><label className={lc}>Dilaporkan Oleh</label><input value={reportForm.reportedBy} onChange={e => setReportForm({ ...reportForm, reportedBy: e.target.value })} className={ic} /></div>
                                 </div>
                                 <div><label className={lc}>Keterangan</label><textarea required value={reportForm.description} onChange={e => setReportForm({ ...reportForm, description: e.target.value })} rows={4} className={ic} /></div>
+
+                                 {(viewing.asset?.category === 'AC' || viewing.asset?.category === 'IT' || true) && (
+                                    <div className={`${viewing.asset?.category === 'AC' ? 'bg-blue-50/50 border-blue-100' : viewing.asset?.category === 'IT' ? 'bg-indigo-50/50 border-indigo-100' : 'bg-slate-50 border-slate-100'} p-5 rounded-[2rem] border space-y-4`}>
+                                        <p className={`text-[10px] font-black ${viewing.asset?.category === 'AC' ? 'text-blue-700' : viewing.asset?.category === 'IT' ? 'text-indigo-700' : 'text-slate-600'} uppercase tracking-widest flex items-center gap-2 mb-2`}>
+                                            <SquareCheckBig size={12} /> 
+                                            Standar Pekerjaan ({viewing.asset?.category || 'Umum'})
+                                        </p>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {(CHECKLIST_TEMPLATES[viewing.asset?.category || 'GENERAL'] || CHECKLIST_TEMPLATES.GENERAL).map((item: string) => (
+                                                <label key={item} className="flex items-center gap-3 p-3 bg-white border border-slate-100 rounded-xl cursor-pointer group hover:border-amber-300 transition-all">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={!!reportForm.checklist[item]} 
+                                                        onChange={e => setReportForm({
+                                                            ...reportForm,
+                                                            checklist: { ...reportForm.checklist, [item]: e.target.checked }
+                                                        })}
+                                                        className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                                                    />
+                                                    <span className="text-[11px] font-bold text-slate-600 group-hover:text-slate-900">{item}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+
+                                        {viewing.asset?.category === 'AC' && (
+                                            <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-blue-100">
+                                                <div><label className={lc}>Pressure (PSI)</label><input type="text" value={reportForm.checklist.pressure || ''} onChange={e => setReportForm({ ...reportForm, checklist: { ...reportForm.checklist, pressure: e.target.value } })} placeholder="e.g. 140" className={ic} /></div>
+                                                <div><label className={lc}>Ampere (A)</label><input type="text" value={reportForm.checklist.ampere || ''} onChange={e => setReportForm({ ...reportForm, checklist: { ...reportForm.checklist, ampere: e.target.value } })} placeholder="e.g. 3.5" className={ic} /></div>
+                                            </div>
+                                        )}
+                                        
+                                        {viewing.asset?.category === 'IT' && (
+                                            <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-indigo-100">
+                                                <div><label className={lc}>CPU Load (%)</label><input type="text" value={reportForm.checklist.cpuLoad || ''} onChange={e => setReportForm({ ...reportForm, checklist: { ...reportForm.checklist, cpuLoad: e.target.value } })} placeholder="e.g. 45" className={ic} /></div>
+                                                <div><label className={lc}>RAM Usage (%)</label><input type="text" value={reportForm.checklist.ramUsage || ''} onChange={e => setReportForm({ ...reportForm, checklist: { ...reportForm.checklist, ramUsage: e.target.value } })} placeholder="e.g. 70" className={ic} /></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div>
                                     <label className={lc}>Foto Lapangan</label>
                                     <input type="file" multiple accept="image/*" onChange={e => { if (e.target.files) setReportPhotos([...reportPhotos, ...Array.from(e.target.files)]) }} className={ic} />

@@ -40,6 +40,11 @@ interface Category {
     name: string
 }
 
+interface BusinessCategory {
+    id: string
+    name: string
+}
+
 interface ProductSKU {
     id?: string
     code: string
@@ -73,6 +78,8 @@ interface Product {
     type: string
     categoryId: string | null
     category: Category | null
+    businessCategoryId: string | null
+    businessCategory: BusinessCategory | null
     image: string | null
     skus: ProductSKU[]
 }
@@ -132,13 +139,30 @@ export default function ProductsPage() {
         });
     }
 
+    const [selectedBusinessCategoryId, setSelectedBusinessCategoryId] = useState<string>("")
+    const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
+
     useEffect(() => {
         fetchProducts()
-    }, [])
+        fetchBusinessCategories()
+    }, [selectedBusinessCategoryId])
+
+    const fetchBusinessCategories = async () => {
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`)
+            const data = await res.json()
+            setBusinessCategories(data)
+        } catch (error) {
+            console.error("Error fetching business categories:", error)
+        }
+    }
 
     const fetchProducts = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products`)
+            const url = selectedBusinessCategoryId 
+                ? `${process.env.NEXT_PUBLIC_API_URL}/api/products?businessCategoryId=${selectedBusinessCategoryId}`
+                : `${process.env.NEXT_PUBLIC_API_URL}/api/products`
+            const res = await fetch(url)
             const data = await res.json()
             setProducts(data)
         } catch (error) {
@@ -201,6 +225,17 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                    <select
+                        value={selectedBusinessCategoryId}
+                        onChange={(e) => setSelectedBusinessCategoryId(e.target.value)}
+                        className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-[11px] font-black uppercase tracking-widest focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm cursor-pointer"
+                    >
+                        <option value="">All Business Units</option>
+                        {businessCategories.map(biz => (
+                            <option key={biz.id} value={biz.id}>{biz.name}</option>
+                        ))}
+                    </select>
+
                     <div className="relative group flex-1 sm:flex-initial">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 group-focus-within:text-indigo-600 transition-colors" size={16} />
                         <input
@@ -236,6 +271,7 @@ export default function ProductsPage() {
                                 <thead>
                                     <tr className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400 border-b border-slate-200 bg-slate-50/80">
                                         <th className="px-5 py-4 font-bold w-10"></th>
+                                        <th className="px-5 py-4 font-bold text-indigo-600">Business Unit</th>
                                         <th className="px-5 py-4 font-bold">Product / SKU</th>
                                         <th className="px-5 py-4 font-bold">Type &amp; Category</th>
                                         <th className="px-5 py-4 text-right font-bold">Total Stock</th>
@@ -271,6 +307,11 @@ export default function ProductsPage() {
                                                         >
                                                             <ChevronLeft size={14} className="-rotate-90 transition-transform" style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' }} />
                                                         </button>
+                                                    </td>
+                                                    <td className="px-4 py-4">
+                                                        <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100 font-black px-2 py-0 text-[9px] uppercase tracking-widest truncate max-w-[120px]">
+                                                            {p.businessCategory?.name || 'GENERIC'}
+                                                        </Badge>
                                                     </td>
                                                     {/* Product info */}
                                                     <td className="px-4 py-4">
@@ -938,6 +979,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
     const [selectedSkuIndex, setSelectedSkuIndex] = useState(0)
     const [categories, setCategories] = useState<Category[]>([])
     const [units, setUnits] = useState<Unit[]>([])
+    const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
 
     const getNewSku = (productCode?: string, index?: number, unitData?: Unit[]): ProductSKU => {
         const defaultUnitId = unitData?.find(u => u.name.toLowerCase() === 'pcs')?.id || (units.length > 0 ? units[0].id : '');
@@ -966,6 +1008,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
         brand: '',
         type: 'GOODS',
         categoryId: '',
+        businessCategoryId: '',
         skus: []
     })
 
@@ -984,6 +1027,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                 brand: product.brand || '',
                 type: product.type,
                 categoryId: product.categoryId || '',
+                businessCategoryId: product.businessCategoryId || '',
                 skus: product.skus ? [...product.skus] : []
             });
             setImagePreview(product.image ? `${process.env.NEXT_PUBLIC_API_URL}${product.image}` : null);
@@ -996,6 +1040,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                 brand: '',
                 type: 'GOODS',
                 categoryId: categories[0]?.id || '',
+                businessCategoryId: '',
                 skus: [getNewSku(autoCode, 0)]
             });
             setImagePreview(null);
@@ -1009,12 +1054,14 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/categories`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/units`)
             ])
-            const [catData, unitData] = await Promise.all([
+            const [catData, unitData, bizData] = await Promise.all([
                 catRes.json(),
-                unitRes.json()
+                unitRes.json(),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`).then(r => r.json())
             ])
             setCategories(catData)
             setUnits(unitData)
+            setBusinessCategories(bizData)
 
             // No longer setting default unit here as it's handled in the useEffect for product
         } catch (error) {
@@ -1058,7 +1105,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
 
         const formDataPayload = new FormData();
         Object.entries(formData).forEach(([key, value]) => {
-            if (['category', 'unit', 'purchaseUnit', 'priceHistory'].includes(key)) return;
+            if (['category', 'unit', 'purchaseUnit', 'priceHistory', 'businessCategory'].includes(key)) return;
             if (key === 'image' && imageFile) return;
             if (key === 'skus') {
                 formDataPayload.append(key, JSON.stringify(value));
@@ -1292,6 +1339,19 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                                                         >
                                                             <option value="">Select Category</option>
                                                             {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                                                        </select>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <label className="text-[11px] font-semibold uppercase tracking-wider text-rose-500 ml-1">Business Unit <span className="text-rose-500">*</span></label>
+                                                        <select
+                                                            required
+                                                            value={formData.businessCategoryId || ''}
+                                                            onChange={e => setFormData({ ...formData, businessCategoryId: e.target.value })}
+                                                            className="w-full bg-rose-50/30 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm"
+                                                        >
+                                                            <option value="">Select Business Unit</option>
+                                                            {businessCategories.map(biz => <option key={biz.id} value={biz.id}>{biz.name}</option>)}
                                                         </select>
                                                     </div>
 

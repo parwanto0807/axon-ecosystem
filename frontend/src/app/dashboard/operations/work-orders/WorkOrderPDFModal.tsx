@@ -19,6 +19,7 @@ interface WorkOrder {
     estimatedHours: number | null; actualHours: number | null
     customer: Customer | null; project: Project | null; salesOrder: SalesOrder | null
     items: WorkOrderItem[]; tasks: WorkOrderTask[]
+    reports: any[]
 }
 
 const WO_TYPE: Record<string, string> = {
@@ -194,6 +195,45 @@ export default function WorkOrderPDFModal({ workOrder, company, onClose }:
                 doc.setFont('helvetica', 'bold').setFontSize(7).setTextColor(...gray).text('CATATAN TAMBAHAN', M + 4, y + 5)
                 doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(71, 85, 105).text(nl, M + 4, y + 10)
                 y += nh + 8
+            }
+
+            // Reports & Checklist (if any)
+            if (workOrder.reports && workOrder.reports.length > 0) {
+                if (y > 230) { doc.addPage(); y = 20 }
+                doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(...dark).text('LAPORAN HASIL PEKERJAAN & CHECKLIST', M, y + 4)
+                y += 6
+                workOrder.reports.forEach((r, idx) => {
+                    if (y > 250) { doc.addPage(); y = 20 }
+                    
+                    autoTable(doc, {
+                        startY: y, margin: { left: M, right: M },
+                        head: [['Tgl Laporan', 'Progress', 'Pelapor']],
+                        body: [[fd(r.date), `${r.progress}%`, r.reportedBy || '-']],
+                        headStyles: { fillColor: gray, textColor: white, fontSize: 7, halign: 'center' },
+                        bodyStyles: { fontSize: 7, textColor: dark, halign: 'center' },
+                        styles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+                    })
+                    y = (doc as any).lastAutoTable.finalY
+
+                    if (r.description) {
+                        const dl = doc.splitTextToSize(r.description, W - M * 2 - 4)
+                        doc.setFont('helvetica', 'normal').setFontSize(7).setTextColor(...dark).text(dl, M + 2, y + 4)
+                        y += dl.length * 3.5 + 5
+                    }
+
+                    if (r.checklist && typeof r.checklist === 'object' && Object.keys(r.checklist).length > 0) {
+                        const clData = Object.entries(r.checklist).map(([k, v]) => [k, typeof v === 'boolean' ? (v ? 'YES' : 'NO') : String(v)])
+                        autoTable(doc, {
+                            startY: y, margin: { left: M + 5, right: M + 5 },
+                            body: clData,
+                            bodyStyles: { fontSize: 6, textColor: [100, 116, 139] },
+                            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 }, 1: { halign: 'right' } },
+                            styles: { lineColor: [241, 245, 249], lineWidth: 0.1 },
+                        })
+                        y = (doc as any).lastAutoTable.finalY + 4
+                    }
+                })
+                y += 4
             }
 
             // Signatures
@@ -386,6 +426,37 @@ export default function WorkOrderPDFModal({ workOrder, company, onClose }:
                             <div className="bg-slate-50 rounded-lg p-4 mb-6 text-[10px]">
                                 <p className="font-black text-[9px] text-slate-400 uppercase tracking-widest mb-2">Catatan Tambahan</p>
                                 <p className="text-slate-600 whitespace-pre-line leading-relaxed">{workOrder.notes}</p>
+                            </div>
+                        )}
+
+                        {/* Recent Reports & Checklists */}
+                        {workOrder.reports && workOrder.reports.length > 0 && (
+                            <div className="mb-6">
+                                <p className="font-bold text-[11px] text-slate-900 mb-2 uppercase">Laporan & Hasil Checklist</p>
+                                <div className="space-y-4">
+                                    {workOrder.reports.map((r, i) => (
+                                        <div key={i} className="border border-slate-200 rounded-xl p-4 bg-white">
+                                            <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
+                                                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter">{fd(r.date)} — Progress: {r.progress}%</span>
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Pelapor: {r.reportedBy || '-'}</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-700 mb-3 whitespace-pre-wrap">{r.description}</p>
+                                            
+                                            {r.checklist && typeof r.checklist === 'object' && Object.keys(r.checklist).length > 0 && (
+                                                <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                    {Object.entries(r.checklist).map(([k, v]) => (
+                                                        <div key={k} className="flex justify-between items-center border-b border-slate-200/50 pb-1">
+                                                            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight">{k}</span>
+                                                            <span className="text-[9px] font-black text-slate-800">
+                                                                {typeof v === 'boolean' ? (v ? '☑' : '☐') : (v as string)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
 

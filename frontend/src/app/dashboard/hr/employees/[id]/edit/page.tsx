@@ -15,7 +15,9 @@ import {
     MapPin,
     ShieldCheck,
     CreditCard,
-    Calendar
+    Calendar,
+    Tag,
+    Building2
 } from "lucide-react"
 import Link from "next/link"
 
@@ -26,6 +28,8 @@ export default function EditEmployeePage() {
     const { id } = useParams()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [categories, setCategories] = useState<any[]>([])
+    const [businessCategories, setBusinessCategories] = useState<any[]>([])
     const [formData, setFormData] = useState({
         name: "",
         nik: "",
@@ -41,12 +45,38 @@ export default function EditEmployeePage() {
         dailyWage: 0,
         bankName: "",
         bankAccount: "",
-        vendorId: ""
+        vendorId: "",
+        categoryId: "",
+        businessCategoryId: ""
     })
 
     useEffect(() => {
-        if (id) fetchEmployee()
+        if (id) {
+            fetchEmployee()
+            fetchCategories()
+            fetchBusinessCategories()
+        }
     }, [id])
+
+    const fetchCategories = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/hr/employee-categories`)
+            const data = await res.json()
+            setCategories(data)
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
+    const fetchBusinessCategories = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/business-categories`)
+            const data = await res.json()
+            setBusinessCategories(data)
+        } catch (e) {
+            console.error(e)
+        }
+    }
 
     const fetchEmployee = async () => {
         try {
@@ -55,7 +85,9 @@ export default function EditEmployeePage() {
             setFormData({
                 ...data,
                 joinDate: data.joinDate ? data.joinDate.split('T')[0] : "",
-                vendorId: data.vendorId || ""
+                vendorId: data.vendorId || "",
+                categoryId: data.categoryId || "",
+                businessCategoryId: data.businessCategoryId || ""
             })
         } catch (e) {
             console.error(e)
@@ -252,6 +284,41 @@ export default function EditEmployeePage() {
                                         value={formData.department}
                                         onChange={e => setFormData({...formData, department: e.target.value})}
                                     />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Departemen / Kumpulan</label>
+                                <div className="relative">
+                                    <Tag className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                                    <select 
+                                        className="w-full bg-slate-50 pl-11 pr-5 py-4 rounded-2xl border-none text-xs font-black focus:ring-2 ring-indigo-500/10 outline-none appearance-none"
+                                        value={formData.categoryId}
+                                        onChange={e => setFormData({...formData, categoryId: e.target.value})}
+                                    >
+                                        <option value="">Pilih Kategori Karyawan...</option>
+                                        {categories.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest pl-1">Unit Bisnis (Multi-Business) *</label>
+                                <div className="relative">
+                                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-rose-300 w-4 h-4" />
+                                    <select 
+                                        required
+                                        className="w-full bg-rose-50/30 pl-11 pr-5 py-4 rounded-2xl border-none text-xs font-black text-slate-900 focus:ring-2 ring-indigo-500/10 outline-none appearance-none"
+                                        value={formData.businessCategoryId}
+                                        onChange={e => setFormData({...formData, businessCategoryId: e.target.value})}
+                                    >
+                                        <option value="">Pilih Unit Bisnis...</option>
+                                        {businessCategories.map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
 

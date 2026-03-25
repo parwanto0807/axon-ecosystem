@@ -21,6 +21,14 @@ const managementModules = [
         icon: Users,
         path: '/dashboard/management/customers',
         color: '#22d3ee'
+    },
+    {
+        id: 'assets',
+        name: 'Master Assets',
+        description: 'Manage customer units (AC, IT) for maintenance tracking and automated scheduling.',
+        icon: Box,
+        path: '/dashboard/management/assets',
+        color: '#f59e0b'
     }
 ]
 

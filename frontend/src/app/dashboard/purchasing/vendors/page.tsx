@@ -3,6 +3,12 @@
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Plus, Users, Search, Edit2, Trash2, Mail, Phone, Building2, MapPin, Loader2, AlertCircle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+
+interface BusinessCategory {
+    id: string;
+    name: string;
+}
 
 interface Vendor {
     id: string;
@@ -14,6 +20,8 @@ interface Vendor {
     company: string | null;
     taxId: string | null;
     taxAddress: string | null;
+    businessCategoryId: string | null;
+    businessCategory: BusinessCategory | null;
     isActive: boolean;
 }
 
@@ -26,15 +34,20 @@ export default function VendorsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
     const [formData, setFormData] = useState<Partial<Vendor>>({
-        name: '', email: '', phone: '', company: '', address: '', taxId: '', taxAddress: '', isActive: true
+        name: '', email: '', phone: '', company: '', address: '', taxId: '', taxAddress: '', businessCategoryId: '', isActive: true
     })
+    const [selectedBusinessCategoryId, setSelectedBusinessCategoryId] = useState<string>("")
+    const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     const fetchVendors = async () => {
         setLoading(true)
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`)
+            const url = selectedBusinessCategoryId 
+                ? `${process.env.NEXT_PUBLIC_API_URL}/api/vendors?businessCategoryId=${selectedBusinessCategoryId}`
+                : `${process.env.NEXT_PUBLIC_API_URL}/api/vendors`
+            const res = await fetch(url)
             const data = await res.json()
             setVendors(Array.isArray(data) ? data : [])
         } catch (e) {
@@ -44,18 +57,32 @@ export default function VendorsPage() {
         }
     }
 
+    const fetchBusinessCategories = async () => {
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`)
+            const data = await res.json()
+            setBusinessCategories(data)
+        } catch (error) {
+            console.error("Error fetching business categories:", error)
+        }
+    }
+
     useEffect(() => {
         fetchVendors()
-    }, [])
+        fetchBusinessCategories()
+    }, [selectedBusinessCategoryId])
 
     const handleOpenModal = (vendor?: Vendor) => {
         setError(null)
         if (vendor) {
             setEditingId(vendor.id)
-            setFormData(vendor)
+            setFormData({
+                ...vendor,
+                businessCategoryId: vendor.businessCategoryId || ''
+            })
         } else {
             setEditingId(null)
-            setFormData({ name: '', email: '', phone: '', company: '', address: '', taxId: '', taxAddress: '', isActive: true })
+            setFormData({ name: '', email: '', phone: '', company: '', address: '', taxId: '', taxAddress: '', businessCategoryId: '', isActive: true })
         }
         setIsModalOpen(true)
     }
@@ -77,7 +104,10 @@ export default function VendorsPage() {
                 body: JSON.stringify(formData)
             })
 
-            if (!res.ok) throw new Error('Failed to save vendor')
+            if (!res.ok) {
+                const errorData = await res.json()
+                throw new Error(errorData.message || 'Failed to save vendor')
+            }
 
             await fetchVendors()
             setIsModalOpen(false)
@@ -119,6 +149,17 @@ export default function VendorsPage() {
                     <p className="text-[10px] md:text-sm text-slate-500 font-medium uppercase tracking-widest mt-1">Procurement Partner Registry</p>
                 </div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                    <select
+                        value={selectedBusinessCategoryId}
+                        onChange={(e) => setSelectedBusinessCategoryId(e.target.value)}
+                        className="w-full sm:w-48 bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-[11px] font-black uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm cursor-pointer"
+                    >
+                        <option value="">All Business Units</option>
+                        {businessCategories.map(biz => (
+                            <option key={biz.id} value={biz.id}>{biz.name}</option>
+                        ))}
+                    </select>
+
                     <div className="relative group flex-1 sm:w-80">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:text-indigo-600 transition-colors" size={18} />
                         <input
@@ -177,6 +218,11 @@ export default function VendorsPage() {
                                             <h3 className="text-lg md:text-xl font-black text-slate-900 uppercase tracking-tight truncate leading-tight transition-colors group-hover:text-indigo-600">
                                                 {vendor.name}
                                             </h3>
+                                            <div className="mt-1">
+                                                <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100 font-black px-2 py-0 text-[9px] uppercase tracking-widest">
+                                                    {vendor.businessCategory?.name || 'GENERIC'}
+                                                </Badge>
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1">
@@ -290,14 +336,18 @@ export default function VendorsPage() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Company Branch/Group</label>
-                                        <input
-                                            type="text"
-                                            value={formData.company || ''}
-                                            onChange={e => setFormData(p => ({ ...p, company: e.target.value }))}
-                                            className="w-full px-4 py-2.5 md:py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-bold text-sm"
-                                            placeholder="Subsidiary of XYZ"
-                                        />
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-rose-500 ml-1">Business Unit *</label>
+                                        <select
+                                            required
+                                            value={formData.businessCategoryId || ''}
+                                            onChange={e => setFormData(p => ({ ...p, businessCategoryId: e.target.value }))}
+                                            className="w-full px-4 py-2.5 md:py-3 bg-rose-50/30 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-bold text-sm"
+                                        >
+                                            <option value="">Select Business Unit</option>
+                                            {businessCategories.map(biz => (
+                                                <option key={biz.id} value={biz.id}>{biz.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
 
                                     <div className="space-y-2">

@@ -34,6 +34,11 @@ interface CustomerPIC {
     phone?: string
 }
 
+interface BusinessCategory {
+    id: string
+    name: string
+}
+
 interface Customer {
     id: string
     code: string
@@ -47,6 +52,8 @@ interface Customer {
     company: string | null
     creditLimit: number
     paymentTerms: string | null
+    businessCategoryId: string | null
+    businessCategory: BusinessCategory | null
     isActive: boolean
     pics?: CustomerPIC[]
 }
@@ -58,13 +65,30 @@ export default function CustomersPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
 
+    const [selectedBusinessCategoryId, setSelectedBusinessCategoryId] = useState<string>("")
+    const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
+
     useEffect(() => {
         fetchCustomers()
-    }, [])
+        fetchBusinessCategories()
+    }, [selectedBusinessCategoryId])
+
+    const fetchBusinessCategories = async () => {
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`)
+            const data = await res.json()
+            setBusinessCategories(data)
+        } catch (error) {
+            console.error("Error fetching business categories:", error)
+        }
+    }
 
     const fetchCustomers = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`)
+            const url = selectedBusinessCategoryId 
+                ? `${process.env.NEXT_PUBLIC_API_URL}/api/customers?businessCategoryId=${selectedBusinessCategoryId}`
+                : `${process.env.NEXT_PUBLIC_API_URL}/api/customers`
+            const res = await fetch(url)
             const data = await res.json()
             setCustomers(data)
         } catch (error) {
@@ -133,6 +157,17 @@ export default function CustomersPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                    <select
+                        value={selectedBusinessCategoryId}
+                        onChange={(e) => setSelectedBusinessCategoryId(e.target.value)}
+                        className="w-full sm:w-48 bg-white border border-border rounded-xl px-4 py-2.5 text-[11px] font-black uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-sm cursor-pointer"
+                    >
+                        <option value="">All Business Units</option>
+                        {businessCategories.map(biz => (
+                            <option key={biz.id} value={biz.id}>{biz.name}</option>
+                        ))}
+                    </select>
+
                     <div className="relative group flex-1 sm:w-80">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-hover:text-primary transition-colors" size={18} />
                         <input
@@ -182,6 +217,7 @@ export default function CustomersPage() {
                                                     <tr className="bg-secondary/30 border-b border-border">
                                                         <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground w-24">Code</th>
                                                         <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground">Entity Name & Details</th>
+                                                        <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground">Business Unit</th>
                                                         <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground hidden lg:table-cell">Contact Info</th>
                                                         <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground hidden xl:table-cell">Financial Terms</th>
                                                         <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground w-32">Status</th>
@@ -210,6 +246,11 @@ export default function CustomersPage() {
                                                                         </p>
                                                                     </div>
                                                                 </div>
+                                                            </td>
+                                                            <td className="px-6 py-5 align-top">
+                                                                <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100 font-black px-2 py-0.5 text-[10px] uppercase tracking-widest">
+                                                                    {c.businessCategory?.name || 'GENERIC'}
+                                                                </Badge>
                                                             </td>
                                                             <td className="px-6 py-5 align-top hidden lg:table-cell">
                                                                 <div className="space-y-1.5">
@@ -369,11 +410,27 @@ function CustomerModal({ isOpen, onClose, customer, onSuccess }: { isOpen: boole
         company: '',
         creditLimit: 0,
         paymentTerms: 'NET 30',
+        businessCategoryId: '',
         isActive: true,
         pics: []
     })
 
+    const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
     const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        fetchBusinessCategories()
+    }, [])
+
+    const fetchBusinessCategories = async () => {
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`)
+            const data = await res.json()
+            setBusinessCategories(data)
+        } catch (error) {
+            console.error("Error fetching business categories:", error)
+        }
+    }
 
     useEffect(() => {
         if (customer) {
@@ -528,6 +585,20 @@ function CustomerModal({ isOpen, onClose, customer, onSuccess }: { isOpen: boole
                                             onChange={e => setFormData({ ...formData, company: e.target.value })}
                                             className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
                                         />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-rose-500 ml-1">Business Unit <span className="text-rose-500">*</span></label>
+                                        <select
+                                            required
+                                            value={formData.businessCategoryId || ''}
+                                            onChange={e => setFormData({ ...formData, businessCategoryId: e.target.value })}
+                                            className="w-full bg-rose-50/30 border border-slate-200 rounded-xl px-4 py-2.5 md:py-3 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-primary/50 outline-none"
+                                        >
+                                            <option value="">Select Business Unit</option>
+                                            {businessCategories.map(biz => (
+                                                <option key={biz.id} value={biz.id}>{biz.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
                             </section>

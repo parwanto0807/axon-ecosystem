@@ -20,7 +20,7 @@ import { useSession } from "next-auth/react"
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api`
 
 const ROLES = ["SUPER_ADMIN", "ADMIN", "MANAGER", "STAFF", "OPERATIONAL"]
-const DEPARTMENTS = ["SALES", "LOGISTIC", "FINANCE", "HR", "NONE"]
+const DEPARTMENTS = ["SALES", "LOGISTIC", "FINANCE", "HR", "OPERATIONAL", "NONE"]
 
 export default function UserManagementPage() {
     const { data: session } = useSession()
@@ -63,7 +63,12 @@ export default function UserManagementPage() {
         if (!userRole) return
         try {
             const res = await fetch(`${API_BASE}/users`, {
-                headers: { 'x-user-role': userRole }
+                headers: { 
+                    'x-user-role': userRole,
+                    'x-user-dept': (session?.user as any)?.department,
+                    'x-user-name': session?.user?.name || '',
+                    'x-user-id': (session?.user as any)?.id || ''
+                }
             })
             if (!res.ok) {
                 const error = await res.json()
@@ -150,7 +155,12 @@ export default function UserManagementPage() {
         try {
             const res = await fetch(`${API_BASE}/users/${id}`, { 
                 method: 'DELETE',
-                headers: { 'x-user-role': userRole }
+                headers: { 
+                    'x-user-role': userRole,
+                    'x-user-dept': (session?.user as any)?.department,
+                    'x-user-name': session?.user?.name || '',
+                    'x-user-id': (session?.user as any)?.id || ''
+                }
             })
             if (res.ok) fetchUsers()
         } catch (e) {

@@ -45,6 +45,8 @@ model User {
   accounts      Account[]
   contracts     Contract[]
   sessions      Session[]
+  businessCategoryId String?
+  businessCategory BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
 }
 
 model VerificationToken {
@@ -87,6 +89,8 @@ model Product {
   image                 String?
   categoryId            String?
   category              Category?             @relation(fields: [categoryId], references: [id])
+  businessCategoryId    String?
+  businessCategory      BusinessCategory?     @relation(fields: [businessCategoryId], references: [id])
   productPriceHistories ProductPriceHistory[]
   skus                  ProductSKU[]
 }
@@ -123,6 +127,24 @@ model Category {
   id       String    @id @default(cuid())
   name     String    @unique
   products Product[]
+}
+
+model BusinessCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g., "IT Service", "AC Service"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  products  Product[]
+  customers Customer[]
+  vendors   Vendor[]
+  assets    CustomerAsset[]
+  employees Employee[]
+  projects  PreSalesProject[]
+  workOrders WorkOrder[]
+  users     User[]
 }
 
 model Unit {
@@ -173,6 +195,9 @@ model Customer {
   salesOrders      SalesOrder[]
   surveyExpenses   SurveyExpense[]
   workOrders       WorkOrder[]
+  assets           CustomerAsset[]
+  businessCategoryId String?
+  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
 }
 
 model CustomerPIC {
@@ -281,6 +306,8 @@ model PreSalesProject {
   salesOrders    SalesOrder[]
   surveyExpenses SurveyExpense[]
   workOrders     WorkOrder[]
+  businessCategoryId String?
+  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
 }
 
 model QuotationItem {
@@ -463,6 +490,10 @@ model WorkOrder {
   items           WorkOrderItem[]
   reports         WorkOrderReport[]
   tasks           WorkOrderTask[]
+  assetId         String?
+  asset           CustomerAsset?    @relation(fields: [assetId], references: [id])
+  businessCategoryId String?
+  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
 }
 
 model WorkOrderItem {
@@ -639,6 +670,7 @@ model WorkOrderReport {
   task        WorkOrderTask?         @relation(fields: [taskId], references: [id])
   workOrder   WorkOrder              @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   photos      WorkOrderReportPhoto[]
+  checklist   Json?                  // New field for numeric readings/checklist
 }
 
 model WorkOrderReportPhoto {
@@ -725,6 +757,8 @@ model Vendor {
   purchaseOrders   PurchaseOrder[]
   purchaseRequests PurchaseRequest[]
   employee         Employee?
+  businessCategoryId String?
+  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
 }
 
 model PurchaseRequest {
@@ -952,9 +986,23 @@ model Employee {
   email             String?
   vendorId          String?        @unique
   vendor            Vendor?        @relation(fields: [vendorId], references: [id])
+  
+  categoryId        String?
+  category          EmployeeCategory? @relation(fields: [categoryId], references: [id])
+
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   payrollItems      PayrollItem[]
+  businessCategoryId String?
+  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
+}
+
+model EmployeeCategory {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  employees Employee[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 }
 
 model PayrollRun {
@@ -999,6 +1047,7 @@ enum Department {
   LOGISTIC
   FINANCE
   HR
+  OPERATIONAL
   NONE
 }
 
@@ -1239,3 +1288,49 @@ model OperationalExpense {
 }
 
 
+
+model CustomerAsset {
+  id               String        @id @default(cuid())
+  customerId       String
+  name             String        // e.g., "Server Utama", "AC Ruang Meeting"
+  category         AssetCategory @default(GENERAL)
+
+  brand            String?       // e.g., "Dell", "Daikin"
+  model            String?       // e.g., "PowerEdge R740", "FTKC25TVM"
+  serialNumber     String?       @unique
+  location         String?       // e.g., "Data Center Lt. 1", "R. Meeting"
+
+  // Flexible technical specs (RAM, CPU, IP, Refrigerant, Capacity, etc.)
+  specifications   Json?
+
+  installationDate DateTime?
+  lastServiceDate  DateTime?
+  nextServiceDate  DateTime?     // For auto-reminder
+  status           AssetStatus   @default(ACTIVE)
+  notes            String?
+
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  customer         Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  workOrders       WorkOrder[]
+  businessCategoryId String?
+  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
+}
+
+enum AssetCategory {
+  AC
+  IT
+  ELECTRONIC
+  VEHICLE
+  FURNITURE
+  GENERAL
+}
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  BROKEN
+  REPLACED
+  SCRAPPED
+}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useSession } from "next-auth/react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     PackageCheck, Plus, Search, Edit, Trash2, X, Save,
@@ -44,6 +45,11 @@ const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('id-ID', { da
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function DeliveryOrdersPage() {
+    const { data: session } = useSession()
+    const userRole = (session?.user as any)?.role
+    const userName = session?.user?.name || ''
+    const userDept = (session?.user as any)?.department || ''
+
     const [dos, setDos] = useState<DO[]>([])
     const [projects, setProjects] = useState<Ref[]>([])
     const [salesOrders, setSalesOrders] = useState<Ref[]>([])
@@ -75,13 +81,19 @@ export default function DeliveryOrdersPage() {
     const loadData = useCallback(async () => {
         setLoading(true)
         try {
+            const headers = {
+                'x-user-role': userRole || '',
+                'x-user-dept': userDept || '',
+                'x-user-name': userName || ''
+            }
+
             const [doRes, prjRes, soRes, woRes, custRes, coRes] = await Promise.all([
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery-orders`).then(r => r.json()),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`).then(r => r.json()),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`).then(r => r.json()),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders`).then(r => r.json()),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`).then(r => r.json()),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`).then(r => r.json())
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery-orders`, { headers }).then(r => r.json()),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`, { headers }).then(r => r.json()),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`, { headers }).then(r => r.json()),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders`, { headers }).then(r => r.json()),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`, { headers }).then(r => r.json()),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`, { headers }).then(r => r.json())
             ])
             setDos(doRes)
             setProjects(prjRes)
@@ -109,7 +121,12 @@ export default function DeliveryOrdersPage() {
             const method = editMode ? 'PUT' : 'POST'
             const res = await fetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-user-role': userRole || '',
+                    'x-user-dept': userDept || '',
+                    'x-user-name': userName || ''
+                },
                 body: JSON.stringify(payload)
             })
             if (res.ok) {
