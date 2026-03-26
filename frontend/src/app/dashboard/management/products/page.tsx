@@ -80,6 +80,7 @@ interface Product {
     category: Category | null
     businessCategoryId: string | null
     businessCategory: BusinessCategory | null
+    businessCategories: BusinessCategory[]
     image: string | null
     skus: ProductSKU[]
 }
@@ -159,7 +160,7 @@ export default function ProductsPage() {
 
     const fetchProducts = async () => {
         try {
-            const url = selectedBusinessCategoryId 
+            const url = selectedBusinessCategoryId
                 ? `${process.env.NEXT_PUBLIC_API_URL}/api/products?businessCategoryId=${selectedBusinessCategoryId}`
                 : `${process.env.NEXT_PUBLIC_API_URL}/api/products`
             const res = await fetch(url)
@@ -309,9 +310,19 @@ export default function ProductsPage() {
                                                         </button>
                                                     </td>
                                                     <td className="px-4 py-4">
-                                                        <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100 font-black px-2 py-0 text-[9px] uppercase tracking-widest truncate max-w-[120px]">
-                                                            {p.businessCategory?.name || 'GENERIC'}
-                                                        </Badge>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {p.businessCategories && p.businessCategories.length > 0 ? (
+                                                                p.businessCategories.map(biz => (
+                                                                    <Badge key={biz.id} variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100 font-black px-2 py-1 text-[9px] uppercase tracking-widest truncate max-w-[120px]">
+                                                                        {biz.name}
+                                                                    </Badge>
+                                                                ))
+                                                            ) : (
+                                                                <Badge variant="secondary" className="bg-slate-50 text-slate-400 border-slate-200 font-black px-2 py-1 text-[9px] uppercase tracking-widest text-center truncate">
+                                                                    GENERIC
+                                                                </Badge>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     {/* Product info */}
                                                     <td className="px-4 py-4">
@@ -761,10 +772,24 @@ function ProductViewModal({ isOpen, onClose, product, onEnlargeImage }: { isOpen
                                                         <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{product.code}</span>
                                                     </div>
                                                     <h3 className="text-2xl font-bold text-black tracking-tight mb-2">{product.name}</h3>
-                                                    <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                                    <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">
                                                         <span className="flex items-center gap-1.5"><Tag size={14} className="text-emerald-500" /> {product.brand || 'Generic Brand'}</span>
                                                         <span className="w-1 h-1 rounded-full bg-slate-300" />
                                                         <span>{product.category?.name || 'Uncategorized'}</span>
+                                                    </div>
+                                                    
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {product.businessCategories && product.businessCategories.length > 0 ? (
+                                                            product.businessCategories.map(biz => (
+                                                                <Badge key={biz.id} variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100 font-bold px-2 py-0.5 text-[9px] uppercase tracking-widest">
+                                                                    {biz.name}
+                                                                </Badge>
+                                                            ))
+                                                        ) : (
+                                                            <Badge variant="secondary" className="bg-slate-50 text-slate-400 border-slate-200 font-bold px-2 py-0.5 text-[9px] uppercase tracking-widest">
+                                                                GENERIC
+                                                            </Badge>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -1028,6 +1053,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                 type: product.type,
                 categoryId: product.categoryId || '',
                 businessCategoryId: product.businessCategoryId || '',
+                businessCategories: product.businessCategories || [],
                 skus: product.skus ? [...product.skus] : []
             });
             setImagePreview(product.image ? `${process.env.NEXT_PUBLIC_API_URL}${product.image}` : null);
@@ -1041,6 +1067,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                 type: 'GOODS',
                 categoryId: categories[0]?.id || '',
                 businessCategoryId: '',
+                businessCategories: [],
                 skus: [getNewSku(autoCode, 0)]
             });
             setImagePreview(null);
@@ -1105,7 +1132,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
 
         const formDataPayload = new FormData();
         Object.entries(formData).forEach(([key, value]) => {
-            if (['category', 'unit', 'purchaseUnit', 'priceHistory', 'businessCategory'].includes(key)) return;
+            if (['category', 'unit', 'purchaseUnit', 'priceHistory', 'businessCategory', 'businessCategories'].includes(key)) return;
             if (key === 'image' && imageFile) return;
             if (key === 'skus') {
                 formDataPayload.append(key, JSON.stringify(value));
@@ -1119,6 +1146,9 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
         if (imageFile) {
             formDataPayload.append('image', imageFile);
         }
+
+        const businessCategoryIds = formData.businessCategories?.map(b => b.id) || [];
+        formDataPayload.append('businessCategoryIds', JSON.stringify(businessCategoryIds));
 
         try {
             console.log("Submitting formData...");
@@ -1343,16 +1373,35 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                                                     </div>
 
                                                     <div className="space-y-2">
-                                                        <label className="text-[11px] font-semibold uppercase tracking-wider text-rose-500 ml-1">Business Unit <span className="text-rose-500">*</span></label>
-                                                        <select
-                                                            required
-                                                            value={formData.businessCategoryId || ''}
-                                                            onChange={e => setFormData({ ...formData, businessCategoryId: e.target.value })}
-                                                            className="w-full bg-rose-50/30 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm"
-                                                        >
-                                                            <option value="">Select Business Unit</option>
-                                                            {businessCategories.map(biz => <option key={biz.id} value={biz.id}>{biz.name}</option>)}
-                                                        </select>
+                                                        <label className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600 ml-1">Business Units <span className="text-rose-500">*</span></label>
+                                                        <div className="flex flex-wrap gap-2 p-3 bg-slate-50/50 border border-slate-200 rounded-xl min-h-[50px]">
+                                                            {businessCategories.map(biz => {
+                                                                const isSelected = formData.businessCategories?.some(b => b.id === biz.id);
+                                                                return (
+                                                                    <Badge
+                                                                        key={biz.id}
+                                                                        onClick={() => {
+                                                                            const current = formData.businessCategories || [];
+                                                                            const next = isSelected 
+                                                                                ? current.filter(b => b.id !== biz.id)
+                                                                                : [...current, biz];
+                                                                            setFormData({ ...formData, businessCategories: next });
+                                                                        }}
+                                                                        variant={isSelected ? "default" : "outline"}
+                                                                        className={`cursor-pointer transition-all px-3 py-1 text-[10px] font-bold uppercase tracking-widest ${
+                                                                            isSelected 
+                                                                                ? "bg-indigo-600 hover:bg-indigo-700 text-white border-transparent shadow-md" 
+                                                                                : "bg-white hover:bg-slate-100 text-slate-500 border-slate-200"
+                                                                        }`}
+                                                                    >
+                                                                        {biz.name}
+                                                                    </Badge>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        {(!formData.businessCategories || formData.businessCategories.length === 0) && (
+                                                            <p className="text-[10px] text-rose-500 font-bold ml-1 uppercase tracking-tight italic">Please select at least one business unit</p>
+                                                        )}
                                                     </div>
 
                                                 </div>

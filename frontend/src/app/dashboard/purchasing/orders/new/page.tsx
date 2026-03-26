@@ -25,27 +25,32 @@ export default function NewPurchaseOrderPage() {
         notes: '',
         terms: '',
         tax: 11,
-        paymentType: 'CREDIT'
+        paymentType: 'CREDIT',
+        businessCategoryId: ''
     })
 
     const [items, setItems] = useState([
         { id: '1', no: 1, description: '', qty: 1, unit: 'pcs', unitPrice: 0, discount: 0, amount: 0 }
     ])
     const [expenses, setExpenses] = useState<any[]>([])
+    const [businessCategories, setBusinessCategories] = useState<any[]>([])
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [venRes, skuRes, woRes] = await Promise.all([
+                const [venRes, skuRes, woRes, bcRes] = await Promise.all([
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`),
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/product-skus`),
-                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders`)
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders`),
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`)
                 ])
                 const venData = await venRes.json()
                 const skuData = await skuRes.json()
                 const woData = await woRes.json()
+                const bcData = await bcRes.json()
                 setVendors(Array.isArray(venData) ? venData : [])
                 setWorkOrders(Array.isArray(woData) ? woData : [])
+                setBusinessCategories(Array.isArray(bcData) ? bcData : [])
 
                 // SKUs come perfectly formatted from /api/product-skus
                 const skusArr = Array.isArray(skuData) ? skuData : [];
@@ -365,7 +370,21 @@ export default function NewPurchaseOrderPage() {
                             >
                                 <option value="">-- Choose Vendor --</option>
                                 {vendors.map(v => (
-                                    <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
+                                        <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase italic text-violet-600">Unit Bisnis / Kategori *</label>
+                            <select
+                                value={poData.businessCategoryId}
+                                onChange={e => setPoData({ ...poData, businessCategoryId: e.target.value })}
+                                className="w-full px-4 py-3 bg-violet-50/30 border border-violet-100 rounded-xl font-bold text-violet-700"
+                            >
+                                <option value="">-- Generic / Shared --</option>
+                                {businessCategories.map(bc => (
+                                    <option key={bc.id} value={bc.id}>{bc.name}</option>
                                 ))}
                             </select>
                         </div>

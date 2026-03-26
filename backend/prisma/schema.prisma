@@ -89,8 +89,7 @@ model Product {
   image                 String?
   categoryId            String?
   category              Category?             @relation(fields: [categoryId], references: [id])
-  businessCategoryId    String?
-  businessCategory      BusinessCategory?     @relation(fields: [businessCategoryId], references: [id])
+  businessCategories    BusinessCategory[]    @relation("ProductToBusinessCategory")
   productPriceHistories ProductPriceHistory[]
   skus                  ProductSKU[]
 }
@@ -137,14 +136,18 @@ model BusinessCategory {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  products  Product[]
-  customers Customer[]
-  vendors   Vendor[]
+  // Relations
+  products  Product[] @relation("ProductToBusinessCategory")
+  customers Customer[] @relation("CustomerToBusinessCategory")
+  vendors   Vendor[] @relation("VendorToBusinessCategory")
+  salesOrders SalesOrder[]
   assets    CustomerAsset[]
   employees Employee[]
   projects  PreSalesProject[]
   workOrders WorkOrder[]
   users     User[]
+  warehouses Warehouse[]
+  purchaseOrders PurchaseOrder[]
 }
 
 model Unit {
@@ -196,8 +199,7 @@ model Customer {
   surveyExpenses   SurveyExpense[]
   workOrders       WorkOrder[]
   assets           CustomerAsset[]
-  businessCategoryId String?
-  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
+  businessCategories BusinessCategory[] @relation("CustomerToBusinessCategory")
 }
 
 model CustomerPIC {
@@ -356,6 +358,8 @@ model SalesOrder {
   quotation      Quotation?       @relation(fields: [quotationId], references: [id])
   items          SalesOrderItem[]
   workOrders     WorkOrder[]
+  businessCategoryId String?
+  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
 }
 
 model SalesOrderItem {
@@ -404,6 +408,8 @@ model Warehouse {
   isActive     Boolean          @default(true)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
+  businessCategoryId String?
+  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
   inMovements  StockMovement[]  @relation("TargetWarehouse")
   outMovements StockMovement[]  @relation("SourceWarehouse")
   stocks       WarehouseStock[]
@@ -757,8 +763,8 @@ model Vendor {
   purchaseOrders   PurchaseOrder[]
   purchaseRequests PurchaseRequest[]
   employee         Employee?
-  businessCategoryId String?
-  businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
+  businessCategories BusinessCategory[] @relation("VendorToBusinessCategory")
+
 }
 
 model PurchaseRequest {
@@ -808,6 +814,8 @@ model PurchaseOrder {
   projectId         String?
   salesOrderId      String?
   workOrderId       String?
+  businessCategoryId String?
+  businessCategory   BusinessCategory?   @relation(fields: [businessCategoryId], references: [id])
   invoices          PurchaseInvoice[]
   project           PreSalesProject?    @relation(fields: [projectId], references: [id])
   purchaseRequest   PurchaseRequest?    @relation(fields: [purchaseRequestId], references: [id])

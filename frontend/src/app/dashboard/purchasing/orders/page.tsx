@@ -17,6 +17,11 @@ interface PurchaseOrder {
         code: string;
         name: string;
     };
+    businessCategoryId: string | null;
+    businessCategory?: {
+        id: string;
+        name: string;
+    };
     items: any[];
     receives: any[];
     surveyExpenses: any[];
@@ -32,6 +37,8 @@ export default function PurchaseOrdersPage() {
     const [selectedOrder, setSelectedOrder] = useState<any>(null)
     const [showPdf, setShowPdf] = useState(false)
     const [warehouses, setWarehouses] = useState<any[]>([])
+    const [businessCategories, setBusinessCategories] = useState<any[]>([])
+    const [filterBusinessCategory, setFilterBusinessCategory] = useState("ALL")
 
     // Modal state for Stock-In confirmation
     const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; poId: string; newStatus: string; warehouseId: string } | null>(null)
@@ -39,14 +46,17 @@ export default function PurchaseOrdersPage() {
     const fetchOrders = async () => {
         setLoading(true)
         try {
-            const [poRes, wRes] = await Promise.all([
+            const [poRes, wRes, bcRes] = await Promise.all([
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders`),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`)
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`)
             ])
             const poData = await poRes.json()
             const wData = await wRes.json()
+            const bcData = await bcRes.json()
             setOrders(Array.isArray(poData) ? poData : [])
             setWarehouses(Array.isArray(wData) ? wData.filter((w: any) => w.isActive) : [])
+            setBusinessCategories(Array.isArray(bcData) ? bcData : [])
         } catch (e) { console.error('Failed to fetch data') } finally {
             setLoading(false)
         }
@@ -116,10 +126,12 @@ export default function PurchaseOrdersPage() {
         }
     }
 
-    const filteredOrders = orders.filter(o =>
-        o.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        o.vendor?.name.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    const filteredOrders = orders.filter(o => {
+        const matchesSearch = o.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            o.vendor?.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesCategory = filterBusinessCategory === 'ALL' || o.businessCategoryId === filterBusinessCategory;
+        return matchesSearch && matchesCategory;
+    })
 
     const getStatusStyle = (status: string) => {
         switch (status) {
@@ -156,6 +168,11 @@ export default function PurchaseOrdersPage() {
                             className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
                         />
                     </div>
+                    <select value={filterBusinessCategory} onChange={e => setFilterBusinessCategory(e.target.value)}
+                        className="bg-white border border-slate-200 rounded-xl px-4 h-11 md:h-10 text-[10px] md:text-xs font-bold text-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none shadow-sm min-w-[140px]">
+                        <option value="ALL">All Business Units</option>
+                        {businessCategories.map(bc => <option key={bc.id} value={bc.id}>{bc.name}</option>)}
+                    </select>
                     <Link
                         href="/dashboard/purchasing/orders/new"
                         className="flex items-center gap-2 bg-indigo-600 text-white px-4 md:px-5 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 whitespace-nowrap text-sm"
@@ -210,6 +227,11 @@ export default function PurchaseOrdersPage() {
                                                     <span className={`w-fit mt-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${po.paymentType === 'CASH' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
                                                         {po.paymentType === 'CASH' ? 'Cash' : 'Tempo'}
                                                     </span>
+                                                    {po.businessCategory && (
+                                                        <span className="w-fit mt-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-violet-100 text-violet-700">
+                                                            {po.businessCategory.name}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4">
@@ -308,6 +330,11 @@ export default function PurchaseOrdersPage() {
                                         <span className="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider bg-indigo-50 text-indigo-600">
                                             {po.paymentType === 'CASH' ? 'Cash' : 'Tempo'}
                                         </span>
+                                        {po.businessCategory && (
+                                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider bg-violet-50 text-violet-600">
+                                                {po.businessCategory.name}
+                                            </span>
+                                        )}
                                         <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1">
                                             <Calendar size={10} />
                                             {new Date(po.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}

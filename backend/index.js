@@ -182,12 +182,12 @@ app.get('/api/products', async (req, res) => {
     const { businessCategoryId, categoryId } = req.query;
     const products = await prisma.product.findMany({
       where: {
-        ...(businessCategoryId ? { businessCategoryId } : {}),
+        ...(businessCategoryId ? { businessCategories: { some: { id: businessCategoryId } } } : {}),
         ...(categoryId ? { categoryId } : {})
       },
       include: {
         category: true,
-        businessCategory: true,
+        businessCategories: true,
         skus: {
           include: {
             unit: true,
@@ -247,11 +247,19 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
     console.log(`[BACKEND] POST /api/products - Received body:`, Object.keys(req.body));
     if (req.file) console.log(`[BACKEND] Received file:`, req.file.originalname);
     
-    const { category, businessCategory, priceHistory, skus: skusRaw, ...masterData } = req.body;
+    const { category, businessCategory, businessCategoryIds: bizIdsRaw, priceHistory, skus: skusRaw, ...masterData } = req.body;
     
     let skus = [];
     if (skusRaw) {
       skus = typeof skusRaw === 'string' ? JSON.parse(skusRaw) : skusRaw;
+    }
+
+    let businessCategoryIds = [];
+    if (bizIdsRaw) {
+      businessCategoryIds = typeof bizIdsRaw === 'string' ? JSON.parse(bizIdsRaw) : bizIdsRaw;
+    } else if (masterData.businessCategoryId) {
+      // Fallback for legacy frontend
+      businessCategoryIds = [masterData.businessCategoryId];
     }
 
     if (req.file) {
@@ -265,13 +273,15 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
       brand: masterData.brand || null,
       type: masterData.type,
       categoryId: masterData.categoryId || null,
-      businessCategoryId: masterData.businessCategoryId || null,
       image: masterData.image || null
     };
 
     const product = await prisma.product.create({
       data: {
         ...cleanMasterData,
+        businessCategories: {
+          connect: businessCategoryIds.map(id => ({ id }))
+        },
         skus: {
           create: skus.map(sku => ({
             code: sku.code,
@@ -293,7 +303,7 @@ app.post('/api/products', upload.single('image'), async (req, res) => {
       },
       include: {
         category: true,
-        businessCategory: true,
+        businessCategories: true,
         skus: {
           include: {
             unit: true,
@@ -315,11 +325,18 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     console.log(`[BACKEND] PUT /api/products/${id} - Received body:`, Object.keys(req.body));
     if (req.file) console.log(`[BACKEND] Received file:`, req.file.originalname);
 
-    const { id: _, priceHistory, createdAt, updatedAt, category, skus: skusRaw, ...masterData } = req.body;
+    const { id: _, priceHistory, createdAt, updatedAt, category, businessCategoryIds: bizIdsRaw, skus: skusRaw, ...masterData } = req.body;
     
     let skus = [];
     if (skusRaw) {
       skus = typeof skusRaw === 'string' ? JSON.parse(skusRaw) : skusRaw;
+    }
+
+    let businessCategoryIds = null;
+    if (bizIdsRaw) {
+      businessCategoryIds = typeof bizIdsRaw === 'string' ? JSON.parse(bizIdsRaw) : bizIdsRaw;
+    } else if (masterData.businessCategoryId) {
+      businessCategoryIds = [masterData.businessCategoryId];
     }
 
     if (req.file) {
@@ -333,8 +350,14 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
     if (masterData.brand !== undefined) cleanMasterData.brand = masterData.brand || null;
     if (masterData.type !== undefined) cleanMasterData.type = masterData.type;
     if (masterData.categoryId !== undefined) cleanMasterData.categoryId = masterData.categoryId || null;
-    if (masterData.businessCategoryId !== undefined) cleanMasterData.businessCategoryId = masterData.businessCategoryId || null;
     if (masterData.image !== undefined) cleanMasterData.image = masterData.image;
+
+    // Handle businessCategories separately because it's many-to-many
+    if (businessCategoryIds !== null) {
+      cleanMasterData.businessCategories = {
+        set: businessCategoryIds.map(id => ({ id }))
+      };
+    }
 
     const original = await prisma.product.findUnique({
       where: { id },
@@ -436,7 +459,7 @@ app.put('/api/products/:id', upload.single('image'), async (req, res) => {
         where: { id },
         include: {
           category: true,
-          businessCategory: true,
+          businessCategories: true,
           skus: {
             include: {
               unit: true,
@@ -647,9 +670,9 @@ app.get('/api/customers', async (req, res) => {
     const { businessCategoryId } = req.query;
     const customers = await prisma.customer.findMany({
       where: {
-        ...(businessCategoryId ? { businessCategoryId } : {})
+        ...(businessCategoryId ? { businessCategories: { some: { id: businessCategoryId } } } : {})
       },
-      include: { pics: true, businessCategory: true },
+      include: { pics: true, businessCategories: true },
       orderBy: { createdAt: 'desc' }
     });
     res.json(customers);
@@ -660,10 +683,21 @@ app.get('/api/customers', async (req, res) => {
 
 app.post('/api/customers', async (req, res) => {
   try {
-    const { pics, businessCategory, ...data } = req.body;
+    const { pics, businessCategory, businessCategoryId: _, businessCategoryIds: bizIdsRaw, ...data } = req.body;
+
+    let businessCategoryIds = [];
+    if (bizIdsRaw) {
+      businessCategoryIds = Array.isArray(bizIdsRaw) ? bizIdsRaw : (typeof bizIdsRaw === 'string' ? JSON.parse(bizIdsRaw) : [bizIdsRaw]);
+    } else if (data.businessCategoryId) {
+      businessCategoryIds = [data.businessCategoryId];
+    }
+
     const customer = await prisma.customer.create({
       data: {
         ...data,
+        businessCategories: {
+          connect: businessCategoryIds.map(id => ({ id }))
+        },
         pics: pics ? {
           create: pics.map(pic => ({
             name: pic.name,
@@ -673,7 +707,7 @@ app.post('/api/customers', async (req, res) => {
           }))
         } : undefined
       },
-      include: { pics: true }
+      include: { pics: true, businessCategories: true }
     });
     res.status(201).json(customer);
   } catch (error) {
@@ -684,12 +718,24 @@ app.post('/api/customers', async (req, res) => {
 app.put('/api/customers/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { pics, businessCategory, id: _, createdAt, updatedAt, ...data } = req.body;
+    const { pics, businessCategory, businessCategoryId: _, businessCategoryIds: bizIdsRaw, id: __, createdAt, updatedAt, ...data } = req.body;
+
+    let businessCategoryIds = null;
+    if (bizIdsRaw) {
+      businessCategoryIds = Array.isArray(bizIdsRaw) ? bizIdsRaw : (typeof bizIdsRaw === 'string' ? JSON.parse(bizIdsRaw) : [bizIdsRaw]);
+    } else if (data.businessCategoryId) {
+      businessCategoryIds = [data.businessCategoryId];
+    }
 
     const customer = await prisma.customer.update({
       where: { id },
       data: {
         ...data,
+        ...(businessCategoryIds !== null ? {
+          businessCategories: {
+            set: businessCategoryIds.map(id => ({ id }))
+          }
+        } : {}),
         pics: pics ? {
           deleteMany: {},
           create: pics.map(pic => ({
@@ -700,7 +746,7 @@ app.put('/api/customers/:id', async (req, res) => {
           }))
         } : undefined
       },
-      include: { pics: true }
+      include: { pics: true, businessCategories: true }
     });
     res.json(customer);
   } catch (error) {
@@ -994,8 +1040,12 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
 app.get('/api/orders', async (req, res) => {
   try {
+    const { businessCategoryId } = req.query;
     const orders = await prisma.salesOrder.findMany({
-      include: { customer: true, items: true, quotation: true, project: true },
+      where: {
+        ...(businessCategoryId ? { businessCategoryId } : {})
+      },
+      include: { customer: true, items: true, quotation: true, project: true, businessCategory: true },
       orderBy: { createdAt: 'desc' }
     });
     res.json(orders);
@@ -1010,7 +1060,8 @@ app.get('/api/orders/:id', async (req, res) => {
         customer: { include: { pics: true } }, 
         items: { orderBy: { no: 'asc' } },
         quotation: true,
-        project: true
+        project: true,
+        businessCategory: true
       }
     });
     if (!o) return res.status(404).json({ message: 'Not found' });
@@ -1020,7 +1071,7 @@ app.get('/api/orders/:id', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
   try {
-    const { items = [], discount = 0, tax = 11, ...data } = req.body;
+    const { items = [], discount = 0, tax = 11, businessCategory, ...data } = req.body;
     const number = await generateSalesOrderNumber();
     const parsedItems = items.map((it, idx) => ({
       no: idx + 1,
@@ -1042,9 +1093,10 @@ app.post('/api/orders', async (req, res) => {
         date: data.date ? new Date(data.date) : new Date(),
         poProof: data.poProof || null,
         projectId: data.projectId || null,
+        businessCategoryId: data.businessCategoryId || null,
         items: { create: parsedItems }
       },
-      include: { customer: true, items: { orderBy: { no: 'asc' } }, project: true }
+      include: { customer: true, items: { orderBy: { no: 'asc' } }, project: true, businessCategory: true }
     });
     res.status(201).json(o);
   } catch (e) { console.error(e); res.status(400).json({ message: e.message }); }
@@ -1053,7 +1105,7 @@ app.post('/api/orders', async (req, res) => {
 app.put('/api/orders/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { items = [], discount = 0, tax = 11, id: _, createdAt, updatedAt, customer, quotation, ...data } = req.body;
+    const { items = [], discount = 0, tax = 11, id: _, createdAt, updatedAt, customer, quotation, businessCategory, ...data } = req.body;
     const parsedItems = items.map((it, idx) => ({
       no: idx + 1,
       description: it.description,
@@ -1075,9 +1127,10 @@ app.put('/api/orders/:id', async (req, res) => {
           date: data.date ? new Date(data.date) : undefined,
           poProof: data.poProof || undefined,
           projectId: data.projectId || undefined,
+          businessCategoryId: data.businessCategoryId || undefined,
           items: { create: parsedItems }
         },
-        include: { customer: true, items: { orderBy: { no: 'asc' } }, project: true }
+        include: { customer: true, items: { orderBy: { no: 'asc' } }, project: true, businessCategory: true }
       });
     });
     res.json(o);
@@ -1740,10 +1793,12 @@ app.delete('/api/proposals/:id', async (req, res) => {
 app.get('/api/warehouses', async (req, res) => {
   try {
     const warehouses = await prisma.warehouse.findMany({
+      where: req.query.businessCategoryId ? { businessCategoryId: req.query.businessCategoryId } : {},
       orderBy: { createdAt: 'desc' },
       include: {
         stocks: { include: { sku: { include: { product: true } } } },
-        _count: { select: { stocks: true } }
+        _count: { select: { stocks: true } },
+        businessCategory: true
       }
     });
     res.json(warehouses);
@@ -1752,16 +1807,22 @@ app.get('/api/warehouses', async (req, res) => {
 
 app.post('/api/warehouses', async (req, res) => {
   try {
-    const warehouse = await prisma.warehouse.create({ data: req.body });
+    const { businessCategory, ...data } = req.body;
+    const warehouse = await prisma.warehouse.create({ 
+      data: data,
+      include: { businessCategory: true }
+    });
     res.status(201).json(warehouse);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 app.put('/api/warehouses/:id', async (req, res) => {
   try {
+    const { id: _, businessCategory, ...data } = req.body;
     const warehouse = await prisma.warehouse.update({
       where: { id: req.params.id },
-      data: req.body
+      data: data,
+      include: { businessCategory: true }
     });
     res.json(warehouse);
   } catch (e) { res.status(400).json({ message: e.message }); }
@@ -3415,6 +3476,51 @@ app.get('/api/reports/profit-loss', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+// 4.1 Sales by Business Category
+app.get('/api/reports/sales-by-category', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const start = startDate ? new Date(startDate + 'T00:00:00') : new Date(new Date().getFullYear(), 0, 1);
+    const end = endDate ? new Date(endDate + 'T23:59:59.999') : new Date();
+
+    const invoices = await prisma.invoice.findMany({
+      where: {
+        date: { gte: start, lte: end },
+        status: { not: 'CANCELLED' }
+      },
+      include: {
+        salesOrder: { include: { businessCategory: true } },
+        project: { include: { businessCategory: true } }
+      }
+    });
+
+    const categoryAggregation = {};
+
+    invoices.forEach(inv => {
+      let categoryName = 'Uncategorized';
+      
+      // Try to get category from Sales Order first, then Project
+      if (inv.salesOrder?.businessCategory?.name) {
+        categoryName = inv.salesOrder.businessCategory.name;
+      } else if (inv.project?.businessCategory?.name) {
+        categoryName = inv.project.businessCategory.name;
+      }
+
+      categoryAggregation[categoryName] = (categoryAggregation[categoryName] || 0) + (inv.grandTotal || 0);
+    });
+
+    const result = Object.keys(categoryAggregation).map(category => ({
+      category,
+      amount: categoryAggregation[category]
+    })).sort((a, b) => b.amount - a.amount);
+
+    res.json(result);
+  } catch (e) { 
+    console.error('Error in sales-by-category report:', e);
+    res.status(500).json({ message: e.message }); 
+  }
+});
+
 // Helper for aggregation
 async function getAccountTypeBalance(types, endDate, startDate = null) {
   const coas = await prisma.chartOfAccounts.findMany({
@@ -3819,9 +3925,9 @@ app.get('/api/vendors', async (req, res) => {
     const { businessCategoryId } = req.query;
     const vendors = await prisma.vendor.findMany({
       where: {
-        ...(businessCategoryId ? { businessCategoryId } : {})
+        ...(businessCategoryId ? { businessCategories: { some: { id: businessCategoryId } } } : {})
       },
-      include: { businessCategory: true },
+      include: { businessCategories: true },
       orderBy: { name: 'asc' }
     });
     res.json(vendors);
@@ -3830,17 +3936,30 @@ app.get('/api/vendors', async (req, res) => {
 
 app.post('/api/vendors', async (req, res) => {
   try {
-    const { id, businessCategory, ...data } = req.body;
+    const { id, businessCategory, businessCategoryId: _, businessCategoryIds: bizIdsRaw, ...data } = req.body;
     const count = await prisma.vendor.count();
     const code = data.code || `VND-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
     
+    let businessCategoryIds = [];
+    if (bizIdsRaw) {
+      businessCategoryIds = Array.isArray(bizIdsRaw) ? bizIdsRaw : (typeof bizIdsRaw === 'string' ? JSON.parse(bizIdsRaw) : [bizIdsRaw]);
+    } else if (data.businessCategoryId) {
+      businessCategoryIds = [data.businessCategoryId];
+    }
+
+    const createData = { ...data };
+    delete createData.businessCategoryId;
+    delete createData.businessCategory;
+
     const vendor = await prisma.vendor.create({
       data: { 
-        ...data, 
+        ...createData, 
         code,
-        businessCategoryId: data.businessCategoryId || null
+        businessCategories: {
+          connect: businessCategoryIds.map(id => ({ id }))
+        }
       },
-      include: { businessCategory: true }
+      include: { businessCategories: true }
     });
     res.json(vendor);
   } catch (e) { 
@@ -3851,14 +3970,29 @@ app.post('/api/vendors', async (req, res) => {
 
 app.put('/api/vendors/:id', async (req, res) => {
   try {
-    const { id: _, businessCategory, createdAt, updatedAt, ...data } = req.body;
+    const { id: _, businessCategory, businessCategoryId: __, createdAt, updatedAt, businessCategoryIds: bizIdsRaw, ...data } = req.body;
+    
+    let businessCategoryIds = null;
+    if (bizIdsRaw) {
+      businessCategoryIds = Array.isArray(bizIdsRaw) ? bizIdsRaw : (typeof bizIdsRaw === 'string' ? JSON.parse(bizIdsRaw) : [bizIdsRaw]);
+    } else if (data.businessCategoryId) {
+      businessCategoryIds = [data.businessCategoryId];
+    }
+
+    const updateData = { ...data };
+    delete updateData.businessCategoryId;
+    delete updateData.businessCategory;
+
+    if (businessCategoryIds !== null) {
+      updateData.businessCategories = {
+        set: businessCategoryIds.map(id => ({ id }))
+      };
+    }
+
     const vendor = await prisma.vendor.update({
       where: { id: req.params.id },
-      data: {
-        ...data,
-        businessCategoryId: data.businessCategoryId || null
-      },
-      include: { businessCategory: true }
+      data: updateData,
+      include: { businessCategories: true }
     });
     res.json(vendor);
   } catch (e) { 
@@ -3878,7 +4012,9 @@ app.delete('/api/vendors/:id', async (req, res) => {
 
 app.get('/api/purchase-orders', async (req, res) => {
   try {
+    const { businessCategoryId } = req.query;
     const pos = await prisma.purchaseOrder.findMany({
+      where: businessCategoryId ? { businessCategoryId } : {},
       include: {
         vendor: true,
         items: true,
@@ -3886,7 +4022,8 @@ app.get('/api/purchase-orders', async (req, res) => {
         workOrder: true,
         project: true,
         salesOrder: true,
-        invoices: true
+        invoices: true,
+        businessCategory: true
       },
       orderBy: { date: 'desc' }
     });
@@ -3925,7 +4062,8 @@ app.get('/api/purchase-orders/:id', async (req, res) => {
         surveyExpenses: true,
         workOrder: true,
         project: true,
-        salesOrder: true
+        salesOrder: true,
+        businessCategory: true
       }
     });
     res.json(po);
@@ -4002,7 +4140,7 @@ app.get('/api/purchase-orders/:id/receivable-items', async (req, res) => {
 
 app.post('/api/purchase-orders', async (req, res) => {
   try {
-    const { items, ...poData } = req.body;
+    const { items, businessCategory, ...poData } = req.body;
     
     let number = poData.number;
     if (!number) {
@@ -4022,7 +4160,7 @@ app.post('/api/purchase-orders', async (req, res) => {
           create: items || []
         }
       },
-      include: { vendor: true, items: true, workOrder: true, project: true, salesOrder: true }
+      include: { vendor: true, items: true, workOrder: true, project: true, salesOrder: true, businessCategory: true }
     });
     res.json(po);
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -4030,7 +4168,7 @@ app.post('/api/purchase-orders', async (req, res) => {
 
 app.put('/api/purchase-orders/:id', async (req, res) => {
   try {
-    const { items, ...poData } = req.body;
+    const { items, businessCategory, ...poData } = req.body;
     
     // Simplistic update: delete existing items and recreate
     await prisma.purchaseOrderItem.deleteMany({ where: { purchaseOrderId: req.params.id } });
@@ -4047,7 +4185,7 @@ app.put('/api/purchase-orders/:id', async (req, res) => {
           create: items || []
         }
       },
-      include: { vendor: true, items: true, workOrder: true, project: true, salesOrder: true }
+      include: { vendor: true, items: true, workOrder: true, project: true, salesOrder: true, businessCategory: true }
     });
     res.json(po);
   } catch (e) { res.status(500).json({ message: e.message }); }

@@ -38,7 +38,16 @@ import {
   Layers,
   ArrowRight,
 } from "lucide-react";
-import { getSalesData, getExpensesData, getInventoryStock, getLowStockItems, getProfitLossReport, getCashFlowReport, getRecentActivity } from "@/lib/api";
+import { 
+  getSalesData, 
+  getExpensesData, 
+  getInventoryStock, 
+  getLowStockItems, 
+  getProfitLossReport, 
+  getCashFlowReport, 
+  getRecentActivity,
+  getSalesByCategory
+} from "@/lib/api";
 import { format } from "date-fns";
 import { useMemo } from "react";
 import Link from "next/link";
@@ -97,6 +106,8 @@ const translations: any = {
     stock: "Stok",
     efficiencyTip: "Tips Efisiensi",
     efficiencyDesc: 'Gunakan tombol "Sinkronisasi" di atas untuk menyegarkan semua metrik secara instan.',
+    salesByCategory: "Performa Penjualan Per Kategori",
+    salesByCategoriesDesc: "Berdasarkan Kategori Bisnis",
   },
   EN: {
     enterpriseDashboard: "Dashboard",
@@ -147,6 +158,8 @@ const translations: any = {
     stock: "Stock",
     efficiencyTip: "Efficiency Tip",
     efficiencyDesc: 'Use the "Sync Data" button at the top to refresh all metrics across the command center instantly.',
+    salesByCategory: "Sales Performance by Category",
+    salesByCategoriesDesc: "By Business Category",
   }
 };
 
@@ -226,9 +239,9 @@ const DashboardCard = ({ title, value, icon: Icon, description, trend, trendType
     whileHover={{ y: -8, scale: 1.02 }}
     transition={{ type: "spring", stiffness: 300, damping: 20 }}
   >
-    <Card className="relative overflow-hidden border-none shadow-xl bg-white/80 backdrop-blur-md rounded-[2rem]">
+    <Card className="relative overflow-hidden border-none shadow-xl bg-white/80 backdrop-blur-md rounded-[2.5rem]">
       <div className={`absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 rounded-full opacity-10 ${colorClass}`} />
-      <CardContent className="p-6">
+      <CardContent className="p-8">
         <div className="flex items-center justify-between mb-4">
           <div className={`p-3 rounded-2xl ${colorClass.replace('bg-', 'bg-').replace('/10', '/20')} text-primary`}>
             <Icon className="h-6 w-6" />
@@ -262,21 +275,6 @@ export default function DashboardPage() {
     }
   }, [session, status, router]);
 
-  if (status === 'loading' || (status === 'authenticated' && (session?.user as any)?.department === 'OPERATIONAL')) {
-    return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 animate-pulse">
-            <TrendingUp size={24} className="text-white" />
-          </div>
-          <p className="text-[10px] font-black text-slate-400 max-w-[120px] text-center uppercase tracking-widest leading-loose">
-            Syncing Experience...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // Fetch data for the dashboard
   const { data: salesData, isLoading: isLoadingSales, refetch: refetchSales } = useQuery<SalesData>({ queryKey: ['salesData'], queryFn: getSalesData });
   const { data: expensesData, isLoading: isLoadingExpenses, refetch: refetchExpenses } = useQuery<ExpensesData>({ queryKey: ['expensesData'], queryFn: getExpensesData });
@@ -285,6 +283,10 @@ export default function DashboardPage() {
   const { data: profitLossReport, isLoading: isLoadingProfitLoss, refetch: refetchProfitLoss } = useQuery<ProfitLossReport>({ queryKey: ['profitLossReport', startDate, endDate], queryFn: () => getProfitLossReport(startDate, endDate) });
   const { data: cashFlowReport, isLoading: isLoadingCashFlow, refetch: refetchCashFlow } = useQuery<CashFlowReport>({ queryKey: ['cashFlowReport', startDate, endDate], queryFn: () => getCashFlowReport(startDate, endDate) });
   const { data: recentActivity, isLoading: isLoadingActivity, refetch: refetchActivity } = useQuery({ queryKey: ['recentActivity'], queryFn: getRecentActivity });
+  const { data: categorySales, isLoading: isLoadingCategorySales, refetch: refetchCategorySales } = useQuery({ 
+    queryKey: ['salesByCategory', startDate, endDate], 
+    queryFn: () => getSalesByCategory(startDate, endDate) 
+  });
 
   const handleRefresh = () => {
     refetchSales();
@@ -294,6 +296,7 @@ export default function DashboardPage() {
     refetchProfitLoss();
     refetchCashFlow();
     refetchActivity();
+    refetchCategorySales();
   };
 
   const isLoading = isLoadingSales || isLoadingExpenses || isLoadingInventory || isLoadingLowStock || isLoadingProfitLoss || isLoadingCashFlow || isLoadingActivity;
@@ -358,6 +361,7 @@ export default function DashboardPage() {
     labels: expensesData?.categories || [],
     datasets: [
       {
+        label: t.expenseAllocation,
         data: expensesData?.amounts || [],
         backgroundColor: [
           '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'
@@ -367,6 +371,36 @@ export default function DashboardPage() {
       },
     ],
   }), [expensesData]);
+
+  const categorySalesPieData = useMemo(() => ({
+    labels: categorySales?.map(d => d.category) || [],
+    datasets: [
+      {
+        label: t.salesByCategory,
+        data: categorySales?.map(d => d.amount) || [],
+        backgroundColor: [
+          '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'
+        ],
+        borderWidth: 0,
+        hoverOffset: 20,
+      },
+    ],
+  }), [categorySales]);
+
+  if (status === 'loading' || (status === 'authenticated' && (session?.user as any)?.department === 'OPERATIONAL')) {
+    return (
+      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 animate-pulse">
+            <TrendingUp size={24} className="text-white" />
+          </div>
+          <p className="text-[10px] font-black text-slate-400 max-w-[120px] text-center uppercase tracking-widest leading-loose">
+            Syncing Experience...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const commonOptions = {
     responsive: true,
@@ -400,10 +434,19 @@ export default function DashboardPage() {
         boxPadding: 6,
         callbacks: {
           label: (context: any) => {
-            let label = context.dataset.label || '';
+            let label = context.dataset.label || context.label || '';
             if (label) label += ': ';
-            if (context.parsed.y !== null) {
-              label += new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(context.parsed.y);
+            
+            // For Bar/Line charts, value is in context.parsed.y
+            // For Pie/Doughnut charts, value is in context.parsed
+            const value = context.parsed.y !== undefined ? context.parsed.y : context.parsed;
+            
+            if (value !== null && value !== undefined) {
+              label += new Intl.NumberFormat('id-ID', { 
+                style: 'currency', 
+                currency: 'IDR', 
+                maximumFractionDigits: 0 
+              }).format(value);
             }
             return label;
           }
@@ -510,7 +553,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Analytics & Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sales Performance Chart */}
         <Card className="lg:col-span-2 border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden">
           <CardHeader className="p-6 lg:p-8 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -547,7 +590,7 @@ export default function DashboardPage() {
             <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em]">{t.operationalCategoriesDesc}</p>
           </CardHeader>
           <CardContent className="p-6 lg:p-8 pt-4 flex flex-col items-center justify-center">
-            <div className="h-[240px] lg:h-[280px] w-full relative">
+            <div className="h-[210px] w-full relative">
               <Doughnut
                 data={expensePieData}
                 options={{
@@ -558,20 +601,69 @@ export default function DashboardPage() {
                 }}
               />
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-4">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t.total}</p>
-                <p className="text-lg lg:text-2xl font-black text-slate-900 truncate w-full">
-                  Rp {(expensesData?.amounts || []).reduce((a: number, b: number) => a + (Number(b) || 0), 0).toLocaleString()}
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">{t.total}</p>
+                <p className="text-sm font-black text-slate-900 truncate w-full">
+                  Rp {((expensesData?.amounts || []).reduce((a: number, b: number) => a + (Number(b) || 0), 0) / 1000000).toFixed(1)}M
                 </p>
               </div>
             </div>
-            <div className="mt-8 w-full space-y-3">
-              {(expensesData?.categories || []).slice(0, 4).map((cat: string, i: number) => (
-                <div key={cat} className="flex items-center justify-between text-[11px] font-black">
-                  <span className="flex items-center gap-2 text-slate-500">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: expensePieData.datasets[0].backgroundColor[i] }} />
-                    {cat}
+            <div className="mt-6 w-full space-y-2">
+              {(expensesData?.categories || []).slice(0, 3).map((cat: string, i: number) => (
+                <div key={cat} className="flex items-center justify-between text-[10px] font-black">
+                  <span className="flex items-center gap-2 text-slate-500 truncate pr-2">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: expensePieData.datasets[0].backgroundColor[i] }} />
+                    <span className="truncate">{cat}</span>
                   </span>
-                  <span className="text-slate-900 font-black">Rp {expensesData?.amounts[i]?.toLocaleString() ?? '0'}</span>
+                  <span className="text-slate-900 font-black whitespace-nowrap">
+                    Rp {((expensesData?.amounts?.[i] || 0) / 1000000).toFixed(1)}M
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Sales by Category Breakdown */}
+        <Card className="border-none shadow-xl rounded-[2.5rem] bg-indigo-600 text-white">
+          <CardHeader className="p-6 lg:p-8 pb-4">
+            <CardTitle className="text-xl font-black tracking-tight">{t.salesByCategory}</CardTitle>
+            <p className="text-[10px] font-bold text-indigo-200 mt-1 uppercase tracking-[0.2em]">{t.salesByCategoriesDesc}</p>
+          </CardHeader>
+          <CardContent className="p-6 lg:p-8 pt-4 flex flex-col items-center justify-center">
+            <div className="h-[210px] w-full relative">
+              <Doughnut
+                data={categorySalesPieData}
+                options={{
+                  ...commonOptions,
+                  cutout: '75%',
+                  plugins: { 
+                    ...commonOptions.plugins, 
+                    legend: { display: false },
+                    tooltip: {
+                      ...commonOptions.plugins.tooltip,
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      titleColor: '#1e293b',
+                      bodyColor: '#475569',
+                    }
+                  },
+                  scales: { x: { display: false }, y: { display: false } }
+                }}
+              />
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-4">
+                <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest leading-none mb-1">{t.total}</p>
+                <p className="text-sm font-black text-white truncate w-full">
+                  Rp {(((categorySales || []).reduce((a, b) => a + b.amount, 0)) / 1000000).toFixed(1)}M
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 w-full space-y-2">
+              {(categorySales || []).slice(0, 3).map((item, i) => (
+                <div key={item.category} className="flex items-center justify-between text-[10px] font-black">
+                  <span className="flex items-center gap-2 text-indigo-200 truncate pr-2">
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: categorySalesPieData.datasets[0].backgroundColor[i] }} />
+                    <span className="truncate">{item.category}</span>
+                  </span>
+                  <span className="text-white font-black whitespace-nowrap">Rp {(item.amount / 1000000).toFixed(1)}M</span>
                 </div>
               ))}
             </div>
@@ -653,7 +745,7 @@ export default function DashboardPage() {
 
         {/* Low Stock Watchlist */}
         <Card className="border-none shadow-xl rounded-[2.5rem] bg-white">
-          <CardHeader className="p-6 lg:p-8 pb-4 flex flex-row items-center justify-between">
+          <CardHeader className="p-8 pb-4 flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-xl font-black text-slate-900 tracking-tight">{t.stockWatchlist}</CardTitle>
               <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em]">{t.immediateAttentionDesc}</p>
@@ -662,7 +754,7 @@ export default function DashboardPage() {
               {t.viewAll}
             </Link>
           </CardHeader>
-          <CardContent className="p-6 lg:p-8 pt-0 pb-8">
+          <CardContent className="p-8 pt-0 pb-8">
             {isLoadingLowStock ? getLoadingSpinner() : (
               <div className="space-y-3">
                 {lowStockItems?.length > 0 ? (
@@ -702,11 +794,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Activity Feed */}
         <Card className="lg:col-span-2 border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden">
-          <CardHeader className="p-6 lg:p-8 pb-4">
+          <CardHeader className="p-8 pb-4">
             <CardTitle className="text-xl font-black text-slate-900 tracking-tight">{t.recentActivity}</CardTitle>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em]">{t.latestTransactionsDesc}</p>
+            <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em] font-mono">{t.latestUpdatesDesc}</p>
           </CardHeader>
-          <CardContent className="p-4 lg:p-8 pt-0">
+          <CardContent className="p-8 pt-4">
             {isLoadingActivity ? getLoadingSpinner() : (
               <div className="space-y-4 lg:space-y-6">
                 {recentActivity && recentActivity.length > 0 ? (
@@ -764,29 +856,29 @@ export default function DashboardPage() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
           <CardHeader className="p-8 pb-4">
             <CardTitle className="text-xl font-black tracking-tight text-white flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
               {t.controlPanel}
             </CardTitle>
             <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-[0.2em]">{t.executeFrequentActions}</p>
           </CardHeader>
-          <CardContent className="p-8 pt-4 pb-12">
+          <CardContent className="p-8 pt-6 pb-12">
             <div className="grid grid-cols-2 gap-4">
               {[
-                { label: t.invoice, icon: DollarSign, color: 'bg-white/5', href: '/dashboard/finance/invoices' },
-                { label: t.quote, icon: ArrowUpRight, color: 'bg-indigo-600/20', href: '/dashboard/sales/quotations' },
-                { label: t.work, icon: Activity, color: 'bg-white/5', href: '/dashboard/operations/work-orders' },
-                { label: t.stock, icon: Package, color: 'bg-white/5', href: '/dashboard/inventory' },
+                { label: t.invoice, icon: DollarSign, color: 'bg-white/5', hoverColor: 'hover:bg-indigo-600/30', iconColor: 'text-indigo-400', href: '/dashboard/finance/invoices' },
+                { label: t.quote, icon: ArrowUpRight, color: 'bg-indigo-600/20', hoverColor: 'hover:bg-indigo-600/40', iconColor: 'text-indigo-300', href: '/dashboard/sales/quotations' },
+                { label: t.work, icon: Activity, color: 'bg-white/5', hoverColor: 'hover:bg-indigo-600/30', iconColor: 'text-indigo-400', href: '/dashboard/operations/work-orders' },
+                { label: t.stock, icon: Package, color: 'bg-white/5', hoverColor: 'hover:bg-indigo-600/30', iconColor: 'text-indigo-400', href: '/dashboard/inventory' },
               ].map((action) => (
-                <Link key={action.label} href={action.href}>
+                <Link key={action.label} href={action.href} className="h-full">
                   <motion.div
-                    whileHover={{ y: -4, backgroundColor: 'rgba(255,255,255,0.1)' }}
+                    whileHover={{ y: -4, scale: 1.02 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`${action.color} backdrop-blur-md p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 border border-white/5 transition-all text-center h-full group`}
+                    className={`${action.color} ${action.hoverColor} backdrop-blur-md p-6 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 border border-white/5 transition-all text-center h-full group pointer-events-auto`}
                   >
-                    <div className="p-3 rounded-2xl bg-slate-800 lg:bg-transparent group-hover:bg-indigo-600 transition-colors">
-                      <action.icon size={22} className="text-indigo-400 lg:text-white" />
+                    <div className="p-4 rounded-2xl bg-slate-800/50 group-hover:bg-indigo-500 transition-all duration-300 shadow-lg group-hover:shadow-indigo-500/20">
+                      <action.icon size={24} className={`${action.iconColor} group-hover:text-white transition-colors`} />
                     </div>
-                    <span className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-300">{action.label}</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-300 group-hover:text-white transition-colors">{action.label}</span>
                   </motion.div>
                 </Link>
               ))}

@@ -29,30 +29,35 @@ export default function EditPurchaseOrderPage() {
         terms: '',
         tax: 11,
         status: 'DRAFT',
-        paymentType: 'CREDIT'
+        paymentType: 'CREDIT',
+        businessCategoryId: ''
     })
 
     const [items, setItems] = useState<any[]>([])
     const [expenses, setExpenses] = useState<any[]>([])
     const [expenseModalOpen, setExpenseModalOpen] = useState(false)
+    const [businessCategories, setBusinessCategories] = useState<any[]>([])
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [venRes, skuRes, poRes, woRes] = await Promise.all([
+                const [venRes, skuRes, poRes, woRes, bcRes] = await Promise.all([
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`),
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/product-skus`),
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${id}`),
-                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders`)
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders`),
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`)
                 ])
                 const venData = await venRes.json()
                 const skuData = await skuRes.json()
                 const poJson = await poRes.json()
                 const woData = await woRes.json()
+                const bcData = await bcRes.json()
 
                 setVendors(Array.isArray(venData) ? venData : [])
                 setWorkOrders(Array.isArray(woData) ? woData : [])
+                setBusinessCategories(Array.isArray(bcData) ? bcData : [])
 
                 const skusArr = Array.isArray(skuData) ? skuData : [];
                 const formattedSkus = skusArr.map(s => ({
@@ -73,7 +78,8 @@ export default function EditPurchaseOrderPage() {
                         terms: poJson.terms || '',
                         tax: poJson.tax !== undefined ? poJson.tax : 11,
                         status: poJson.status || 'DRAFT',
-                        paymentType: poJson.paymentType || 'CREDIT'
+                        paymentType: poJson.paymentType || 'CREDIT',
+                        businessCategoryId: poJson.businessCategoryId || ''
                     })
                     if (poJson.items && poJson.items.length > 0) {
                         setItems(poJson.items.map((i: any) => ({
@@ -469,7 +475,21 @@ export default function EditPurchaseOrderPage() {
                             >
                                 <option value="">-- Choose Vendor --</option>
                                 {vendors.map(v => (
-                                    <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
+                                        <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase italic text-violet-600">Unit Bisnis / Kategori *</label>
+                            <select
+                                value={poData.businessCategoryId}
+                                onChange={e => setPoData({ ...poData, businessCategoryId: e.target.value })}
+                                className="w-full px-4 py-3 bg-violet-50/30 border border-violet-100 rounded-xl font-bold text-violet-700"
+                            >
+                                <option value="">-- Generic / Shared --</option>
+                                {businessCategories.map(bc => (
+                                    <option key={bc.id} value={bc.id}>{bc.name}</option>
                                 ))}
                             </select>
                         </div>

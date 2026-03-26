@@ -26,6 +26,7 @@ interface SalesOrder {
     subtotal: number; discountAmt: number; taxAmt: number; grandTotal: number
     createdAt: string; items: OrderItem[]; quotationId?: string; quotation?: { number: string }
     poProof?: string | null; projectId?: string; project?: { number: string; name: string }
+    businessCategoryId: string | null; businessCategory?: { id: string; name: string }
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
@@ -72,6 +73,8 @@ export default function SalesOrdersPage() {
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
     const [company, setCompany] = useState<Record<string, string>>({})
     const [projects, setProjects] = useState<any[]>([])
+    const [businessCategories, setBusinessCategories] = useState<any[]>([])
+    const [filterBusinessCategory, setFilterBusinessCategory] = useState("ALL")
 
     const showToast = useCallback((type: 'success' | 'error', msg: string) => {
         setToast({ type, msg }); setTimeout(() => setToast(null), 4000)
@@ -80,13 +83,14 @@ export default function SalesOrdersPage() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const [oR, cR, pR, coR, qR, prR] = await Promise.all([
+            const [oR, cR, pR, coR, qR, prR, bcR] = await Promise.all([
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`),
             ])
             setOrders(await oR.json())
             setCustomers(await cR.json())
@@ -94,6 +98,7 @@ export default function SalesOrdersPage() {
             setCompany(await coR.json())
             setQuotations(await qR.json())
             setProjects(await prR.json())
+            setBusinessCategories(await bcR.json())
         } catch { showToast('error', 'Failed to load data') }
         finally { setLoading(false) }
     }, [showToast])
@@ -117,7 +122,8 @@ export default function SalesOrdersPage() {
         const s = search.toLowerCase()
         return (o.number.toLowerCase().includes(s) || (o.poNumber || '').toLowerCase().includes(s) || o.customer?.name?.toLowerCase().includes(s) || o.subject?.toLowerCase().includes(s)) &&
             (filterStatus === 'ALL' || o.status === filterStatus) &&
-            (filterProject === 'ALL' || o.projectId === filterProject)
+            (filterProject === 'ALL' || o.projectId === filterProject) &&
+            (filterBusinessCategory === 'ALL' || o.businessCategoryId === filterBusinessCategory)
     }).sort((a, b) => (a.projectId || '').localeCompare(b.projectId || ''))
 
     const stats = {
@@ -216,11 +222,16 @@ export default function SalesOrdersPage() {
                     {['ALL', ...Object.keys(STATUS_CONFIG)].map(s => (
                         <button key={s} onClick={() => setFilterStatus(s)}
                             className={`px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap font-bold uppercase tracking-wider transition-all ${filterStatus === s ? 'bg-indigo-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
-                            {s === 'ALL' ? 'All' : STATUS_CONFIG[s].label}
+                            {s === 'ALL' ? 'All Status' : STATUS_CONFIG[s].label}
                         </button>
                     ))}
                 </div>
                 <div className="md:ml-auto w-full md:w-auto flex items-center gap-2">
+                    <select value={filterBusinessCategory} onChange={e => setFilterBusinessCategory(e.target.value)}
+                        className="w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none">
+                        <option value="ALL">All Business Units</option>
+                        {Array.isArray(businessCategories) && businessCategories.map(bc => <option key={bc.id} value={bc.id}>{bc.name}</option>)}
+                    </select>
                     <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
                         className="w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none">
                         <option value="ALL">All Projects</option>
@@ -245,6 +256,7 @@ export default function SalesOrdersPage() {
                             <tr className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400 border-b border-slate-100 bg-slate-50/80">
                                 <th className="px-6 py-4">PO Proof</th>
                                 <th className="px-6 py-4">SO Number</th>
+                                <th className="px-6 py-4">Business Unit</th>
                                 <th className="px-6 py-4">Customer / PO#</th>
                                 <th className="px-6 py-4">Subject</th>
                                 <th className="px-6 py-4">Date</th>
@@ -297,6 +309,15 @@ export default function SalesOrdersPage() {
                                                         <div className="flex items-center gap-1 mt-1 text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded cursor-help" title="Based on Quotation">
                                                             <FileText size={8} /> {o.quotation.number}
                                                         </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    {o.businessCategory ? (
+                                                        <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-wider border border-indigo-100">
+                                                            {o.businessCategory.name}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-300 text-[10px] font-bold uppercase tracking-widest italic">Generic</span>
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4">
@@ -384,7 +405,14 @@ export default function SalesOrdersPage() {
                                                         </button>
                                                     )}
                                                 </div>
-                                                <h3 className="font-bold text-slate-800 text-sm leading-tight">{o.customer?.name}</h3>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h3 className="font-bold text-slate-800 text-sm leading-tight">{o.customer?.name}</h3>
+                                                    {o.businessCategory && (
+                                                        <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100 shrink-0">
+                                                            {o.businessCategory.name}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-[11px] text-slate-500 line-clamp-1">{o.subject}</p>
                                             </div>
                                             <select value={o.status} onChange={(e) => handleStatus(o.id, e.target.value)}
@@ -427,7 +455,7 @@ export default function SalesOrdersPage() {
             <AnimatePresence>
                 {modalOpen && (
                     <OrderFormModal
-                        order={editing} customers={customers} products={products} quotations={quotations} projects={projects}
+                        order={editing} customers={customers} products={products} quotations={quotations} projects={projects} businessCategories={businessCategories}
                         onClose={() => setModalOpen(false)}
                         onPreview={setPreviewImage}
                         onSuccess={() => { setModalOpen(false); load(); showToast('success', editing ? 'Sales Order updated!' : 'Sales Order created!') }}
@@ -449,8 +477,8 @@ export default function SalesOrdersPage() {
 }
 
 // ─── FORM MODAL ───────────────────────────────────────────────────────────────
-function OrderFormModal({ order, customers, products, quotations, projects, onClose, onSuccess, onPreview }:
-    { order: SalesOrder | null; customers: Customer[]; products: any[]; quotations: Quotation[]; projects: any[]; onClose: () => void; onSuccess: () => void; onPreview: (url: string) => void }) {
+function OrderFormModal({ order, customers, products, quotations, projects, businessCategories, onClose, onSuccess, onPreview }:
+    { order: SalesOrder | null; customers: Customer[]; products: any[]; quotations: Quotation[]; projects: any[]; businessCategories: any[]; onClose: () => void; onSuccess: () => void; onPreview: (url: string) => void }) {
 
     const isEdit = !!order
     const today = new Date().toISOString().split('T')[0]
@@ -470,6 +498,7 @@ function OrderFormModal({ order, customers, products, quotations, projects, onCl
         quotationId: order?.quotationId || '',
         poProof: order?.poProof || null,
         projectId: order?.projectId || '',
+        businessCategoryId: order?.businessCategoryId || '',
     })
     const [items, setItems] = useState<OrderItem[]>(
         order?.items?.length ? order.items.map(i => ({ ...i })) :
@@ -577,6 +606,13 @@ function OrderFormModal({ order, customers, products, quotations, projects, onCl
                             <select value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })} className={ic + " text-indigo-700 font-bold border-indigo-200 bg-indigo-50/20"}>
                                 <option value="">-- No Project --</option>
                                 {Array.isArray(projects) && projects.filter(p => p.customerId === form.customerId || !form.customerId).map(p => <option key={p.id} value={p.id}>{p.number} — {p.name}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={lc}>Business Unit / Category <span className="text-rose-500">*</span></label>
+                            <select required value={form.businessCategoryId} onChange={e => setForm({ ...form, businessCategoryId: e.target.value })} className={ic + " font-bold text-indigo-600"}>
+                                <option value="">-- Select Business Unit --</option>
+                                {Array.isArray(businessCategories) && businessCategories.map(bc => <option key={bc.id} value={bc.id}>{bc.name}</option>)}
                             </select>
                         </div>
                         <div><label className={lc}>Tanggal</label><input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={ic} /></div>

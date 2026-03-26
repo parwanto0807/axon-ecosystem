@@ -22,6 +22,7 @@ interface Vendor {
     taxAddress: string | null;
     businessCategoryId: string | null;
     businessCategory: BusinessCategory | null;
+    businessCategories: BusinessCategory[];
     isActive: boolean;
 }
 
@@ -34,7 +35,7 @@ export default function VendorsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [editingId, setEditingId] = useState<string | null>(null)
     const [formData, setFormData] = useState<Partial<Vendor>>({
-        name: '', email: '', phone: '', company: '', address: '', taxId: '', taxAddress: '', businessCategoryId: '', isActive: true
+        name: '', email: '', phone: '', company: '', address: '', taxId: '', taxAddress: '', businessCategoryId: '', businessCategories: [], isActive: true
     })
     const [selectedBusinessCategoryId, setSelectedBusinessCategoryId] = useState<string>("")
     const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
@@ -78,11 +79,12 @@ export default function VendorsPage() {
             setEditingId(vendor.id)
             setFormData({
                 ...vendor,
-                businessCategoryId: vendor.businessCategoryId || ''
+                businessCategoryId: vendor.businessCategoryId || '',
+                businessCategories: vendor.businessCategories || []
             })
         } else {
             setEditingId(null)
-            setFormData({ name: '', email: '', phone: '', company: '', address: '', taxId: '', taxAddress: '', businessCategoryId: '', isActive: true })
+            setFormData({ name: '', email: '', phone: '', company: '', address: '', taxId: '', taxAddress: '', businessCategoryId: '', businessCategories: [], isActive: true })
         }
         setIsModalOpen(true)
     }
@@ -98,10 +100,15 @@ export default function VendorsPage() {
 
             const method = editingId ? 'PUT' : 'POST'
 
+            const payload = {
+                ...formData,
+                businessCategoryIds: formData.businessCategories?.map(b => b.id) || []
+            };
+
             const res = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             })
 
             if (!res.ok) {
@@ -218,10 +225,18 @@ export default function VendorsPage() {
                                             <h3 className="text-lg md:text-xl font-black text-slate-900 uppercase tracking-tight truncate leading-tight transition-colors group-hover:text-indigo-600">
                                                 {vendor.name}
                                             </h3>
-                                            <div className="mt-1">
-                                                <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100 font-black px-2 py-0 text-[9px] uppercase tracking-widest">
-                                                    {vendor.businessCategory?.name || 'GENERIC'}
-                                                </Badge>
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                {vendor.businessCategories && vendor.businessCategories.length > 0 ? (
+                                                    vendor.businessCategories.map(biz => (
+                                                        <Badge key={biz.id} variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100 font-bold px-2 py-0 text-[9px] uppercase tracking-widest">
+                                                            {biz.name}
+                                                        </Badge>
+                                                    ))
+                                                ) : (
+                                                    <Badge variant="secondary" className="bg-slate-50 text-slate-400 border-slate-200 font-bold px-2 py-0 text-[9px] uppercase tracking-widest">
+                                                        GENERIC
+                                                    </Badge>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -335,19 +350,36 @@ export default function VendorsPage() {
                                             placeholder="PT. Example Supplier"
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-rose-500 ml-1">Business Unit *</label>
-                                        <select
-                                            required
-                                            value={formData.businessCategoryId || ''}
-                                            onChange={e => setFormData(p => ({ ...p, businessCategoryId: e.target.value }))}
-                                            className="w-full px-4 py-2.5 md:py-3 bg-rose-50/30 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-bold text-sm"
-                                        >
-                                            <option value="">Select Business Unit</option>
-                                            {businessCategories.map(biz => (
-                                                <option key={biz.id} value={biz.id}>{biz.name}</option>
-                                            ))}
-                                        </select>
+                                    <div className="space-y-2 col-span-full">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600 ml-1">Business Units <span className="text-rose-500">*</span></label>
+                                        <div className="flex flex-wrap gap-2 p-3 bg-secondary/20 border border-slate-200 rounded-xl min-h-[50px]">
+                                            {businessCategories.map(biz => {
+                                                const isSelected = formData.businessCategories?.some(b => b.id === biz.id);
+                                                return (
+                                                    <Badge
+                                                        key={biz.id}
+                                                        onClick={() => {
+                                                            const current = formData.businessCategories || [];
+                                                            const next = isSelected 
+                                                                ? current.filter(b => b.id !== biz.id)
+                                                                : [...current, biz];
+                                                            setFormData({ ...formData, businessCategories: next });
+                                                        }}
+                                                        variant={isSelected ? "default" : "outline"}
+                                                        className={`cursor-pointer transition-all px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest shadow-none ${
+                                                            isSelected 
+                                                                ? "bg-indigo-600 hover:bg-indigo-700 text-white border-transparent" 
+                                                                : "bg-white hover:bg-secondary text-slate-500 border-slate-200"
+                                                        }`}
+                                                    >
+                                                        {biz.name}
+                                                    </Badge>
+                                                );
+                                            })}
+                                        </div>
+                                        {(!formData.businessCategories || formData.businessCategories.length === 0) && (
+                                            <p className="text-[10px] text-rose-500 font-bold ml-1 uppercase tracking-tight italic">Please select at least one business unit</p>
+                                        )}
                                     </div>
 
                                     <div className="space-y-2">

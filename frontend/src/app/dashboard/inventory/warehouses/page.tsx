@@ -13,6 +13,7 @@ interface Warehouse {
     managedBy?: string; phone?: string; isActive: boolean;
     _count?: { stocks: number }; stocks?: { quantity: number; sku: { purchasePrice: number } }[]
     createdAt: string;
+    businessCategoryId: string | null; businessCategory?: { id: string; name: string }
 }
 
 const TYPE_CFG: Record<string, string> = {
@@ -22,7 +23,7 @@ const TYPE_CFG: Record<string, string> = {
 }
 
 const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
-const defaultForm = { code: '', name: '', location: '', type: 'MAIN', managedBy: '', phone: '', isActive: true }
+const defaultForm = { code: '', name: '', location: '', type: 'MAIN', managedBy: '', phone: '', isActive: true, businessCategoryId: '' }
 
 export default function WarehousesPage() {
     const [warehouses, setWarehouses] = useState<Warehouse[]>([])
@@ -32,6 +33,8 @@ export default function WarehousesPage() {
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
     const [form, setForm] = useState(defaultForm)
     const [saving, setSaving] = useState(false)
+    const [businessCategories, setBusinessCategories] = useState<any[]>([])
+    const [filterBusinessCategory, setFilterBusinessCategory] = useState("ALL")
 
     const showToast = (type: 'success' | 'error', msg: string) => {
         setToast({ type, msg }); setTimeout(() => setToast(null), 4000)
@@ -39,8 +42,12 @@ export default function WarehousesPage() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`)
-            setWarehouses(await res.json())
+            const [wR, bcR] = await Promise.all([
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`)
+            ])
+            setWarehouses(await wR.json())
+            setBusinessCategories(await bcR.json())
         } catch { showToast('error', 'Gagal memuat data') }
         finally { setLoading(false) }
     }, [])
@@ -48,7 +55,7 @@ export default function WarehousesPage() {
     useEffect(() => { load() }, [load])
 
     const openCreate = () => { setEditing(null); setForm(defaultForm); setModalOpen(true) }
-    const openEdit = (w: Warehouse) => { setEditing(w); setForm({ code: w.code, name: w.name, location: w.location || '', type: w.type, managedBy: w.managedBy || '', phone: w.phone || '', isActive: w.isActive }); setModalOpen(true) }
+    const openEdit = (w: Warehouse) => { setEditing(w); setForm({ code: w.code, name: w.name, location: w.location || '', type: w.type, managedBy: w.managedBy || '', phone: w.phone || '', isActive: w.isActive, businessCategoryId: w.businessCategoryId || '' }); setModalOpen(true) }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); setSaving(true)
@@ -67,6 +74,10 @@ export default function WarehousesPage() {
 
     const ic = "w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm text-sm"
     const lc = "text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block"
+
+    const filtered = warehouses.filter(w => 
+        filterBusinessCategory === 'ALL' || w.businessCategoryId === filterBusinessCategory
+    )
 
     return (
         <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-5 md:space-y-6 font-inter w-full pb-24 md:pb-8">
@@ -89,7 +100,12 @@ export default function WarehousesPage() {
                         <p className="text-[10px] md:text-[11px] font-semibold text-slate-400 uppercase tracking-widest leading-none mt-1">Kelola Lokasi Penyimpanan Stok</p>
                     </div>
                 </div>
-                <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
+                    <select value={filterBusinessCategory} onChange={e => setFilterBusinessCategory(e.target.value)}
+                        className="bg-white border border-slate-200 rounded-xl px-4 h-11 md:h-10 text-[10px] md:text-xs font-bold text-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none shadow-sm min-w-[140px]">
+                        <option value="ALL">All Business Units</option>
+                        {Array.isArray(businessCategories) && businessCategories.map(bc => <option key={bc.id} value={bc.id}>{bc.name}</option>)}
+                    </select>
                     <Button variant="outline" onClick={load} className="flex-1 md:flex-none rounded-xl border-slate-200 text-slate-600 h-11 md:h-10 px-4 text-[10px] md:text-xs font-bold uppercase tracking-wider">
                         <RefreshCw size={13} className={`mr-1.5 md:mr-2 ${loading ? 'animate-spin' : ''}`} /> Reload
                     </Button>
@@ -103,7 +119,7 @@ export default function WarehousesPage() {
                 <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600" /></div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {warehouses.map((w, idx) => {
+                    {filtered.map((w, idx) => {
                         const totalValue = w.stocks?.reduce((s, ws) => s + ws.quantity * ws.sku.purchasePrice, 0) || 0
                         return (
                             <motion.div key={w.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
@@ -115,6 +131,11 @@ export default function WarehousesPage() {
                                             <h3 className="font-black text-slate-900 text-[15px] md:text-lg leading-tight break-words whitespace-normal">{w.name}</h3>
                                             <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                                                 <span className={`inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${TYPE_CFG[w.type]}`}>{w.type}</span>
+                                                {w.businessCategory && (
+                                                    <span className="inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border border-indigo-200 bg-indigo-50 text-indigo-700">
+                                                        {w.businessCategory.name}
+                                                    </span>
+                                                )}
                                                 {!w.isActive && <span className="inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border bg-rose-50 text-rose-600 border-rose-200">Nonaktif</span>}
                                             </div>
                                         </div>
@@ -177,6 +198,12 @@ export default function WarehousesPage() {
                                                 <option value="MAIN">Main (Utama)</option>
                                                 <option value="BRANCH">Branch (Cabang)</option>
                                                 <option value="VIRTUAL">Virtual</option>
+                                            </select>
+                                        </div>
+                                        <div className="md:col-span-1"><label className={lc}>Unit Bisnis / Kategori</label>
+                                            <select value={form.businessCategoryId} onChange={e => setForm({ ...form, businessCategoryId: e.target.value })} className={ic + " font-bold text-indigo-600"}>
+                                                <option value="">-- Generic / Shared --</option>
+                                                {Array.isArray(businessCategories) && businessCategories.map(bc => <option key={bc.id} value={bc.id}>{bc.name}</option>)}
                                             </select>
                                         </div>
                                         <div className="col-span-1 md:col-span-2"><label className={lc}>Nama Gudang <span className="text-rose-500">*</span></label><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Gudang Utama Jakarta" className={ic} /></div>

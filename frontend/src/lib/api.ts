@@ -110,6 +110,19 @@ export const getCashFlowReport = async (startDate: string, endDate: string) => {
   }
 };
 
+// Fetch Sales by Business Category
+export const getSalesByCategory = async (startDate: string, endDate: string): Promise<{ category: string, amount: number }[]> => {
+  try {
+    const response = await api.get(`/api/reports/sales-by-category`, {
+      params: { startDate, endDate },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching sales by category:', error);
+    throw error;
+  }
+};
+
 // Example: Fetch Recent Activity (Unifies multiple sources)
 export const getRecentActivity = async () => {
   try {
