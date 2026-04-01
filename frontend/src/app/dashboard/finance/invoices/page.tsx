@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Receipt, Plus, Search, Edit, Trash2, X, Save,
@@ -72,8 +72,9 @@ export default function InvoicesPage() {
     const [customers, setCustomers] = useState<{ id: string; name: string; code: string }[]>([])
     const [contracts, setContracts] = useState<ContractRef[]>([])
     const [banks, setBanks] = useState<BankAccount[]>([])
+    const [coas, setCoas] = useState<{ id: string; name: string; code: string; type: string }[]>([])
     const [showBankForm, setShowBankForm] = useState(false)
-    const [bankForm, setBankForm] = useState({ bankName: '', accountNumber: '', accountHolder: '', branch: '' })
+    const [bankForm, setBankForm] = useState({ bankName: '', accountNumber: '', accountHolder: '', branch: '', coaId: '' })
 
     const [loading, setLoading] = useState(true)
     const [modalOpen, setModalOpen] = useState(false)
@@ -114,7 +115,7 @@ export default function InvoicesPage() {
         if (!userRole) return
         setLoading(true)
         try {
-            const [invRes, prjRes, soRes, doRes, custRes, cntRes, coRes, bankRes] = await Promise.all([
+            const [invRes, prjRes, soRes, doRes, custRes, cntRes, coRes, bankRes, coaRes] = await Promise.all([
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/invoices`).then(r => r.json()),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`).then(r => r.json()),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`).then(r => r.json()),
@@ -122,7 +123,8 @@ export default function InvoicesPage() {
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`).then(r => r.json()),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts`).then(r => r.json()),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`, { headers: { 'x-user-role': userRole } }).then(r => r.json()),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/banks`).then(r => r.json())
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/banks`).then(r => r.json()),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/coa?type=ASSET`).then(r => r.json())
             ])
             setInvoices(invRes)
             setProjects(prjRes)
@@ -132,6 +134,7 @@ export default function InvoicesPage() {
             setContracts(cntRes)
             setCompany(coRes)
             setBanks(bankRes)
+            setCoas(coaRes)
         } catch (e) { console.error(e) }
         setLoading(false)
     }, [userRole])
@@ -200,6 +203,22 @@ export default function InvoicesPage() {
         }
     }
 
+    const handleDelete = async (id: string) => {
+        if (!confirm('Hapus invoice ini?')) return
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/invoices/${id}`, { method: 'DELETE' })
+            if (res.ok) {
+                showToast('success', 'Invoice berhasil dihapus')
+                loadData()
+            } else {
+                const err = await res.json()
+                showToast('error', err.message || 'Gagal menghapus invoice')
+            }
+        } catch (e: any) {
+            showToast('error', e.message)
+        }
+    }
+
     const addItem = () => {
         const newItems = [...form.items, { no: form.items.length + 1, description: '', qty: 1, unit: 'pcs', unitPrice: 0, discount: 0, amount: 0 }]
         const totals = calculateTotals(newItems, form.tax, form.discount)
@@ -250,11 +269,24 @@ export default function InvoicesPage() {
         }
     }
 
-    const filtered = invoices.filter(inv =>
-        inv.number.toLowerCase().includes(search.toLowerCase()) ||
-        inv.customer.name.toLowerCase().includes(search.toLowerCase()) ||
-        inv.contract?.number.toLowerCase().includes(search.toLowerCase())
-    )
+    const filtered = (invoices || [])
+        .filter(inv =>
+            inv.number.toLowerCase().includes(search.toLowerCase()) ||
+            inv.customer.name.toLowerCase().includes(search.toLowerCase()) ||
+            inv.contract?.number.toLowerCase().includes(search.toLowerCase())
+        )
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+    const groupedInvoices = filtered.reduce((groups: Record<string, { month: string, total: number, invoices: Invoice[] }>, inv) => {
+        const date = new Date(inv.date)
+        const monthHeader = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+        if (!groups[monthHeader]) {
+            groups[monthHeader] = { month: monthHeader, total: 0, invoices: [] }
+        }
+        groups[monthHeader].invoices.push(inv)
+        groups[monthHeader].total += inv.grandTotal
+        return groups
+    }, {})
 
     return (
         <div className="p-4 md:p-6 space-y-6 max-w-full mx-auto pb-24 md:pb-20">
@@ -333,93 +365,117 @@ export default function InvoicesPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
-                            {filtered.map((inv) => (
-                                <tr key={inv.id} className="hover:bg-emerald-600/[0.02] transition-colors group">
-                                    <td className="px-6 py-5">
-                                        <p className="font-black text-foreground group-hover:text-emerald-600 transition-colors tracking-tight">{inv.number}</p>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">{fmtDate(inv.date)}</p>
-                                            <span className="w-1 h-1 rounded-full bg-slate-300" />
-                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Due: {fmtDate(inv.dueDate)}</p>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-5">
-                                        <p className="font-bold text-sm tracking-tight">{inv.customer.name}</p>
-                                        <div className="flex items-center gap-1.5 mt-1">
-                                            {inv.contract ? (
-                                                <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 uppercase tracking-tighter shadow-sm">
-                                                    Contract {inv.contract.number}
-                                                </span>
-                                            ) : (
-                                                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter border-l-2 border-slate-200 pl-2">Tanpa Kontrak</span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-5 text-right">
-                                        <p className="font-black text-foreground">{fmt(inv.grandTotal)}</p>
-                                    </td>
-                                    <td className="px-6 py-5">
-                                        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider ${INV_STATUS[inv.status]?.color || ''}`}>
-                                            {inv.status}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-5 text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => setDetailModal(inv)} title="View Detail" className="h-9 w-9 rounded-xl hover:bg-emerald-50 text-emerald-600">
-                                                <Eye size={16} />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => setViewModal(inv)} title="Print / Preview Invoice" className="h-9 w-9 rounded-xl hover:bg-slate-100">
-                                                <Printer size={16} />
-                                            </Button>
-                                            {inv.status === 'DRAFT' && (
-                                                <Button
-                                                    variant="ghost" size="sm"
-                                                    onClick={() => setPostingInvoice(inv)}
-                                                    className="h-9 rounded-xl hover:bg-indigo-50 text-indigo-600 font-bold px-3 gap-1"
-                                                >
-                                                    <Send size={14} /> POSTING
-                                                </Button>
-                                            )}
-                                            {inv.status === 'POSTED' && (
-                                                <Button
-                                                    variant="ghost" size="sm"
-                                                    onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '' })}
-                                                    className="h-9 rounded-xl hover:bg-emerald-50 text-emerald-600 font-bold px-3 gap-1"
-                                                >
-                                                    <DollarSign size={14} /> PAID
-                                                </Button>
-                                            )}
-                                            <Button variant="ghost" size="icon" onClick={() => {
-                                                setSelectedId(inv.id);
-                                                setEditMode(true);
-                                                setForm({
-                                                    customerId: inv.customerId,
-                                                    projectId: inv.projectId || '',
-                                                    contractId: inv.contractId || '',
-                                                    salesOrderId: inv.salesOrderId || '',
-                                                    deliveryOrderId: inv.deliveryOrderId || '',
-                                                    bankAccountId: inv.bankAccountId || '',
-                                                    signerName: inv.signerName || '',
-                                                    signerPosition: inv.signerPosition || '',
-                                                    date: inv.date.split('T')[0],
-                                                    dueDate: inv.dueDate ? inv.dueDate.split('T')[0] : '',
-                                                    notes: inv.notes || '',
-                                                    paymentTerms: inv.paymentTerms || '',
-                                                    subtotal: inv.subtotal,
-                                                    tax: inv.tax,
-                                                    discount: inv.discount,
-                                                    discountAmt: inv.discountAmt,
-                                                    taxAmt: inv.taxAmt,
-                                                    grandTotal: inv.grandTotal,
-                                                    items: inv.items
-                                                });
-                                                setModalOpen(true);
-                                            }} className="h-9 w-9 rounded-xl hover:bg-emerald-50 text-emerald-600">
-                                                <Edit size={16} />
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
+                            {Object.entries(groupedInvoices).map(([month, data]) => (
+                                <React.Fragment key={month}>
+                                    <tr className="bg-slate-50/80 border-y border-border/50">
+                                        <td colSpan={5} className="px-6 py-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Calendar size={14} className="text-emerald-600" />
+                                                    <span className="text-[11px] font-black uppercase tracking-widest text-slate-900">{month}</span>
+                                                    <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-lg border border-slate-100 ml-2">
+                                                        {data.invoices.length} Invoices
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Period:</span>
+                                                    <span className="text-xs font-black text-emerald-700">{fmt(data.total)}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {data.invoices.map((inv) => (
+                                        <tr key={inv.id} className="hover:bg-emerald-600/[0.02] transition-colors group">
+                                            <td className="px-6 py-5">
+                                                <p className="font-black text-foreground group-hover:text-emerald-600 transition-colors tracking-tight">{inv.number}</p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">{fmtDate(inv.date)}</p>
+                                                    <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Due: {fmtDate(inv.dueDate)}</p>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <p className="font-bold text-sm tracking-tight">{inv.customer.name}</p>
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    {inv.contract ? (
+                                                        <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 uppercase tracking-tighter shadow-sm">
+                                                            Contract {inv.contract.number}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter border-l-2 border-slate-200 pl-2">Tanpa Kontrak</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-5 text-right">
+                                                <p className="font-black text-foreground">{fmt(inv.grandTotal)}</p>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider ${INV_STATUS[inv.status]?.color || ''}`}>
+                                                    {inv.status}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-5 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <Button variant="ghost" size="icon" onClick={() => setDetailModal(inv)} title="View Detail" className="h-9 w-9 rounded-xl hover:bg-emerald-50 text-emerald-600">
+                                                        <Eye size={16} />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" onClick={() => setViewModal(inv)} title="Print / Preview Invoice" className="h-9 w-9 rounded-xl hover:bg-slate-100">
+                                                        <Printer size={16} />
+                                                    </Button>
+                                                    {inv.status === 'DRAFT' && (
+                                                        <Button
+                                                            variant="ghost" size="sm"
+                                                            onClick={() => setPostingInvoice(inv)}
+                                                            className="h-9 rounded-xl hover:bg-indigo-50 text-indigo-600 font-bold px-3 gap-1"
+                                                        >
+                                                            <Send size={14} /> POSTING
+                                                        </Button>
+                                                    )}
+                                                    {inv.status === 'POSTED' && (
+                                                        <Button
+                                                            variant="ghost" size="sm"
+                                                            onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '' })}
+                                                            className="h-9 rounded-xl hover:bg-emerald-50 text-emerald-600 font-bold px-3 gap-1"
+                                                        >
+                                                            <DollarSign size={14} /> PAID
+                                                        </Button>
+                                                    )}
+                                                    <Button variant="ghost" size="icon" onClick={() => {
+                                                        setSelectedId(inv.id);
+                                                        setEditMode(true);
+                                                        setForm({
+                                                            customerId: inv.customerId,
+                                                            projectId: inv.projectId || '',
+                                                            contractId: inv.contractId || '',
+                                                            salesOrderId: inv.salesOrderId || '',
+                                                            deliveryOrderId: inv.deliveryOrderId || '',
+                                                            bankAccountId: inv.bankAccountId || '',
+                                                            signerName: inv.signerName || '',
+                                                            signerPosition: inv.signerPosition || '',
+                                                            date: inv.date.split('T')[0],
+                                                            dueDate: inv.dueDate ? inv.dueDate.split('T')[0] : '',
+                                                            notes: inv.notes || '',
+                                                            paymentTerms: inv.paymentTerms || '',
+                                                            subtotal: inv.subtotal,
+                                                            tax: inv.tax,
+                                                            discount: inv.discount,
+                                                            discountAmt: inv.discountAmt,
+                                                            taxAmt: inv.taxAmt,
+                                                            grandTotal: inv.grandTotal,
+                                                            items: inv.items
+                                                        });
+                                                        setModalOpen(true);
+                                                    }} className="h-9 w-9 rounded-xl hover:bg-emerald-50 text-emerald-600">
+                                                        <Edit size={16} />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(inv.id)} title="Delete" className="h-9 w-9 rounded-xl hover:bg-rose-50 text-rose-600">
+                                                        <Trash2 size={16} />
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </React.Fragment>
                             ))}
                         </tbody>
                     </table>
@@ -427,84 +483,95 @@ export default function InvoicesPage() {
 
                 {/* Mobile Cards View */}
                 <div className="md:hidden flex flex-col gap-4 p-4 bg-slate-50/30">
-                    {filtered.map((inv) => (
-                        <div key={inv.id} className="bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col gap-4">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="font-black text-slate-800 tracking-tight">{inv.number}</p>
-                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter mt-0.5">{fmtDate(inv.date)}</p>
-                                </div>
-                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[9px] font-black uppercase tracking-wider ${INV_STATUS[inv.status]?.color || ''}`}>
-                                    {inv.status}
-                                </div>
+                    {Object.entries(groupedInvoices).map(([month, data]) => (
+                        <div key={month} className="space-y-4">
+                            <div className="flex items-center justify-between pb-1 border-b border-slate-200 mx-1">
+                                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">{month}</h3>
+                                <span className="text-[10px] font-black text-emerald-600">{fmt(data.total)}</span>
                             </div>
+                            {data.invoices.map((inv) => (
+                                <div key={inv.id} className="bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col gap-4">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="font-black text-slate-800 tracking-tight">{inv.number}</p>
+                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter mt-0.5">{fmtDate(inv.date)}</p>
+                                        </div>
+                                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[9px] font-black uppercase tracking-wider ${INV_STATUS[inv.status]?.color || ''}`}>
+                                            {inv.status}
+                                        </div>
+                                    </div>
 
-                            <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100/50">
-                                <p className="font-bold text-sm text-slate-800 tracking-tight">{inv.customer.name}</p>
-                                <div className="flex items-center gap-1.5 mt-1">
-                                    {inv.contract ? (
-                                        <span className="text-[9px] font-black text-indigo-600 uppercase tracking-tighter shadow-sm bg-indigo-50 px-2 rounded-md">
-                                            Contract {inv.contract.number}
-                                        </span>
-                                    ) : (
-                                        <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter border-l-2 border-slate-200 pl-2">Tanpa Kontrak</span>
-                                    )}
-                                </div>
-                            </div>
+                                    <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100/50">
+                                        <p className="font-bold text-sm text-slate-800 tracking-tight">{inv.customer.name}</p>
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                            {inv.contract ? (
+                                                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-tighter shadow-sm bg-indigo-50 px-2 rounded-md">
+                                                    Contract {inv.contract.number}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter border-l-2 border-slate-200 pl-2">Tanpa Kontrak</span>
+                                            )}
+                                        </div>
+                                    </div>
 
-                            <div className="flex justify-between items-end border-t border-slate-50 pt-3">
-                                <div className="space-y-1">
-                                    <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Total Tagihan</p>
-                                    <p className="font-black text-slate-900">{fmt(inv.grandTotal)}</p>
-                                </div>
-                            </div>
+                                    <div className="flex justify-between items-end border-t border-slate-50 pt-3">
+                                        <div className="space-y-1">
+                                            <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Total Tagihan</p>
+                                            <p className="font-black text-slate-900">{fmt(inv.grandTotal)}</p>
+                                        </div>
+                                    </div>
 
-                            <div className="flex gap-2 pt-2 border-t border-slate-50 overflow-x-auto pb-1 custom-scrollbar">
-                                <Button variant="ghost" size="sm" onClick={() => setDetailModal(inv)} className="h-9 rounded-xl hover:bg-emerald-50 text-emerald-600 shrink-0">
-                                    <Eye size={16} />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => setViewModal(inv)} className="h-9 rounded-xl hover:bg-slate-100 shrink-0">
-                                    <Printer size={16} />
-                                </Button>
-                                {inv.status === 'DRAFT' && (
-                                    <Button variant="ghost" size="sm" onClick={() => setPostingInvoice(inv)} className="h-9 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold px-3 gap-1 shrink-0">
-                                        <Send size={14} /> POSTING
-                                    </Button>
-                                )}
-                                {inv.status === 'POSTED' && (
-                                    <Button variant="ghost" size="sm" onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '' })} className="h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-bold px-3 gap-1 shrink-0">
-                                        <DollarSign size={14} /> PAID
-                                    </Button>
-                                )}
-                                <Button variant="ghost" size="sm" onClick={() => {
-                                    setSelectedId(inv.id);
-                                    setEditMode(true);
-                                    setForm({
-                                        customerId: inv.customerId,
-                                        projectId: inv.projectId || '',
-                                        contractId: inv.contractId || '',
-                                        salesOrderId: inv.salesOrderId || '',
-                                        deliveryOrderId: inv.deliveryOrderId || '',
-                                        bankAccountId: inv.bankAccountId || '',
-                                        signerName: inv.signerName || '',
-                                        signerPosition: inv.signerPosition || '',
-                                        date: inv.date.split('T')[0],
-                                        dueDate: inv.dueDate ? inv.dueDate.split('T')[0] : '',
-                                        notes: inv.notes || '',
-                                        paymentTerms: inv.paymentTerms || '',
-                                        subtotal: inv.subtotal,
-                                        tax: inv.tax,
-                                        discount: inv.discount,
-                                        discountAmt: inv.discountAmt,
-                                        taxAmt: inv.taxAmt,
-                                        grandTotal: inv.grandTotal,
-                                        items: inv.items
-                                    });
-                                    setModalOpen(true);
-                                }} className="h-9 rounded-xl hover:bg-emerald-50 text-emerald-600 shrink-0">
-                                    <Edit size={16} />
-                                </Button>
-                            </div>
+                                    <div className="flex gap-2 pt-2 border-t border-slate-50 overflow-x-auto pb-1 custom-scrollbar">
+                                        <Button variant="ghost" size="sm" onClick={() => setDetailModal(inv)} className="h-9 rounded-xl hover:bg-emerald-50 text-emerald-600 shrink-0">
+                                            <Eye size={16} />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => setViewModal(inv)} className="h-9 rounded-xl hover:bg-slate-100 shrink-0">
+                                            <Printer size={16} />
+                                        </Button>
+                                        {inv.status === 'DRAFT' && (
+                                            <Button variant="ghost" size="sm" onClick={() => setPostingInvoice(inv)} className="h-9 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold px-3 gap-1 shrink-0">
+                                                <Send size={14} /> POSTING
+                                            </Button>
+                                        )}
+                                        {inv.status === 'POSTED' && (
+                                            <Button variant="ghost" size="sm" onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '' })} className="h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-bold px-3 gap-1 shrink-0">
+                                                <DollarSign size={14} /> PAID
+                                            </Button>
+                                        )}
+                                        <Button variant="ghost" size="sm" onClick={() => {
+                                            setSelectedId(inv.id);
+                                            setEditMode(true);
+                                            setForm({
+                                                customerId: inv.customerId,
+                                                projectId: inv.projectId || '',
+                                                contractId: inv.contractId || '',
+                                                salesOrderId: inv.salesOrderId || '',
+                                                deliveryOrderId: inv.deliveryOrderId || '',
+                                                bankAccountId: inv.bankAccountId || '',
+                                                signerName: inv.signerName || '',
+                                                signerPosition: inv.signerPosition || '',
+                                                date: inv.date.split('T')[0],
+                                                dueDate: inv.dueDate ? inv.dueDate.split('T')[0] : '',
+                                                notes: inv.notes || '',
+                                                paymentTerms: inv.paymentTerms || '',
+                                                subtotal: inv.subtotal,
+                                                tax: inv.tax,
+                                                discount: inv.discount,
+                                                discountAmt: inv.discountAmt,
+                                                taxAmt: inv.taxAmt,
+                                                grandTotal: inv.grandTotal,
+                                                items: inv.items
+                                            });
+                                            setModalOpen(true);
+                                        }} className="h-9 rounded-xl hover:bg-emerald-50 text-emerald-600 shrink-0">
+                                            <Edit size={16} />
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => handleDelete(inv.id)} className="h-9 rounded-xl hover:bg-rose-50 text-rose-500 shrink-0">
+                                            <Trash2 size={16} />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     ))}
                 </div>
@@ -864,6 +931,20 @@ export default function InvoicesPage() {
                                         <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Cabang (Opsional)</label>
                                         <input value={bankForm.branch} onChange={e => setBankForm({ ...bankForm, branch: e.target.value })} placeholder="Pekayon, Bekasi" className="w-full h-11 px-4 rounded-xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner" />
                                     </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Hubungkan ke Akun Buku Besar (COA) <span className="text-rose-500">*</span></label>
+                                        <select
+                                            value={bankForm.coaId}
+                                            onChange={e => setBankForm({ ...bankForm, coaId: e.target.value })}
+                                            className="w-full h-11 px-4 rounded-xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner"
+                                        >
+                                            <option value="">Pilih Akun Buku Besar...</option>
+                                            {coas.filter(c => c.name.toLowerCase().includes('bank') || c.name.toLowerCase().includes('kas')).map(c => (
+                                                <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                                            ))}
+                                        </select>
+                                        <p className="text-[9px] text-muted-foreground mt-1 ml-1 leading-tight italic">Pilih akun asset (Kas/Bank) yang sesuai agar pencatatan keuangan akurat.</p>
+                                    </div>
                                     <div className="pt-4 flex gap-2">
                                         <Button variant="outline" className="flex-1 rounded-xl font-bold h-11" onClick={() => setShowBankForm(false)}>Batal</Button>
                                         <Button className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold h-11" onClick={async () => {
@@ -878,7 +959,7 @@ export default function InvoicesPage() {
                                                 setBanks(prev => [newBank, ...prev]);
                                                 setForm(f => ({ ...f, bankAccountId: newBank.id }));
                                                 setShowBankForm(false);
-                                                setBankForm({ bankName: '', accountNumber: '', accountHolder: '', branch: '' });
+                                                setBankForm({ bankName: '', accountNumber: '', accountHolder: '', branch: '', coaId: '' });
                                                 showToast('success', 'Rekening Bank berhasil ditambahkan');
                                             }
                                         }}>Simpan Bank</Button>

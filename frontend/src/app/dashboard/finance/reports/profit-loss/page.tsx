@@ -15,9 +15,19 @@ interface Account {
 }
 
 interface ProfitLossData {
-    revenue: Account[]
+    operatingRevenue: Account[]
     cogs: Account[]
-    expenses: Account[]
+    operatingExpenses: Account[]
+    otherIncome: Account[]
+    otherExpenses: Account[]
+    totalOperatingRevenue: number
+    totalCOGS: number
+    grossProfit: number
+    totalOperatingExpenses: number
+    operatingIncome: number
+    totalOtherIncome: number
+    totalOtherExpenses: number
+    netProfit: number
 }
 
 const containerVariants = {
@@ -38,15 +48,26 @@ const itemVariants = {
 }
 
 export default function ProfitLossPage() {
-    const [data, setData] = useState<ProfitLossData>({ revenue: [], cogs: [], expenses: [] })
+    const [data, setData] = useState<ProfitLossData>({ 
+        operatingRevenue: [], 
+        cogs: [], 
+        operatingExpenses: [], 
+        otherIncome: [], 
+        otherExpenses: [],
+        totalOperatingRevenue: 0,
+        totalCOGS: 0,
+        grossProfit: 0,
+        totalOperatingExpenses: 0,
+        operatingIncome: 0,
+        totalOtherIncome: 0,
+        totalOtherExpenses: 0,
+        netProfit: 0
+    })
+    const [isMounted, setIsMounted] = useState(false)
     const [loading, setLoading] = useState(true)
-    const [filters, setFilters] = useState(() => {
-        const d = new Date();
-        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        return {
-            startDate: new Date(d.getFullYear(), 0, 1).toISOString().split('T')[0],
-            endDate: today
-        }
+    const [filters, setFilters] = useState({
+        startDate: '',
+        endDate: ''
     })
 
     const loadData = useCallback(async () => {
@@ -54,7 +75,23 @@ export default function ProfitLossPage() {
         try {
             const query = new URLSearchParams(filters).toString()
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reports/profit-loss?${query}`)
-            setData(await res.json())
+            const rawData = await res.json()
+            setData({
+                operatingRevenue: [],
+                cogs: [],
+                operatingExpenses: [],
+                otherIncome: [],
+                otherExpenses: [],
+                totalOperatingRevenue: 0,
+                totalCOGS: 0,
+                grossProfit: 0,
+                totalOperatingExpenses: 0,
+                operatingIncome: 0,
+                totalOtherIncome: 0,
+                totalOtherExpenses: 0,
+                netProfit: 0,
+                ...rawData
+            })
         } catch (e) {
             console.error(e)
         } finally {
@@ -63,17 +100,36 @@ export default function ProfitLossPage() {
     }, [filters])
 
     useEffect(() => {
-        loadData()
-    }, [loadData])
+        const d = new Date()
+        const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        setFilters({
+            startDate: new Date(d.getFullYear(), 0, 1).toISOString().split('T')[0],
+            endDate: today
+        })
+        setIsMounted(true)
+    }, [])
 
-    const totalRevenue = data.revenue.reduce((sum, a) => sum + a.balance, 0)
-    const totalCogs = data.cogs.reduce((sum, a) => sum + a.balance, 0)
-    const grossProfit = totalRevenue - totalCogs
-    const totalExpenses = data.expenses.reduce((sum, a) => sum + a.balance, 0)
-    const netProfit = grossProfit - totalExpenses
+    useEffect(() => {
+        if (isMounted && filters.startDate && filters.endDate) {
+            loadData()
+        }
+    }, [isMounted, filters, loadData])
 
-    const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0
-    const netMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0
+    if (!isMounted) return null
+
+    const { 
+        totalOperatingRevenue = 0, 
+        totalCOGS = 0, 
+        grossProfit = 0, 
+        totalOperatingExpenses = 0, 
+        operatingIncome = 0, 
+        totalOtherIncome = 0, 
+        totalOtherExpenses = 0, 
+        netProfit = 0 
+    } = data || {}
+
+    const grossMargin = totalOperatingRevenue > 0 ? (grossProfit / totalOperatingRevenue) * 100 : 0
+    const netMargin = totalOperatingRevenue > 0 ? (netProfit / totalOperatingRevenue) * 100 : 0
 
     return (
         <motion.div 
@@ -162,7 +218,7 @@ export default function ProfitLossPage() {
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Total Pendapatan</p>
                             <p className="text-3xl md:text-4xl font-black text-white tracking-tighter truncate leading-none">
                                 <span className="text-indigo-400 mr-2 font-light">Rp</span>
-                                {totalRevenue.toLocaleString('id-ID')}
+                                {totalOperatingRevenue.toLocaleString('id-ID')}
                             </p>
                         </div>
                     </motion.div>
@@ -223,49 +279,49 @@ export default function ProfitLossPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {/* Revenue Section */}
-                            <tr className="bg-slate-50/30">
-                                <td colSpan={2} className="px-8 py-5">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-1.5 h-6 bg-indigo-600 rounded-full" />
-                                        <span className="font-black text-[11px] text-indigo-900 uppercase tracking-[0.2em]">Pendapatan (Revenue)</span>
-                                    </div>
-                                </td>
-                            </tr>
-                            <AnimatePresence mode="wait">
-                                {loading ? (
-                                    <motion.tr 
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                    >
-                                        <td colSpan={2} className="py-24 text-center">
-                                            <RefreshCw className="animate-spin text-indigo-600 mx-auto w-10 h-10 opacity-20" />
-                                            <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading Report Data...</p>
-                                        </td>
-                                    </motion.tr>
-                                ) : data.revenue.length === 0 ? (
-                                    <tr><td colSpan={2} className="px-8 py-10 text-center text-slate-400 italic text-sm">No revenue recorded in this period</td></tr>
-                                ) : data.revenue.map((acc, idx) => (
-                                    <motion.tr 
-                                        key={acc.id}
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: idx * 0.05 }}
-                                        className="group hover:bg-slate-50/50 transition-colors"
-                                    >
-                                        <td className="px-8 py-5 flex items-center gap-4">
-                                            <span className="font-mono text-[10px] text-slate-400 font-bold bg-slate-100 px-2 py-1 rounded-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors shrink-0">{acc.code}</span>
-                                            <span className="font-bold text-slate-800 tracking-tight">{acc.name}</span>
-                                        </td>
-                                        <td className="px-8 py-5 text-right font-mono font-black text-slate-900 tracking-tighter">{acc.balance.toLocaleString('id-ID')}</td>
-                                    </motion.tr>
-                                ))}
-                            </AnimatePresence>
-                            <tr className="bg-indigo-50/20 font-black">
-                                <td className="px-8 py-6 text-[10px] uppercase tracking-widest text-indigo-900">Total Pendapatan</td>
-                                <td className="px-8 py-6 text-right text-indigo-600 text-lg md:text-xl tracking-tighter">{totalRevenue.toLocaleString('id-ID')}</td>
-                            </tr>
+                             {/* Operating Revenue Section */}
+                             <tr className="bg-slate-50/30">
+                                 <td colSpan={2} className="px-8 py-5">
+                                     <div className="flex items-center gap-3">
+                                         <div className="w-1.5 h-6 bg-indigo-600 rounded-full" />
+                                         <span className="font-black text-[11px] text-indigo-900 uppercase tracking-[0.2em]">Pendapatan Operasional</span>
+                                     </div>
+                                 </td>
+                             </tr>
+                             <AnimatePresence mode="wait">
+                                 {loading ? (
+                                     <motion.tr 
+                                         initial={{ opacity: 0 }}
+                                         animate={{ opacity: 1 }}
+                                         exit={{ opacity: 0 }}
+                                     >
+                                         <td colSpan={2} className="py-24 text-center">
+                                             <RefreshCw className="animate-spin text-indigo-600 mx-auto w-10 h-10 opacity-20" />
+                                             <p className="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Loading Report Data...</p>
+                                         </td>
+                                     </motion.tr>
+                                 ) : (data.operatingRevenue || []).length === 0 ? (
+                                     <tr><td colSpan={2} className="px-8 py-10 text-center text-slate-400 italic text-sm">No revenue recorded in this period</td></tr>
+                                 ) : (data.operatingRevenue || []).map((acc, idx) => (
+                                     <motion.tr 
+                                         key={acc.id}
+                                         initial={{ opacity: 0, x: -10 }}
+                                         animate={{ opacity: 1, x: 0 }}
+                                         transition={{ delay: idx * 0.05 }}
+                                         className="group hover:bg-slate-50/50 transition-colors"
+                                     >
+                                         <td className="px-8 py-5 flex items-center gap-4">
+                                             <span className="font-mono text-[10px] text-slate-400 font-bold bg-slate-100 px-2 py-1 rounded-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors shrink-0">{acc.code}</span>
+                                             <span className="font-bold text-slate-800 tracking-tight">{acc.name}</span>
+                                         </td>
+                                         <td className="px-8 py-5 text-right font-mono font-black text-slate-900 tracking-tighter">{acc.balance.toLocaleString('id-ID')}</td>
+                                     </motion.tr>
+                                 ))}
+                             </AnimatePresence>
+                             <tr className="bg-indigo-50/20 font-black">
+                                 <td className="px-8 py-6 text-[10px] uppercase tracking-widest text-indigo-900">Total Pendapatan Operasional</td>
+                                 <td className="px-8 py-6 text-right text-indigo-600 text-lg md:text-xl tracking-tighter">{totalOperatingRevenue.toLocaleString('id-ID')}</td>
+                             </tr>
 
                             {/* COGS Section */}
                             <tr className="bg-slate-50/30">
@@ -276,7 +332,7 @@ export default function ProfitLossPage() {
                                     </div>
                                 </td>
                             </tr>
-                            {data.cogs.map((acc, idx) => (
+                            {(data.cogs || []).map((acc, idx) => (
                                 <motion.tr 
                                     key={acc.id}
                                     initial={{ opacity: 0, x: -10 }}
@@ -291,10 +347,10 @@ export default function ProfitLossPage() {
                                     <td className="px-8 py-5 text-right font-mono font-black text-slate-900 tracking-tighter">{acc.balance.toLocaleString('id-ID')}</td>
                                 </motion.tr>
                             ))}
-                            <tr className="bg-rose-50/20 font-black">
-                                <td className="px-8 py-6 text-[10px] uppercase tracking-widest text-rose-900">Total HPP</td>
-                                <td className="px-8 py-6 text-right text-rose-600 text-lg md:text-xl tracking-tighter">{totalCogs.toLocaleString('id-ID')}</td>
-                            </tr>
+                             <tr className="bg-rose-50/20 font-black">
+                                 <td className="px-8 py-6 text-[10px] uppercase tracking-widest text-rose-900">Total HPP</td>
+                                 <td className="px-8 py-6 text-right text-rose-600 text-lg md:text-xl tracking-tighter">{totalCOGS.toLocaleString('id-ID')}</td>
+                             </tr>
 
                             {/* Gross Profit */}
                             <tr className="bg-slate-900 text-white font-black">
@@ -305,34 +361,87 @@ export default function ProfitLossPage() {
                                 </td>
                             </tr>
 
-                            {/* Expenses Section */}
-                            <tr className="bg-slate-50/30">
-                                <td colSpan={2} className="px-8 py-5 mt-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-1.5 h-6 bg-slate-400 rounded-full" />
-                                        <span className="font-black text-[11px] text-slate-600 uppercase tracking-[0.2em]">Beban Operasional (Expenses)</span>
-                                    </div>
-                                </td>
-                            </tr>
-                            {data.expenses.map((acc, idx) => (
-                                <motion.tr 
-                                    key={acc.id}
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: idx * 0.05 }}
-                                    className="group hover:bg-slate-50/50 transition-colors"
-                                >
-                                    <td className="px-8 py-5 flex items-center gap-4">
-                                        <span className="font-mono text-[10px] text-slate-400 font-bold bg-slate-100 px-2 py-1 rounded-lg group-hover:bg-slate-200 group-hover:text-slate-900 transition-colors shrink-0">{acc.code}</span>
-                                        <span className="font-bold text-slate-800 tracking-tight">{acc.name}</span>
-                                    </td>
-                                    <td className="px-8 py-5 text-right font-mono font-black text-slate-900 tracking-tighter">{acc.balance.toLocaleString('id-ID')}</td>
-                                </motion.tr>
-                            ))}
-                            <tr className="bg-slate-50 font-black border-b-2 border-slate-200">
-                                <td className="px-8 py-6 text-[10px] uppercase tracking-widest text-slate-500">Total Beban</td>
-                                <td className="px-8 py-6 text-right text-slate-900 text-lg md:text-xl tracking-tighter">{totalExpenses.toLocaleString('id-ID')}</td>
-                            </tr>
+                             {/* Operating Expenses Section */}
+                             <tr className="bg-slate-50/30">
+                                 <td colSpan={2} className="px-8 py-5 mt-4">
+                                     <div className="flex items-center gap-3">
+                                         <div className="w-1.5 h-6 bg-slate-400 rounded-full" />
+                                         <span className="font-black text-[11px] text-slate-600 uppercase tracking-[0.2em]">Beban Operasional</span>
+                                     </div>
+                                 </td>
+                             </tr>
+                             {(data.operatingExpenses || []).map((acc, idx) => (
+                                 <motion.tr 
+                                     key={acc.id}
+                                     initial={{ opacity: 0, x: -10 }}
+                                     animate={{ opacity: 1, x: 0 }}
+                                     transition={{ delay: idx * 0.05 }}
+                                     className="group hover:bg-slate-50/50 transition-colors"
+                                 >
+                                     <td className="px-8 py-5 flex items-center gap-4">
+                                         <span className="font-mono text-[10px] text-slate-400 font-bold bg-slate-100 px-2 py-1 rounded-lg group-hover:bg-slate-200 group-hover:text-slate-900 transition-colors shrink-0">{acc.code}</span>
+                                         <span className="font-bold text-slate-800 tracking-tight">{acc.name}</span>
+                                     </td>
+                                     <td className="px-8 py-5 text-right font-mono font-black text-slate-900 tracking-tighter">{acc.balance.toLocaleString('id-ID')}</td>
+                                 </motion.tr>
+                             ))}
+                             <tr className="bg-slate-50 font-black">
+                                 <td className="px-8 py-6 text-[10px] uppercase tracking-widest text-slate-500">Total Beban Operasional</td>
+                                 <td className="px-8 py-6 text-right text-slate-900 text-lg md:text-xl tracking-tighter">{totalOperatingExpenses.toLocaleString('id-ID')}</td>
+                             </tr>
+ 
+                             {/* Operating Income */}
+                             <tr className="bg-slate-800 text-white font-black">
+                                 <td className="px-8 py-8 uppercase tracking-[0.3em] text-[11px] md:text-xs">Laba Operasional (EBIT)</td>
+                                 <td className="px-8 py-8 text-right text-xl md:text-3xl tracking-tighter flex items-center justify-end gap-3">
+                                     <span className="text-emerald-400 text-lg md:text-xl font-light">Rp</span>
+                                     {operatingIncome.toLocaleString('id-ID')}
+                                 </td>
+                             </tr>
+ 
+                             {/* Other Income & Expenses Section */}
+                             <tr className="bg-slate-50/30">
+                                 <td colSpan={2} className="px-8 py-5 mt-4">
+                                     <div className="flex items-center gap-3">
+                                         <div className="w-1.5 h-6 bg-amber-500 rounded-full" />
+                                         <span className="font-black text-[11px] text-amber-900 uppercase tracking-[0.2em]">Pendapatan & Beban Lainnya</span>
+                                     </div>
+                                 </td>
+                             </tr>
+                             {(data.otherIncome || []).map((acc, idx) => (
+                                 <motion.tr 
+                                     key={acc.id}
+                                     initial={{ opacity: 0, x: -10 }}
+                                     animate={{ opacity: 1, x: 0 }}
+                                     transition={{ delay: idx * 0.05 }}
+                                     className="group hover:bg-slate-50/50 transition-colors"
+                                 >
+                                     <td className="px-8 py-5 flex items-center gap-4">
+                                         <span className="font-mono text-[10px] text-amber-400 font-bold bg-amber-50 px-2 py-1 rounded-lg group-hover:bg-amber-100 transition-colors shrink-0">{acc.code}</span>
+                                         <span className="font-bold text-slate-800 tracking-tight">{acc.name}</span>
+                                     </td>
+                                     <td className="px-8 py-5 text-right font-mono font-black text-emerald-600 tracking-tighter">{acc.balance.toLocaleString('id-ID')}</td>
+                                 </motion.tr>
+                             ))}
+                             {(data.otherExpenses || []).map((acc, idx) => (
+                                 <motion.tr 
+                                     key={acc.id}
+                                     initial={{ opacity: 0, x: -10 }}
+                                     animate={{ opacity: 1, x: 0 }}
+                                     transition={{ delay: ((data.otherIncome || []).length + idx) * 0.05 }}
+                                     className="group hover:bg-slate-50/50 transition-colors"
+                                 >
+                                     <td className="px-8 py-5 flex items-center gap-4">
+                                         <span className="font-mono text-[10px] text-rose-400 font-bold bg-rose-50 px-2 py-1 rounded-lg group-hover:bg-rose-100 transition-colors shrink-0">{acc.code}</span>
+                                         <span className="font-bold text-slate-800 tracking-tight">{acc.name}</span>
+                                     </td>
+                                     <td className="px-8 py-5 text-right font-mono font-black text-rose-600 tracking-tighter">({acc.balance.toLocaleString('id-ID')})</td>
+                                 </motion.tr>
+                             ))}
+                             <tr className="bg-slate-50 font-black border-b-2 border-slate-200">
+                                 <td className="px-8 py-6 text-[10px] uppercase tracking-widest text-slate-500">Total Pendapatan/Beban Bersih Lainnya</td>
+                                 <td className="px-8 py-6 text-right text-slate-900 text-lg md:text-xl tracking-tighter">{(totalOtherIncome - totalOtherExpenses).toLocaleString('id-ID')}</td>
+                             </tr>
 
                             {/* Net Profit */}
                             <tr className={`font-black overflow-hidden relative ${netProfit >= 0 ? 'bg-linear-to-r from-indigo-600 to-violet-700 text-white' : 'bg-linear-to-r from-rose-600 to-red-700 text-white'}`}>

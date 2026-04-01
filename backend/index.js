@@ -1071,7 +1071,7 @@ app.get('/api/orders/:id', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
   try {
-    const { items = [], discount = 0, tax = 11, businessCategory, ...data } = req.body;
+    const { items = [], discount = 0, tax = 11, businessCategory, quotation, customer, ...data } = req.body;
     const number = await generateSalesOrderNumber();
     const parsedItems = items.map((it, idx) => ({
       no: idx + 1,
@@ -1094,6 +1094,7 @@ app.post('/api/orders', async (req, res) => {
         poProof: data.poProof || null,
         projectId: data.projectId || null,
         businessCategoryId: data.businessCategoryId || null,
+        quotationId: data.quotationId || null,
         items: { create: parsedItems }
       },
       include: { customer: true, items: { orderBy: { no: 'asc' } }, project: true, businessCategory: true }
@@ -1126,8 +1127,9 @@ app.put('/api/orders/:id', async (req, res) => {
           subtotal, discountAmt, taxAmt, grandTotal,
           date: data.date ? new Date(data.date) : undefined,
           poProof: data.poProof || undefined,
-          projectId: data.projectId || undefined,
-          businessCategoryId: data.businessCategoryId || undefined,
+          projectId: data.projectId || null,
+          businessCategoryId: data.businessCategoryId || null,
+          quotationId: data.quotationId || null,
           items: { create: parsedItems }
         },
         include: { customer: true, items: { orderBy: { no: 'asc' } }, project: true, businessCategory: true }
@@ -3138,6 +3140,13 @@ app.put('/api/invoices/:id', async (req, res) => {
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
+app.delete('/api/invoices/:id', async (req, res) => {
+  try {
+    await prisma.invoice.delete({ where: { id: req.params.id } });
+    res.json({ message: 'Deleted' });
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
 // --- BANK ACCOUNT ROUTES ---
 
 app.get('/api/banks', async (req, res) => {
@@ -3152,16 +3161,20 @@ app.get('/api/banks', async (req, res) => {
 
 app.post('/api/banks', async (req, res) => {
   try {
-    const bank = await prisma.bankAccount.create({ data: req.body });
+    const data = { ...req.body };
+    if (data.coaId === '') data.coaId = null;
+    const bank = await prisma.bankAccount.create({ data });
     res.status(201).json(bank);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 app.put('/api/banks/:id', async (req, res) => {
   try {
+    const data = { ...req.body };
+    if (data.coaId === '') data.coaId = null;
     const bank = await prisma.bankAccount.update({
       where: { id: req.params.id },
-      data: req.body
+      data
     });
     res.json(bank);
   } catch (e) { res.status(400).json({ message: e.message }); }
@@ -3426,9 +3439,9 @@ app.get('/api/reports/balance-sheet', async (req, res) => {
     // Calculate Net Profit (Laba Tahun Berjalan) for the period until endDate
     // Note: This usually covers from start of year until endDate
     const startOfYear = new Date(new Date(endDate).getFullYear(), 0, 1);
-    const revenues = await getAccountTypeBalance(['PENDAPATAN'], endDate, startOfYear);
+    const revenues = await getAccountTypeBalance(['PENDAPATAN', 'PENDAPATAN_LAIN'], endDate, startOfYear);
     const cogs = await getAccountTypeBalance(['HPP'], endDate, startOfYear);
-    const expenses = await getAccountTypeBalance(['BEBAN'], endDate, startOfYear);
+    const expenses = await getAccountTypeBalance(['BEBAN', 'BEBAN_LAIN'], endDate, startOfYear);
 
     const totalRevenue = revenues.reduce((sum, r) => sum + r.balance, 0);
     const totalCOGS = cogs.reduce((sum, c) => sum + c.balance, 0);
@@ -3455,25 +3468,42 @@ app.get('/api/reports/profit-loss', async (req, res) => {
     const start = startDate ? new Date(startDate + 'T00:00:00') : new Date(new Date().getFullYear(), 0, 1);
     const end = endDate ? new Date(endDate + 'T23:59:59.999') : new Date();
 
-    const revenues = await getAccountTypeBalance(['PENDAPATAN'], end, start);
-    const cogsItems = await getAccountTypeBalance(['HPP'], end, start);
-    const expenseItems = await getAccountTypeBalance(['BEBAN'], end, start);
+    const operatingRevenue = await getAccountTypeBalance(['PENDAPATAN'], end, start);
+    const cogs = await getAccountTypeBalance(['HPP'], end, start);
+    const operatingExpenses = await getAccountTypeBalance(['BEBAN'], end, start);
+    const otherIncome = await getAccountTypeBalance(['PENDAPATAN_LAIN'], end, start);
+    const otherExpenses = await getAccountTypeBalance(['BEBAN_LAIN'], end, start);
 
-    const totalRevenue = revenues.reduce((sum, r) => sum + r.balance, 0);
-    const totalCOGS = cogsItems.reduce((sum, c) => sum + c.balance, 0);
-    const totalExpenses = expenseItems.reduce((sum, e) => sum + e.balance, 0);
-    const netProfit = totalRevenue - totalCOGS - totalExpenses;
+    const totalOperatingRevenue = operatingRevenue.reduce((sum, r) => sum + r.balance, 0);
+    const totalCOGS = cogs.reduce((sum, c) => sum + c.balance, 0);
+    const grossProfit = totalOperatingRevenue - totalCOGS;
+
+    const totalOperatingExpenses = operatingExpenses.reduce((sum, e) => sum + e.balance, 0);
+    const operatingIncome = grossProfit - totalOperatingExpenses;
+
+    const totalOtherIncome = otherIncome.reduce((sum, r) => sum + r.balance, 0);
+    const totalOtherExpenses = otherExpenses.reduce((sum, e) => sum + e.balance, 0);
+    const netProfit = operatingIncome + totalOtherIncome - totalOtherExpenses;
 
     res.json({ 
-      revenue: revenues, 
-      cogs: cogsItems, 
-      expenses: expenseItems,
-      totalRevenue,
+      operatingRevenue, 
+      cogs, 
+      operatingExpenses,
+      otherIncome,
+      otherExpenses,
+      totalOperatingRevenue,
       totalCOGS,
-      totalExpenses,
+      grossProfit,
+      totalOperatingExpenses,
+      operatingIncome,
+      totalOtherIncome,
+      totalOtherExpenses,
       netProfit
     });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { 
+    console.error('Error in profit-loss report:', e);
+    res.status(500).json({ message: e.message }); 
+  }
 });
 
 // 4.1 Sales by Business Category
@@ -3524,7 +3554,7 @@ app.get('/api/reports/sales-by-category', async (req, res) => {
 // Helper for aggregation
 async function getAccountTypeBalance(types, endDate, startDate = null) {
   const coas = await prisma.chartOfAccounts.findMany({
-    where: { type: { in: types }, postingType: 'POSTING' }
+    where: { type: { in: types } }
   });
 
   const items = await prisma.journalItem.groupBy({
@@ -3568,8 +3598,7 @@ app.get('/api/reports/cash-flow', async (req, res) => {
           { name: { contains: 'Kas', mode: 'insensitive' } },
           { name: { contains: 'Bank', mode: 'insensitive' } },
           { id: { in: systemCash.map(a => a.coaId) } }
-        ],
-        postingType: 'POSTING' 
+        ]
       }
     });
 
@@ -4762,10 +4791,10 @@ app.get('/api/hr/employees/:id', async (req, res) => {
 
 app.post('/api/hr/employees', async (req, res) => {
   try {
-    const data = req.body;
+    const { createVendor, id: _id, createdAt, updatedAt, vendor, category, businessCategory, payrollItems, ...data } = req.body;
     
     let vendorId = data.vendorId;
-    if (!vendorId && data.createVendor) {
+    if (!vendorId && createVendor) {
       const count = await prisma.vendor.count();
       const code = `EMP-${String(count + 1).padStart(4, '0')}`;
       const vendor = await prisma.vendor.create({
@@ -4811,7 +4840,7 @@ app.post('/api/hr/employees', async (req, res) => {
 app.put('/api/hr/employees/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { id: _id, createdAt, updatedAt, vendor, category, payrollItems, ...data } = req.body;
+    const { id: _id, createdAt, updatedAt, vendor, category, businessCategory, payrollItems, ...data } = req.body;
     
     const employee = await prisma.employee.update({
       where: { id },
