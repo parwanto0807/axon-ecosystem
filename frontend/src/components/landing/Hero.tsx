@@ -103,16 +103,16 @@ export function Hero() {
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ duration: 0.8, delay: 0.3, type: "spring", bounce: 0.4 }}
-                            className="flex flex-col sm:flex-row items-center gap-6"
+                            className="flex flex-row items-center gap-2 sm:gap-6 w-full max-w-xl"
                         >
-                            <Button size="lg" className="rounded-2xl px-12 h-20 text-sm font-black uppercase tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)] bg-indigo-600 hover:bg-slate-900 text-white border-t border-white/20 group glow-button transition-all duration-300 active:scale-95 w-full sm:w-auto">
-                                <span className="mr-3">📞</span>
+                            <Button size="lg" className="flex-1 rounded-2xl px-4 md:px-12 h-14 md:h-20 text-[9px] md:text-sm font-black uppercase tracking-[0.1em] md:tracking-[0.2em] shadow-[0_20px_40px_-10px_rgba(79,70,229,0.4)] bg-indigo-600 hover:bg-slate-900 text-white border-t border-white/20 group glow-button transition-all duration-300 active:scale-95">
+                                <span className="mr-2 md:mr-3 text-base md:text-xl">📞</span>
                                 {t.cta1}
                             </Button>
-                            <Link href={isAuthenticated ? "/dashboard" : "/login"} className="w-full sm:w-auto">
-                                <Button size="lg" className="rounded-2xl px-12 h-20 text-sm font-black uppercase tracking-[0.2em] bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900 hover:border-indigo-600/30 transition-all duration-300 shadow-xl shadow-indigo-600/5 flex items-center justify-center gap-3 active:scale-95 group w-full">
-                                    <PlayCircle size={24} className="text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
-                                    {isAuthenticated ? (lang === 'ID' ? 'Ke Dashboard' : 'Go to Dashboard') : t.cta2}
+                            <Link href={isAuthenticated ? "/dashboard" : "/login"} className="flex-1">
+                                <Button size="lg" className="flex-1 rounded-2xl px-4 md:px-12 h-14 md:h-20 text-[9px] md:text-sm font-black uppercase tracking-[0.1em] md:tracking-[0.2em] bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900 hover:border-indigo-600/30 transition-all duration-300 shadow-xl shadow-indigo-600/5 flex items-center justify-center gap-2 active:scale-95 group">
+                                    <PlayCircle className="text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform w-4 h-4 md:w-6 md:h-6" />
+                                    {isAuthenticated ? (lang === 'ID' ? 'Dashboard' : 'Dashboard') : t.cta2}
                                 </Button>
                             </Link>
                         </motion.div>

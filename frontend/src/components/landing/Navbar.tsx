@@ -11,7 +11,9 @@ import {
     ArrowRight,
     Check,
     Lock,
-    Zap
+    Zap,
+    LayoutDashboard,
+    LogIn
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -235,17 +237,34 @@ export function Navbar() {
                     </div>
                 </div>
 
-                {/* Mobile Menu Action */}
-                <button
-                    className="lg:hidden w-11 h-11 rounded-2xl bg-background border border-border flex items-center justify-center text-foreground hover:bg-secondary active:scale-95 transition-all shadow-sm"
-                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                >
-                    <AnimatePresence mode="wait">
-                        {isMobileMenuOpen
-                            ? <motion.div key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }}><X size={20} /></motion.div>
-                            : <motion.div key="m" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }}><Menu size={20} /></motion.div>}
-                    </AnimatePresence>
-                </button>
+                {/* Mobile Menu & Quick Actions */}
+                <div className="flex items-center gap-3 lg:hidden">
+                    {/* Quick Login/Dashboard Button for Mobile */}
+                    <Link href={isAuthenticated ? "/dashboard" : "/login"}>
+                        <Button className="h-10 rounded-xl px-3.5 bg-indigo-600 hover:bg-slate-900 text-white shadow-lg shadow-indigo-600/20 border-t border-white/10 flex items-center gap-2 transition-all active:scale-95">
+                            <span className="font-black text-[9px] uppercase tracking-widest hidden sm:inline-block">
+                                {isAuthenticated ? t.dashboard : t.login}
+                            </span>
+                            {isAuthenticated ? (
+                                <LayoutDashboard size={16} className="sm:hidden" />
+                            ) : (
+                                <LogIn size={16} className="sm:hidden" />
+                            )}
+                            <ArrowRight size={14} className="hidden sm:inline-block opacity-70" />
+                        </Button>
+                    </Link>
+
+                    <button
+                        className="w-11 h-11 rounded-2xl bg-background border border-border flex items-center justify-center text-foreground hover:bg-secondary active:scale-95 transition-all shadow-sm"
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    >
+                        <AnimatePresence mode="wait">
+                            {isMobileMenuOpen
+                                ? <motion.div key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }}><X size={20} /></motion.div>
+                                : <motion.div key="m" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }}><Menu size={20} /></motion.div>}
+                        </AnimatePresence>
+                    </button>
+                </div>
             </div>
 
             {/* Mobile Menu Overlay */}

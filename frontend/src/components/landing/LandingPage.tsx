@@ -687,12 +687,12 @@ export function LandingPage() {
                                 ? 'Tim Axon siap mendiskusikan kebutuhan Anda dan merekomendasikan jalur terbaik — apakah cukup dengan konfigurasi standar, atau perlu pengembangan khusus.'
                                 : 'Axon team is ready to discuss your needs and recommend the best path — whether standard configuration is enough, or custom development is required.'}
                         </p>
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
-                            <Button size="lg" className="rounded-[2rem] px-16 h-24 text-sm font-black uppercase tracking-[0.2em] bg-primary hover:bg-primary/90 text-primary-foreground shadow-2xl shadow-primary/30 transition-all hover:-translate-y-2 active:scale-95 group">
-                                <span className="mr-3">📞</span> {lang === 'ID' ? 'Konsultasi Gratis' : 'Free Consultation'}
+                        <div className="flex flex-row items-center justify-center gap-2 sm:gap-8 w-full max-w-2xl mx-auto">
+                            <Button size="lg" className="flex-1 rounded-2xl md:rounded-[2rem] px-4 md:px-16 h-16 md:h-24 text-[9px] md:text-sm font-black uppercase tracking-[0.1em] md:tracking-[0.2em] bg-primary hover:bg-primary/90 text-primary-foreground shadow-2xl shadow-primary/30 transition-all hover:-translate-y-2 active:scale-95 group">
+                                <span className="mr-1 md:mr-3 text-base md:text-xl">📞</span> {lang === 'ID' ? 'Konsultasi Gratis' : 'Free Consultation'}
                             </Button>
-                            <Button size="lg" className="rounded-[2rem] px-16 h-24 text-sm font-black uppercase tracking-[0.2em] bg-background border border-primary/20 hover:border-primary text-primary shadow-xl transition-all hover:-translate-y-2 active:scale-95">
-                                <span className="mr-3">🚀</span> {lang === 'ID' ? 'Coba Demo' : 'Try Demo'}
+                            <Button size="lg" className="flex-1 rounded-2xl md:rounded-[2rem] px-4 md:px-16 h-16 md:h-24 text-[9px] md:text-sm font-black uppercase tracking-[0.1em] md:tracking-[0.2em] bg-background border border-primary/20 hover:border-primary text-primary shadow-xl transition-all hover:-translate-y-2 active:scale-95">
+                                <span className="mr-1 md:mr-3 text-base md:text-xl">🚀</span> {lang === 'ID' ? 'Coba Demo' : 'Try Demo'}
                             </Button>
                         </div>
                     </div>
