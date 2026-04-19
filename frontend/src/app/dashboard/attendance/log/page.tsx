@@ -23,7 +23,6 @@ import {
     Calendar
 } from "lucide-react"
 import { useSession } from "next-auth/react"
-import * as faceapi from "@vladmandic/face-api"
 import Link from 'next/link'
 import { useUIStore } from "@/store/uiStore"
 
@@ -54,6 +53,7 @@ export default function AttendanceLogPage() {
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
     const [modelsLoaded, setModelsLoaded] = useState(false)
+    const [faceapi, setFaceapi] = useState<any>(null)
     const [faceDetected, setFaceDetected] = useState(false)
     const [autoCaptureProgress, setAutoCaptureProgress] = useState(0)
     const [sensorStatus, setSensorStatus] = useState({ camera: false, gps: false })
@@ -118,9 +118,11 @@ export default function AttendanceLogPage() {
 
     const loadModels = async () => {
         try {
+            const faceapiModule = await import("@vladmandic/face-api")
+            setFaceapi(faceapiModule)
             await Promise.all([
-                faceapi.nets.tinyFaceDetector.load(MODEL_URL),
-                faceapi.nets.faceLandmark68Net.load(MODEL_URL),
+                faceapiModule.nets.tinyFaceDetector.load(MODEL_URL),
+                faceapiModule.nets.faceLandmark68Net.load(MODEL_URL),
             ])
             setModelsLoaded(true)
         } catch (e) {
@@ -232,7 +234,7 @@ export default function AttendanceLogPage() {
             setFaceDetected(false);
             setAutoCaptureProgress(0);
         }
-    }, [isCapturing, photo, modelsLoaded]);
+    }, [isCapturing, photo, modelsLoaded, faceapi]);
 
     const takePhoto = () => {
         if (videoRef.current && canvasRef.current) {
