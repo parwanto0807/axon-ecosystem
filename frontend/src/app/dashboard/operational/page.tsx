@@ -70,7 +70,7 @@ export default function OperationalDashboard() {
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900 pb-32">
             {/* App Header (Native Feel) */}
-            <header className="bg-white px-6 pt-12 pb-6 rounded-b-[2.5rem] shadow-sm relative z-10">
+            <header className="bg-white/95 backdrop-blur-xl px-4 pt-5 pb-4 rounded-b-[2.5rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border-b border-slate-50 relative z-20">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-full bg-indigo-600 border-4 border-indigo-50 flex items-center justify-center shadow-lg shadow-indigo-600/20">
@@ -102,7 +102,7 @@ export default function OperationalDashboard() {
                 </div>
             </header>
 
-            <motion.div variants={container} initial="hidden" animate="show" className="px-6 space-y-8 -mt-4 pt-10">
+            <motion.div variants={container} initial="hidden" animate="show" className="px-4 space-y-6 -mt-6 pt-6 pb-20">
                 
                 {/* Main Action Card (Hero) */}
                 <motion.div variants={item}>
@@ -128,9 +128,9 @@ export default function OperationalDashboard() {
                 </motion.div>
 
                 {/* Quick Actions (Native App Icons Menu) */}
-                <motion.div variants={item} className="space-y-3">
-                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Menu Cepat</h3>
-                    <div className="grid grid-cols-4 gap-4 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                <motion.div variants={item} className="space-y-4">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pl-1">Menu Layanan</h3>
+                    <div className="grid grid-cols-4 gap-3 bg-white p-5 rounded-[2.5rem] shadow-[0_8px_30px_rgba(0,0,0,0.02)] border border-slate-50/50">
                         <Link href="/dashboard/attendance/history" className="flex flex-col items-center gap-3 active:scale-90 transition-all outline-none">
                             <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center">
                                 <History size={20} />

@@ -35,8 +35,8 @@ export function FloatingOperationalNav() {
     };
 
     return (
-        <div className="lg:hidden fixed bottom-0 inset-x-0 p-6 z-[100] pointer-events-none">
-            <div className="max-w-md mx-auto bg-white/80 backdrop-blur-2xl border border-slate-100 rounded-[2.5rem] p-3 flex items-center justify-around shadow-2xl shadow-indigo-500/10 pointer-events-auto">
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-[100]">
+            <div className="w-full bg-white/95 backdrop-blur-2xl border-t border-slate-50 px-6 py-3 pb-safe flex items-center justify-around shadow-[0_-10px_30px_rgba(0,0,0,0.06)]">
                 {/* Hr. Libur */}
                 <Link 
                     href="/dashboard/attendance/holidays" 
@@ -58,7 +58,7 @@ export function FloatingOperationalNav() {
                 {/* Action: Absen (Camera) */}
                 <Link 
                     href="/dashboard/attendance/log" 
-                    className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-xl -mt-10 border-4 transition-all active:scale-90 ${isActive('/dashboard/attendance/log') ? 'bg-indigo-600 border-white' : 'bg-slate-900 border-white'}`}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-[0_8px_20px_rgba(79,70,229,0.3)] -mt-8 border-[4px] border-white transition-all active:scale-95 ${isActive('/dashboard/attendance/log') ? 'bg-indigo-600' : 'bg-slate-900'}`}
                 >
                     <Camera size={24} />
                 </Link>

@@ -291,30 +291,30 @@ export default function AttendanceLogPage() {
 
     return (
         <div className="flex flex-col min-h-screen bg-white">
-            {/* Native Thin Header */}
-            <div className="fixed top-0 inset-x-0 z-[60] bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex items-center justify-between">
+            {/* Native Thin Header (Stacked below Global Header) */}
+            <div className="relative z-10 bg-white/95 backdrop-blur-2xl border-b border-slate-50 px-4 py-1.5 flex items-center justify-between shadow-sm shadow-slate-200/10">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white shadow-lg overflow-hidden shrink-0">
                         {session?.user?.image ? <img src={session.user.image} alt="U" className="w-full h-full object-cover" /> : <User size={14} />}
                     </div>
                     <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Employee Profile</p>
-                        <p className="text-xs font-black text-slate-800 uppercase tracking-tight truncate max-w-[120px]">{session?.user?.name}</p>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">Employee Profile</p>
+                        <p className="text-[13px] font-black text-slate-800 uppercase tracking-tight truncate max-w-[150px]">{session?.user?.name}</p>
                     </div>
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest leading-none">{currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
-                    <p className="text-[8px] font-bold text-slate-400 uppercase mt-1">{currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</p>
+                    <p className="text-[11px] font-black text-indigo-600 uppercase tracking-widest leading-none tabular-nums">{currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase mt-1.5">{currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</p>
                 </div>
             </div>
 
             {/* Scrollable Content Area */}
-            <div className="flex-1 pt-24 pb-32 px-5 space-y-6 overflow-y-auto max-w-md mx-auto w-full">
+            <div className="flex-1 pt-2 pb-32 px-4 space-y-4 overflow-y-auto max-w-md mx-auto w-full">
 
                 {/* Geofencing Warning Banners */}
                 <AnimatePresence>
                     {isNoAssignment && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="bg-amber-50 border border-amber-100 rounded-3xl p-4 flex items-center gap-4 mb-3">
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-center gap-4">
                             <div className="w-10 h-10 rounded-2xl bg-amber-500 flex items-center justify-center text-white shrink-0"><AlertCircle size={20} /></div>
                             <div>
                                 <p className="text-[10px] font-black text-amber-600 uppercase">Lokasi Belum Diatur</p>
@@ -324,7 +324,7 @@ export default function AttendanceLogPage() {
                     )}
 
                     {isLowAccuracy && !isNoAssignment && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="bg-blue-50 border border-blue-100 rounded-3xl p-4 flex items-center gap-4 mb-3">
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center gap-4">
                             <div className="w-10 h-10 rounded-2xl bg-blue-500 flex items-center justify-center text-white shrink-0"><Activity size={20} /></div>
                             <div className="flex-1">
                                 <p className="text-[10px] font-black text-blue-600 uppercase">Akurasi GPS Rendah (±{Math.round(location?.accuracy || 0)}m)</p>
@@ -338,7 +338,7 @@ export default function AttendanceLogPage() {
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            className="bg-rose-50 border border-rose-100 rounded-3xl p-4 flex items-center gap-4 overflow-hidden"
+                            className="bg-rose-50 border border-rose-100 rounded-2xl p-4 flex items-center gap-4 overflow-hidden"
                         >
                             <div className="w-10 h-10 rounded-2xl bg-rose-600 flex items-center justify-center text-white shrink-0 shadow-lg shadow-rose-200">
                                 <AlertCircle size={20} />

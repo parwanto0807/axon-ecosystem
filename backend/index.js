@@ -5373,15 +5373,7 @@ app.get('/api/hr/attendance/my-performance', async (req, res) => {
     });
     const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]));
 
-    // ── 2. Count actual working days (exclude Sat, Sun, Holidays) ──
-    let totalWorkDays = 0;
-    for (let d = new Date(startOfMonth); d <= now; d.setDate(d.getDate() + 1)) {
-      const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
-      const dateStr = d.toISOString().split('T')[0];
-      if (dayOfWeek === 0 || dayOfWeek === 6) continue; // Skip weekends
-      if (holidayDates.has(dateStr)) continue; // Skip holidays
-      totalWorkDays++;
-    }
+    // totalWorkDays will be determined based on schedules below
 
     // ── 3. Get employee schedules this month (for lateness calc) ──
     const schedules = await prisma.employeeSchedule.findMany({
@@ -5404,12 +5396,17 @@ app.get('/api/hr/attendance/my-performance', async (req, res) => {
       orderBy: { timestamp: 'asc' }
     });
 
-    // ── 5. Count unique present days (one per calendar day) ──
+    // ── 5. Count unique present days & Calculate Performance ──
     const presentDaySet = new Set();
     clockIns.forEach(ci => {
       presentDaySet.add(new Date(ci.timestamp).toISOString().split('T')[0]);
     });
     const presentDays = presentDaySet.size;
+
+    // Use schedules as base, but fallback to presentDays if no schedules exist 
+    // to avoid penalizing employees without fixed schedules or new hires.
+    const totalWorkDays = Math.max(schedules.length, presentDays);
+    
     const absentDays = Math.max(totalWorkDays - presentDays, 0);
     const performance = totalWorkDays > 0 ? Math.round((presentDays / totalWorkDays) * 100) : 0;
 
