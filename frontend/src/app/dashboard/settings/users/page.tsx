@@ -13,7 +13,10 @@ import {
     Mail,
     X,
     Check,
-    Loader2
+    Loader2,
+    History,
+    Monitor,
+    Globe
 } from "lucide-react"
 import { useSession } from "next-auth/react"
 
@@ -39,6 +42,10 @@ export default function UserManagementPage() {
         department: "NONE"
     })
     const [isMobile, setIsMobile] = useState(false)
+    const [isLogModalOpen, setIsLogModalOpen] = useState(false)
+    const [userLogs, setUserLogs] = useState<any[]>([])
+    const [loadingLogs, setLoadingLogs] = useState(false)
+    const [selectedUserForLog, setSelectedUserForLog] = useState<any>(null)
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768)
@@ -149,6 +156,31 @@ export default function UserManagementPage() {
         }
     }
 
+    const fetchUserLogs = async (user: any) => {
+        if (userRole !== 'SUPER_ADMIN') return
+        setSelectedUserForLog(user)
+        setIsLogModalOpen(true)
+        setLoadingLogs(true)
+        try {
+            const res = await fetch(`${API_BASE}/users/${user.id}/logs`, {
+                headers: { 
+                    'x-user-role': userRole,
+                    'x-user-dept': (session?.user as any)?.department,
+                    'x-user-name': session?.user?.name || '',
+                    'x-user-id': (session?.user as any)?.id || ''
+                }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setUserLogs(data)
+            }
+        } catch (e) {
+            console.error("Failed to fetch logs", e)
+        } finally {
+            setLoadingLogs(false)
+        }
+    }
+
     const handleDeleteUser = async (id: string) => {
         if (!confirm("Hapus user ini? Tindakan ini tidak bisa dibatalkan.")) return
         if (!userRole) return
@@ -174,7 +206,7 @@ export default function UserManagementPage() {
     )
 
     return (
-        <div className="p-4 md:p-8 space-y-6 md:space-y-8 bg-slate-50/50 min-h-screen pb-24 md:pb-8">
+        <div className="w-full space-y-6 md:space-y-8 bg-slate-50/50 min-h-screen pb-24 md:pb-8 px-4 md:px-6 lg:px-8 py-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                     <div className="flex items-center gap-3">
@@ -264,6 +296,15 @@ export default function UserManagementPage() {
                                 </td>
                                 <td className="px-6 py-5">
                                     <div className="flex items-center justify-center gap-2">
+                                        {userRole === 'SUPER_ADMIN' && (
+                                            <button 
+                                                onClick={() => fetchUserLogs(user)}
+                                                className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                                                title="Lihat Log Login"
+                                            >
+                                                <History size={14} />
+                                            </button>
+                                        )}
                                         <button 
                                             onClick={() => {
                                                 setEditingUser(user)
@@ -325,6 +366,14 @@ export default function UserManagementPage() {
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    {userRole === 'SUPER_ADMIN' && (
+                                        <button 
+                                            onClick={() => fetchUserLogs(user)}
+                                            className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                                        >
+                                            <History size={14} />
+                                        </button>
+                                    )}
                                     <button 
                                         onClick={() => {
                                             setEditingUser(user)
@@ -549,6 +598,86 @@ export default function UserManagementPage() {
                                         BUAT USER SEKARANG
                                     </button>
                                 </form>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Log Modal */}
+            <AnimatePresence>
+                {isLogModalOpen && (
+                    <div className={`fixed inset-0 z-[110] flex ${isMobile ? 'items-end' : 'items-center justify-center p-4'} bg-slate-900/60 backdrop-blur-md`}>
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsLogModalOpen(false)}
+                            className="absolute inset-0"
+                        />
+                        <motion.div 
+                            initial={isMobile ? { y: "100%" } : { scale: 0.9, opacity: 0, y: 20 }}
+                            animate={isMobile ? { y: 0 } : { scale: 1, opacity: 1, y: 0 }}
+                            exit={isMobile ? { y: "100%" } : { scale: 0.9, opacity: 0, y: 20 }}
+                            className={`relative bg-white w-full max-w-2xl overflow-hidden flex flex-col ${isMobile ? 'rounded-t-[2.5rem] max-h-[85vh]' : 'rounded-[2.5rem] shadow-2xl h-[600px]'}`}
+                        >
+                            <div className="p-6 md:p-8 flex flex-col h-full">
+                                <div className="flex items-center justify-between mb-6 shrink-0">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20">
+                                            <History className="text-white w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">Log Login User</h2>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedUserForLog?.name} ({selectedUserForLog?.email})</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setIsLogModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                                        <X size={24} className="text-slate-400" />
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                                    {loadingLogs ? (
+                                        <div className="h-full flex flex-col items-center justify-center gap-4 text-slate-400">
+                                            <Loader2 size={32} className="animate-spin text-indigo-600" />
+                                            <p className="text-[10px] font-black uppercase tracking-widest">Mengambil Catatan Log...</p>
+                                        </div>
+                                    ) : userLogs.length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center gap-4 text-slate-300 text-center px-10">
+                                            <Globe size={48} strokeWidth={1} />
+                                            <p className="text-sm font-bold">Belum ada catatan aktivitas login untuk user ini.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {userLogs.map((log) => (
+                                                <div key={log.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 transition-colors">
+                                                            <Monitor size={18} />
+                                                        </div>
+                                                        <div className="space-y-0.5">
+                                                            <p className="text-[10px] font-black text-slate-800 uppercase tracking-wide">
+                                                                {new Date(log.timestamp).toLocaleString('id-ID', { 
+                                                                    day: '2-digit', month: 'long', year: 'numeric',
+                                                                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                                                                })}
+                                                            </p>
+                                                            <p className="text-[10px] font-bold text-slate-400 truncate max-w-[200px] md:max-w-md">
+                                                                {log.userAgent || 'Unknown Device'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right shrink-0">
+                                                        <span className="text-[10px] font-black px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg">
+                                                            {log.ipAddress || 'No IP'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </motion.div>
                     </div>

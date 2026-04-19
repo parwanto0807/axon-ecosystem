@@ -26,7 +26,7 @@ export function ClientLayout({
             {/* Main Application Container with Dynamic Blur */}
             <div 
                 className={`flex-1 flex flex-col min-h-screen transition-all duration-700 ease-in-out ${
-                    isSidebarCollapsed ? 'md:pl-20' : 'md:pl-80'
+                    isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-[280px]'
                 }`}
             >
                 {/* Mobile Header - Visible only on mobile/tablet */}
@@ -50,15 +50,8 @@ export function ClientLayout({
 
                 <Sidebar />
                 
-                <main
-                    className="flex-1 transition-all duration-300 ease-in-out pb-32 mt-14 lg:mt-0"
-                    style={{ 
-                        paddingLeft: mounted && window.innerWidth >= 1024 
-                            ? (isSidebarCollapsed ? '84px' : '284px') 
-                            : '0' 
-                    }}
-                >
-                    <div className="w-full">
+                <main className="flex-1 transition-all duration-300 ease-in-out pb-32 mt-14 lg:mt-0">
+                    <div className="w-full h-full">
                         {children}
                     </div>
                 </main>

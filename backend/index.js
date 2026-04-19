@@ -174,6 +174,20 @@ app.post('/api/login', async (req, res) => {
 
     if (isMatch) {
       console.log(`[AUTH] Login success for: ${email}`);
+      
+      // Record Login Log
+      try {
+        await prisma.userLoginLog.create({
+          data: {
+            userId: user.id,
+            ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+            userAgent: req.headers['user-agent']
+          }
+        });
+      } catch (logError) {
+        console.error('[AUTH] Failed to record login log:', logError);
+      }
+
       // If it was a legacy plain-text password, migrate it to hashed now
       if (isLegacy) {
         try {
@@ -6251,3 +6265,19 @@ process.on('SIGINT', async () => {
   process.exit();
 });
 
+
+// --- USER LOG ROUTES ---
+app.get('/api/users/:id/logs', checkRole(['SUPER_ADMIN']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const logs = await prisma.userLoginLog.findMany({
+      where: { userId: id },
+      orderBy: { timestamp: 'desc' },
+      take: 50 // Limit to last 50 logins
+    });
+    res.json(logs);
+  } catch (error) {
+    console.error('Error fetching user logs:', error);
+    res.status(500).json({ message: 'Error fetching user logs' });
+  }
+});
