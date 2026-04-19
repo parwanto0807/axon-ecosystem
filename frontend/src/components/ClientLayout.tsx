@@ -2,10 +2,11 @@
 
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
+import { FloatingOperationalNav } from "@/components/FloatingOperationalNav";
 import { useUIStore } from "@/store/uiStore";
-import { Providers } from "@/components/Providers";
 import { useState, useEffect } from "react"
 import { Menu, BarChart3, Search, Bell } from "lucide-react"
+
 
 export function ClientLayout({
     children,
@@ -57,6 +58,7 @@ export function ClientLayout({
 
             {/* Bottom Nav for Mobile */}
             <MobileNav />
+            <FloatingOperationalNav />
         </div>
     )
 }

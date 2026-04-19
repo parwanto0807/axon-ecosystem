@@ -30,6 +30,8 @@ export default function EditEmployeePage() {
     const [saving, setSaving] = useState(false)
     const [categories, setCategories] = useState<any[]>([])
     const [businessCategories, setBusinessCategories] = useState<any[]>([])
+    const [locations, setLocations] = useState<any[]>([])
+    const [unlinkedUsers, setUnlinkedUsers] = useState<any[]>([])
     const [formData, setFormData] = useState({
         name: "",
         nik: "",
@@ -47,7 +49,9 @@ export default function EditEmployeePage() {
         bankAccount: "",
         vendorId: "",
         categoryId: "",
-        businessCategoryId: ""
+        businessCategoryId: "",
+        attendanceLocationId: "",
+        userId: ""
     })
 
     useEffect(() => {
@@ -55,8 +59,32 @@ export default function EditEmployeePage() {
             fetchEmployee()
             fetchCategories()
             fetchBusinessCategories()
+            fetchLocations()
+            fetchUnlinkedUsers()
         }
     }, [id])
+
+    const fetchUnlinkedUsers = async () => {
+        try {
+            // We pass the current linked userId so it's included in the options
+            const currentId = formData.userId; 
+            const res = await fetch(`${API_BASE}/hr/unlinked-users?currentUserId=${currentId}`)
+            const data = await res.json()
+            setUnlinkedUsers(data)
+        } catch (e) {
+            console.error(e)
+        }
+    }
+
+    const fetchLocations = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/hr/attendance-locations`)
+            const data = await res.json()
+            setLocations(data)
+        } catch (e) {
+            console.error(e)
+        }
+    }
 
     const fetchCategories = async () => {
         try {
@@ -87,8 +115,16 @@ export default function EditEmployeePage() {
                 joinDate: data.joinDate ? data.joinDate.split('T')[0] : "",
                 vendorId: data.vendorId || "",
                 categoryId: data.categoryId || "",
-                businessCategoryId: data.businessCategoryId || ""
+                businessCategoryId: data.businessCategoryId || "",
+                attendanceLocationId: data.attendanceLocationId || "",
+                userId: data.userId || ""
             })
+            // Re-fetch unlinked users once we have the current userId
+            if (data.userId) {
+                const res = await fetch(`${API_BASE}/hr/unlinked-users?currentUserId=${data.userId}`)
+                const users = await res.json()
+                setUnlinkedUsers(users)
+            }
         } catch (e) {
             console.error(e)
             alert("Failed to fetch employee data.")
@@ -323,6 +359,23 @@ export default function EditEmployeePage() {
                             </div>
 
                             <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1">Lokasi Tugas Absensi (Geofencing Master)</label>
+                                <div className="relative">
+                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300 w-4 h-4" />
+                                    <select 
+                                        className="w-full bg-indigo-50/30 pl-11 pr-5 py-4 rounded-2xl border-none text-xs font-black text-slate-900 focus:ring-2 ring-indigo-500/10 outline-none appearance-none"
+                                        value={formData.attendanceLocationId}
+                                        onChange={e => setFormData({...formData, attendanceLocationId: e.target.value})}
+                                    >
+                                        <option value="">Gunakan Lokasi Terdekat (Default)</option>
+                                        {locations.map(l => (
+                                            <option key={l.id} value={l.id}>{l.name} ({l.radius}m)</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Tanggal Bergabung</label>
                                 <div className="relative">
                                     <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
@@ -410,6 +463,52 @@ export default function EditEmployeePage() {
                         <div>
                             <p className="text-xs font-black text-slate-800 uppercase tracking-tight">Profile Pembayaran Terkait</p>
                             <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Vendor ID: {formData.vendorId || 'Not Linked'}</p>
+                        </div>
+                    </div>
+
+                    {/* Account Linking Section */}
+                    <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-8 rounded-[2.5rem] text-white shadow-xl shadow-indigo-600/30 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-10">
+                            <ShieldCheck size={100} strokeWidth={1} />
+                        </div>
+                        
+                        <div className="relative z-10 space-y-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md">
+                                    <ShieldCheck size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-black tracking-tight uppercase">Akses Akun & Relasi</h2>
+                                    <p className="text-[9px] font-bold text-indigo-200 uppercase tracking-widest leading-none mt-1">Hubungkan karyawan ke akun login</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-indigo-100 uppercase tracking-widest pl-1">Pilih Akun User System</label>
+                                    <div className="relative">
+                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400 w-4 h-4" />
+                                        <select 
+                                            className="w-full bg-white/10 border border-white/20 pl-11 pr-5 py-4 rounded-2xl text-xs font-black text-white focus:ring-2 ring-white/20 outline-none appearance-none backdrop-blur-md"
+                                            value={formData.userId}
+                                            onChange={e => setFormData({...formData, userId: e.target.value})}
+                                        >
+                                            <option value="" className="text-slate-900">Belum Terhubung / Putus Relasi</option>
+                                            {unlinkedUsers.map(u => (
+                                                <option key={u.id} value={u.id} className="text-slate-900">
+                                                    {u.name} ({u.email}) - {u.role}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                                    <p className="text-[10px] font-medium text-indigo-100 italic">
+                                        * Dengan menghubungkan akun, karyawan ini dapat login menggunakan kredensial user tersebut dan mengakses menu operasional (Presensi, dll).
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

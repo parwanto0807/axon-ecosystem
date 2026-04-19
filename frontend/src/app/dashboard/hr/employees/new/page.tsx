@@ -29,6 +29,7 @@ export default function NewEmployeePage() {
     const [loading, setLoading] = useState(false)
     const [categories, setCategories] = useState<any[]>([])
     const [businessCategories, setBusinessCategories] = useState<any[]>([])
+    const [locations, setLocations] = useState<any[]>([])
     const [formData, setFormData] = useState({
         name: "",
         nik: "",
@@ -46,6 +47,7 @@ export default function NewEmployeePage() {
         bankAccount: "",
         categoryId: "",
         businessCategoryId: "",
+        attendanceLocationId: "",
         createVendor: true
     })
 
@@ -68,8 +70,16 @@ export default function NewEmployeePage() {
                 console.error(e)
             }
         }
+        const fetchLocations = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/hr/attendance-locations`)
+                const data = await res.json()
+                setLocations(data)
+            } catch (e) { console.error(e) }
+        }
         fetchCategories()
         fetchBusinessCategories()
+        fetchLocations()
     }, [])
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -290,6 +300,23 @@ export default function NewEmployeePage() {
                                         <option value="">Pilih Unit Bisnis...</option>
                                         {businessCategories.map(c => (
                                             <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest pl-1">Lokasi Tugas Absensi (Geofencing Master)</label>
+                                <div className="relative">
+                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-300 w-4 h-4" />
+                                    <select 
+                                        className="w-full bg-indigo-50/30 pl-11 pr-5 py-4 rounded-2xl border-none text-xs font-black text-slate-900 focus:ring-2 ring-indigo-500/10 outline-none appearance-none"
+                                        value={formData.attendanceLocationId}
+                                        onChange={e => setFormData({...formData, attendanceLocationId: e.target.value})}
+                                    >
+                                        <option value="">Gunakan Lokasi Terdekat (Default)</option>
+                                        {locations.map(l => (
+                                            <option key={l.id} value={l.id}>{l.name} ({l.radius}m)</option>
                                         ))}
                                     </select>
                                 </div>

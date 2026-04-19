@@ -21,24 +21,29 @@ export function MobileNav() {
     const { data: session } = useSession()
 
     const userRole = session?.user?.role || 'USER'
+    if (userRole === 'OPERATIONAL') return null;
+    
     const userDept = session?.user?.department || 'NONE'
 
-    const dashboardPath = userDept === 'OPERATIONAL' ? '/dashboard/operations' : '/dashboard'
+    const dashboardPath = userRole === 'OPERATIONAL' ? '/dashboard/operational' : (userDept === 'OPERATIONAL' ? '/dashboard/operations' : '/dashboard')
 
     const allItems = [
         { id: 'dashboard', icon: LayoutDashboard, label: 'Dash', path: dashboardPath },
+        { id: 'attendance', icon: HardHat, label: 'Absen', path: '/dashboard/attendance/log', requiredDept: ['OPERATIONAL'], requiredRole: ['OPERATIONAL'] },
         { id: 'sales', icon: ShoppingCart, label: 'Sales', path: '/dashboard/sales/projects', requiredDept: ['SALES'] },
         { id: 'finance', icon: DollarSign, label: 'Fin', path: '/dashboard/finance/invoices', requiredDept: ['FINANCE'] },
         { id: 'inventory', icon: Package, label: 'Inv', path: '/dashboard/inventory', requiredDept: ['LOGISTIC'] },
-        { id: 'operations', icon: HardHat, label: 'Ops', path: '/dashboard/operations', requiredDept: ['LOGISTIC', 'OPERATIONAL'] },
-        { id: 'assets', icon: Box, label: 'Assets', path: '/dashboard/management/assets', requiredDept: ['SALES', 'LOGISTIC', 'OPERATIONAL'] },
+        { id: 'operations', icon: HardHat, label: 'Ops', path: '/dashboard/operations', requiredDept: ['LOGISTIC'] },
     ]
 
-    const filteredItems = allItems.filter(item => {
+    const filteredItems = allItems.filter((item: any) => {
         if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN') return true
+        if (userRole === 'OPERATIONAL') {
+            return item.id === 'dashboard' || item.id === 'attendance';
+        }
         if (!item.requiredDept) return true
         return item.requiredDept.includes(userDept)
-    }).slice(0, 4) // Keep it to 4 items max to fit with Menu button
+    }).slice(0, 4)
 
     return (
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-20 bg-white/95 backdrop-blur-xl border-t border-slate-200/60 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] z-[50] flex items-center justify-around px-2 pb-safe">

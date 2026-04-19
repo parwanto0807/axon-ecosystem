@@ -106,6 +106,32 @@ const processOperasionalImage = async (file) => {
   return `/public/operasional/${fileName}`;
 };
 
+const attendanceUploadDir = path.join(__dirname, 'public/attendance');
+if (!fs.existsSync(attendanceUploadDir)) fs.mkdirSync(attendanceUploadDir, { recursive: true });
+
+const processAttendanceImage = async (file) => {
+  const fileName = `att-${Date.now()}-${Math.round(Math.random() * 1000)}.webp`;
+  const filePath = path.join(attendanceUploadDir, fileName);
+  await sharp(file.buffer).webp({ quality: 80 }).toFile(filePath);
+  return `/public/attendance/${fileName}`;
+};
+
+function getDistance(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
+  const R = 6371e3; // meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+          Math.cos(φ1) * Math.cos(φ2) *
+          Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // in meters
+}
+
 app.get('/', (req, res) => {
   res.send('API AXON ECOSYSTEM RUNNING...');
 });
@@ -4728,6 +4754,33 @@ app.delete('/api/business-categories/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+// --- HR & EMPLOYEE ROUTES ---
+
+app.get('/api/hr/unlinked-users', async (req, res) => {
+  try {
+    const { currentUserId } = req.query;
+    console.log(`[GET /api/hr/unlinked-users] Hit with currentUserId: "${currentUserId}"`);
+
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { employee: null },
+          (currentUserId && currentUserId !== 'undefined' && currentUserId !== '' ? { id: currentUserId } : { id: 'none' })
+        ]
+      },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: 'asc' }
+    });
+    
+    console.log(`[GET /api/hr/unlinked-users] Sending ${users.length} users`);
+    res.setHeader('Content-Type', 'application/json');
+    return res.json(users);
+  } catch (e) { 
+    console.error('[GET /api/hr/unlinked-users] API ERROR:', e);
+    return res.status(500).json({ message: e.message }); 
+  }
+});
+
 // --- HR / EMPLOYEE CATEGORIES ---
 
 app.get('/api/hr/employee-categories', async (req, res) => {
@@ -4763,18 +4816,35 @@ app.delete('/api/hr/employee-categories/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// --- HR / EMPLOYEES ---
 
 app.get('/api/hr/employees', async (req, res) => {
   try {
+    const userRole = req.headers['x-user-role'] || req.headers['X-User-Role'];
+    const userId = req.headers['x-user-id'] || req.headers['X-User-Id'];
     const { businessCategoryId } = req.query;
-    const employees = await prisma.employee.findMany({
-      where: {
+
+    console.log(`[GET /api/hr/employees] Role: ${userRole}, UserId: ${userId}`);
+
+    // STRICTOR FILTERING
+    let whereClause = {
         ...(businessCategoryId ? { businessCategoryId } : {})
-      },
-      include: { vendor: true, category: true, businessCategory: true },
+    };
+
+    if (userRole === 'OPERATIONAL') {
+        if (!userId || userId === 'undefined' || userId === '') {
+            console.warn(`[GET /api/hr/employees] BLOCKED: Operational user with no ID`);
+            return res.json([]); 
+        }
+        whereClause.userId = userId;
+    }
+
+    const employees = await prisma.employee.findMany({
+      where: whereClause,
+      include: { vendor: true, category: true, businessCategory: true, attendanceLocation: true },
       orderBy: { name: 'asc' }
     });
+    
+    console.log(`[GET /api/hr/employees] Returning ${employees.length} records`);
     res.json(employees);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -4783,7 +4853,7 @@ app.get('/api/hr/employees/:id', async (req, res) => {
   try {
     const employee = await prisma.employee.findUnique({
       where: { id: req.params.id },
-      include: { vendor: true, category: true, businessCategory: true }
+      include: { vendor: true, category: true, businessCategory: true, attendanceLocation: true }
     });
     res.json(employee);
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -4791,7 +4861,7 @@ app.get('/api/hr/employees/:id', async (req, res) => {
 
 app.post('/api/hr/employees', async (req, res) => {
   try {
-    const { createVendor, id: _id, createdAt, updatedAt, vendor, category, businessCategory, payrollItems, ...data } = req.body;
+    const { createVendor, id: _id, createdAt, updatedAt, vendor, category, businessCategory, attendanceLocation, payrollItems, ...data } = req.body;
     
     let vendorId = data.vendorId;
     if (!vendorId && createVendor) {
@@ -4829,9 +4899,11 @@ app.post('/api/hr/employees', async (req, res) => {
         email: data.email || null,
         vendorId: vendorId || null,
         categoryId: data.categoryId || null,
-        businessCategoryId: data.businessCategoryId || null
+        businessCategoryId: data.businessCategoryId || null,
+        attendanceLocationId: data.attendanceLocationId || null,
+        userId: data.userId || null
       },
-      include: { vendor: true, category: true, businessCategory: true }
+      include: { vendor: true, category: true, businessCategory: true, attendanceLocation: true, user: true }
     });
     res.json(employee);
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -4840,7 +4912,7 @@ app.post('/api/hr/employees', async (req, res) => {
 app.put('/api/hr/employees/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { id: _id, createdAt, updatedAt, vendor, category, businessCategory, payrollItems, ...data } = req.body;
+    const { id: _id, createdAt, updatedAt, vendor, category, businessCategory, attendanceLocation, payrollItems, ...data } = req.body;
     
     const employee = await prisma.employee.update({
       where: { id },
@@ -4849,9 +4921,11 @@ app.put('/api/hr/employees/:id', async (req, res) => {
         joinDate: data.joinDate ? new Date(data.joinDate) : undefined,
         baseSalary: data.baseSalary !== undefined ? Number(data.baseSalary) : undefined,
         dailyWage: data.dailyWage !== undefined ? Number(data.dailyWage) : undefined,
-        businessCategoryId: data.businessCategoryId || null
+        businessCategoryId: data.businessCategoryId || null,
+        attendanceLocationId: data.attendanceLocationId !== undefined ? data.attendanceLocationId : undefined,
+        userId: data.userId !== undefined ? (data.userId || null) : undefined
       },
-      include: { vendor: true, category: true, businessCategory: true }
+      include: { vendor: true, category: true, businessCategory: true, attendanceLocation: true, user: true }
     });
     res.json(employee);
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -4862,6 +4936,624 @@ app.delete('/api/hr/employees/:id', async (req, res) => {
     await prisma.employee.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// --- ATTENDANCE LOCATIONS ---
+
+app.get('/api/hr/attendance-locations', async (req, res) => {
+  try {
+    const locations = await prisma.attendanceLocation.findMany({ orderBy: { name: 'asc' } });
+    res.json(locations);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/hr/attendance-locations', async (req, res) => {
+  try {
+    const { name, address, latitude, longitude, radius, isActive } = req.body;
+    const loc = await prisma.attendanceLocation.create({ 
+      data: {
+        name,
+        address,
+        latitude: Number(latitude),
+        longitude: Number(longitude),
+        radius: Number(radius),
+        isActive: Boolean(isActive)
+      } 
+    });
+    res.json(loc);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.put('/api/hr/attendance-locations/:id', async (req, res) => {
+  try {
+    const { name, address, latitude, longitude, radius, isActive } = req.body;
+    const loc = await prisma.attendanceLocation.update({
+      where: { id: req.params.id },
+      data: {
+        name,
+        address,
+        latitude: Number(latitude),
+        longitude: Number(longitude),
+        radius: Number(radius),
+        isActive: Boolean(isActive)
+      }
+    });
+    res.json(loc);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.delete('/api/hr/attendance-locations/:id', async (req, res) => {
+  try {
+    await prisma.attendanceLocation.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// --- EMPLOYEE SCHEDULES ---
+
+app.get('/api/hr/employee-schedules', async (req, res) => {
+  try {
+    const userRole = req.headers['x-user-role'] || req.headers['X-User-Role'];
+    const userId = req.headers['x-user-id'] || req.headers['X-User-Id'];
+    const { employeeId, startDate, endDate } = req.query;
+
+    console.log(`[GET /api/hr/employee-schedules] Role: ${userRole}, UserId: ${userId}`);
+
+    let targetEmployeeId = employeeId;
+    if (userRole === 'OPERATIONAL') {
+        if (!userId || userId === 'undefined' || userId === '') {
+            console.warn(`[GET /api/hr/employee-schedules] BLOCKED: Operational user with no ID`);
+            return res.json([]); 
+        }
+        const emp = await prisma.employee.findUnique({ where: { userId } });
+        console.log(`[GET /api/hr/employee-schedules] Found linked employee: ${emp?.name || 'NONE'}`);
+        if (emp) targetEmployeeId = emp.id;
+        else return res.json([]); 
+    }
+
+    const items = await prisma.employeeSchedule.findMany({
+      where: {
+        ...(targetEmployeeId ? { employeeId: targetEmployeeId } : {}),
+        ...(startDate && endDate ? {
+          date: { gte: new Date(startDate), lte: new Date(endDate) }
+        } : {})
+      },
+      include: { employee: true },
+      orderBy: { date: 'asc' }
+    });
+    res.json(items);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/hr/employee-schedules', async (req, res) => {
+  try {
+    const { date, ...data } = req.body;
+    const item = await prisma.employeeSchedule.create({
+      data: { ...data, date: new Date(date) }
+    });
+    res.json(item);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/hr/employee-schedules/bulk', async (req, res) => {
+  try {
+    const { employeeIds, startDate, endDate, startTime, endTime, excludeWeekends, excludeHolidays, notes } = req.body;
+    console.log(`--- Memulai Bulk Schedule untuk ${employeeIds?.length} karyawan ---`);
+    console.log(`Rentang: ${startDate} s/d ${endDate}`);
+    
+    if (!employeeIds || !Array.isArray(employeeIds) || employeeIds.length === 0) {
+      return res.status(400).json({ message: 'Pilih karyawan terlebih dahulu' });
+    }
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // Antispit for invalid date range
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({ message: 'Format tanggal tidak valid' });
+    }
+
+    // Get all holidays in range
+    const holidays = await prisma.holiday.findMany({
+      where: { date: { gte: start, lte: end } }
+    });
+    const holidayDates = holidays.map(h => h.date.toISOString().split('T')[0]);
+    console.log(`Ditemukan ${holidayDates.length} hari libur nasional dalam rentang waktu ini.`);
+
+    let totalCreated = 0;
+    let totalUpdated = 0;
+    const current = new Date(start);
+    
+    // Set hours to 0 to avoid timezone issues during comparison
+    current.setHours(0, 0, 0, 0);
+    const stopAt = new Date(end);
+    stopAt.setHours(0, 0, 0, 0);
+
+    while (current <= stopAt) {
+      const dateStr = current.toISOString().split('T')[0];
+      const dayOfWeek = current.getDay(); // 0 = Sunday, 6 = Saturday
+      
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const isHoliday = holidayDates.includes(dateStr);
+      
+      const shouldSkip = (excludeWeekends && isWeekend) || (excludeHolidays && isHoliday);
+      
+      if (!shouldSkip) {
+        for (const empId of employeeIds) {
+          // Check if already exists
+          const existing = await prisma.employeeSchedule.findFirst({
+            where: {
+              employeeId: empId,
+              date: new Date(dateStr)
+            }
+          });
+
+          if (existing) {
+            await prisma.employeeSchedule.update({
+              where: { id: existing.id },
+              data: { startTime, endTime, notes, updatedAt: new Date() }
+            });
+            totalUpdated++;
+          } else {
+            await prisma.employeeSchedule.create({
+              data: { 
+                employeeId: empId, 
+                date: new Date(dateStr), 
+                startTime, 
+                endTime, 
+                notes,
+                type: 'REGULAR'
+              }
+            });
+            totalCreated++;
+          }
+        }
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    
+    console.log(`Bulk Schedule Selesai: ${totalCreated} dibuat, ${totalUpdated} diperbarui.`);
+    res.json({ success: true, count: totalCreated + totalUpdated, created: totalCreated, updated: totalUpdated });
+  } catch (e) {
+    console.error('ERROR BULK SCHEDULE:', e);
+    res.status(500).json({ message: 'Terjadi kesalahan sistem: ' + e.message });
+  }
+});
+
+app.delete('/api/hr/employee-schedules/:id', async (req, res) => {
+  try {
+    await prisma.employeeSchedule.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// --- ATTENDANCE LOGGING ---
+
+// Helper to check if now is within window of HH:mm string
+const isWithinWindow = (timeStr, windowHours = 2) => {
+  if (!timeStr) return false;
+  const now = new Date();
+  const [h, m] = timeStr.split(':').map(Number);
+  const target = new Date(now);
+  target.setHours(h, m, 0, 0);
+  const diffMs = Math.abs(now - target);
+  return diffMs <= (windowHours * 60 * 60 * 1000);
+};
+
+app.post('/api/hr/attendance/clock-in', upload.single('image'), async (req, res) => {
+  try {
+    const { employeeId, latitude, longitude, accuracy, timestamp } = req.body;
+    const lat = Number(latitude);
+    const lon = Number(longitude);
+    
+    // Smart ID Resolution: Find employee by ID or by UserID
+    let employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: { attendanceLocation: true }
+    });
+
+    if (!employee) {
+      employee = await prisma.employee.findUnique({
+        where: { userId: employeeId },
+        include: { attendanceLocation: true }
+      });
+    }
+
+    if (!employee) {
+        return res.status(404).json({ message: "Data Karyawan tidak ditemukan. Pastikan akun login Anda sudah terhubung ke data Karyawan." });
+    }
+
+    const actualEmployeeId = employee.id;
+
+    // Find center point for validation
+    let nearest = null;
+    let minDistance = 999999;
+
+    if (employee?.attendanceLocationId && employee.attendanceLocation) {
+      // If employee has assigned master location, use that
+      const loc = employee.attendanceLocation;
+      minDistance = getDistance(lat, lon, loc.latitude, loc.longitude);
+      nearest = loc;
+    } else {
+      // Fallback: Find nearest location from all active locations
+      const locations = await prisma.attendanceLocation.findMany({ where: { isActive: true } });
+      locations.forEach(loc => {
+        const dist = getDistance(lat, lon, loc.latitude, loc.longitude);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearest = loc;
+        }
+      });
+    }
+
+    // Check Mock detection: if accuracy is exactly 0 or suspicious
+    const isMocked = Number(accuracy) === 0;
+
+    let photoUrl = '';
+    if (req.file) {
+      photoUrl = await processAttendanceImage(req.file);
+    }
+
+    // Find schedule for today
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+    const schedule = await prisma.employeeSchedule.findFirst({
+      where: {
+        employeeId: actualEmployeeId,
+        date: { gte: startOfDay, lt: endOfDay }
+      }
+    });
+
+    // Check if within 2-hour window of schedule
+    if (schedule?.startTime && !isWithinWindow(schedule.startTime)) {
+        return res.status(400).json({ message: `Absen Masuk hanya diperbolehkan dalam jendela waktu 2 jam dari jadwal (${schedule.startTime})` });
+    }
+
+    const status = (nearest && minDistance <= nearest.radius && !isMocked) ? 'VALID' : 'INVALID';
+
+    // Calculate Lateness / Appreciation
+    let noteText = isMocked ? 'Suspicious: Spoofed GPS detected' : (status === 'INVALID' ? 'Outside allowed radius' : '');
+    if (status === 'VALID' && schedule?.startTime) {
+      const [sHour, sMin] = schedule.startTime.split(':').map(Number);
+      const schedTime = new Date(now);
+      schedTime.setHours(sHour, sMin, 0, 0);
+
+      if (now > schedTime) {
+        const diff = Math.floor((now - schedTime) / 1000 / 60);
+        noteText = `Terlambat ${diff} menit. Tetap semangat, usahakan lebih awal besok!`;
+      } else {
+        noteText = `Tepat Waktu! Luar biasa! Terima kasih atas kedisiplinan Anda. Selamat bekerja!`;
+      }
+    }
+
+    const attendance = await prisma.attendance.create({
+      data: {
+        employeeId: actualEmployeeId,
+        scheduleId: schedule?.id,
+        locationId: nearest?.id,
+        type: 'CLOCK_IN',
+        latitude: lat,
+        longitude: lon,
+        accuracy: Number(accuracy),
+        photoUrl,
+        isMocked,
+        distance: minDistance,
+        status,
+        notes: noteText
+      }
+    });
+
+    res.json({ success: true, attendance });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/hr/attendance/clock-out', upload.single('image'), async (req, res) => {
+  try {
+    const { employeeId, latitude, longitude, accuracy } = req.body;
+    const lat = Number(latitude);
+    const lon = Number(longitude);
+
+    // Smart ID Resolution
+    let employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: { attendanceLocation: true }
+    });
+
+    if (!employee) {
+      employee = await prisma.employee.findUnique({
+        where: { userId: employeeId },
+        include: { attendanceLocation: true }
+      });
+    }
+
+    if (!employee) {
+        return res.status(404).json({ message: "Data Karyawan tidak ditemukan." });
+    }
+
+    const actualEmployeeId = employee.id;
+
+    let nearest = null;
+    let minDistance = 999999;
+
+    if (employee?.attendanceLocationId && employee.attendanceLocation) {
+        const loc = employee.attendanceLocation;
+        minDistance = getDistance(lat, lon, loc.latitude, loc.longitude);
+        nearest = loc;
+    } else {
+        const locations = await prisma.attendanceLocation.findMany({ where: { isActive: true } });
+        locations.forEach(loc => {
+          const dist = getDistance(lat, lon, loc.latitude, loc.longitude);
+          if (dist < minDistance) {
+            minDistance = dist;
+            nearest = loc;
+          }
+        });
+    }
+
+    const isMocked = Number(accuracy) === 0;
+
+    // Check if Clock-In exists for today
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+    const lastIn = await prisma.attendance.findFirst({
+      where: {
+        employeeId: actualEmployeeId,
+        type: 'CLOCK_IN',
+        timestamp: { gte: startOfDay, lt: endOfDay }
+      }
+    });
+
+    const schedule = await prisma.employeeSchedule.findFirst({
+        where: {
+          employeeId: actualEmployeeId,
+          date: { gte: startOfDay, lt: endOfDay }
+        }
+    });
+
+    // Check Window for Clock-Out
+    if (schedule?.endTime && !isWithinWindow(schedule.endTime)) {
+        return res.status(400).json({ message: `Absen Keluar hanya diperbolehkan dalam jendela waktu 2 jam dari jadwal (${schedule.endTime})` });
+    }
+
+    if (!lastIn) {
+      return res.status(400).json({ message: "Gagal: Anda belum melakukan Absen Masuk hari ini. Mohon lakukan Absen Masuk terlebih dahulu." });
+    }
+
+    let photoUrl = '';
+    if (req.file) {
+      photoUrl = await processAttendanceImage(req.file);
+    }
+
+    const attendance = await prisma.attendance.create({
+      data: {
+        employeeId,
+        type: 'CLOCK_OUT',
+        latitude: lat,
+        longitude: lon,
+        accuracy: Number(accuracy),
+        photoUrl,
+        isMocked,
+        distance: minDistance,
+        status: (nearest && minDistance <= nearest.radius && !isMocked) ? 'VALID' : 'INVALID',
+        locationId: nearest?.id
+      }
+    });
+    res.json({ success: true, attendance });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ============ OPERATIONAL PERFORMANCE STATS ============
+app.get('/api/hr/attendance/my-performance', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || req.headers['X-User-Id'];
+    if (!userId) return res.json({ performance: 0, totalWorkDays: 0, presentDays: 0, absentDays: 0, lateness: [] });
+
+    // Resolve employee
+    let employee = await prisma.employee.findUnique({ where: { userId } });
+    if (!employee) {
+      employee = await prisma.employee.findUnique({ where: { id: userId } });
+    }
+    if (!employee) return res.json({ performance: 0, totalWorkDays: 0, presentDays: 0, absentDays: 0, lateness: [] });
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // ── 1. Fetch public holidays this month ──
+    const holidays = await prisma.holiday.findMany({
+      where: {
+        date: {
+          gte: startOfMonth,
+          lte: now
+        }
+      }
+    });
+    const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]));
+
+    // ── 2. Count actual working days (exclude Sat, Sun, Holidays) ──
+    let totalWorkDays = 0;
+    for (let d = new Date(startOfMonth); d <= now; d.setDate(d.getDate() + 1)) {
+      const dayOfWeek = d.getDay(); // 0=Sun, 6=Sat
+      const dateStr = d.toISOString().split('T')[0];
+      if (dayOfWeek === 0 || dayOfWeek === 6) continue; // Skip weekends
+      if (holidayDates.has(dateStr)) continue; // Skip holidays
+      totalWorkDays++;
+    }
+
+    // ── 3. Get employee schedules this month (for lateness calc) ──
+    const schedules = await prisma.employeeSchedule.findMany({
+      where: {
+        employeeId: employee.id,
+        date: { gte: startOfMonth, lte: now }
+      }
+    });
+
+    // ── 4. Get all valid CLOCK_IN logs this month ──
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const clockIns = await prisma.attendance.findMany({
+      where: {
+        employeeId: employee.id,
+        type: 'CLOCK_IN',
+        status: 'VALID',
+        timestamp: { gte: startOfMonth, lte: endOfMonth }
+      },
+      include: { schedule: true },
+      orderBy: { timestamp: 'asc' }
+    });
+
+    // ── 5. Count unique present days (one per calendar day) ──
+    const presentDaySet = new Set();
+    clockIns.forEach(ci => {
+      presentDaySet.add(new Date(ci.timestamp).toISOString().split('T')[0]);
+    });
+    const presentDays = presentDaySet.size;
+    const absentDays = Math.max(totalWorkDays - presentDays, 0);
+    const performance = totalWorkDays > 0 ? Math.round((presentDays / totalWorkDays) * 100) : 0;
+
+    // ── 6. Calculate daily lateness for last 7 days ──
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const latenessData = [];
+    for (let d = new Date(sevenDaysAgo); d <= now; d.setDate(d.getDate() + 1)) {
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+      const dayName = dayStart.toLocaleDateString('id-ID', { weekday: 'short' });
+      const dateStr = dayStart.toISOString().split('T')[0];
+      const dayOfWeek = dayStart.getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const isHoliday = holidayDates.has(dateStr);
+
+      // Skip weekends & holidays in the chart
+      if (isWeekend || isHoliday) {
+        latenessData.push({ day: dayName, date: dateStr, lateMinutes: -2, label: isHoliday ? 'Libur' : 'Off' });
+        continue;
+      }
+
+      const dayClockIn = clockIns.find(ci => {
+        const ts = new Date(ci.timestamp);
+        return ts >= dayStart && ts < dayEnd;
+      });
+
+      let lateMinutes = 0;
+      if (dayClockIn && dayClockIn.schedule?.startTime) {
+        const [sH, sM] = dayClockIn.schedule.startTime.split(':').map(Number);
+        const schedTime = new Date(dayClockIn.timestamp);
+        schedTime.setHours(sH, sM, 0, 0);
+        const ts = new Date(dayClockIn.timestamp);
+        if (ts > schedTime) {
+          lateMinutes = Math.floor((ts - schedTime) / 1000 / 60);
+        }
+      } else if (!dayClockIn) {
+        const hadSchedule = schedules.find(s => {
+          const sd = new Date(s.date);
+          return sd >= dayStart && sd < dayEnd;
+        });
+        if (hadSchedule) lateMinutes = -1; // absent
+      }
+
+      latenessData.push({ day: dayName, date: dateStr, lateMinutes });
+    }
+
+    res.json({
+      performance: Math.min(performance, 100),
+      totalWorkDays,
+      presentDays,
+      absentDays,
+      holidayCount: holidayDates.size,
+      lateness: latenessData
+    });
+  } catch (e) {
+    console.error('Performance API Error:', e);
+    res.status(500).json({ message: e.message });
+  }
+});
+
+app.get('/api/hr/attendance/history', async (req, res) => {
+  try {
+    const userRole = req.headers['x-user-role'] || req.headers['X-User-Role'];
+    const userId = req.headers['x-user-id'] || req.headers['X-User-Id'];
+    const { employeeId, startDate, endDate } = req.query;
+
+    console.log(`[GET /api/hr/attendance/history] Role: ${userRole}, UserId: ${userId}`);
+
+    let targetEmployeeId = employeeId;
+    if (userRole === 'OPERATIONAL') {
+        if (!userId || userId === 'undefined' || userId === '') {
+            console.warn(`[GET /api/hr/attendance/history] BLOCKED: Operational user with no ID`);
+            return res.json([]); 
+        }
+        const emp = await prisma.employee.findUnique({ where: { userId } });
+        if (emp) targetEmployeeId = emp.id;
+        else return res.json([]);
+    }
+
+    const history = await prisma.attendance.findMany({
+      where: {
+        ...(targetEmployeeId ? { employeeId: targetEmployeeId } : {}),
+        ...(startDate && endDate ? {
+          timestamp: { gte: new Date(startDate), lte: new Date(endDate) }
+        } : {})
+      },
+      include: { employee: true, location: true, schedule: true },
+      orderBy: { timestamp: 'desc' }
+    });
+    res.json(history);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.get('/api/hr/attendance/my-status', async (req, res) => {
+    try {
+        const { employeeId } = req.query;
+        if (!employeeId) return res.status(400).json({ message: 'Missing employeeId' });
+
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+        // Smart ID Resolution
+        let employee = await prisma.employee.findUnique({
+            where: { id: employeeId },
+            include: { attendanceLocation: true }
+        });
+
+        if (!employee) {
+            employee = await prisma.employee.findUnique({
+                where: { userId: employeeId },
+                include: { attendanceLocation: true }
+            });
+        }
+
+        if (!employee) {
+            return res.json({ logs: [], schedule: null, employee: null });
+        }
+
+        const actualEmployeeId = employee.id;
+
+        const logs = await prisma.attendance.findMany({
+            where: {
+                employeeId: actualEmployeeId,
+                timestamp: { gte: startOfDay, lt: endOfDay }
+            },
+            orderBy: { timestamp: 'asc' }
+        });
+
+        const schedule = await prisma.employeeSchedule.findFirst({
+            where: {
+                employeeId: actualEmployeeId,
+                date: { gte: startOfDay, lt: endOfDay }
+            }
+        });
+
+        res.json({ logs, schedule, employee });
+    } catch (e) { 
+        console.error("My Status Error:", e);
+        res.status(500).json({ message: e.message }); 
+    }
 });
 
 // --- HR / PAYROLL ---
@@ -5319,12 +6011,16 @@ app.get('/api/users', checkRole(['SUPER_ADMIN', 'ADMIN', 'OPERATIONAL']), async 
     const userRole = req.headers['x-user-role'];
     const userName = req.headers['x-user-name'];
     const { businessCategoryId } = req.query;
+
+    console.log(`[GET /api/users] UserRole: ${userRole}, UserName: ${userName}, BizID: ${businessCategoryId}`);
+
     const users = await prisma.user.findMany({
       where: {
-        ...(userRole === 'OPERATIONAL' ? { name: userName } : {}),
-        ...(businessCategoryId ? { businessCategoryId } : {})
+        ...(userRole === 'OPERATIONAL' ? { 
+          name: { contains: userName, mode: 'insensitive' } 
+        } : {}),
+        ...(businessCategoryId && businessCategoryId !== 'undefined' ? { businessCategoryId } : {})
       },
-      include: { businessCategory: true },
       select: {
         id: true,
         name: true,
@@ -5332,10 +6028,16 @@ app.get('/api/users', checkRole(['SUPER_ADMIN', 'ADMIN', 'OPERATIONAL']), async 
         role: true,
         department: true,
         businessCategoryId: true,
+        businessCategory: true,
       },
     });
+
+    console.log(`[GET /api/users] Found ${users.length} users`);
     res.json(users);
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { 
+    console.error('[GET /api/users] ERROR:', e);
+    res.status(500).json({ message: e.message }); 
+  }
 });
 
 app.post('/api/users', checkRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
@@ -5409,6 +6111,138 @@ app.put('/api/settings/company', checkRole(['SUPER_ADMIN', 'ADMIN']), async (req
     });
     res.json(company);
   } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+// --- HOLIDAY ROUTES ---
+
+app.get('/api/hr/holidays', async (req, res) => {
+  try {
+    const list = await prisma.holiday.findMany({ orderBy: { date: 'asc' } });
+    res.json(list);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/hr/holidays', async (req, res) => {
+  try {
+    const { date, name, description, isNational } = req.body;
+    const h = await prisma.holiday.upsert({
+      where: { date: new Date(date) },
+      update: { name, description, isNational },
+      create: { date: new Date(date), name, description, isNational }
+    });
+    res.json(h);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.delete('/api/hr/holidays/:id', async (req, res) => {
+  try {
+    await prisma.holiday.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/hr/holidays/sync', async (req, res) => {
+  const { year } = req.body;
+  const targetYear = year || new Date().getFullYear();
+  console.log(`--- Memulai Sinkronisasi Hari Libur Nasional Tahun ${targetYear} ---`);
+  
+  try {
+    const axios = require('axios');
+    let holidays = [];
+    
+    // SOURCE 1: Day Off API (Mendukung 2026)
+    try {
+      console.log('Mencoba mengambil data dari Day Off API...');
+      const resp = await axios.get(`https://day-off-api.vercel.app/api?year=${targetYear}`);
+      if (Array.isArray(resp.data)) {
+        holidays = resp.data.map(item => {
+          // Fix date format if it's YYYY-MM-D (e.g. 2026-01-1 -> 2026-01-01)
+          let dateStr = item.tanggal;
+          const parts = dateStr.split('-');
+          if (parts.length === 3) {
+            const y = parts[0];
+            const m = parts[1].padStart(2, '0');
+            const d = parts[2].padStart(2, '0');
+            dateStr = `${y}-${m}-${d}`;
+          }
+          return {
+            holiday_date: dateStr,
+            holiday_name: item.keterangan,
+            is_holiday: true
+          };
+        });
+        console.log(`Ditemukan ${holidays.length} data dari Day Off API.`);
+      }
+    } catch (err) {
+      console.warn('Gagal mengambil data dari Day Off API:', err.message);
+    }
+
+    // FALLBACK SOURCE 2: GitHub (Hanya s/d 2024)
+    if (holidays.length === 0) {
+      try {
+        console.log('Mencoba mengambil data dari GitHub...');
+        const resp = await axios.get(`https://raw.githubusercontent.com/guangrei/Json-Indonesia-Holidays/master/calendar.json`);
+        if (resp.data) {
+          holidays = Object.entries(resp.data)
+            .map(([date, val]) => ({
+              holiday_date: date.length === 8 ? `${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}` : date,
+              holiday_name: val.holiday_name,
+              is_holiday: val.holiday
+            }))
+            .filter(h => h.holiday_date.startsWith(targetYear.toString()));
+          console.log(`Ditemukan ${holidays.length} data dari GitHub.`);
+        }
+      } catch (err) {
+        console.warn('Gagal mengambil data dari GitHub.');
+      }
+    }
+
+    if (!holidays || holidays.length === 0) {
+      throw new Error('Tidak ada data hari libur yang ditemukan dari semua sumber.');
+    }
+
+    let syncCount = 0;
+    for (const item of holidays) {
+      if (item.is_holiday) {
+        // Validation for date
+        const d = new Date(item.holiday_date);
+        if (isNaN(d.getTime())) continue;
+
+        await prisma.holiday.upsert({
+          where: { date: d },
+          update: { name: item.holiday_name, isNational: true },
+          create: { date: d, name: item.holiday_name, isNational: true }
+        });
+        syncCount++;
+      }
+    }
+    
+    console.log(`Sinkronisasi selesai. Berhasil memproses ${syncCount} hari libur.`);
+    res.json({ success: true, count: syncCount });
+  } catch (e) {
+    console.error('CRITICAL ERROR DURING SYNC:', e.message);
+    res.status(500).json({ message: 'Gagal melakukan sinkronisasi otomatis. Silakan gunakan fitur Import CSV Manual.' });
+  }
+});
+
+app.post('/api/hr/holidays/import', async (req, res) => {
+  try {
+    const { items } = req.body; // Expecting array of { date, name, isNational }
+    if (!items || !Array.isArray(items)) return res.status(400).json({ message: 'Invalid data format' });
+
+    let count = 0;
+    for (const item of items) {
+      await prisma.holiday.upsert({
+        where: { date: new Date(item.date) },
+        update: { name: item.name, isNational: item.isNational ?? true },
+        create: { date: new Date(item.date), name: item.name, isNational: item.isNational ?? true }
+      });
+      count++;
+    }
+    res.json({ success: true, count });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 });
 
 app.listen(PORT, () => {

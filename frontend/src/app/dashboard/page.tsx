@@ -270,8 +270,8 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (status === 'authenticated' && (session?.user as any)?.department === 'OPERATIONAL') {
-      router.push('/dashboard/operations');
+    if (status === 'authenticated' && (session?.user as any)?.role === 'OPERATIONAL') {
+      router.push('/dashboard/operational');
     }
   }, [session, status, router]);
 
@@ -387,7 +387,7 @@ export default function DashboardPage() {
     ],
   }), [categorySales]);
 
-  if (status === 'loading' || (status === 'authenticated' && (session?.user as any)?.department === 'OPERATIONAL')) {
+  if (status === 'loading' || (status === 'authenticated' && (session?.user as any)?.role === 'OPERATIONAL')) {
     return (
       <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">

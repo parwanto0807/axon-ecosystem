@@ -47,6 +47,7 @@ model User {
   sessions      Session[]
   businessCategoryId String?
   businessCategory BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
+  employee      Employee?
 }
 
 model VerificationToken {
@@ -995,6 +996,12 @@ model Employee {
   vendorId          String?        @unique
   vendor            Vendor?        @relation(fields: [vendorId], references: [id])
   
+  userId            String?        @unique
+  user              User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  attendanceLocationId String?
+  attendanceLocation   AttendanceLocation? @relation(fields: [attendanceLocationId], references: [id], onDelete: SetNull)
+  
   categoryId        String?
   category          EmployeeCategory? @relation(fields: [categoryId], references: [id])
 
@@ -1003,6 +1010,8 @@ model Employee {
   payrollItems      PayrollItem[]
   businessCategoryId String?
   businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
+  schedules         EmployeeSchedule[]
+  attendances       Attendance[]
 }
 
 model EmployeeCategory {
@@ -1341,4 +1350,77 @@ enum AssetStatus {
   BROKEN
   REPLACED
   SCRAPPED
+}
+
+model AttendanceLocation {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  latitude  Float
+  longitude Float
+  radius    Float    @default(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  attendances Attendance[]
+  employees   Employee[]
+}
+
+model EmployeeSchedule {
+  id              String         @id @default(cuid())
+  employeeId      String
+  date            DateTime
+  startTime       String
+  endTime         String
+  type            String         @default("REGULAR")
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  employee        Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  attendances     Attendance[]
+}
+
+model Attendance {
+  id              String           @id @default(cuid())
+  employeeId      String
+  scheduleId      String?
+  locationId      String?
+  type            AttendanceType
+  timestamp       DateTime         @default(now())
+  latitude        Float
+  longitude       Float
+  accuracy        Float?
+  photoUrl        String
+  isMocked        Boolean          @default(false)
+  distance        Float?
+  status          AttendanceStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime         @default(now())
+  
+  employee        Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  schedule        EmployeeSchedule? @relation(fields: [scheduleId], references: [id])
+  location        AttendanceLocation? @relation(fields: [locationId], references: [id])
+}
+
+enum AttendanceType {
+  CLOCK_IN
+  CLOCK_OUT
+}
+
+enum AttendanceStatus {
+  VALID
+  INVALID
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  date        DateTime @unique
+  name        String
+  description String?
+  isNational  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

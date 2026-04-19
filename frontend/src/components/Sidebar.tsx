@@ -44,7 +44,8 @@ import {
     LayoutGrid,
     ShoppingBag,
     Wallet,
-    LogOut
+    LogOut,
+    Calendar
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -103,7 +104,14 @@ const translations: any = {
         preferences: 'Preferensi',
         userManagement: 'Manajemen Pengguna',
         businessCategories: 'Kategori Bisnis',
-        signOut: 'Keluar'
+        signOut: 'Keluar',
+        attendance: 'Presensi',
+        clockInOut: 'Absen Masuk / Keluar',
+        attendanceHistory: 'Riwayat Absensi',
+        attendanceSettings: 'Pengaturan Lokasi',
+        attendanceSchedules: 'Jadwal Kerja',
+        holidays: 'Hari Libur',
+        operationalHome: 'Beranda (Ops)',
     },
     EN: {
         overview: 'Overview',
@@ -156,7 +164,14 @@ const translations: any = {
         preferences: 'Preferences',
         userManagement: 'User Management',
         businessCategories: 'Business Categories',
-        signOut: 'Sign Out'
+        signOut: 'Sign Out',
+        attendance: 'Attendance',
+        clockInOut: 'Clock In / Out',
+        attendanceHistory: 'History',
+        attendanceSettings: 'Location Settings',
+        attendanceSchedules: 'Work Schedules',
+        holidays: 'Public Holidays',
+        operationalHome: 'Home (Ops)',
     }
 }
 
@@ -167,9 +182,32 @@ const getMenuItems = (t: any) => [
         isHeader: true,
         requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE', 'HR']
     },
-    { id: 'dashboard', icon: LayoutDashboard, label: t.overview, path: '/dashboard', requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE', 'HR'] },
     {
-        id: 'master', icon: Database, label: t.masterData, requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE', 'HR', 'OPERATIONAL'], children: [
+        id: 'dashboard', 
+        icon: LayoutDashboard, 
+        label: t.overview, 
+        path: '/dashboard', 
+        requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE', 'HR'] 
+    },
+    {
+        id: 'attendance-group',
+        label: 'PRESENSI',
+        isHeader: true,
+    },
+    {
+        id: 'attendance',
+        icon: ShieldCheck,
+        label: t.attendance,
+        children: [
+            { id: 'att-log', icon: Activity, label: t.clockInOut, path: '/dashboard/attendance/log' },
+            { id: 'att-history', icon: ClipboardList, label: t.attendanceHistory, path: '/dashboard/attendance/history' },
+            { id: 'att-schedules', icon: Briefcase, label: t.attendanceSchedules, path: '/dashboard/attendance/schedules', requiredRoles: ['ADMIN', 'SUPER_ADMIN', 'MANAGER', 'OPERATIONAL'] },
+            { id: 'att-settings', icon: MapPin, label: t.attendanceSettings, path: '/dashboard/attendance/settings', requiredRoles: ['ADMIN', 'SUPER_ADMIN'] },
+            { id: 'att-holidays', icon: Calendar, label: t.holidays, path: '/dashboard/attendance/holidays' },
+        ]
+    },
+    {
+        id: 'master', icon: Database, label: t.masterData, requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE', 'HR'], children: [
             { id: 'business-categories', label: t.businessCategories, path: '/dashboard/management/business-categories', icon: LayoutGrid, requiredRoles: ['ADMIN', 'SUPER_ADMIN'] },
             { id: 'products', label: t.products, path: '/dashboard/management/products', icon: Package, requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE'] },
             { id: 'customers', label: t.customers, path: '/dashboard/management/customers', icon: Users },
@@ -234,13 +272,13 @@ const getMenuItems = (t: any) => [
         id: 'operation-group',
         label: 'OPERATION',
         isHeader: true,
-        requiredDepartment: ['LOGISTIC', 'OPERATIONAL']
+        requiredDepartment: ['LOGISTIC']
     },
     {
         id: 'operations',
         icon: HardHat,
         label: t.operations,
-        requiredDepartment: ['LOGISTIC', 'OPERATIONAL'],
+        requiredDepartment: ['LOGISTIC'],
         children: [
             { id: 'op-overview', icon: LayoutGrid, label: t.operationsOverview, path: '/dashboard/operations' },
             { id: 'work-orders', icon: Wrench, label: t.workOrders, path: '/dashboard/operations/work-orders', requiredDepartment: ['LOGISTIC'] },
@@ -311,6 +349,7 @@ export function Sidebar() {
 
     const userRole = session?.user?.role || 'USER'
     const userDept = session?.user?.department || 'NONE'
+    const isOperational = userRole === 'OPERATIONAL'
 
     const isLoading = status === 'loading'
 
@@ -372,7 +411,8 @@ export function Sidebar() {
                 </div>
             </motion.div>
 
-            {/* Mobile Sidebar Overlay */}
+            {/* Mobile Sidebar Overlay (hidden for OPERATIONAL — they use floating nav) */}
+            {!isOperational && (
             <AnimatePresence>
                 {isMobileMenuOpen && (
                     <>
@@ -408,6 +448,7 @@ export function Sidebar() {
                     </>
                 )}
             </AnimatePresence>
+            )}
         </>
     )
 }
