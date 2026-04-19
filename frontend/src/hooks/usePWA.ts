@@ -36,7 +36,7 @@ export function usePWA() {
             // Instead, we let the UI decide when to show the prompt based on 'isInstallable'
         }
 
-        window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+        (window as any).addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
 
         // 3. Handle successful installation
         const handleAppInstalled = () => {
@@ -52,7 +52,7 @@ export function usePWA() {
             }, 1000)
         }
 
-        window.addEventListener("appinstalled", handleAppInstalled)
+        window.addEventListener("appinstalled", handleAppInstalled as any)
 
         // 4. Detect if already in standalone mode
         if (window.matchMedia("(display-mode: standalone)").matches) {
@@ -62,8 +62,8 @@ export function usePWA() {
         }
 
         return () => {
-            window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
-            window.removeEventListener("appinstalled", handleAppInstalled)
+            (window as any).removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+            window.removeEventListener("appinstalled", handleAppInstalled as any)
         }
     }, [setPWAInstallPromptActive, setShouldBlurBackground])
 
