@@ -357,7 +357,7 @@ export default function AttendanceSchedulesPage() {
                                             bgColor = 'bg-orange-50/30'
                                             textColor = 'text-orange-600'
                                             borderColor = 'border-orange-200'
-                                        } else if (label === 'PM') {
+                                        } else if (label === 'S') {
                                             bgColor = 'bg-indigo-50/30'
                                             textColor = 'text-indigo-600'
                                             borderColor = 'border-indigo-200'
