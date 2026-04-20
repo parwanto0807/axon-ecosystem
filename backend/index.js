@@ -5565,9 +5565,32 @@ app.post('/api/hr/attendance/clock-out', upload.single('image'), async (req, res
       photoUrl = await processAttendanceImage(req.file);
     }
 
+    const status = (nearest && minDistance <= nearest.radius && !isMocked) ? 'VALID' : 'INVALID';
+
+    // Calculate Early Leave / Friendly Note
+    let noteText = isMocked ? 'Suspicious: Spoofed GPS detected' : (status === 'INVALID' ? 'Outside allowed radius' : '');
+    if (status === 'VALID' && schedule?.endTime) {
+        const [eHour, eMin] = schedule.endTime.split(':').map(Number);
+        
+        // Get hours and minutes in Asia/Jakarta timezone
+        const localTimeString = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
+        const [h, m] = localTimeString.split(':').map(Number);
+        
+        const nowTotalMinutes = h * 60 + m;
+        const schedTotalMinutes = eHour * 60 + eMin;
+
+        if (nowTotalMinutes < schedTotalMinutes) {
+            const diff = schedTotalMinutes - nowTotalMinutes;
+            noteText = `Pulang lebih awal ${diff} menit. Sehat selalu!`;
+        } else {
+            noteText = `Terima kasih atas kerja kerasnya hari ini. Selamat beristirahat!`;
+        }
+    }
+
     const attendance = await prisma.attendance.create({
       data: {
-        employeeId,
+        employeeId: actualEmployeeId,
+        scheduleId: schedule?.id,
         type: 'CLOCK_OUT',
         latitude: lat,
         longitude: lon,
@@ -5575,7 +5598,8 @@ app.post('/api/hr/attendance/clock-out', upload.single('image'), async (req, res
         photoUrl,
         isMocked,
         distance: minDistance,
-        status: (nearest && minDistance <= nearest.radius && !isMocked) ? 'VALID' : 'INVALID',
+        status,
+        notes: noteText,
         locationId: nearest?.id
       }
     });
