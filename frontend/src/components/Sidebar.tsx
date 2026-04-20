@@ -112,6 +112,9 @@ const translations: any = {
         attendanceSchedules: 'Jadwal Kerja',
         holidays: 'Hari Libur',
         operationalHome: 'Beranda (Ops)',
+        infrastructure: 'Infrastruktur',
+        networkSettings: 'Pengaturan Jaringan',
+        mikrotikMonitoring: 'Monitoring MikroTik',
     },
     EN: {
         overview: 'Overview',
@@ -172,6 +175,9 @@ const translations: any = {
         attendanceSchedules: 'Work Schedules',
         holidays: 'Public Holidays',
         operationalHome: 'Home (Ops)',
+        infrastructure: 'Infrastructure',
+        networkSettings: 'Network Settings',
+        mikrotikMonitoring: 'MikroTik Monitoring',
     }
 }
 
@@ -188,6 +194,13 @@ const getMenuItems = (t: any) => [
         label: t.overview, 
         path: '/dashboard', 
         requiredDepartment: ['SALES', 'LOGISTIC', 'FINANCE', 'HR'] 
+    },
+    {
+        id: 'operational-dashboard',
+        icon: LayoutDashboard,
+        label: t.operationalHome,
+        path: '/dashboard/operational',
+        requiredRoles: ['OPERATIONAL']
     },
     {
         id: 'attendance-group',
@@ -332,6 +345,26 @@ const getMenuItems = (t: any) => [
             { id: 'employee-list', icon: ClipboardList, label: t.employeeData, path: '/dashboard/hr/employees' },
             { id: 'payroll-list', icon: DollarSign, label: t.payrollSystem, path: '/dashboard/hr/payroll' },
         ]
+    },
+    {
+        id: 'infra-group',
+        label: t.infrastructure,
+        isHeader: true,
+        requiredRoles: ['ADMIN', 'SUPER_ADMIN']
+    },
+    {
+        id: 'mikrotik-monitor',
+        icon: Activity,
+        label: t.mikrotikMonitoring,
+        path: '/dashboard',
+        requiredRoles: ['ADMIN', 'SUPER_ADMIN']
+    },
+    {
+        id: 'network',
+        icon: Cpu,
+        label: t.networkSettings,
+        path: '/dashboard/settings/network',
+        requiredRoles: ['ADMIN', 'SUPER_ADMIN']
     },
     { id: 'settings', icon: Settings, label: t.preferences, path: '/dashboard/settings/company', requiredRoles: ['ADMIN', 'SUPER_ADMIN'] },
     { id: 'user-management', icon: Users, label: t.userManagement, path: '/dashboard/settings/users', requiredRoles: ['ADMIN', 'SUPER_ADMIN'] },

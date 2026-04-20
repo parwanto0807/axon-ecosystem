@@ -55,6 +55,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import MikroTikStats from "@/components/dashboard/MikroTikStats";
 
 const translations: any = {
   ID: {
@@ -551,6 +552,9 @@ export default function DashboardPage() {
           colorClass="bg-amber-500"
         />
       </div>
+
+      {/* Infrastructure Monitoring Section */}
+      <MikroTikStats />
 
       {/* Analytics & Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

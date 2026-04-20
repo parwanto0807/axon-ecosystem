@@ -16,9 +16,13 @@ import {
     Loader2,
     History,
     Monitor,
-    Globe
+    Globe,
+    Settings,
+    Smartphone
 } from "lucide-react"
 import { useSession } from "next-auth/react"
+import { formatDistanceToNow, format } from 'date-fns'
+import { id } from 'date-fns/locale'
 
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api`
 
@@ -204,6 +208,42 @@ export default function UserManagementPage() {
         user.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
         user.email?.toLowerCase().includes(searchQuery.toLowerCase())
     )
+
+    const parseUA = (ua: string) => {
+        if (!ua) return { browser: 'Tidak Terdefinisi', os: 'Web', icon: <Monitor size={14} /> };
+        const lower = ua.toLowerCase();
+        
+        let browser = 'Browser';
+        let icon = <Monitor size={14} />;
+
+        if (lower.includes('node') || lower.includes('axios') || lower.includes('fetch')) {
+            browser = 'Sistem Otomatis';
+            icon = <Settings size={14} />;
+        } else if (lower.includes('edg')) browser = 'Edge';
+        else if (lower.includes('chrome')) browser = 'Chrome';
+        else if (lower.includes('firefox')) browser = 'Firefox';
+        else if (lower.includes('safari') && !lower.includes('chrome')) browser = 'Safari';
+
+        let os = 'Perangkat Web';
+        if (lower.includes('win')) os = 'Windows';
+        else if (lower.includes('mac')) os = 'macOS';
+        else if (lower.includes('linux')) os = 'Linux';
+        else if (lower.includes('android')) {
+            os = 'Android';
+            icon = <Smartphone size={14} />;
+        } else if (lower.includes('iphone') || lower.includes('ipad')) {
+            os = 'iOS';
+            icon = <Smartphone size={14} />;
+        }
+
+        return { browser, os, icon };
+    };
+
+    const formatIP = (ip: string) => {
+        if (!ip) return 'Tanpa IP';
+        if (ip === '::1' || ip === '127.0.0.1' || ip === 'localhost') return 'Internal Jaringan';
+        return ip.replace('::ffff:', '');
+    };
 
     return (
         <div className="w-full space-y-6 md:space-y-8 bg-slate-50/50 min-h-screen pb-24 md:pb-8 px-4 md:px-6 lg:px-8 py-8">
@@ -650,31 +690,39 @@ export default function UserManagementPage() {
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
-                                            {userLogs.map((log) => (
-                                                <div key={log.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-4 group hover:bg-white hover:shadow-md transition-all">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 transition-colors">
-                                                            <Monitor size={18} />
+                                            {userLogs.map((log: any) => {
+                                                const { browser, os, icon } = parseUA(log.userAgent);
+                                                return (
+                                                    <div key={log.id} className="p-5 rounded-3xl bg-slate-50 border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:bg-white hover:shadow-xl hover:shadow-indigo-500/5 transition-all">
+                                                        <div className="flex items-center gap-5">
+                                                            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all shadow-sm">
+                                                                {icon}
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="text-xs font-black text-slate-800 uppercase tracking-tight">
+                                                                        {browser} <span className="text-slate-300 mx-1 font-normal text-[9px]">on</span> {os}
+                                                                    </p>
+                                                                    <div className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[8px] font-black uppercase tracking-widest">
+                                                                        {formatIP(log.ipAddress)}
+                                                                    </div>
+                                                                </div>
+                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                                    {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true, locale: id })}
+                                                                </p>
+                                                            </div>
                                                         </div>
-                                                        <div className="space-y-0.5">
-                                                            <p className="text-[10px] font-black text-slate-800 uppercase tracking-wide">
-                                                                {new Date(log.timestamp).toLocaleString('id-ID', { 
-                                                                    day: '2-digit', month: 'long', year: 'numeric',
-                                                                    hour: '2-digit', minute: '2-digit', second: '2-digit'
-                                                                })}
+                                                        <div className="flex flex-col items-end justify-center pt-3 md:pt-0 border-t md:border-t-0 border-slate-100">
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                                                Waktu Log
                                                             </p>
-                                                            <p className="text-[10px] font-bold text-slate-400 truncate max-w-[200px] md:max-w-md">
-                                                                {log.userAgent || 'Unknown Device'}
+                                                            <p className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">
+                                                                {format(new Date(log.timestamp), 'dd MMM yyyy, HH.mm', { locale: id })}
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right shrink-0">
-                                                        <span className="text-[10px] font-black px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg">
-                                                            {log.ipAddress || 'No IP'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>

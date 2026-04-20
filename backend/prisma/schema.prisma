@@ -999,6 +999,7 @@ model Employee {
   
   userId            String?        @unique
   user              User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  macAddress        String?        @unique // Added for MikroTik tracking
   
   attendanceLocationId String?
   attendanceLocation   AttendanceLocation? @relation(fields: [attendanceLocationId], references: [id], onDelete: SetNull)
@@ -1432,4 +1433,26 @@ model UserLoginLog {
   timestamp DateTime @default(now())
   ipAddress String?
   userAgent String?
+}
+
+model MikrotikDevice {
+  id        String   @id @default(cuid())
+  name      String
+  ip        String
+  port      Int      @default(8728)
+  username  String
+  password  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  logs      MikrotikLog[]
+}
+
+model MikrotikLog {
+  id        String   @id @default(cuid())
+  deviceId  String
+  device    MikrotikDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  event     String
+  details   String?
+  timestamp DateTime @default(now())
 }

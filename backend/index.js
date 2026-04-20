@@ -12,10 +12,16 @@ const SALT_ROUNDS = 10;
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', true);
 const prisma = new PrismaClient();
 const cron = require('node-cron');
 const { postJournalFromSystemKey } = require('./utils/accountingUtils');
 const PORT = process.env.PORT || 5003;
+const { encrypt, decrypt } = require('./utils/encryption');
+const { testMikrotikConnection } = require('./utils/mikrotik');
+
+// Global memory for traffic calculation
+let lastTrafficStats = {};
 
 app.use(cors());
 app.use(express.json());
@@ -180,7 +186,7 @@ app.post('/api/login', async (req, res) => {
         await prisma.userLoginLog.create({
           data: {
             userId: user.id,
-            ipAddress: req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+            ipAddress: req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.socket.remoteAddress,
             userAgent: req.headers['user-agent']
           }
         });
@@ -212,6 +218,223 @@ app.post('/api/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Activity Pulse: Record that a user opened/is active in the app
+app.post('/api/auth/activity-pulse', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ message: 'Missing userId' });
+
+    await prisma.userLoginLog.create({
+      data: {
+        userId,
+        ipAddress: req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.socket.remoteAddress,
+        userAgent: req.headers['user-agent']
+      }
+    });
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Pulse Error:', e);
+    res.status(500).json({ success: false });
+  }
+});
+
+// --- MIKROTIK INFRASTRUCTURE ---
+
+app.get('/api/infrastructure/mikrotik', async (req, res) => {
+  try {
+    const devices = await prisma.mikrotikDevice.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    // Don't send real passwords in list
+    const safeDevices = devices.map(d => ({ ...d, password: '••••••••' }));
+    res.json(safeDevices);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/infrastructure/mikrotik', async (req, res) => {
+  const { name, ip, port, username, password } = req.body;
+  try {
+    const device = await prisma.mikrotikDevice.create({
+      data: {
+        name,
+        ip,
+        port: parseInt(port) || 8728,
+        username,
+        password: encrypt(password)
+      }
+    });
+    res.json(device);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.put('/api/infrastructure/mikrotik/:id', async (req, res) => {
+  const { id } = req.params;
+  const { name, ip, port, username, password } = req.body;
+  try {
+    const updateData = { name, ip, port: parseInt(port) || 8728, username };
+    // Only update password if it's not the masked placeholder
+    if (password && password !== '••••••••') {
+      updateData.password = encrypt(password);
+    }
+    
+    const device = await prisma.mikrotikDevice.update({
+      where: { id },
+      data: updateData
+    });
+    res.json(device);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/infrastructure/mikrotik/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.mikrotikDevice.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/infrastructure/mikrotik/:id/test', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const device = await prisma.mikrotikDevice.findUnique({ where: { id } });
+    if (!device) return res.status(404).json({ error: "Device not found" });
+
+    const password = decrypt(device.password);
+    const result = await testMikrotikConnection(device.ip, device.port, device.username, password);
+    
+    if (result) {
+      await prisma.mikrotikLog.create({
+        data: {
+          deviceId: id,
+          event: "CONNECTION_SUCCESS",
+          details: "Successfully connected to MikroTik API"
+        }
+      });
+      res.json({ success: true });
+    }
+  } catch (e) {
+    await prisma.mikrotikLog.create({
+      data: {
+        deviceId: id,
+        event: "CONNECTION_FAILED",
+        details: e.message
+      }
+    });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/infrastructure/mikrotik/:id/monitor', async (req, res) => {
+  const { id } = req.params;
+  console.log(`[MikroTik Trace] Requesting MONITOR for device: ${id}`);
+  const { executeMikrotikCommand } = require('./utils/mikrotik');
+  
+  try {
+    const device = await prisma.mikrotikDevice.findUnique({ where: { id } });
+    if (!device) {
+      console.warn(`[MikroTik Trace] Device ${id} NOT FOUND`);
+      return res.status(404).json({ error: "Device not found" });
+    }
+
+    const password = decrypt(device.password);
+    
+    // Fetch sequentially to avoid MikroTik API concurrency limits
+    console.log(`[MikroTik Trace] Fetching system resources...`);
+    const resources = await executeMikrotikCommand(device.ip, device.port, device.username, password, '/system/resource/print');
+    
+    console.log(`[MikroTik Trace] Fetching hotspot active count...`);
+    const hotspotUsers = await executeMikrotikCommand(device.ip, device.port, device.username, password, '/ip/hotspot/active/print').catch(() => []);
+
+    const stats = resources[0] || {};
+    console.log(`[MikroTik Trace] MONITOR SUCCESS for ${id}`);
+    
+    res.json({
+      cpu: stats['cpu-load'] || 0,
+      memory: stats['free-memory'] || 0,
+      totalMemory: stats['total-memory'] || 0,
+      uptime: stats['uptime'] || 'N/A',
+      activeUsers: Array.isArray(hotspotUsers) ? hotspotUsers.length : 0
+    });
+  } catch (e) {
+    console.error(`[MikroTik Trace] MONITOR FAILED: ${e.message}`);
+    // Return empty stats instead of error to keep UI alive
+    res.json({ cpu: 0, memory: 0, activeUsers: 0, uptime: 'Offline' });
+  }
+});
+
+app.get('/api/infrastructure/mikrotik/:id/traffic', async (req, res) => {
+  const { id } = req.params;
+  const { executeMikrotikCommand } = require('./utils/mikrotik');
+  
+  try {
+    const device = await prisma.mikrotikDevice.findUnique({ where: { id } });
+    if (!device) return res.status(404).json({ error: "Device not found" });
+
+    const password = decrypt(device.password);
+    
+    // Fetch all interfaces to dynamically find active ones
+    const results = await executeMikrotikCommand(device.ip, device.port, device.username, password, '/interface/print', {
+      '.proplist': 'name,rx-byte,tx-byte,running,disabled,type'
+    });
+
+    const now = Date.now();
+    const currentStats = {};
+    const calculatedTraffic = [];
+
+    results.forEach(iface => {
+      // Monitor if it's an ethernet interface and it's running (active)
+      // Or if it's a PPPoE/VLAN that might be WAN
+      const isPhysical = iface.type === 'ether' || iface.type === 'pppoe-out' || iface.type === 'vlan';
+      const isActive = iface.running === 'true' && iface.disabled === 'false';
+      
+      if (isPhysical && isActive) {
+        currentStats[iface.name] = {
+          rx: parseInt(iface['rx-byte'] || 0),
+          tx: parseInt(iface['tx-byte'] || 0),
+          time: now
+        };
+
+        // Calculate delta if previous stats exist
+        let rxBps = 0;
+        let txBps = 0;
+        const prev = lastTrafficStats[id]?.[iface.name];
+        
+        if (prev) {
+          const timeDiff = (now - prev.time) / 1000; // in seconds
+          if (timeDiff > 0) {
+            rxBps = Math.max(0, (currentStats[iface.name].rx - prev.rx) * 8 / timeDiff);
+            txBps = Math.max(0, (currentStats[iface.name].tx - prev.tx) * 8 / timeDiff);
+          }
+        }
+
+        calculatedTraffic.push({
+          name: iface.name,
+          'rx-bits-per-second': rxBps,
+          'tx-bits-per-second': txBps
+        });
+      }
+    });
+
+    // Update memory
+    lastTrafficStats[id] = currentStats;
+
+    console.log(`[MikroTik Trace] TRAFFIC CALCULATED for ${id}`);
+    res.json(calculatedTraffic);
+  } catch (e) {
+    console.error(`[MikroTik Trace] TRAFFIC FAILED: ${e.message}`);
+    res.json([]);
   }
 });
 
@@ -5229,11 +5452,16 @@ app.post('/api/hr/attendance/clock-in', upload.single('image'), async (req, res)
     let noteText = isMocked ? 'Suspicious: Spoofed GPS detected' : (status === 'INVALID' ? 'Outside allowed radius' : '');
     if (status === 'VALID' && schedule?.startTime) {
       const [sHour, sMin] = schedule.startTime.split(':').map(Number);
-      const schedTime = new Date(now);
-      schedTime.setHours(sHour, sMin, 0, 0);
+      
+      // Get hours and minutes in Asia/Jakarta timezone for accurate lateness check
+      const localTimeString = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' });
+      const [h, m] = localTimeString.split(':').map(Number);
+      
+      const nowTotalMinutes = h * 60 + m;
+      const schedTotalMinutes = sHour * 60 + sMin;
 
-      if (now > schedTime) {
-        const diff = Math.floor((now - schedTime) / 1000 / 60);
+      if (nowTotalMinutes > schedTotalMinutes) {
+        const diff = nowTotalMinutes - schedTotalMinutes;
         noteText = `Terlambat ${diff} menit. Tetap semangat, usahakan lebih awal besok!`;
       } else {
         noteText = `Tepat Waktu! Luar biasa! Terima kasih atas kedisiplinan Anda. Selamat bekerja!`;

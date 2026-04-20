@@ -34,7 +34,9 @@ const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api`
 export default function AttendanceHistoryPage() {
     const { data: session } = useSession()
     const { toggleMobileMenu } = useUIStore()
+    const isSuperAdmin = session?.user?.role === 'SUPER_ADMIN'
     const isOperational = session?.user?.role === 'OPERATIONAL'
+    const showPhoto = isSuperAdmin
 
     const [history, setHistory] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
@@ -144,7 +146,9 @@ export default function AttendanceHistoryPage() {
                                 <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Karyawan</th>
                                 <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tipe</th>
                                 <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Waktu</th>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Jadwal</th>
                                 <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Lokasi / Cabang</th>
+                                <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Kehadiran</th>
                                 <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
                                 <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Aksi</th>
                             </tr>
@@ -152,14 +156,14 @@ export default function AttendanceHistoryPage() {
                         <tbody className="divide-y divide-slate-50">
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="py-20 text-center">
+                                    <td colSpan={8} className="py-20 text-center">
                                         <Clock className="mx-auto text-slate-200 animate-spin mb-4" size={40} />
                                         <p className="text-xs font-black text-slate-300 uppercase tracking-[0.2em]">Memuat riwayat...</p>
                                     </td>
                                 </tr>
                             ) : filteredHistory.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="py-20 text-center text-slate-300 uppercase font-black text-xs tracking-widest">
+                                    <td colSpan={8} className="py-20 text-center text-slate-300 uppercase font-black text-xs tracking-widest">
                                         Tidak ada riwayat ditemukan
                                     </td>
                                 </tr>
@@ -194,9 +198,39 @@ export default function AttendanceHistoryPage() {
                                     </td>
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-2">
+                                            <Clock size={12} className="text-slate-300 shrink-0" />
+                                            <span className="text-xs font-bold text-slate-700">
+                                                {log.schedule ? `${log.schedule.startTime} - ${log.schedule.endTime}` : "-"}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        <div className="flex items-center gap-2">
                                             <MapPin size={12} className="text-slate-300" />
                                             <span className="text-xs font-bold text-slate-600 truncate max-w-[150px]">{log.location?.name || "Tidak Diketahui"}</span>
                                         </div>
+                                    </td>
+                                    <td className="px-8 py-5">
+                                        {(() => {
+                                            if (log.type !== 'CLOCK_IN') return <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">-</span>;
+                                            
+                                            const isLate = log.notes?.toLowerCase().includes('terlambat');
+                                            const isOntime = log.notes?.toLowerCase().includes('tepat waktu');
+                                            
+                                            if (isLate) return (
+                                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-amber-50 text-amber-600">
+                                                    <Clock size={12} />
+                                                    <span className="text-[10px] font-black uppercase">TERLAMBAT</span>
+                                                </div>
+                                            );
+                                            if (isOntime) return (
+                                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600">
+                                                    <CheckCircle2 size={12} />
+                                                    <span className="text-[10px] font-black uppercase">TEPAT WAKTU</span>
+                                                </div>
+                                            );
+                                            return <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">No Data</span>;
+                                        })()}
                                     </td>
                                     <td className="px-8 py-5">
                                         <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg ${log.status === 'VALID' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
@@ -241,9 +275,28 @@ export default function AttendanceHistoryPage() {
                                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{log.employee?.position || "Staff"}</p>
                                     </div>
                                 </div>
-                                <div className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${log.status === 'VALID' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                    {log.status}
-                                </div>
+                                 {(() => {
+                                    const isLate = log.status === 'VALID' && log.notes?.toLowerCase().includes('terlambat');
+                                    const isOntime = log.status === 'VALID' && log.notes?.toLowerCase().includes('tepat waktu');
+                                    
+                                    let badgeClass = "bg-emerald-50 text-emerald-600";
+                                    let label = log.status;
+
+                                    if (log.status !== 'VALID') {
+                                        badgeClass = "bg-rose-50 text-rose-600";
+                                    } else if (isLate) {
+                                        badgeClass = "bg-amber-50 text-amber-600";
+                                        label = "TERLAMBAT";
+                                    } else if (isOntime) {
+                                        label = "TEPAT WAKTU";
+                                    }
+
+                                    return (
+                                        <div className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest ${badgeClass}`}>
+                                            {label}
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
@@ -294,10 +347,10 @@ export default function AttendanceHistoryPage() {
                             initial={{ opacity: 0, scale: 0.9, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className={`bg-white w-full ${isOperational ? 'max-w-xl' : 'max-w-4xl'} max-h-[90vh] md:max-h-none overflow-y-auto md:overflow-visible rounded-[2.5rem] md:rounded-[3rem] shadow-2xl relative flex flex-col md:flex-row m-4`}
+                            className={`bg-white w-full ${!showPhoto ? 'max-w-xl' : 'max-w-4xl'} max-h-[90vh] md:max-h-none overflow-y-auto md:overflow-visible rounded-[2.5rem] md:rounded-[3rem] shadow-2xl relative flex flex-col md:flex-row m-4`}
                         >
-                            {/* Left Side: Photo - Hidden for Operational Role */}
-                            {!isOperational && (
+                            {/* Left Side: Photo - Only for Authorized Roles */}
+                            {showPhoto && (
                                 <div className="w-full md:w-1/2 bg-slate-900 relative aspect-[4/3] md:aspect-square flex-shrink-0">
                                     {selectedLog.photoUrl ? (
                                         <img 
@@ -319,7 +372,7 @@ export default function AttendanceHistoryPage() {
                             )}
  
                             {/* Right Side: Data */}
-                            <div className={`w-full ${isOperational ? 'md:w-full' : 'md:w-1/2'} p-6 md:p-10 space-y-6 md:space-y-8 flex flex-col`}>
+                            <div className={`w-full ${!showPhoto ? 'md:w-full' : 'md:w-1/2'} p-6 md:p-10 space-y-6 md:space-y-8 flex flex-col`}>
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-1">
                                         <h2 className="text-xl md:text-2xl font-black text-slate-800 uppercase tracking-tighter">{selectedLog.employee?.name}</h2>
