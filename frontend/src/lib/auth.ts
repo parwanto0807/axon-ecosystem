@@ -12,22 +12,28 @@ export const authOptions: NextAuthOptions = {
             async authorize(credentials) {
                 if (!credentials?.email || !credentials?.password) return null
 
-                try {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5003';
+                console.log(`[AUTH DEBUG] Attempting login to: ${apiUrl}/api/login`);
 
-                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/login`, {
+                try {
+                    const res = await fetch(`${apiUrl}/api/login`, {
                         method: 'POST',
                         body: JSON.stringify(credentials),
                         headers: { "Content-Type": "application/json" }
                     })
 
+                    console.log(`[AUTH DEBUG] Response Status: ${res.status}`);
                     const user = await res.json()
 
                     if (res.ok && user) {
+                        console.log(`[AUTH DEBUG] Login successful for: ${credentials.email}`);
                         return user
                     }
+                    
+                    console.warn(`[AUTH DEBUG] Login failed for: ${credentials.email}. Status: ${res.status}`);
                     return null
                 } catch (error) {
-                    console.error("Auth error:", error)
+                    console.error("[AUTH DEBUG] Critical fetch error:", error);
                     return null
                 }
             }
