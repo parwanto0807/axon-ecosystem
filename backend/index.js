@@ -5221,12 +5221,7 @@ app.post('/api/hr/attendance/clock-in', upload.single('image'), async (req, res)
       }
     });
 
-    // Check if within 2-hour window of schedule
-    if (schedule?.startTime && !isWithinWindow(schedule.startTime)) {
-        return res.status(400).json({ 
-          message: `Absen Masuk hanya diperbolehkan dalam jendela waktu 2 jam SEBELUM atau 2 jam SESUDAH jadwal (${schedule.startTime})` 
-        });
-    }
+    // Note: Time window restriction removed as per user request
 
     const status = (nearest && minDistance <= nearest.radius && !isMocked) ? 'VALID' : 'INVALID';
 
@@ -5331,12 +5326,7 @@ app.post('/api/hr/attendance/clock-out', upload.single('image'), async (req, res
         }
     });
 
-    // Check Window for Clock-Out
-    if (schedule?.endTime && !isWithinWindow(schedule.endTime)) {
-        return res.status(400).json({ 
-          message: `Absen Keluar hanya diperbolehkan dalam jendela waktu 2 jam SEBELUM atau 2 jam SESUDAH jadwal (${schedule.endTime})` 
-        });
-    }
+    // Note: Time window restriction removed as per user request
 
     if (!lastIn) {
       return res.status(400).json({ message: "Gagal: Anda belum melakukan Absen Masuk hari ini. Mohon lakukan Absen Masuk terlebih dahulu." });

@@ -61,19 +61,9 @@ export default function AttendanceLogPage() {
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
 
-    // Helper: Check if now is within ±2 Hour window of schedule
+    // Helper: Window restriction removed, always allow
     const checkWindow = (timeStr: string) => {
-        if (!timeStr || !currentTime) return { ok: true, status: 'OK' };
-        const [h, m] = timeStr.split(':').map(Number);
-        const target = new Date(currentTime);
-        target.setHours(h, m, 0, 0);
-        
-        const diffMs = currentTime.getTime() - target.getTime();
-        const absDiff = Math.abs(diffMs);
-        const twoHours = 2 * 60 * 60 * 1000;
-        
-        if (absDiff <= twoHours) return { ok: true, status: 'OK' };
-        return { ok: false, status: diffMs < 0 ? 'EARLY' : 'LATE' };
+        return { ok: true, status: 'OK' };
     };
 
     const assignedLoc = status?.employee?.attendanceLocation;
@@ -85,11 +75,8 @@ export default function AttendanceLogPage() {
     const hasIn = status?.logs?.some((l: any) => l.type === 'CLOCK_IN');
     const hasOut = status?.logs?.some((l: any) => l.type === 'CLOCK_OUT');
 
-    const inCheck = checkWindow(status?.schedule?.startTime);
-    const outCheck = checkWindow(status?.schedule?.endTime);
-
-    const inWindow = inCheck.ok;
-    const outWindow = outCheck.ok;
+    const inWindow = true;
+    const outWindow = true;
 
     const canShowCamera = isCapturing && sensorStatus.gps && !isLowAccuracy && !isOutOfRange && assignedLoc && !hasOut && (inWindow || outWindow);
 
@@ -200,8 +187,8 @@ export default function AttendanceLogPage() {
             let detectionCount = 0;
             interval = setInterval(async () => {
                 if (videoRef.current && videoRef.current.readyState === 4) {
-                    // Set higher threshold (0.85) for strictness
-                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.85 });
+                    // Relaxed threshold (0.5) to make detection easier while still being effective
+                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
                     const detection = await faceapi.detectSingleFace(videoRef.current, options);
 
                     if (detection && videoRef.current) {
@@ -209,16 +196,16 @@ export default function AttendanceLogPage() {
                         const videoWidth = videoRef.current.videoWidth;
                         const centerX = x + width / 2;
 
-                        // Validation: Must be large enough and relatively centered
-                        const isLargeEnough = width > 160;
-                        const isCentered = centerX > videoWidth * 0.25 && centerX < videoWidth * 0.75;
+                        // Validation: Slightly more lenient size and centering
+                        const isLargeEnough = width > 100;
+                        const isCentered = centerX > videoWidth * 0.15 && centerX < videoWidth * 0.85;
 
                         if (isLargeEnough && isCentered) {
                             setFaceDetected(true);
                             detectionCount++;
-                            // Increase to 20 frames for stability (~2 seconds)
-                            setAutoCaptureProgress(Math.min((detectionCount / 20) * 100, 100));
-                            if (detectionCount >= 20) {
+                            // Faster capture: 10 frames (~1 second) instead of 20
+                            setAutoCaptureProgress(Math.min((detectionCount / 10) * 100, 100));
+                            if (detectionCount >= 10) {
                                 clearInterval(interval);
                                 takePhoto();
                             }
@@ -453,12 +440,6 @@ export default function AttendanceLogPage() {
                 </div>
 
                 <AnimatePresence>
-                    {status?.schedule && !inWindow && !outWindow && !hasOut && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 rounded-3xl bg-amber-50 border border-amber-100 text-[10px] font-black uppercase text-amber-700 text-center leading-relaxed">
-                            <p className="mb-1">Bukan Jendela Waktu Absensi</p>
-                            <p className="text-[8px] opacity-60">Window: 2 Jam Sebelum & Sesudah Jadwal</p>
-                        </motion.div>
-                    )}
                     {message && (
                         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className={`p-4 rounded-3xl border text-[10px] font-black uppercase text-center leading-relaxed ${message.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`}>
                             {message.text}
@@ -478,13 +459,8 @@ export default function AttendanceLogPage() {
                                 </div>
                             )}
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                            <div className="px-3 py-1 bg-white rounded-full text-[8px] font-black text-slate-600 uppercase border border-slate-200">
-                                {status?.schedule?.startTime ? `${status.schedule.startTime} - ${status.schedule.endTime}` : 'No Schedule'}
-                            </div>
-                            {status?.schedule && (
-                                <p className="text-[7px] font-black text-indigo-400 uppercase tracking-tighter">±2h Window Active</p>
-                            )}
+                        <div className="px-3 py-1 bg-white rounded-full text-[8px] font-black text-slate-600 uppercase border border-slate-200">
+                            {status?.schedule?.startTime ? `${status.schedule.startTime} - ${status.schedule.endTime}` : 'No Schedule'}
                         </div>
                     </div>
 
@@ -518,14 +494,14 @@ export default function AttendanceLogPage() {
                         className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-2 ${isOutOfRange || isNoAssignment || hasIn || !inWindow ? 'bg-slate-200 text-slate-400 shadow-none' : 'bg-indigo-600 text-white shadow-indigo-200'}`}
                     >
                         {loading ? <Loader2 className="animate-spin" size={14} /> : (hasIn ? <Check size={14} /> : (isOutOfRange || isNoAssignment ? <AlertCircle size={14} /> : <Check size={14} />))}
-                        <span className="truncate">{hasIn ? 'Sudah Masuk' : (!inWindow ? (inCheck.status === 'EARLY' ? 'Terlalu Pagi' : 'Sudah Lewat') : (isOutOfRange || isNoAssignment) ? 'Luar Radius' : 'Absen Masuk')}</span>
+                        <span className="truncate">{hasIn ? 'Sudah Masuk' : ((isOutOfRange || isNoAssignment) ? 'Luar Radius' : 'Absen Masuk')}</span>
                     </button>
                     <button
                         disabled={loading || !photo || !sensorStatus.gps || isOutOfRange || isNoAssignment || hasOut || (!hasIn && !status?.logs?.length) || !outWindow}
                         onClick={() => handleClock('CLOCK_OUT')}
                         className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-2 ${hasOut || isOutOfRange || isNoAssignment || (!hasIn && !status?.logs?.length) || !outWindow ? 'bg-white border-2 border-slate-100 text-slate-300' : 'bg-white border-2 border-slate-100 text-slate-800'}`}
                     >
-                        <span className="truncate">{hasOut ? 'Sudah Keluar' : (!outWindow ? (outCheck.status === 'EARLY' ? 'Belum Waktu' : 'Sudah Lewat') : (isOutOfRange || isNoAssignment) ? 'Luar Radius' : 'Absen Keluar')}</span>
+                        <span className="truncate">{hasOut ? 'Sudah Keluar' : ((isOutOfRange || isNoAssignment) ? 'Luar Radius' : 'Absen Keluar')}</span>
                     </button>
                 </div>
             </div>
