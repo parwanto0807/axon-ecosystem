@@ -61,14 +61,19 @@ export default function AttendanceLogPage() {
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
 
-    // Helper: Is within 2-hour window
+    // Helper: Check if now is within ±2 Hour window of schedule
     const checkWindow = (timeStr: string) => {
-        if (!timeStr) return true; // If no schedule, allow (or change to false if strict)
+        if (!timeStr || !currentTime) return { ok: true, status: 'OK' };
         const [h, m] = timeStr.split(':').map(Number);
-        const target = new Date();
+        const target = new Date(currentTime);
         target.setHours(h, m, 0, 0);
-        const diff = Math.abs(currentTime.getTime() - target.getTime());
-        return diff <= (2 * 60 * 60 * 1000); // 2 Hours
+        
+        const diffMs = currentTime.getTime() - target.getTime();
+        const absDiff = Math.abs(diffMs);
+        const twoHours = 2 * 60 * 60 * 1000;
+        
+        if (absDiff <= twoHours) return { ok: true, status: 'OK' };
+        return { ok: false, status: diffMs < 0 ? 'EARLY' : 'LATE' };
     };
 
     const assignedLoc = status?.employee?.attendanceLocation;
@@ -80,8 +85,11 @@ export default function AttendanceLogPage() {
     const hasIn = status?.logs?.some((l: any) => l.type === 'CLOCK_IN');
     const hasOut = status?.logs?.some((l: any) => l.type === 'CLOCK_OUT');
 
-    const inWindow = checkWindow(status?.schedule?.startTime);
-    const outWindow = checkWindow(status?.schedule?.endTime);
+    const inCheck = checkWindow(status?.schedule?.startTime);
+    const outCheck = checkWindow(status?.schedule?.endTime);
+
+    const inWindow = inCheck.ok;
+    const outWindow = outCheck.ok;
 
     const canShowCamera = isCapturing && sensorStatus.gps && !isLowAccuracy && !isOutOfRange && assignedLoc && !hasOut && (inWindow || outWindow);
 
@@ -447,7 +455,8 @@ export default function AttendanceLogPage() {
                 <AnimatePresence>
                     {status?.schedule && !inWindow && !outWindow && !hasOut && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 rounded-3xl bg-amber-50 border border-amber-100 text-[10px] font-black uppercase text-amber-700 text-center leading-relaxed">
-                            Bukan Jendela Waktu Absensi Anda
+                            <p className="mb-1">Bukan Jendela Waktu Absensi</p>
+                            <p className="text-[8px] opacity-60">Window: 2 Jam Sebelum & Sesudah Jadwal</p>
                         </motion.div>
                     )}
                     {message && (
@@ -469,8 +478,13 @@ export default function AttendanceLogPage() {
                                 </div>
                             )}
                         </div>
-                        <div className="px-3 py-1 bg-white rounded-full text-[8px] font-black text-slate-600 uppercase border border-slate-200">
-                            {status?.schedule?.startTime ? `${status.schedule.startTime} - ${status.schedule.endTime}` : 'No Schedule'}
+                        <div className="flex flex-col items-end gap-1">
+                            <div className="px-3 py-1 bg-white rounded-full text-[8px] font-black text-slate-600 uppercase border border-slate-200">
+                                {status?.schedule?.startTime ? `${status.schedule.startTime} - ${status.schedule.endTime}` : 'No Schedule'}
+                            </div>
+                            {status?.schedule && (
+                                <p className="text-[7px] font-black text-indigo-400 uppercase tracking-tighter">±2h Window Active</p>
+                            )}
                         </div>
                     </div>
 
@@ -501,17 +515,17 @@ export default function AttendanceLogPage() {
                     <button
                         disabled={loading || !photo || !sensorStatus.gps || isOutOfRange || isNoAssignment || hasIn || !inWindow}
                         onClick={() => handleClock('CLOCK_IN')}
-                        className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-2 ${isOutOfRange || isNoAssignment || hasIn || !inWindow ? 'bg-slate-200 text-slate-400 shadow-none' : 'bg-indigo-600 text-white shadow-indigo-200'}`}
+                        className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-2 ${isOutOfRange || isNoAssignment || hasIn || !inWindow ? 'bg-slate-200 text-slate-400 shadow-none' : 'bg-indigo-600 text-white shadow-indigo-200'}`}
                     >
                         {loading ? <Loader2 className="animate-spin" size={14} /> : (hasIn ? <Check size={14} /> : (isOutOfRange || isNoAssignment ? <AlertCircle size={14} /> : <Check size={14} />))}
-                        <span className="truncate">{hasIn ? 'Sudah Masuk' : (!inWindow ? 'Belum Waktu' : (isOutOfRange || isNoAssignment) ? 'Luar Radius' : 'Absen Masuk')}</span>
+                        <span className="truncate">{hasIn ? 'Sudah Masuk' : (!inWindow ? (inCheck.status === 'EARLY' ? 'Terlalu Pagi' : 'Sudah Lewat') : (isOutOfRange || isNoAssignment) ? 'Luar Radius' : 'Absen Masuk')}</span>
                     </button>
                     <button
                         disabled={loading || !photo || !sensorStatus.gps || isOutOfRange || isNoAssignment || hasOut || (!hasIn && !status?.logs?.length) || !outWindow}
                         onClick={() => handleClock('CLOCK_OUT')}
-                        className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-2 ${hasOut || isOutOfRange || isNoAssignment || (!hasIn && !status?.logs?.length) || !outWindow ? 'bg-white border-2 border-slate-100 text-slate-300' : 'bg-white border-2 border-slate-100 text-slate-800'}`}
+                        className={`w-full py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-2 ${hasOut || isOutOfRange || isNoAssignment || (!hasIn && !status?.logs?.length) || !outWindow ? 'bg-white border-2 border-slate-100 text-slate-300' : 'bg-white border-2 border-slate-100 text-slate-800'}`}
                     >
-                        <span className="truncate">{hasOut ? 'Sudah Keluar' : (!outWindow ? 'Belum Waktu' : (isOutOfRange || isNoAssignment) ? 'Luar Radius' : 'Absen Keluar')}</span>
+                        <span className="truncate">{hasOut ? 'Sudah Keluar' : (!outWindow ? (outCheck.status === 'EARLY' ? 'Belum Waktu' : 'Sudah Lewat') : (isOutOfRange || isNoAssignment) ? 'Luar Radius' : 'Absen Keluar')}</span>
                     </button>
                 </div>
             </div>

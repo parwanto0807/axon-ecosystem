@@ -5144,6 +5144,7 @@ app.delete('/api/hr/employee-schedules/:id', async (req, res) => {
 // --- ATTENDANCE LOGGING ---
 
 // Helper to check if now is within window of HH:mm string
+// Default is 2 hours before and 2 hours after schedule (Total 4 hours window)
 const isWithinWindow = (timeStr, windowHours = 2) => {
   if (!timeStr) return false;
   const now = new Date();
@@ -5222,7 +5223,9 @@ app.post('/api/hr/attendance/clock-in', upload.single('image'), async (req, res)
 
     // Check if within 2-hour window of schedule
     if (schedule?.startTime && !isWithinWindow(schedule.startTime)) {
-        return res.status(400).json({ message: `Absen Masuk hanya diperbolehkan dalam jendela waktu 2 jam dari jadwal (${schedule.startTime})` });
+        return res.status(400).json({ 
+          message: `Absen Masuk hanya diperbolehkan dalam jendela waktu 2 jam SEBELUM atau 2 jam SESUDAH jadwal (${schedule.startTime})` 
+        });
     }
 
     const status = (nearest && minDistance <= nearest.radius && !isMocked) ? 'VALID' : 'INVALID';
@@ -5330,7 +5333,9 @@ app.post('/api/hr/attendance/clock-out', upload.single('image'), async (req, res
 
     // Check Window for Clock-Out
     if (schedule?.endTime && !isWithinWindow(schedule.endTime)) {
-        return res.status(400).json({ message: `Absen Keluar hanya diperbolehkan dalam jendela waktu 2 jam dari jadwal (${schedule.endTime})` });
+        return res.status(400).json({ 
+          message: `Absen Keluar hanya diperbolehkan dalam jendela waktu 2 jam SEBELUM atau 2 jam SESUDAH jadwal (${schedule.endTime})` 
+        });
     }
 
     if (!lastIn) {
