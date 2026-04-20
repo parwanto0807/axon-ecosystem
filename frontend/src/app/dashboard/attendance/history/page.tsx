@@ -294,30 +294,32 @@ export default function AttendanceHistoryPage() {
                             initial={{ opacity: 0, scale: 0.9, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                            className="bg-white w-full max-w-4xl max-h-[90vh] md:max-h-none overflow-y-auto md:overflow-visible rounded-[2.5rem] md:rounded-[3rem] shadow-2xl relative flex flex-col md:flex-row m-4"
+                            className={`bg-white w-full ${isOperational ? 'max-w-xl' : 'max-w-4xl'} max-h-[90vh] md:max-h-none overflow-y-auto md:overflow-visible rounded-[2.5rem] md:rounded-[3rem] shadow-2xl relative flex flex-col md:flex-row m-4`}
                         >
-                            {/* Left Side: Photo */}
-                            <div className="w-full md:w-1/2 bg-slate-900 relative aspect-[4/3] md:aspect-square flex-shrink-0">
-                                {selectedLog.photoUrl ? (
-                                    <img 
-                                        src={`${process.env.NEXT_PUBLIC_API_URL}${selectedLog.photoUrl}`} 
-                                        alt="Verification" 
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-700">
-                                        <User size={60} />
-                                        <p className="text-[10px] font-black uppercase tracking-widest mt-4">Foto tidak tersedia</p>
+                            {/* Left Side: Photo - Hidden for Operational Role */}
+                            {!isOperational && (
+                                <div className="w-full md:w-1/2 bg-slate-900 relative aspect-[4/3] md:aspect-square flex-shrink-0">
+                                    {selectedLog.photoUrl ? (
+                                        <img 
+                                            src={`${process.env.NEXT_PUBLIC_API_URL}${selectedLog.photoUrl}`} 
+                                            alt="Verification" 
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-700">
+                                            <User size={60} />
+                                            <p className="text-[10px] font-black uppercase tracking-widest mt-4">Foto tidak tersedia</p>
+                                        </div>
+                                    )}
+                                    <div className="absolute top-6 md:top-8 left-6 md:left-8 p-2.5 md:p-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl text-white">
+                                        <p className="text-[8px] font-black uppercase tracking-widest opacity-60">Verification Photo</p>
+                                        <p className="text-[10px] font-bold">MATCHED ID: {selectedLog.employeeId.slice(-8)}</p>
                                     </div>
-                                )}
-                                <div className="absolute top-6 md:top-8 left-6 md:left-8 p-2.5 md:p-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl text-white">
-                                    <p className="text-[8px] font-black uppercase tracking-widest opacity-60">Verification Photo</p>
-                                    <p className="text-[10px] font-bold">MATCHED ID: {selectedLog.employeeId.slice(-8)}</p>
                                 </div>
-                            </div>
+                            )}
  
                             {/* Right Side: Data */}
-                            <div className="w-full md:w-1/2 p-6 md:p-10 space-y-6 md:space-y-8 flex flex-col">
+                            <div className={`w-full ${isOperational ? 'md:w-full' : 'md:w-1/2'} p-6 md:p-10 space-y-6 md:space-y-8 flex flex-col`}>
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-1">
                                         <h2 className="text-xl md:text-2xl font-black text-slate-800 uppercase tracking-tighter">{selectedLog.employee?.name}</h2>
