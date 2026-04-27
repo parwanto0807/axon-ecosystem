@@ -1007,6 +1007,9 @@ model Employee {
   categoryId        String?
   category          EmployeeCategory? @relation(fields: [categoryId], references: [id])
 
+  pingRequested     Boolean        @default(false) // Super Admin trigger manual check
+  pingRequestedAt   DateTime?      // When the manual check was requested
+
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   payrollItems      PayrollItem[]
@@ -1014,6 +1017,7 @@ model Employee {
   businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
   schedules         EmployeeSchedule[]
   attendances       Attendance[]
+  locationPings     LocationPing[]
 }
 
 model EmployeeCategory {
@@ -1455,4 +1459,18 @@ model MikrotikLog {
   event     String
   details   String?
   timestamp DateTime @default(now())
+}
+
+model LocationPing {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  latitude    Float
+  longitude   Float
+  accuracy    Float?
+  notes       String?  // e.g. "Auto - jam kerja", "Manual request"
+  isManual    Boolean  @default(false) // true = triggered by Super Admin
+  scheduleId  String?  // Jadwal aktif saat itu (nullable jika di luar jadwal)
+  reportedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
 }

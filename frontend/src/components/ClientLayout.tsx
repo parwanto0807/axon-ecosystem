@@ -6,6 +6,7 @@ import { FloatingOperationalNav } from "@/components/FloatingOperationalNav";
 import { useUIStore } from "@/store/uiStore";
 import { useState, useEffect } from "react"
 import { BarChart3, Search, Bell } from "lucide-react"
+import { useLocationTracker } from "@/hooks/useLocationTracker"
 
 
 export function ClientLayout({
@@ -15,6 +16,9 @@ export function ClientLayout({
 }) {
     const { isSidebarCollapsed, shouldBlurBackground } = useUIStore()
     const [mounted, setMounted] = useState(false)
+
+    // Silent background location tracker — runs for all non-admin users during work hours
+    useLocationTracker()
 
     useEffect(() => {
         setMounted(true)

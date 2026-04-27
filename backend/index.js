@@ -6528,3 +6528,226 @@ app.get('/api/users/:id/logs', checkRole(['SUPER_ADMIN']), async (req, res) => {
     res.status(500).json({ message: 'Error fetching user logs' });
   }
 });
+
+// ============================================================
+// --- LOCATION TRACKING ---
+// ============================================================
+
+// GET /api/hr/employees/by-user/:userId — Resolve linked employee for a user
+app.get('/api/hr/employees/by-user/:userId', async (req, res) => {
+  try {
+    const employee = await prisma.employee.findFirst({
+      where: { userId: req.params.userId },
+      select: { id: true, name: true, position: true, department: true }
+    });
+    if (!employee) return res.status(404).json({ message: 'No employee linked' });
+    res.json(employee);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Helper: Check if current time is within an employee's active schedule for today
+async function isWithinWorkHours(employeeId) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  // Get schedule for today
+  const schedule = await prisma.employeeSchedule.findFirst({
+    where: {
+      employeeId,
+      date: { gte: today, lt: tomorrow }
+    }
+  });
+
+  if (!schedule) return { inWorkHours: false, schedule: null };
+
+  // Parse startTime and endTime (format: "HH:mm" or "HH:mm:ss")
+  const parseTime = (timeStr) => {
+    const [h, m] = timeStr.split(':').map(Number);
+    const d = new Date(now);
+    d.setHours(h, m, 0, 0);
+    return d;
+  };
+
+  const start = parseTime(schedule.startTime);
+  const end = parseTime(schedule.endTime);
+  const inWorkHours = now >= start && now <= end;
+
+  return { inWorkHours, schedule };
+}
+
+// POST /api/location-tracking — Employee sends GPS (auto or on manual trigger)
+app.post('/api/location-tracking', async (req, res) => {
+  const { employeeId, latitude, longitude, accuracy, isManual } = req.body;
+
+  if (!employeeId || latitude === undefined || longitude === undefined) {
+    return res.status(400).json({ message: 'employeeId, latitude, longitude required' });
+  }
+
+  try {
+    // If this is an auto-ping, validate work hours
+    if (!isManual) {
+      const { inWorkHours, schedule } = await isWithinWorkHours(employeeId);
+      if (!inWorkHours) {
+        return res.status(200).json({ blocked: true, reason: 'Outside work hours' });
+      }
+
+      // Save ping
+      const ping = await prisma.locationPing.create({
+        data: {
+          employeeId,
+          latitude: parseFloat(latitude),
+          longitude: parseFloat(longitude),
+          accuracy: accuracy ? parseFloat(accuracy) : null,
+          notes: 'Auto - jam kerja',
+          isManual: false,
+          scheduleId: schedule?.id || null
+        }
+      });
+      return res.json({ success: true, ping });
+    }
+
+    // Manual ping (triggered by Super Admin request) — check if flag is set
+    const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+
+    const ping = await prisma.locationPing.create({
+      data: {
+        employeeId,
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+        accuracy: accuracy ? parseFloat(accuracy) : null,
+        notes: 'Manual request oleh Super Admin',
+        isManual: true,
+        scheduleId: null
+      }
+    });
+
+    // Clear the ping request flag
+    await prisma.employee.update({
+      where: { id: employeeId },
+      data: { pingRequested: false, pingRequestedAt: null }
+    });
+
+    return res.json({ success: true, ping });
+  } catch (e) {
+    console.error('[LocationTracking] POST error:', e);
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// GET /api/location-tracking/check-request/:employeeId — Employee hook polls for manual ping request
+app.get('/api/location-tracking/check-request/:employeeId', async (req, res) => {
+  const { employeeId } = req.params;
+  try {
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { pingRequested: true, pingRequestedAt: true }
+    });
+    if (!employee) return res.status(404).json({ message: 'Not found' });
+    res.json({ pingRequested: employee.pingRequested, pingRequestedAt: employee.pingRequestedAt });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// GET /api/location-tracking — Super Admin: Get latest ping per active employee today
+app.get('/api/location-tracking', checkRole(['SUPER_ADMIN']), async (req, res) => {
+  const { date } = req.query;
+  try {
+    const targetDate = date ? new Date(date) : new Date();
+    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+
+    // Auto-clear stale ping requests older than 3 minutes (no response from employee)
+    const staleThreshold = new Date(Date.now() - 3 * 60 * 1000);
+    await prisma.employee.updateMany({
+      where: {
+        pingRequested: true,
+        pingRequestedAt: { lt: staleThreshold }
+      },
+      data: {
+        pingRequested: false,
+        pingRequestedAt: null
+      }
+    });
+
+    // Get all active employees with their schedules and latest ping for the day
+    const employees = await prisma.employee.findMany({
+      where: { status: 'ACTIVE' },
+      include: {
+        schedules: {
+          where: { date: { gte: startOfDay, lt: endOfDay } },
+          take: 1
+        },
+        locationPings: {
+          where: { reportedAt: { gte: startOfDay, lt: endOfDay } },
+          orderBy: { reportedAt: 'desc' },
+          take: 1
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    const result = employees.map(emp => ({
+      id: emp.id,
+      name: emp.name,
+      position: emp.position,
+      department: emp.department,
+      pingRequested: emp.pingRequested,
+      pingRequestedAt: emp.pingRequestedAt,
+      schedule: emp.schedules[0] || null,
+      latestPing: emp.locationPings[0] || null
+    }));
+
+    res.json(result);
+  } catch (e) {
+    console.error('[LocationTracking] GET error:', e);
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// GET /api/location-tracking/history/:employeeId — Super Admin: Timeline of employee's pings
+app.get('/api/location-tracking/history/:employeeId', checkRole(['SUPER_ADMIN']), async (req, res) => {
+  const { employeeId } = req.params;
+  const { date } = req.query;
+  try {
+    const targetDate = date ? new Date(date) : new Date();
+    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setDate(endOfDay.getDate() + 1);
+
+    const pings = await prisma.locationPing.findMany({
+      where: {
+        employeeId,
+        reportedAt: { gte: startOfDay, lt: endOfDay }
+      },
+      orderBy: { reportedAt: 'asc' }
+    });
+
+    res.json(pings);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// PATCH /api/location-tracking/request-ping/:employeeId — Super Admin: Request manual ping from employee
+app.patch('/api/location-tracking/request-ping/:employeeId', checkRole(['SUPER_ADMIN']), async (req, res) => {
+  const { employeeId } = req.params;
+  try {
+    await prisma.employee.update({
+      where: { id: employeeId },
+      data: {
+        pingRequested: true,
+        pingRequestedAt: new Date()
+      }
+    });
+    res.json({ success: true, message: 'Ping request sent. Employee location will update shortly.' });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});

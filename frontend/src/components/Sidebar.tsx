@@ -101,7 +101,9 @@ const translations: any = {
         hrManagement: 'Manajemen SDM',
         employeeData: 'Data Karyawan',
         payrollSystem: 'Sistem Payroll',
+        locationTracking: 'Live Location',
         preferences: 'Preferensi',
+
         userManagement: 'Manajemen Pengguna',
         businessCategories: 'Kategori Bisnis',
         signOut: 'Keluar',
@@ -164,7 +166,9 @@ const translations: any = {
         hrManagement: 'HR Management',
         employeeData: 'Employee Data',
         payrollSystem: 'Payroll System',
+        locationTracking: 'Live Location',
         preferences: 'Preferences',
+
         userManagement: 'User Management',
         businessCategories: 'Business Categories',
         signOut: 'Sign Out',
@@ -344,6 +348,7 @@ const getMenuItems = (t: any) => [
         children: [
             { id: 'employee-list', icon: ClipboardList, label: t.employeeData, path: '/dashboard/hr/employees' },
             { id: 'payroll-list', icon: DollarSign, label: t.payrollSystem, path: '/dashboard/hr/payroll' },
+            { id: 'location-tracking', icon: MapPin, label: t.locationTracking, path: '/dashboard/hr/location-tracking', requiredRoles: ['SUPER_ADMIN'] },
         ]
     },
     {
