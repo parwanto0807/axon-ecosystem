@@ -150,7 +150,7 @@ export default function OperationalDashboard() {
                                 { href: "/dashboard/attendance/holidays", color: "bg-sky-50 text-sky-600", icon: Palmtree, label: "Libur" },
                                 { href: "/dashboard/operational/mikrotik", color: "bg-blue-50 text-blue-600", icon: Network, label: "MikroTik" },
                                 { isButton: true, onClick: () => signOut(), color: "bg-rose-50 text-rose-600", icon: LogOut, label: "Keluar", danger: true }
-                            ].map((act, i) => (
+                            ].map((act: any, i: number) => (
                                 act.isButton ? (
                                     <button key={i} onClick={act.onClick} className={`flex flex-col items-center gap-3 active:scale-90 transition-all outline-none ${act.soon ? 'opacity-50 relative cursor-not-allowed' : ''}`}>
                                         <div className={`w-12 h-12 lg:w-16 lg:h-16 rounded-2xl flex items-center justify-center ${act.color} ${act.danger ? 'border border-rose-100' : ''}`}>
