@@ -19,12 +19,13 @@ export function useLocationTracker() {
     const [employeeId, setEmployeeId] = useState<string | null>(null)
     const autoTimerRef = useRef<NodeJS.Timeout | null>(null)
     const pollTimerRef = useRef<NodeJS.Timeout | null>(null)
+    const lastPingRef = useRef<number>(0)
 
     const userId = (session?.user as any)?.id
     const userRole = (session?.user as any)?.role
 
-    // Super Admin is not tracked
-    const shouldTrack = !!session && userRole !== 'SUPER_ADMIN' && userRole !== 'ADMIN'
+    // Hanya melacak role OPERATIONAL secara eksklusif
+    const shouldTrack = !!session && userRole === 'OPERATIONAL'
 
     // Resolve the linked employee for this user
     useEffect(() => {
@@ -44,7 +45,7 @@ export function useLocationTracker() {
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 try {
-                    await fetch(`${API_BASE}/location-tracking`, {
+                    const res = await fetch(`${API_BASE}/location-tracking`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -55,12 +56,20 @@ export function useLocationTracker() {
                             isManual
                         })
                     })
-                } catch {
-                    // Silent — no error shown to user
+                    const data = await res.json()
+                    if (data.blocked) {
+                        console.warn('[LocationTracker] Ping blocked by server:', data.reason)
+                    } else {
+                        console.log('[LocationTracker] Ping sent successfully')
+                    }
+                } catch (e) {
+                    console.error('[LocationTracker] Error sending ping:', e)
                 }
             },
-            () => { /* GPS denied or unavailable — silent */ },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+            (err) => { 
+                console.error('[LocationTracker] GPS error:', err.message)
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         )
     }
 
@@ -78,22 +87,44 @@ export function useLocationTracker() {
         }
     }
 
+    const pingAndSchedule = () => {
+        lastPingRef.current = Date.now()
+        sendPing(false)
+        if (autoTimerRef.current) clearTimeout(autoTimerRef.current)
+        autoTimerRef.current = setTimeout(pingAndSchedule, AUTO_INTERVAL_MS)
+    }
+
     useEffect(() => {
         if (!shouldTrack || !employeeId) return
 
-        // Send first ping shortly after hook starts
-        const initDelay = setTimeout(() => sendPing(false), 5000)
+        // 1. Initial Ping on mount (1 second delay)
+        const initDelay = setTimeout(() => pingAndSchedule(), 1000)
 
-        // Auto ping every 30 minutes
-        autoTimerRef.current = setInterval(() => sendPing(false), AUTO_INTERVAL_MS)
-
-        // Poll for manual request every 1 minute
+        // 2. Poll for manual request every 1 minute
         pollTimerRef.current = setInterval(() => checkManualRequest(), POLL_INTERVAL_MS)
+
+        // 3. Handle App Visibility (Resumed from minimize/background)
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                const timeSinceLastPing = Date.now() - lastPingRef.current
+                
+                // Jika aplikasi dibuka ulang dan sudah lewat 5 menit dari ping terakhir, 
+                // kirim ping sekarang juga dan reset timer 30 menit.
+                // (Cooldown 5 menit mencegah spam jika user keluar-masuk aplikasi dengan cepat)
+                if (timeSinceLastPing > 5 * 60 * 1000) {
+                    console.log('[LocationTracker] App opened, resetting 30m timer and sending ping.')
+                    if (autoTimerRef.current) clearTimeout(autoTimerRef.current)
+                    pingAndSchedule()
+                }
+            }
+        }
+        document.addEventListener('visibilitychange', handleVisibilityChange)
 
         return () => {
             clearTimeout(initDelay)
-            if (autoTimerRef.current) clearInterval(autoTimerRef.current)
+            if (autoTimerRef.current) clearTimeout(autoTimerRef.current)
             if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+            document.removeEventListener('visibilitychange', handleVisibilityChange)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [shouldTrack, employeeId])

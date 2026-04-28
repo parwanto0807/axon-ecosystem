@@ -122,6 +122,16 @@ const processAttendanceImage = async (file) => {
   return `/public/attendance/${fileName}`;
 };
 
+const maintenanceUploadDir = path.join(__dirname, 'public/maintenance');
+if (!fs.existsSync(maintenanceUploadDir)) fs.mkdirSync(maintenanceUploadDir, { recursive: true });
+
+const processMaintenanceImage = async (file) => {
+  const fileName = `maint-${Date.now()}-${Math.round(Math.random() * 1000)}.webp`;
+  const filePath = path.join(maintenanceUploadDir, fileName);
+  await sharp(file.buffer).webp({ quality: 80 }).toFile(filePath);
+  return `/public/maintenance/${fileName}`;
+};
+
 function getDistance(lat1, lon1, lat2, lon2) {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
   const R = 6371e3; // meters
@@ -6582,8 +6592,11 @@ async function isWithinWorkHours(employeeId) {
 // POST /api/location-tracking — Employee sends GPS (auto or on manual trigger)
 app.post('/api/location-tracking', async (req, res) => {
   const { employeeId, latitude, longitude, accuracy, isManual } = req.body;
+  
+  console.log(`[LocationTracking] POST Request from employeeId: ${employeeId}, isManual: ${isManual}`);
 
   if (!employeeId || latitude === undefined || longitude === undefined) {
+    console.log(`[LocationTracking] Rejected: Missing data`);
     return res.status(400).json({ message: 'employeeId, latitude, longitude required' });
   }
 
@@ -6591,6 +6604,8 @@ app.post('/api/location-tracking', async (req, res) => {
     // If this is an auto-ping, validate work hours
     if (!isManual) {
       const { inWorkHours, schedule } = await isWithinWorkHours(employeeId);
+      console.log(`[LocationTracking] Auto-ping validation for ${employeeId} - inWorkHours: ${inWorkHours}, schedule: ${schedule?.startTime}-${schedule?.endTime}`);
+      
       if (!inWorkHours) {
         return res.status(200).json({ blocked: true, reason: 'Outside work hours' });
       }
@@ -6607,12 +6622,15 @@ app.post('/api/location-tracking', async (req, res) => {
           scheduleId: schedule?.id || null
         }
       });
+      console.log(`[LocationTracking] Saved auto ping for ${employeeId}`);
       return res.json({ success: true, ping });
     }
 
     // Manual ping (triggered by Super Admin request) — check if flag is set
     const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
+
+    console.log(`[LocationTracking] Processing manual ping for ${employee.name}`);
 
     const ping = await prisma.locationPing.create({
       data: {
@@ -6751,3 +6769,309 @@ app.patch('/api/location-tracking/request-ping/:employeeId', checkRole(['SUPER_A
     res.status(500).json({ message: e.message });
   }
 });
+
+// ============================================================
+// --- IT MAINTENANCE CHECKLIST ---
+// ============================================================
+
+// Upload single photo for maintenance item
+app.post('/api/maintenance/upload', upload.single('image'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+  try {
+    const url = await processMaintenanceImage(req.file);
+    res.json({ url });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Submit a full daily maintenance checklist
+app.post('/api/maintenance', async (req, res) => {
+  const { notes, items } = req.body;
+  const userRole = req.headers['x-user-role'];
+  const userEmail = req.headers['x-user-email'];
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: { email: userEmail }
+    });
+
+    if (!user) return res.status(401).json({ message: `User not found for email: ${userEmail}` });
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    let run = await prisma.dailyMaintenanceRun.findFirst({
+      where: { userId: user.id, createdAt: { gte: startOfDay } }
+    });
+
+    if (!run) {
+      run = await prisma.dailyMaintenanceRun.create({
+        data: { userId: user.id, notes }
+      });
+    } else {
+      if (notes) {
+        await prisma.dailyMaintenanceRun.update({ where: { id: run.id }, data: { notes } });
+      }
+    }
+
+    for (const item of items) {
+      const existing = await prisma.maintenanceItemResponse.findFirst({
+        where: { runId: run.id, itemName: item.itemName }
+      });
+
+      if (existing) {
+        await prisma.maintenanceItemResponse.update({
+          where: { id: existing.id },
+          data: {
+            status: item.status,
+            troubleAnalysis: item.troubleAnalysis || null,
+            photoUrl: item.photoUrl || existing.photoUrl
+          }
+        });
+      } else {
+        await prisma.maintenanceItemResponse.create({
+          data: {
+            runId: run.id,
+            itemCategory: item.itemCategory,
+            itemName: item.itemName,
+            status: item.status,
+            troubleAnalysis: item.troubleAnalysis || null,
+            photoUrl: item.photoUrl || null
+          }
+        });
+      }
+    }
+
+    const updatedRun = await prisma.dailyMaintenanceRun.findUnique({
+      where: { id: run.id },
+      include: { items: true }
+    });
+
+    res.json(updatedRun);
+  } catch (e) {
+    console.error('[Maintenance] POST error:', e);
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Get maintenance history
+app.get('/api/maintenance', async (req, res) => {
+  try {
+    const runs = await prisma.dailyMaintenanceRun.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        user: { select: { name: true, role: true } },
+        items: true
+      }
+    });
+    res.json(runs);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+
+// --- MAINTENANCE TEMPLATE MANAGEMENT ---
+
+// Seeder function to be called if templates are empty
+async function seedDefaultTemplates() {
+  const count = await prisma.maintenanceTemplateCategory.count();
+  if (count > 0) return;
+
+  const defaultTemplates = [
+    {
+      name: 'Server Room',
+      order: 1,
+      items: ['Suhu & Kelembapan', 'Kebersihan', 'Indikator UPS']
+    },
+    {
+      name: 'Network',
+      order: 2,
+      items: ['Koneksi Internet Utama', 'Koneksi Internet Backup', 'Switch Core', 'Router']
+    },
+    {
+      name: 'Server & Storage',
+      order: 3,
+      items: ['Indikator Harddisk Server', 'Server HRD', 'Status Backup Harian', 'NAS', 'Kapasitas Storage']
+    },
+    {
+      name: 'Security & Devices',
+      order: 4,
+      items: ['CCTV Aktif', 'Mesin Fingerprint Absensi']
+    }
+  ];
+
+  for (const cat of defaultTemplates) {
+    await prisma.maintenanceTemplateCategory.create({
+      data: {
+        name: cat.name,
+        order: cat.order,
+        items: {
+          create: cat.items.map((itemName, index) => ({
+            name: itemName,
+            order: index + 1
+          }))
+        }
+      }
+    });
+  }
+}
+
+// Ensure seeded on startup
+seedDefaultTemplates().catch(console.error);
+
+// Get active templates (for filling checklist)
+app.get('/api/maintenance/templates', async (req, res) => {
+  try {
+    const categories = await prisma.maintenanceTemplateCategory.findMany({
+      where: { isActive: true },
+      orderBy: { order: 'asc' },
+      include: {
+        items: {
+          where: { isActive: true },
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+    res.json(categories);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Get ALL templates (for Settings tab - Super Admin only)
+app.get('/api/maintenance/templates/all', checkRole(['SUPER_ADMIN']), async (req, res) => {
+  try {
+    const categories = await prisma.maintenanceTemplateCategory.findMany({
+      orderBy: { order: 'asc' },
+      include: {
+        items: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+    res.json(categories);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Create/Update Category
+app.post('/api/maintenance/templates/category', checkRole(['SUPER_ADMIN']), async (req, res) => {
+  const { id, name, order, isActive } = req.body;
+  try {
+    if (id) {
+      const cat = await prisma.maintenanceTemplateCategory.update({
+        where: { id },
+        data: { name, order, isActive }
+      });
+      return res.json(cat);
+    }
+    const cat = await prisma.maintenanceTemplateCategory.create({
+      data: { name, order: order || 99, isActive: true }
+    });
+    res.json(cat);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Create Item
+app.post('/api/maintenance/templates/item', checkRole(['SUPER_ADMIN']), async (req, res) => {
+  const { categoryId, name, order } = req.body;
+  try {
+    const item = await prisma.maintenanceTemplateItem.create({
+      data: { categoryId, name, order: order || 99, isActive: true }
+    });
+    res.json(item);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Toggle Item Status
+app.patch('/api/maintenance/templates/item/:id/toggle', checkRole(['SUPER_ADMIN']), async (req, res) => {
+  const { id } = req.params;
+  const { isActive } = req.body;
+  try {
+    const item = await prisma.maintenanceTemplateItem.update({
+      where: { id },
+      data: { isActive }
+    });
+    res.json(item);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// Delete Item
+app.delete('/api/maintenance/templates/item/:id', checkRole(['SUPER_ADMIN']), async (req, res) => {
+  const { id } = req.params;
+  try {
+    await prisma.maintenanceTemplateItem.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+
+// Edit Item Name
+app.patch('/api/maintenance/templates/item/:id', checkRole(['SUPER_ADMIN']), async (req, res) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  try {
+    const item = await prisma.maintenanceTemplateItem.update({
+      where: { id },
+      data: { name }
+    });
+    res.json(item);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+
+// Get Today's maintenance run for user
+app.get('/api/maintenance/today', async (req, res) => {
+  const userEmail = req.headers['x-user-email'];
+  console.log('[DEBUG] /api/maintenance/today called with email:', userEmail);
+  if (!userEmail) return res.json(null);
+
+  try {
+    const user = await prisma.user.findFirst({ where: { email: userEmail } });
+    if (!user) {
+        console.log('[DEBUG] user not found in DB for email:', userEmail);
+        return res.json(null);
+    }
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    console.log('[DEBUG] startOfDay:', startOfDay);
+
+    const run = await prisma.dailyMaintenanceRun.findFirst({
+      where: {
+        userId: user.id,
+        createdAt: { gte: startOfDay }
+      },
+      include: { items: true }
+    });
+
+    console.log('[DEBUG] found run:', run ? run.id : 'null');
+    res.json(run);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+
+// Log debug
+app.use((req, res, next) => {
+  if (req.path === '/api/maintenance/today') {
+    console.log('[DEBUG] /api/maintenance/today called with email:', req.headers['x-user-email']);
+  }
+  next();
+});
+

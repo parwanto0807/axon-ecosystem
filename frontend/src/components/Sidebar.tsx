@@ -352,6 +352,17 @@ const getMenuItems = (t: any) => [
         ]
     },
     {
+        id: 'maintenance-group',
+        label: 'MAINTENANCE',
+        isHeader: true,
+    },
+    {
+        id: 'it-maintenance',
+        icon: Wrench,
+        label: 'IT Maintenance',
+        path: '/dashboard/maintenance',
+    },
+    {
         id: 'infra-group',
         label: t.infrastructure,
         isHeader: true,

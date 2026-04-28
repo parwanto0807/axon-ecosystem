@@ -49,6 +49,7 @@ model User {
   businessCategoryId String?
   businessCategory BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
   employee      Employee?
+  maintenanceRuns DailyMaintenanceRun[]
 }
 
 model VerificationToken {
@@ -1473,4 +1474,48 @@ model LocationPing {
   scheduleId  String?  // Jadwal aktif saat itu (nullable jika di luar jadwal)
   reportedAt  DateTime @default(now())
   createdAt   DateTime @default(now())
+}
+
+model DailyMaintenanceRun {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  notes       String?
+  items       MaintenanceItemResponse[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MaintenanceItemResponse {
+  id              String   @id @default(cuid())
+  runId           String
+  run             DailyMaintenanceRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  itemCategory    String
+  itemName        String
+  status          String   // "NORMAL" | "TROUBLE"
+  troubleAnalysis String?
+  photoUrl        String?
+  createdAt       DateTime @default(now())
+}
+
+model MaintenanceTemplateCategory {
+  id        String   @id @default(cuid())
+  name      String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  items     MaintenanceTemplateItem[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MaintenanceTemplateItem {
+  id         String   @id @default(cuid())
+  categoryId String
+  category   MaintenanceTemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name       String
+  order      Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
