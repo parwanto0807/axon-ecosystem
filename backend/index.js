@@ -5675,14 +5675,22 @@ app.get('/api/hr/attendance/my-performance', async (req, res) => {
       const dateKey = new Date(ci.timestamp).toISOString().split('T')[0];
       presentDaySet.add(dateKey);
 
-      // Calculate lateness for this specific clock-in
+      // Calculate lateness for this specific clock-in using Asia/Jakarta timezone
       if (ci.schedule?.startTime) {
         const [sH, sM] = ci.schedule.startTime.split(':').map(Number);
-        const schedTime = new Date(ci.timestamp);
-        schedTime.setHours(sH, sM, 0, 0);
-        const ts = new Date(ci.timestamp);
-        if (ts > schedTime) {
-          totalLateMinutes += Math.floor((ts - schedTime) / 1000 / 60);
+        
+        const jakartaTime = new Date(ci.timestamp).toLocaleTimeString('en-GB', { 
+          timeZone: 'Asia/Jakarta', 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
+        const [h, m] = jakartaTime.split(':').map(Number);
+        
+        const actualMin = h * 60 + m;
+        const schedMin = sH * 60 + sM;
+        
+        if (actualMin > schedMin) {
+          totalLateMinutes += (actualMin - schedMin);
         }
       }
     });
@@ -5729,11 +5737,19 @@ app.get('/api/hr/attendance/my-performance', async (req, res) => {
       let lateMinutes = 0;
       if (dayClockIn && dayClockIn.schedule?.startTime) {
         const [sH, sM] = dayClockIn.schedule.startTime.split(':').map(Number);
-        const schedTime = new Date(dayClockIn.timestamp);
-        schedTime.setHours(sH, sM, 0, 0);
-        const ts = new Date(dayClockIn.timestamp);
-        if (ts > schedTime) {
-          lateMinutes = Math.floor((ts - schedTime) / 1000 / 60);
+        
+        const jakartaTime = new Date(dayClockIn.timestamp).toLocaleTimeString('en-GB', { 
+          timeZone: 'Asia/Jakarta', 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
+        const [h, m] = jakartaTime.split(':').map(Number);
+        
+        const actualMin = h * 60 + m;
+        const schedMin = sH * 60 + sM;
+        
+        if (actualMin > schedMin) {
+          lateMinutes = actualMin - schedMin;
         }
       } else if (!dayClockIn) {
         const hadSchedule = schedules.find(s => {
