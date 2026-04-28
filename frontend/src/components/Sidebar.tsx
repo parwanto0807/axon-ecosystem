@@ -45,7 +45,8 @@ import {
     ShoppingBag,
     Wallet,
     LogOut,
-    Calendar
+    Calendar,
+    Network
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -360,7 +361,10 @@ const getMenuItems = (t: any) => [
         id: 'it-maintenance',
         icon: Wrench,
         label: 'IT Maintenance',
-        path: '/dashboard/maintenance',
+        children: [
+            { id: 'it-checklist', icon: ClipboardList, label: 'IT Checklist', path: '/dashboard/maintenance' },
+            { id: 'it-mikrotik', icon: Network, label: t.mikrotikMonitoring, path: '/dashboard/operational/mikrotik' },
+        ]
     },
     {
         id: 'infra-group',
@@ -368,13 +372,7 @@ const getMenuItems = (t: any) => [
         isHeader: true,
         requiredRoles: ['ADMIN', 'SUPER_ADMIN']
     },
-    {
-        id: 'mikrotik-monitor',
-        icon: Activity,
-        label: t.mikrotikMonitoring,
-        path: '/dashboard',
-        requiredRoles: ['ADMIN', 'SUPER_ADMIN']
-    },
+
     {
         id: 'network',
         icon: Cpu,

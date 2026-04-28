@@ -18,7 +18,8 @@ import {
     Target,
     TrendingDown,
     ClipboardList,
-    Palmtree
+    Palmtree,
+    Network
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
@@ -26,7 +27,6 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { useUIStore } from "@/store/uiStore";
-import MikroTikStats from "@/components/dashboard/MikroTikStats";
 
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api`;
 
@@ -139,11 +139,6 @@ export default function OperationalDashboard() {
                         </div>
                     </motion.div>
 
-                    {/* MikroTik Monitoring - Locked to Grafindo */}
-                    <motion.div variants={item} className="overflow-hidden">
-                        <MikroTikStats deviceId="cmo6n97xe0000ig0gllj7yjyi" hideSelector={true} />
-                    </motion.div>
-
                     {/* Quick Actions (Native App Icons Menu) */}
                     <motion.div variants={item} className="space-y-4">
                         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pl-1">Menu Layanan</h3>
@@ -151,9 +146,9 @@ export default function OperationalDashboard() {
                             {[
                                 { href: "/dashboard/attendance/history", color: "bg-purple-50 text-purple-600", icon: History, label: "Riwayat" },
                                 { href: "/dashboard/attendance/schedules", color: "bg-amber-50 text-amber-600", icon: Calendar, label: "Jadwal" },
-                                { href: "/dashboard/maintenance", color: "bg-emerald-50 text-emerald-600", icon: ClipboardList, label: "Maintenance" },
+                                { href: "/dashboard/maintenance", color: "bg-emerald-50 text-emerald-600", icon: ClipboardList, label: "Checklist" },
                                 { href: "/dashboard/attendance/holidays", color: "bg-sky-50 text-sky-600", icon: Palmtree, label: "Libur" },
-                                { isButton: true, color: "bg-blue-50 text-blue-600", icon: ShieldCheck, label: "Izin", soon: true },
+                                { href: "/dashboard/operational/mikrotik", color: "bg-blue-50 text-blue-600", icon: Network, label: "MikroTik" },
                                 { isButton: true, onClick: () => signOut(), color: "bg-rose-50 text-rose-600", icon: LogOut, label: "Keluar", danger: true }
                             ].map((act, i) => (
                                 act.isButton ? (
