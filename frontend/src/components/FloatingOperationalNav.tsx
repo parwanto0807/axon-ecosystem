@@ -8,7 +8,8 @@ import {
     Camera, 
     History, 
     Calendar,
-    Palmtree
+    Palmtree,
+    ClipboardList
 } from "lucide-react";
 import { useUIStore } from "@/store/uiStore";
 import { useSession } from "next-auth/react";
@@ -37,15 +38,6 @@ export function FloatingOperationalNav() {
     return (
         <div className="lg:hidden fixed bottom-0 inset-x-0 z-[100]">
             <div className="w-full bg-white/95 backdrop-blur-2xl border-t border-slate-50 px-6 py-3 pb-safe flex items-center justify-around shadow-[0_-10px_30px_rgba(0,0,0,0.06)]">
-                {/* Hr. Libur */}
-                <Link 
-                    href="/dashboard/attendance/holidays" 
-                    className={`flex flex-col items-center gap-1 transition-all ${isActive('/dashboard/attendance/holidays') ? 'text-indigo-600 scale-110' : 'text-slate-400 hover:text-indigo-600'}`}
-                >
-                    <Palmtree size={22} className={isActive('/dashboard/attendance/holidays') ? 'fill-indigo-600/10' : ''} />
-                    <span className="text-[8px] font-black uppercase tracking-widest truncate max-w-[50px] text-center">Hr. Libur</span>
-                </Link>
-
                 {/* Jadwal */}
                 <Link 
                     href="/dashboard/attendance/schedules" 
@@ -53,6 +45,15 @@ export function FloatingOperationalNav() {
                 >
                     <Calendar size={22} className={isActive('/dashboard/attendance/schedules') ? 'fill-indigo-600/10' : ''} />
                     <span className="text-[8px] font-black uppercase tracking-widest truncate max-w-[50px] text-center">Jadwal</span>
+                </Link>
+
+                {/* Riwayat */}
+                <Link 
+                    href="/dashboard/attendance/history" 
+                    className={`flex flex-col items-center gap-1 transition-all ${isActive('/dashboard/attendance/history') ? 'text-indigo-600 scale-110' : 'text-slate-400 hover:text-indigo-600'}`}
+                >
+                    <History size={22} className={isActive('/dashboard/attendance/history') ? 'fill-indigo-600/10' : ''} />
+                    <span className="text-[8px] font-black uppercase tracking-widest truncate max-w-[50px] text-center">Riwayat</span>
                 </Link>
                 
                 {/* Action: Absen (Camera) */}
@@ -63,13 +64,13 @@ export function FloatingOperationalNav() {
                     <Camera size={24} />
                 </Link>
 
-                {/* Riwayat */}
+                {/* Checklist */}
                 <Link 
-                    href="/dashboard/attendance/history" 
-                    className={`flex flex-col items-center gap-1 transition-all ${isActive('/dashboard/attendance/history') ? 'text-indigo-600 scale-110' : 'text-slate-400 hover:text-indigo-600'}`}
+                    href="/dashboard/maintenance" 
+                    className={`flex flex-col items-center gap-1 transition-all ${isActive('/dashboard/maintenance') ? 'text-indigo-600 scale-110' : 'text-slate-400 hover:text-indigo-600'}`}
                 >
-                    <History size={22} className={isActive('/dashboard/attendance/history') ? 'fill-indigo-600/10' : ''} />
-                    <span className="text-[8px] font-black uppercase tracking-widest truncate max-w-[50px] text-center">Riwayat</span>
+                    <ClipboardList size={22} className={isActive('/dashboard/maintenance') ? 'fill-indigo-600/10' : ''} />
+                    <span className="text-[8px] font-black uppercase tracking-widest truncate max-w-[50px] text-center">Checklist</span>
                 </Link>
 
                 {/* Home */}

@@ -16,7 +16,9 @@ import {
     LayoutGrid,
     Menu as MenuIcon,
     Target,
-    TrendingDown
+    TrendingDown,
+    ClipboardList,
+    Palmtree
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
@@ -145,10 +147,12 @@ export default function OperationalDashboard() {
                     {/* Quick Actions (Native App Icons Menu) */}
                     <motion.div variants={item} className="space-y-4">
                         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pl-1">Menu Layanan</h3>
-                        <div className="grid grid-cols-4 lg:grid-cols-4 gap-3 bg-white p-5 lg:p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgba(0,0,0,0.02)] border border-slate-50/50">
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 bg-white p-5 lg:p-8 rounded-[2.5rem] shadow-[0_8px_30px_rgba(0,0,0,0.02)] border border-slate-50/50">
                             {[
                                 { href: "/dashboard/attendance/history", color: "bg-purple-50 text-purple-600", icon: History, label: "Riwayat" },
                                 { href: "/dashboard/attendance/schedules", color: "bg-amber-50 text-amber-600", icon: Calendar, label: "Jadwal" },
+                                { href: "/dashboard/maintenance", color: "bg-emerald-50 text-emerald-600", icon: ClipboardList, label: "Maintenance" },
+                                { href: "/dashboard/attendance/holidays", color: "bg-sky-50 text-sky-600", icon: Palmtree, label: "Libur" },
                                 { isButton: true, color: "bg-blue-50 text-blue-600", icon: ShieldCheck, label: "Izin", soon: true },
                                 { isButton: true, onClick: () => signOut(), color: "bg-rose-50 text-rose-600", icon: LogOut, label: "Keluar", danger: true }
                             ].map((act, i) => (

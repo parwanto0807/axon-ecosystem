@@ -6592,34 +6592,42 @@ app.get('/api/hr/employees/by-user/:userId', async (req, res) => {
   }
 });
 
-// Helper: Check if current time is within an employee's active schedule for today
+// Helper: Check if current time is within an employee's active schedule for today (Asia/Jakarta)
 async function isWithinWorkHours(employeeId) {
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  // Get today's date in Jakarta
+  const jakartaDateStr = now.toLocaleDateString('en-GB', { timeZone: 'Asia/Jakarta' }); // DD/MM/YYYY
+  const [day, month, year] = jakartaDateStr.split('/').map(Number);
+  const startOfDay = new Date(year, month - 1, day);
+  const endOfDay = new Date(year, month - 1, day + 1);
 
   // Get schedule for today
   const schedule = await prisma.employeeSchedule.findFirst({
     where: {
       employeeId,
-      date: { gte: today, lt: tomorrow }
+      date: { gte: startOfDay, lt: endOfDay }
     }
   });
 
   if (!schedule) return { inWorkHours: false, schedule: null };
 
-  // Parse startTime and endTime (format: "HH:mm" or "HH:mm:ss")
-  const parseTime = (timeStr) => {
-    const [h, m] = timeStr.split(':').map(Number);
-    const d = new Date(now);
-    d.setHours(h, m, 0, 0);
-    return d;
-  };
+  // Get current time in Jakarta
+  const jakartaTime = now.toLocaleTimeString('en-GB', { 
+    timeZone: 'Asia/Jakarta', 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
+  const [h, m] = jakartaTime.split(':').map(Number);
+  const nowMin = h * 60 + m;
 
-  const start = parseTime(schedule.startTime);
-  const end = parseTime(schedule.endTime);
-  const inWorkHours = now >= start && now <= end;
+  // Parse schedule times
+  const [sH, sM] = schedule.startTime.split(':').map(Number);
+  const [eH, eM] = schedule.endTime.split(':').map(Number);
+  const startMin = sH * 60 + sM;
+  const endMin = eH * 60 + eM;
+
+  const inWorkHours = nowMin >= startMin && nowMin <= endMin;
 
   return { inWorkHours, schedule };
 }
@@ -6708,7 +6716,7 @@ app.get('/api/location-tracking/check-request/:employeeId', async (req, res) => 
 });
 
 // GET /api/location-tracking — Super Admin: Get latest ping per active employee today
-app.get('/api/location-tracking', checkRole(['SUPER_ADMIN']), async (req, res) => {
+app.get('/api/location-tracking', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATIONAL']), async (req, res) => {
   const { date } = req.query;
   try {
     const targetDate = date ? new Date(date) : new Date();
@@ -6765,7 +6773,7 @@ app.get('/api/location-tracking', checkRole(['SUPER_ADMIN']), async (req, res) =
 });
 
 // GET /api/location-tracking/history/:employeeId — Super Admin: Timeline of employee's pings
-app.get('/api/location-tracking/history/:employeeId', checkRole(['SUPER_ADMIN']), async (req, res) => {
+app.get('/api/location-tracking/history/:employeeId', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATIONAL']), async (req, res) => {
   const { employeeId } = req.params;
   const { date } = req.query;
   try {
@@ -6789,7 +6797,7 @@ app.get('/api/location-tracking/history/:employeeId', checkRole(['SUPER_ADMIN'])
 });
 
 // PATCH /api/location-tracking/request-ping/:employeeId — Super Admin: Request manual ping from employee
-app.patch('/api/location-tracking/request-ping/:employeeId', checkRole(['SUPER_ADMIN']), async (req, res) => {
+app.patch('/api/location-tracking/request-ping/:employeeId', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATIONAL']), async (req, res) => {
   const { employeeId } = req.params;
   try {
     await prisma.employee.update({

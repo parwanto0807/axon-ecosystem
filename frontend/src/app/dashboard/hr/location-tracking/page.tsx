@@ -94,15 +94,17 @@ export default function LocationTrackingPage() {
     const refreshRef = useRef<NodeJS.Timeout | null>(null)
     const pingPollRef = useRef<NodeJS.Timeout | null>(null)
 
-    // Guard: redirect if not Super Admin
+    const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATIONAL']
+
+    // Guard: redirect if not authorized
     useEffect(() => {
-        if (session && userRole !== 'SUPER_ADMIN') {
+        if (session && !allowedRoles.includes(userRole)) {
             router.replace('/dashboard')
         }
     }, [session, userRole, router])
 
     const fetchData = useCallback(async () => {
-        if (!session || userRole !== 'SUPER_ADMIN') return
+        if (!session || !allowedRoles.includes(userRole)) return
         setLoading(true)
         try {
             const res = await fetch(`${API_BASE}/location-tracking?date=${date}`, {
@@ -216,7 +218,7 @@ export default function LocationTrackingPage() {
     const offlineCount = employees.filter(e => getStatus(e) === 'offline').length
     const mappableEmployees = employees.filter(e => e.latestPing)
 
-    if (!session || userRole !== 'SUPER_ADMIN') return null
+    if (!session || !allowedRoles.includes(userRole)) return null
 
     return (
         <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
@@ -228,7 +230,7 @@ export default function LocationTrackingPage() {
                     </div>
                     <div>
                         <h1 className="text-base font-black text-slate-800 uppercase tracking-tight">Live Location Tracking</h1>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Hanya jam kerja aktif · Super Admin</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Hanya jam kerja aktif · Multi-Role Access</p>
                     </div>
                 </div>
 
