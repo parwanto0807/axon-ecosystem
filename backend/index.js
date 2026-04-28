@@ -5669,9 +5669,24 @@ app.get('/api/hr/attendance/my-performance', async (req, res) => {
 
     // ── 5. Count unique present days & Calculate Performance ──
     const presentDaySet = new Set();
+    let totalLateMinutes = 0;
+
     clockIns.forEach(ci => {
-      presentDaySet.add(new Date(ci.timestamp).toISOString().split('T')[0]);
+      const dateKey = new Date(ci.timestamp).toISOString().split('T')[0];
+      presentDaySet.add(dateKey);
+
+      // Calculate lateness for this specific clock-in
+      if (ci.schedule?.startTime) {
+        const [sH, sM] = ci.schedule.startTime.split(':').map(Number);
+        const schedTime = new Date(ci.timestamp);
+        schedTime.setHours(sH, sM, 0, 0);
+        const ts = new Date(ci.timestamp);
+        if (ts > schedTime) {
+          totalLateMinutes += Math.floor((ts - schedTime) / 1000 / 60);
+        }
+      }
     });
+
     const presentDays = presentDaySet.size;
 
     // Use schedules as base, but fallback to presentDays if no schedules exist 
@@ -5679,7 +5694,11 @@ app.get('/api/hr/attendance/my-performance', async (req, res) => {
     const totalWorkDays = Math.max(schedules.length, presentDays);
     
     const absentDays = Math.max(totalWorkDays - presentDays, 0);
-    const performance = totalWorkDays > 0 ? Math.round((presentDays / totalWorkDays) * 100) : 0;
+    
+    // Performance Formula: (PresentDays * 100 - TotalLateMinutes) / TotalWorkDays
+    // This ensures that lateness directly penalizes the 100% attendance score.
+    const performance = totalWorkDays > 0 ? 
+      Math.max(0, Math.round(((presentDays * 100) - totalLateMinutes) / totalWorkDays)) : 0;
 
     // ── 6. Calculate daily lateness for last 7 days ──
     const sevenDaysAgo = new Date(now);
