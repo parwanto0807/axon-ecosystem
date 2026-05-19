@@ -8,6 +8,7 @@ import {
     Send, Check, Ban, Clock, Briefcase
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useSession } from "next-auth/react"
 import QuotationPDFModal from "./QuotationPDFModal"
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -40,6 +41,8 @@ const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function QuotationsPage() {
+    const { data: session } = useSession()
+    const userRole = (session?.user as any)?.role
     const [quotations, setQuotations] = useState<Quotation[]>([])
     const [customers, setCustomers] = useState<Customer[]>([])
     const [products, setProducts] = useState<Product[]>([])
@@ -59,13 +62,14 @@ export default function QuotationsPage() {
     }, [])
 
     const load = useCallback(async () => {
+        if (!userRole) return
         setLoading(true)
         try {
             const [qR, cR, pR, coR, prR] = await Promise.all([
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products`),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`, { headers: { 'x-user-role': userRole } }),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`),
             ])
             setQuotations(await qR.json())
@@ -75,7 +79,7 @@ export default function QuotationsPage() {
             setProjects(await prR.json())
         } catch { showToast('error', 'Failed to load data') }
         finally { setLoading(false) }
-    }, [showToast])
+    }, [userRole, showToast])
 
     useEffect(() => { load() }, [load])
 
@@ -387,7 +391,7 @@ export default function QuotationsPage() {
             {/* PDF Modal */}
             <AnimatePresence>
                 {viewModal && (
-                    <QuotationPDFModal quotation={viewModal} company={company} onClose={() => setViewModal(null)} />
+                    <QuotationPDFModal quotation={viewModal} company={company} products={products} onClose={() => setViewModal(null)} />
                 )}
             </AnimatePresence>
         </div>

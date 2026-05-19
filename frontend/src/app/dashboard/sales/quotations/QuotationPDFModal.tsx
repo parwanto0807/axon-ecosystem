@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 import { X, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-interface QuotationItem { no: number; description: string; qty: number; unit: string; unitPrice: number; discount: number; amount: number }
+interface QuotationItem { id?: string; no: number; description: string; qty: number; unit: string; unitPrice: number; discount: number; amount: number }
 interface Customer { id: string; name: string; code: string; address: string | null; taxId: string | null; phone: string | null; email: string | null }
 interface Quotation {
     id: string; number: string; date: string; validUntil: string; status: string
@@ -24,12 +24,38 @@ const STATUS_CFG: Record<string, { label: string; color: string }> = {
 const fd = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 const fr = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 
-export default function QuotationPDFModal({ quotation, company, onClose }:
-    { quotation: Quotation; company: Record<string, string>; onClose: () => void }) {
+export default function QuotationPDFModal({ quotation, company, products, onClose }:
+    { quotation: Quotation; company: Record<string, string>; products: any[]; onClose: () => void }) {
 
     const [busy, setBusy] = useState(false)
+    const [showProductImages, setShowProductImages] = useState(false)
     const c = quotation.customer
     const sc = STATUS_CFG[quotation.status] || STATUS_CFG.DRAFT
+
+    const getProductImage = (it: QuotationItem) => {
+        if (!products) return null
+        // 1. Match by SKU code inside parentheses at the end of the description
+        const codeMatch = it.description.match(/\(([^)]+)\)$/)
+        if (codeMatch) {
+            const code = codeMatch[1]
+            for (const p of products) {
+                const hasSku = p.skus?.some((s: any) => s.code === code)
+                if (hasSku && p.image) return p.image
+            }
+        }
+        // 2. Match by exact or partial product/SKU name inside description
+        const lowerDesc = it.description.toLowerCase()
+        for (const p of products) {
+            if (lowerDesc.includes(p.name.toLowerCase()) && p.image) {
+                return p.image
+            }
+            const skuMatch = p.skus?.find((s: any) => s.name && lowerDesc.includes(s.name.toLowerCase()))
+            if (skuMatch && p.image) {
+                return p.image
+            }
+        }
+        return null
+    }
 
     const generatePDF = async () => {
         setBusy(true)
@@ -45,7 +71,31 @@ export default function QuotationPDFModal({ quotation, company, onClose }:
             const light = [241, 245, 249] as [number, number, number]
             let y = M
 
+            // Pre-load product images if requested
+            const loadedImages: Record<string, HTMLImageElement> = {}
+            if (showProductImages && products) {
+                await Promise.all(
+                    quotation.items.map(async (it) => {
+                        const imgPath = getProductImage(it)
+                        if (imgPath) {
+                            try {
+                                const img = new Image(); img.crossOrigin = 'anonymous'
+                                await new Promise<void>(r => {
+                                    img.onload = () => r()
+                                    img.onerror = () => r()
+                                    img.src = `${process.env.NEXT_PUBLIC_API_URL}${imgPath}`
+                                })
+                                if (img.complete && img.naturalWidth > 0) {
+                                    loadedImages[it.id || it.no] = img
+                                }
+                            } catch { /* skip */ }
+                        }
+                    })
+                )
+            }
+
             // Logo
+            let logoWidth = 0
             if (company.logo) {
                 try {
                     const img = new Image(); img.crossOrigin = 'anonymous'
@@ -54,13 +104,15 @@ export default function QuotationPDFModal({ quotation, company, onClose }:
                         const cv = document.createElement('canvas')
                         cv.width = img.naturalWidth; cv.height = img.naturalHeight
                         cv.getContext('2d')!.drawImage(img, 0, 0)
-                        doc.addImage(cv.toDataURL('image/png'), 'PNG', M, y, 22, 22)
+                        const h = 12
+                        logoWidth = (img.naturalWidth / img.naturalHeight) * h
+                        doc.addImage(cv.toDataURL('image/png'), 'PNG', M, y, logoWidth, h)
                     }
                 } catch { /* skip */ }
             }
 
             // Company info
-            const ix = company.logo ? M + 26 : M
+            const ix = logoWidth > 0 ? M + logoWidth + 5 : M
             doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(...dark)
             doc.text(company.name || 'PT. Axon Ecosystem', ix, y + 5)
             doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...gray)
@@ -133,10 +185,36 @@ export default function QuotationPDFModal({ quotation, company, onClose }:
                 head: [['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Disc%', 'Jumlah']],
                 body: sortedItems.map(it => [it.no, it.description, it.qty, it.unit, fr(it.unitPrice), it.discount > 0 ? `${it.discount}%` : '-', fr(it.amount)]),
                 headStyles: { fillColor: indigo, textColor: white, fontStyle: 'bold', fontSize: 8, halign: 'center' },
-                bodyStyles: { fontSize: 8, textColor: dark },
+                bodyStyles: { fontSize: 8, textColor: dark, minCellHeight: showProductImages ? 13 : 0 },
                 alternateRowStyles: { fillColor: light },
-                columnStyles: { 0: { halign: 'center', cellWidth: 10 }, 1: { halign: 'left' }, 2: { halign: 'center', cellWidth: 14 }, 3: { halign: 'center', cellWidth: 16 }, 4: { halign: 'right', cellWidth: 32 }, 5: { halign: 'center', cellWidth: 14 }, 6: { halign: 'right', cellWidth: 32 } },
+                columnStyles: { 
+                    0: { halign: 'center', cellWidth: 10 }, 
+                    1: { halign: 'left', cellPadding: showProductImages ? { left: 15, top: 3, right: 4, bottom: 3 } : 4 }, 
+                    2: { halign: 'center', cellWidth: 14 }, 
+                    3: { halign: 'center', cellWidth: 16 }, 
+                    4: { halign: 'right', cellWidth: 32 }, 
+                    5: { halign: 'center', cellWidth: 14 }, 
+                    6: { halign: 'right', cellWidth: 32 } 
+                },
                 styles: { lineColor: [226, 232, 240], lineWidth: 0.2 },
+                didDrawCell: (data) => {
+                    if (data.column.index === 1 && data.cell.section === 'body') {
+                        const itemIdx = data.row.index
+                        const item = sortedItems[itemIdx]
+                        const img = loadedImages[item.id || item.no]
+                        if (img) {
+                            try {
+                                const cv = document.createElement('canvas')
+                                cv.width = img.naturalWidth; cv.height = img.naturalHeight
+                                cv.getContext('2d')!.drawImage(img, 0, 0)
+                                // Draw a 9x9mm thumbnail in the cell
+                                const x = data.cell.x + 2
+                                const y = data.cell.y + (data.cell.height - 9) / 2
+                                doc.addImage(cv.toDataURL('image/png'), 'PNG', x, y, 9, 9)
+                            } catch { /* skip */ }
+                        }
+                    }
+                }
             })
 
             y = (doc as any).lastAutoTable.finalY + 8
@@ -233,7 +311,16 @@ export default function QuotationPDFModal({ quotation, company, onClose }:
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${sc.color}`}>{quotation.number}</span>
                         <span className="text-slate-500 text-sm font-medium">{c?.name}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-4 px-4 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Gambar Produk</span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked={showProductImages} onChange={(e) => setShowProductImages(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600"></div>
+                                </label>
+                            </div>
+                        </div>
                         <Button onClick={generatePDF} disabled={busy}
                             className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 px-5 text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20">
                             <Download size={13} className="mr-2" />
@@ -333,7 +420,18 @@ export default function QuotationPDFModal({ quotation, company, onClose }:
                                 {[...(quotation.items || [])].sort((a, b) => a.no - b.no).map((it, idx) => (
                                     <tr key={idx} style={{ background: idx % 2 === 0 ? '#fff' : '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                                         <td style={{ padding: '7px 10px', textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>{it.no}</td>
-                                        <td style={{ padding: '7px 10px', color: '#1e293b', fontWeight: 500 }}>{it.description}</td>
+                                        <td style={{ padding: '7px 10px', color: '#1e293b', fontWeight: 500 }}>
+                                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                                {showProductImages && getProductImage(it) && (
+                                                    <img 
+                                                        src={`${process.env.NEXT_PUBLIC_API_URL}${getProductImage(it)}`} 
+                                                        alt="product" 
+                                                        style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#f8fafc', flexShrink: 0 }} 
+                                                    />
+                                                )}
+                                                <span>{it.description}</span>
+                                            </div>
+                                        </td>
                                         <td style={{ padding: '7px 10px', textAlign: 'center' }}>{it.qty}</td>
                                         <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.unit}</td>
                                         <td style={{ padding: '7px 10px', textAlign: 'right' }}>Rp {it.unitPrice?.toLocaleString('id-ID')}</td>

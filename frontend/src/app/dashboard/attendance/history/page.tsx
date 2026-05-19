@@ -18,6 +18,7 @@ import {
     User,
     ChevronDown,
     ChevronRight,
+    ChevronLeft,
     X,
     ExternalLink,
     LayoutGrid,
@@ -41,30 +42,53 @@ export default function AttendanceHistoryPage() {
     const [history, setHistory] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
+    const [debouncedSearch, setDebouncedSearch] = useState('')
     const [selectedLog, setSelectedLog] = useState<any>(null)
     const [filter, setFilter] = useState({
         startDate: '',
         endDate: '',
         employeeId: ''
     })
+    const [page, setPage] = useState(1)
+    const [limit, setLimit] = useState(20)
+    const [totalPages, setTotalPages] = useState(0)
+    const [totalRecords, setTotalRecords] = useState(0)
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedSearch(searchQuery.trim())
+            setPage(1)
+        }, 400)
+
+        return () => clearTimeout(handler)
+    }, [searchQuery])
 
     useEffect(() => {
         if (session) {
             fetchHistory()
         }
-    }, [filter, session])
+    }, [filter, session, page, limit, debouncedSearch])
 
     const fetchHistory = async () => {
         setLoading(true)
         try {
-            const query = new URLSearchParams(filter).toString()
+            const params: any = {
+                ...filter,
+                page: page.toString(),
+                limit: limit.toString()
+            }
+            if (debouncedSearch) params.search = debouncedSearch
+
+            const query = new URLSearchParams(params).toString()
             const headers = {
                 'x-user-role': session?.user?.role || '',
                 'x-user-id': (session?.user as any)?.id || ''
             }
             const res = await fetch(`${API_BASE}/hr/attendance/history?${query}`, { headers })
             const data = await res.json()
-            setHistory(data)
+            setHistory(data.data || [])
+            setTotalPages(data.totalPages || 0)
+            setTotalRecords(data.total || 0)
         } catch (e) {
             console.error(e)
         } finally {
@@ -72,9 +96,7 @@ export default function AttendanceHistoryPage() {
         }
     }
 
-    const filteredHistory = history.filter(h => 
-        h.employee?.name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const filteredHistory = history
 
     return (
         <div className="p-4 md:p-8 pb-32 space-y-8 bg-slate-50/50 min-h-screen">
@@ -112,7 +134,7 @@ export default function AttendanceHistoryPage() {
                         <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input 
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => { setSearchQuery(e.target.value); setPage(1) }}
                             className="w-full pl-14 pr-6 py-3.5 md:py-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-bold focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all"
                             placeholder="Cari nama karyawan..."
                         />
@@ -329,6 +351,56 @@ export default function AttendanceHistoryPage() {
                             </div>
                         </div>
                     ))}
+                </div>
+            </div>
+
+            {/* Pagination Footer */}
+            <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white border border-slate-100 rounded-[2rem] p-4 md:p-5 shadow-sm">
+                <div className="flex flex-wrap items-center gap-3 text-slate-500 text-[11px] font-black uppercase tracking-widest">
+                    <span>Tampilkan</span>
+                    <select
+                        value={limit}
+                        onChange={(e) => { setLimit(parseInt(e.target.value, 10)); setPage(1) }}
+                        className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-[11px] font-black"
+                    >
+                        {[20, 50, 100].map(size => (
+                            <option key={size} value={size}>{size} baris</option>
+                        ))}
+                    </select>
+                    <span>{totalRecords.toLocaleString()} catatan</span>
+                    <span>{totalPages ? `Halaman ${page} dari ${totalPages}` : ''}</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 justify-end">
+                    <button
+                        onClick={() => setPage(Math.max(1, page - 1))}
+                        disabled={page === 1 || loading}
+                        className="px-3 py-2 rounded-full border border-slate-200 bg-white text-slate-600 text-[11px] font-black uppercase tracking-[0.24em] transition-colors disabled:opacity-50"
+                    >
+                        Sebelumnya
+                    </button>
+
+                    <div className="hidden sm:flex items-center gap-2">
+                        {Array.from({ length: totalPages }, (_, index) => index + 1)
+                            .filter(pageNumber => pageNumber === 1 || pageNumber === totalPages || (pageNumber >= page - 2 && pageNumber <= page + 2))
+                            .map(pageNumber => (
+                                <button
+                                    key={pageNumber}
+                                    onClick={() => setPage(pageNumber)}
+                                    className={`px-3 py-2 rounded-full text-[11px] font-black uppercase tracking-[0.24em] transition-all ${pageNumber === page ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+                                >
+                                    {pageNumber}
+                                </button>
+                            ))}
+                    </div>
+
+                    <button
+                        onClick={() => setPage(Math.min(totalPages || page, page + 1))}
+                        disabled={page === totalPages || loading || totalPages === 0}
+                        className="px-3 py-2 rounded-full border border-slate-200 bg-white text-slate-600 text-[11px] font-black uppercase tracking-[0.24em] transition-colors disabled:opacity-50"
+                    >
+                        Berikutnya
+                    </button>
                 </div>
             </div>
 

@@ -42,7 +42,8 @@ export const getSalesData = async (): Promise<{ monthlySales: number[], months: 
 
 export const getExpensesData = async (): Promise<{ categories: string[], amounts: number[], rawData: any[] }> => {
   try {
-    const response = await api.get('/api/finance/operational-expenses');
+    // Now fetches combined operational expenses + payroll (salary)
+    const response = await api.get('/api/finance/all-operational-expenses');
     const expenses = response.data;
 
     const expensesByCategory = expenses.reduce((acc: any, expense: any) => {

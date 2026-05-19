@@ -5780,32 +5780,55 @@ app.get('/api/hr/attendance/history', async (req, res) => {
   try {
     const userRole = req.headers['x-user-role'] || req.headers['X-User-Role'];
     const userId = req.headers['x-user-id'] || req.headers['X-User-Id'];
-    const { employeeId, startDate, endDate } = req.query;
+    const { employeeId, startDate, endDate, search = '', page = 1, limit = 20 } = req.query;
 
-    console.log(`[GET /api/hr/attendance/history] Role: ${userRole}, UserId: ${userId}`);
+    console.log(`[GET /api/hr/attendance/history] Role: ${userRole}, UserId: ${userId}, Page: ${page}, Search: ${search}`);
 
     let targetEmployeeId = employeeId;
     if (userRole === 'OPERATIONAL') {
         if (!userId || userId === 'undefined' || userId === '') {
             console.warn(`[GET /api/hr/attendance/history] BLOCKED: Operational user with no ID`);
-            return res.json([]); 
+            return res.json({ data: [], total: 0, page: 1, totalPages: 0, limit: parseInt(limit) }); 
         }
         const emp = await prisma.employee.findUnique({ where: { userId } });
         if (emp) targetEmployeeId = emp.id;
-        else return res.json([]);
+        else return res.json({ data: [], total: 0, page: 1, totalPages: 0, limit: parseInt(limit) });
     }
 
-    const history = await prisma.attendance.findMany({
-      where: {
+    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const whereClause = {
         ...(targetEmployeeId ? { employeeId: targetEmployeeId } : {}),
         ...(startDate && endDate ? {
           timestamp: { gte: new Date(startDate), lte: new Date(endDate) }
+        } : {}),
+        ...(search ? {
+          employee: { name: { contains: String(search), mode: 'insensitive' } }
         } : {})
-      },
-      include: { employee: true, location: true, schedule: true },
-      orderBy: { timestamp: 'desc' }
+    };
+
+    const [history, total] = await Promise.all([
+        prisma.attendance.findMany({
+            where: whereClause,
+            include: { employee: true, location: true, schedule: true },
+            orderBy: { timestamp: 'desc' },
+            skip,
+            take: parsedLimit
+        }),
+        prisma.attendance.count({ where: whereClause })
+    ]);
+
+    const totalPages = Math.ceil(total / parsedLimit);
+
+    res.json({
+        data: history,
+        total,
+        page: parsedPage,
+        totalPages,
+        limit: parsedLimit
     });
-    res.json(history);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
@@ -6136,6 +6159,57 @@ app.get('/api/finance/operational-expenses', async (req, res) => {
     });
     res.json(expenses);
   } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// --- NEW: Combined Operational Expenses (includes Salary/Payroll) ---
+app.get('/api/finance/all-operational-expenses', async (req, res) => {
+  try {
+    // Fetch regular operational expenses
+    const opexes = await prisma.operationalExpense.findMany({
+      include: { coa: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Fetch payroll runs (salaries) - only POSTED or PAID status
+    const payrolls = await prisma.payrollRun.findMany({
+      where: {
+        status: { in: ['POSTED', 'PAID'] }
+      },
+      include: {
+        items: {
+          include: { employee: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Transform payroll runs to match OperationalExpense structure for dashboard compatibility
+    const formattedPayrolls = payrolls.map(pr => ({
+      id: pr.id,
+      name: `Gaji ${pr.type === 'THR' ? 'THR' : 'Bulanan'} - ${pr.month}/${pr.year}`,
+      category: pr.type === 'THR' ? 'THR/Bonus' : 'Gaji Karyawan',
+      amount: pr.totalAmount,
+      month: pr.month,
+      year: pr.year,
+      date: pr.date,
+      status: pr.status,
+      type: 'PAYROLL', // To differentiate from OpEx
+      payrollType: pr.type,
+      itemCount: pr.items.length,
+      createdAt: pr.createdAt,
+      updatedAt: pr.updatedAt
+    }));
+
+    // Combine both arrays
+    const combined = [...opexes, ...formattedPayrolls].sort((a, b) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    res.json(combined);
+  } catch (e) { 
+    console.error("[API Error] Fetching all operational expenses:", e);
+    res.status(500).json({ message: e.message }); 
+  }
 });
 
 app.post('/api/finance/operational-expenses', upload.single('attachment'), async (req, res) => {

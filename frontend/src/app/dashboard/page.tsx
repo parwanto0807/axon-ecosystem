@@ -239,24 +239,24 @@ const DashboardCard = ({ title, value, icon: Icon, description, trend, trendType
     whileHover={{ y: -8, scale: 1.02 }}
     transition={{ type: "spring", stiffness: 300, damping: 20 }}
   >
-    <Card className="relative overflow-hidden border-none shadow-xl bg-white/80 backdrop-blur-md rounded-[2.5rem]">
-      <div className={`absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 rounded-full opacity-10 ${colorClass}`} />
-      <CardContent className="p-8">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`p-3 rounded-2xl ${colorClass.replace('bg-', 'bg-').replace('/10', '/20')} text-primary`}>
-            <Icon className="h-6 w-6" />
+    <Card className="relative overflow-hidden border-none shadow-xl bg-white/80 backdrop-blur-md rounded-2xl">
+      <div className={`absolute top-0 right-0 w-24 h-24 -mr-12 -mt-12 rounded-full opacity-10 ${colorClass}`} />
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className={`p-2 rounded-xl ${colorClass.replace('bg-', 'bg-').replace('/10', '/20')} text-primary`}>
+            <Icon className="h-5 w-5" />
           </div>
           {trend && (
-            <div className={`flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${trendType === 'up' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-              {trendType === 'up' ? <ArrowUpRight size={14} className="mr-1" /> : <ArrowDownRight size={14} className="mr-1" />}
+            <div className={`flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${trendType === 'up' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+              {trendType === 'up' ? <ArrowUpRight size={12} className="mr-0.5" /> : <ArrowDownRight size={12} className="mr-0.5" />}
               {trend}
             </div>
           )}
         </div>
         <div>
-          <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-1">{title}</p>
-          <div className="text-3xl font-black text-slate-900 tracking-tight">{value}</div>
-          <p className="text-xs font-medium text-slate-400 mt-2">{description}</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">{title}</p>
+          <div className="text-2xl font-black text-slate-900 tracking-tight">{value}</div>
+          <p className="text-[11px] font-medium text-slate-400 mt-1.5">{description}</p>
         </div>
       </CardContent>
     </Card>
@@ -480,7 +480,7 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-4 lg:p-10 space-y-6 lg:space-y-10">
+    <div className="min-h-screen bg-[#f8fafc] p-4 lg:p-8 space-y-6 lg:space-y-8">
       {/* Header Section */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -488,11 +488,11 @@ export default function DashboardPage() {
         className="flex flex-col lg:flex-row lg:items-center justify-between gap-6"
       >
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 flex-shrink-0">
-            <TrendingUp size={24} className="text-white" />
+          <div className="w-11 h-11 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 flex-shrink-0">
+            <TrendingUp size={22} className="text-white" />
           </div>
           <div>
-            <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+            <h1 className="text-xl lg:text-2xl font-black text-slate-900 tracking-tight leading-tight">
               {t.enterprise} <span className="text-indigo-600">{t.enterpriseDashboard}</span>
             </h1>
             <p className="text-xs font-semibold text-slate-400">{t.analyticsSubtitle}</p>
@@ -503,12 +503,12 @@ export default function DashboardPage() {
           <Button
             onClick={handleRefresh}
             variant="outline"
-            className="flex-1 lg:flex-none rounded-2xl border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition-all font-black text-[10px] uppercase tracking-widest px-4 lg:px-6 h-12"
+            className="flex-1 lg:flex-none rounded-2xl border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition-all font-black text-[10px] uppercase tracking-widest px-3 lg:px-5 h-10"
           >
-            <RefreshCcw size={16} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCcw size={14} className={`mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
             {t.syncDashboard}
           </Button>
-          <Button className="flex-1 lg:flex-none rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest px-4 lg:px-8 h-12 shadow-xl shadow-indigo-600/30 transition-all active:scale-95">
+          <Button className="flex-1 lg:flex-none rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest px-3 lg:px-7 h-10 shadow-xl shadow-indigo-600/30 transition-all active:scale-95">
             {t.intelligenceReport}
           </Button>
         </div>
@@ -557,10 +557,10 @@ export default function DashboardPage() {
       {/* Analytics & Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sales Performance Chart */}
-        <Card className="lg:col-span-2 border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden">
-          <CardHeader className="p-6 lg:p-8 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <Card className="lg:col-span-2 border-none shadow-xl rounded-2xl bg-white overflow-hidden">
+          <CardHeader className="p-4 lg:p-6 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle className="text-xl font-black text-slate-900 tracking-tight">{t.salesPerformance}</CardTitle>
+              <CardTitle className="text-lg font-black text-slate-900 tracking-tight">{t.salesPerformance}</CardTitle>
               <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em]">{t.revenueGrowthDesc}</p>
             </div>
             <div className="flex">
@@ -569,8 +569,8 @@ export default function DashboardPage() {
               </span>
             </div>
           </CardHeader>
-          <CardContent className="p-4 lg:p-8 pt-4">
-            <div className="h-[300px] lg:h-[400px] w-full">
+          <CardContent className="p-4 lg:p-6 pt-3">
+            <div className="h-[250px] lg:h-[320px] w-full">
               <Chart type="bar" data={salesChartData as any} options={{
                 ...commonOptions,
                 plugins: {
@@ -586,9 +586,9 @@ export default function DashboardPage() {
         </Card>
 
         {/* Expenses Breakdown */}
-        <Card className="border-none shadow-xl rounded-[2.5rem] bg-white">
-          <CardHeader className="p-6 lg:p-8 pb-4">
-            <CardTitle className="text-xl font-black text-slate-900 tracking-tight">{t.expenseAllocation}</CardTitle>
+        <Card className="border-none shadow-xl rounded-2xl bg-white">
+          <CardHeader className="p-4 lg:p-6 pb-3">
+            <CardTitle className="text-lg font-black text-slate-900 tracking-tight">{t.expenseAllocation}</CardTitle>
             <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em]">{t.operationalCategoriesDesc}</p>
           </CardHeader>
           <CardContent className="p-6 lg:p-8 pt-4 flex flex-col items-center justify-center">
@@ -626,13 +626,13 @@ export default function DashboardPage() {
         </Card>
 
         {/* Sales by Category Breakdown */}
-        <Card className="border-none shadow-xl rounded-[2.5rem] bg-indigo-600 text-white">
-          <CardHeader className="p-6 lg:p-8 pb-4">
-            <CardTitle className="text-xl font-black tracking-tight">{t.salesByCategory}</CardTitle>
+        <Card className="border-none shadow-xl rounded-2xl bg-indigo-600 text-white">
+          <CardHeader className="p-4 lg:p-6 pb-3">
+            <CardTitle className="text-lg font-black tracking-tight">{t.salesByCategory}</CardTitle>
             <p className="text-[10px] font-bold text-indigo-200 mt-1 uppercase tracking-[0.2em]">{t.salesByCategoriesDesc}</p>
           </CardHeader>
-          <CardContent className="p-6 lg:p-8 pt-4 flex flex-col items-center justify-center">
-            <div className="h-[210px] w-full relative">
+          <CardContent className="p-4 lg:p-6 pt-3 flex flex-col items-center justify-center">
+            <div className="h-[180px] w-full relative">
               <Doughnut
                 data={categorySalesPieData}
                 options={{
@@ -676,15 +676,15 @@ export default function DashboardPage() {
       {/* Bottom Section: Reports & Inventory */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Financial Summary */}
-        <Card className="border-none shadow-xl rounded-[2.5rem] bg-slate-900 text-white overflow-hidden relative">
+        <Card className="border-none shadow-xl rounded-2xl bg-slate-900 text-white overflow-hidden relative">
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <CardHeader className="p-6 lg:p-8 pb-4">
-            <CardTitle className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+          <CardHeader className="p-4 lg:p-6 pb-3">
+            <CardTitle className="text-lg font-black tracking-tight text-white flex items-center gap-2">
               <Layers size={20} className="text-indigo-400" />
               {t.financialHealthSummary}
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-6 lg:p-8 pt-0 flex flex-col md:flex-row gap-8 lg:gap-10">
+          <CardContent className="p-4 lg:p-6 pt-0 flex flex-col md:flex-row gap-8 lg:gap-10">
             <div className="flex-1 space-y-6">
               <div className="p-6 rounded-[2rem] bg-white/5 border border-white/10 relative overflow-hidden group">
                 <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity">
@@ -746,17 +746,17 @@ export default function DashboardPage() {
         </Card>
 
         {/* Low Stock Watchlist */}
-        <Card className="border-none shadow-xl rounded-[2.5rem] bg-white">
-          <CardHeader className="p-8 pb-4 flex flex-row items-center justify-between">
+        <Card className="border-none shadow-xl rounded-2xl bg-white">
+          <CardHeader className="p-6 pb-3 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-xl font-black text-slate-900 tracking-tight">{t.stockWatchlist}</CardTitle>
+              <CardTitle className="text-lg font-black text-slate-900 tracking-tight">{t.stockWatchlist}</CardTitle>
               <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em]">{t.immediateAttentionDesc}</p>
             </div>
             <Link href="/dashboard/inventory" className="text-[10px] font-black text-indigo-600 hover:underline uppercase tracking-widest">
               {t.viewAll}
             </Link>
           </CardHeader>
-          <CardContent className="p-8 pt-0 pb-8">
+          <CardContent className="p-6 pt-0 pb-6">
             {isLoadingLowStock ? getLoadingSpinner() : (
               <div className="space-y-3">
                 {lowStockItems?.length > 0 ? (
@@ -795,12 +795,12 @@ export default function DashboardPage() {
       {/* Last Row: Activity & Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Activity Feed */}
-        <Card className="lg:col-span-2 border-none shadow-xl rounded-[2.5rem] bg-white overflow-hidden">
-          <CardHeader className="p-8 pb-4">
-            <CardTitle className="text-xl font-black text-slate-900 tracking-tight">{t.recentActivity}</CardTitle>
+        <Card className="lg:col-span-2 border-none shadow-xl rounded-2xl bg-white overflow-hidden">
+          <CardHeader className="p-6 pb-3">
+            <CardTitle className="text-lg font-black text-slate-900 tracking-tight">{t.recentActivity}</CardTitle>
             <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em] font-mono">{t.latestUpdatesDesc}</p>
           </CardHeader>
-          <CardContent className="p-8 pt-4">
+          <CardContent className="p-6 pt-3">
             {isLoadingActivity ? getLoadingSpinner() : (
               <div className="space-y-4 lg:space-y-6">
                 {recentActivity && recentActivity.length > 0 ? (
@@ -854,16 +854,16 @@ export default function DashboardPage() {
         </Card>
 
         {/* Quick Actions Panel */}
-        <Card className="border-none shadow-xl rounded-[2.5rem] bg-slate-900 text-white overflow-hidden relative">
+        <Card className="border-none shadow-xl rounded-2xl bg-slate-900 text-white overflow-hidden relative">
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
-          <CardHeader className="p-8 pb-4">
-            <CardTitle className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+          <CardHeader className="p-6 pb-3">
+            <CardTitle className="text-lg font-black tracking-tight text-white flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
               {t.controlPanel}
             </CardTitle>
             <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-[0.2em]">{t.executeFrequentActions}</p>
           </CardHeader>
-          <CardContent className="p-8 pt-6 pb-12">
+          <CardContent className="p-6 pt-4 pb-10">
             <div className="grid grid-cols-2 gap-4">
               {[
                 { label: t.invoice, icon: DollarSign, color: 'bg-white/5', hoverColor: 'hover:bg-indigo-600/30', iconColor: 'text-indigo-400', href: '/dashboard/finance/invoices' },
@@ -875,10 +875,10 @@ export default function DashboardPage() {
                   <motion.div
                     whileHover={{ y: -4, scale: 1.02 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`${action.color} ${action.hoverColor} backdrop-blur-md p-6 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 border border-white/5 transition-all text-center h-full group pointer-events-auto`}
+                    className={`${action.color} ${action.hoverColor} backdrop-blur-md p-4 rounded-2xl flex flex-col items-center justify-center gap-2 border border-white/5 transition-all text-center h-full group pointer-events-auto`}
                   >
-                    <div className="p-4 rounded-2xl bg-slate-800/50 group-hover:bg-indigo-500 transition-all duration-300 shadow-lg group-hover:shadow-indigo-500/20">
-                      <action.icon size={24} className={`${action.iconColor} group-hover:text-white transition-colors`} />
+                    <div className="p-3 rounded-xl bg-slate-800/50 group-hover:bg-indigo-500 transition-all duration-300 shadow-lg group-hover:shadow-indigo-500/20">
+                      <action.icon size={20} className={`${action.iconColor} group-hover:text-white transition-colors`} />
                     </div>
                     <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-300 group-hover:text-white transition-colors">{action.label}</span>
                   </motion.div>
