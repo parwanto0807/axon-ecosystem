@@ -26,7 +26,7 @@ interface Invoice {
     signerName?: string; signerPosition?: string;
     currency: string; subtotal: number; tax: number; discount: number;
     discountAmt: number; taxAmt: number; grandTotal: number;
-    payments?: { amount: number }[];
+    payments?: { id: string; amount: number; date: string; notes?: string }[];
     notes?: string; paymentTerms?: string;
     items: InvoiceItem[];
     createdAt: string;
