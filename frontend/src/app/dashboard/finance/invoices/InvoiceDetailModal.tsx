@@ -21,11 +21,13 @@ interface Invoice {
     discountAmt: number; taxAmt: number; grandTotal: number;
     notes?: string; paymentTerms?: string;
     items: InvoiceItem[];
+    payments?: { id: string; amount: number; date: string; notes?: string }[];
 }
 
 const STATUS_CFG: Record<string, { label: string; color: string; icon: any }> = {
     DRAFT: { label: 'Draft', color: 'bg-slate-100 text-slate-600 border-slate-200', icon: Clock },
     POSTED: { label: 'Posted', color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: Send },
+    PARTIAL: { label: 'Cicilan', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
     SENT: { label: 'Sent', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: FileText },
     PAID: { label: 'Paid', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
     OVERDUE: { label: 'Overdue', color: 'bg-rose-50 text-rose-700 border-rose-200', icon: AlertCircle },
@@ -40,6 +42,9 @@ import { CheckCircle2 } from "lucide-react"
 export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invoice: Invoice; onClose: () => void; onPrint?: () => void }) {
     const s = STATUS_CFG[invoice.status] || STATUS_CFG.DRAFT
     const [isMobile, setIsMobile] = useState(false)
+    
+    const totalPaid = invoice.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+    const remainingBalance = invoice.grandTotal - totalPaid;
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768)
@@ -195,6 +200,35 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                         </div>
                     </div>
 
+                    {/* Payment History */}
+                    {invoice.payments && invoice.payments.length > 0 && (
+                        <div className="space-y-4">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 ml-1">
+                                <DollarSign size={14} /> Riwayat Pembayaran
+                            </h3>
+                            <div className="rounded-[2rem] border border-slate-100 overflow-hidden bg-slate-50/30">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal</th>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Referensi</th>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Nominal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {invoice.payments.map((p, idx) => (
+                                            <tr key={idx} className="bg-white/50 group hover:bg-white transition-colors">
+                                                <td className="px-6 py-4 text-xs font-bold text-slate-600">{fmtDate(p.date)}</td>
+                                                <td className="px-6 py-4 text-sm font-black text-slate-900">{p.notes || '-'}</td>
+                                                <td className="px-6 py-4 text-right text-sm font-black text-emerald-600">{fmt(p.amount)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Bottom Row: Notes & Payment Info + Totals */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-slate-100">
                         <div className="space-y-6">
@@ -243,13 +277,35 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                                 <span>PPN ({invoice.tax}%)</span>
                                 <span>+ {fmt(invoice.taxAmt)}</span>
                             </div>
-                            <div className="flex justify-between items-end pt-2">
+                            <div className="flex justify-between items-end pt-2 pb-2">
                                 <div className="space-y-1">
                                     <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500 leading-none">Grand Total</p>
-                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-tighter">Tagihan Terhutang</p>
                                 </div>
-                                <p className="text-3xl font-black tracking-tighter text-white">{fmt(invoice.grandTotal)}</p>
+                                <p className="text-xl font-black tracking-tighter text-white">{fmt(invoice.grandTotal)}</p>
                             </div>
+                            
+                            {totalPaid > 0 && (
+                                <>
+                                    <div className="flex justify-between items-center text-sm font-medium text-emerald-400 uppercase tracking-widest border-t border-white/10 pt-4">
+                                        <span>Total Terbayar</span>
+                                        <span>{fmt(totalPaid)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-end pt-2">
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 leading-none">Sisa Tagihan</p>
+                                        </div>
+                                        <p className="text-3xl font-black tracking-tighter text-white">{fmt(remainingBalance)}</p>
+                                    </div>
+                                </>
+                            )}
+                            {totalPaid === 0 && (
+                                <div className="flex justify-between items-end pt-2 border-t border-white/10 mt-2">
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 leading-none">Sisa Tagihan</p>
+                                    </div>
+                                    <p className="text-3xl font-black tracking-tighter text-white">{fmt(invoice.grandTotal)}</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

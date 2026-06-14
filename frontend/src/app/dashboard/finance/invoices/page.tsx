@@ -26,6 +26,7 @@ interface Invoice {
     signerName?: string; signerPosition?: string;
     currency: string; subtotal: number; tax: number; discount: number;
     discountAmt: number; taxAmt: number; grandTotal: number;
+    payments?: { amount: number }[];
     notes?: string; paymentTerms?: string;
     items: InvoiceItem[];
     createdAt: string;
@@ -86,7 +87,7 @@ export default function InvoicesPage() {
     const [viewModal, setViewModal] = useState<Invoice | null>(null)
     const [detailModal, setDetailModal] = useState<Invoice | null>(null)
     const [postingInvoice, setPostingInvoice] = useState<Invoice | null>(null)
-    const [paymentConfirm, setPaymentConfirm] = useState<{ invoice: Invoice, bankAccountId: string } | null>(null)
+    const [paymentConfirm, setPaymentConfirm] = useState<{ invoice: Invoice, bankAccountId: string, amount: number } | null>(null)
     const [company, setCompany] = useState<Record<string, string>>({})
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
     const [isMobile, setIsMobile] = useState(false)
@@ -408,6 +409,11 @@ export default function InvoicesPage() {
                                             </td>
                                             <td className="px-6 py-5 text-right">
                                                 <p className="font-black text-foreground">{fmt(inv.grandTotal)}</p>
+                                                {inv.payments && inv.payments.length > 0 && inv.status !== 'PAID' && (
+                                                    <p className="text-[10px] font-black text-rose-500 uppercase tracking-tighter mt-1">
+                                                        Sisa: {fmt(inv.grandTotal - inv.payments.reduce((s, p) => s + p.amount, 0))}
+                                                    </p>
+                                                )}
                                             </td>
                                             <td className="px-6 py-5">
                                                 <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider ${INV_STATUS[inv.status]?.color || ''}`}>
@@ -431,13 +437,13 @@ export default function InvoicesPage() {
                                                             <Send size={14} /> POSTING
                                                         </Button>
                                                     )}
-                                                    {inv.status === 'POSTED' && (
+                                                    {['POSTED', 'PARTIAL'].includes(inv.status) && (
                                                         <Button
                                                             variant="ghost" size="sm"
-                                                            onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '' })}
+                                                            onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '', amount: inv.grandTotal - (inv.payments?.reduce((s, p) => s + p.amount, 0) || 0) })}
                                                             className="h-9 rounded-xl hover:bg-emerald-50 text-emerald-600 font-bold px-3 gap-1"
                                                         >
-                                                            <DollarSign size={14} /> PAID
+                                                            <DollarSign size={14} /> PAY
                                                         </Button>
                                                     )}
                                                     <Button variant="ghost" size="icon" onClick={() => {
@@ -518,6 +524,11 @@ export default function InvoicesPage() {
                                         <div className="space-y-1">
                                             <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Total Tagihan</p>
                                             <p className="font-black text-slate-900">{fmt(inv.grandTotal)}</p>
+                                            {inv.payments && inv.payments.length > 0 && inv.status !== 'PAID' && (
+                                                <p className="text-[10px] font-black text-rose-500 uppercase tracking-tighter mt-1">
+                                                    Sisa: {fmt(inv.grandTotal - inv.payments.reduce((s, p) => s + p.amount, 0))}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
@@ -533,9 +544,9 @@ export default function InvoicesPage() {
                                                 <Send size={14} /> POSTING
                                             </Button>
                                         )}
-                                        {inv.status === 'POSTED' && (
-                                            <Button variant="ghost" size="sm" onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '' })} className="h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-bold px-3 gap-1 shrink-0">
-                                                <DollarSign size={14} /> PAID
+                                        {['POSTED', 'PARTIAL'].includes(inv.status) && (
+                                            <Button variant="ghost" size="sm" onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '', amount: inv.grandTotal - (inv.payments?.reduce((s, p) => s + p.amount, 0) || 0) })} className="h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 font-bold px-3 gap-1 shrink-0">
+                                                <DollarSign size={14} /> PAY
                                             </Button>
                                         )}
                                         <Button variant="ghost" size="sm" onClick={() => {
@@ -1041,21 +1052,38 @@ export default function InvoicesPage() {
 
                             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 mb-6">
                                 <p className="text-sm font-bold text-amber-800 leading-relaxed">
-                                    <span className="block mb-1 font-black">⚠️ PERINGATAN!</span>
-                                    Konfirmasi pembayaran akan mencatat penerimaan uang ke kas/bank dan mengurangi piutang. **Tindakan ini tidak dapat dibatalkan.**
+                                    <span className="block mb-1 font-black">⚠️ INFO PEMBAYARAN</span>
+                                    Konfirmasi pembayaran akan mencatat penerimaan uang ke kas/bank dan mengurangi piutang. Anda dapat mengedit nominal jika pelanggan membayar cicilan.
                                 </p>
                             </div>
 
-                            <div className="space-y-2 mb-6">
-                                <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Pilih Rekening Penerima <span className="text-rose-500">*</span></label>
-                                <select
-                                    className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 px-4"
-                                    value={paymentConfirm.bankAccountId}
-                                    onChange={(e) => setPaymentConfirm({ ...paymentConfirm, bankAccountId: e.target.value })}
-                                >
-                                    <option value="">Pilih Bank...</option>
-                                    {banks.map(b => <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber} ({b.accountHolder})</option>)}
-                                </select>
+                            <div className="space-y-4 mb-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Pilih Rekening Penerima <span className="text-rose-500">*</span></label>
+                                    <select
+                                        className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 px-4"
+                                        value={paymentConfirm.bankAccountId}
+                                        onChange={(e) => setPaymentConfirm({ ...paymentConfirm, bankAccountId: e.target.value })}
+                                    >
+                                        <option value="">Pilih Bank...</option>
+                                        {banks.map(b => <option key={b.id} value={b.id}>{b.bankName} - {b.accountNumber} ({b.accountHolder})</option>)}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Nominal Pembayaran <span className="text-rose-500">*</span></label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                            <span className="text-slate-500 font-bold">Rp</span>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            className="w-full h-12 pl-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 px-4"
+                                            value={paymentConfirm.amount}
+                                            onChange={(e) => setPaymentConfirm({ ...paymentConfirm, amount: Number(e.target.value) })}
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-muted-foreground ml-1">Total Tagihan: {fmt(paymentConfirm.invoice.grandTotal)}</p>
+                                </div>
                             </div>
 
                             <div className="flex gap-3 mt-8">
@@ -1064,11 +1092,14 @@ export default function InvoicesPage() {
                                     className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold h-12 shadow-lg shadow-emerald-600/20 text-white disabled:opacity-50"
                                     disabled={!paymentConfirm.bankAccountId}
                                     onClick={() => {
-                                        handleAction(paymentConfirm.invoice.id, 'pay', { bankAccountId: paymentConfirm.bankAccountId });
+                                        handleAction(paymentConfirm.invoice.id, 'pay', { 
+                                            bankAccountId: paymentConfirm.bankAccountId,
+                                            amount: paymentConfirm.amount
+                                        });
                                         setPaymentConfirm(null);
                                     }}
                                 >
-                                    Konfirmasi Lunas
+                                    Konfirmasi Pembayaran
                                 </Button>
                             </div>
                         </motion.div>

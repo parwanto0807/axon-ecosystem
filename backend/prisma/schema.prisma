@@ -603,6 +603,7 @@ model Invoice {
   salesOrder      SalesOrder?      @relation(fields: [salesOrderId], references: [id])
   contract        Contract?        @relation(fields: [contractId], references: [id])
   items           InvoiceItem[]
+  payments        InvoicePayment[]
 }
 
 model InvoiceItem {
@@ -616,6 +617,27 @@ model InvoiceItem {
   discount    Float   @default(0)
   amount      Float   @default(0)
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model InvoicePayment {
+  id              String        @id @default(cuid())
+  invoiceId       String
+  date            DateTime      @default(now())
+  amount          Float         @default(0)
+  paymentMethod   String
+  status          PaymentStatus @default(PENDING)
+  proofOfPayment  String?
+  notes           String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
 
 model BankAccount {
@@ -1188,6 +1210,7 @@ enum DeliveryOrderStatus {
 enum InvoiceStatus {
   DRAFT
   SENT
+  PARTIAL
   PAID
   OVERDUE
   CANCELLED

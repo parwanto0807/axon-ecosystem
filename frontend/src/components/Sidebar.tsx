@@ -118,6 +118,7 @@ const translations: any = {
         infrastructure: 'Infrastruktur',
         networkSettings: 'Pengaturan Jaringan',
         mikrotikMonitoring: 'Monitoring MikroTik',
+        invoiceTemplate: 'Template Invoice',
     },
     EN: {
         overview: 'Overview',
@@ -183,6 +184,7 @@ const translations: any = {
         infrastructure: 'Infrastructure',
         networkSettings: 'Network Settings',
         mikrotikMonitoring: 'MikroTik Monitoring',
+        invoiceTemplate: 'Invoice Template',
     }
 }
 
@@ -378,6 +380,13 @@ const getMenuItems = (t: any) => [
         icon: Cpu,
         label: t.networkSettings,
         path: '/dashboard/settings/network',
+        requiredRoles: ['ADMIN', 'SUPER_ADMIN']
+    },
+    {
+        id: 'invoice-template',
+        icon: Receipt,
+        label: t.invoiceTemplate,
+        path: '/dashboard/invoice',
         requiredRoles: ['ADMIN', 'SUPER_ADMIN']
     },
     { id: 'settings', icon: Settings, label: t.preferences, path: '/dashboard/settings/company', requiredRoles: ['ADMIN', 'SUPER_ADMIN'] },

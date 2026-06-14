@@ -3108,7 +3108,8 @@ const INV_INCLUDE = {
   bast: true,
   contract: true,
   bankAccount: true,
-  items: { orderBy: { no: 'asc' } }
+  items: { orderBy: { no: 'asc' } },
+  payments: { orderBy: { date: 'asc' } }
 };
 
 app.get('/api/invoices', async (req, res) => {
@@ -3282,17 +3283,25 @@ app.patch('/api/invoices/:id/post', async (req, res) => {
 app.patch('/api/invoices/:id/pay', async (req, res) => {
   try {
     const { id } = req.params;
-    const { bankAccountId } = req.body;
+    const { bankAccountId, amount } = req.body;
 
     const inv = await prisma.$transaction(async (tx) => {
       // 1. Get the invoice and ensure it can be paid
       const invoice = await tx.invoice.findUnique({
         where: { id },
-        include: INV_INCLUDE
+        include: { ...INV_INCLUDE, payments: true }
       });
 
       if (!invoice) throw new Error('Invoice not found');
-      if (invoice.status === 'PAID') throw new Error('Invoice already paid');
+      if (invoice.status === 'PAID') throw new Error('Invoice already fully paid');
+
+      const currentPaid = invoice.payments ? invoice.payments.reduce((sum, p) => sum + p.amount, 0) : 0;
+      const paymentAmount = amount ? Number(amount) : (invoice.grandTotal - currentPaid);
+
+      if (paymentAmount <= 0) throw new Error('Payment amount must be greater than 0');
+
+      const totalPaid = currentPaid + paymentAmount;
+      const newStatus = totalPaid >= invoice.grandTotal ? 'PAID' : 'PARTIAL';
 
       // 2. Resolve Bank and AR Accounts
       let targetCoaId = null;
@@ -3322,34 +3331,49 @@ app.patch('/api/invoices/:id/pay', async (req, res) => {
       });
       if (!arAcc) throw new Error('AR system account not mapped');
 
-      // 3. Update Invoice Status
+      // 3. Create InvoicePayment and Update Invoice Status
       const result = await tx.invoice.update({
         where: { id },
         data: { 
-          status: 'PAID',
+          status: newStatus,
           bankAccountId: bankAccountId || invoice.bankAccountId 
         },
-        include: INV_INCLUDE
+        include: { ...INV_INCLUDE, payments: true }
+      });
+
+      const paymentRecord = await tx.invoicePayment.create({
+        data: {
+          invoiceId: id,
+          amount: paymentAmount,
+          date: new Date(),
+          paymentMethod: 'TRANSFER',
+          status: 'SUCCESS',
+          notes: `Ref: PAY-${result.number}-${result.payments.length + 1}`
+        }
       });
 
       // 4. Create Journal Entry
       const journalItems = [
         {
           coaId: targetCoaId,
-          description: `Penerimaan Pembayaran: ${result.number} - ${result.customer?.name || ''}`,
-          debit: result.grandTotal,
+          description: `Penerimaan Pembayaran (${newStatus}): ${result.number} - ${result.customer?.name || ''}`,
+          debit: paymentAmount,
           credit: 0
         },
         {
           coaId: arAcc.coaId,
-          description: `Pelunasan Piutang: ${result.number}`,
+          description: `Pelunasan Piutang (${newStatus}): ${result.number}`,
           debit: 0,
-          credit: result.grandTotal
+          credit: paymentAmount
         }
       ];
 
-      const count = await tx.journalEntry.count();
-      const jvNumber = `JV-${new Date().getFullYear()}-${(count + 1).toString().padStart(4, '0')}`;
+      const lastJE = await tx.journalEntry.findFirst({
+        where: { number: { startsWith: `JV-${new Date().getFullYear()}-` } },
+        orderBy: { number: 'desc' }
+      });
+      const nextNum = lastJE ? parseInt(lastJE.number.split('-')[2] || '0') + 1 : 1;
+      const jvNumber = `JV-${new Date().getFullYear()}-${nextNum.toString().padStart(4, '0')}`;
 
       await tx.journalEntry.create({
         data: {
