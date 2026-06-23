@@ -10,7 +10,7 @@ export default function InvoiceTemplate() {
     
     // Mock Data for Payments
     const grandTotal = 3516457;
-    const paidAmount = 1000000; // Mock paid amount
+    const paidAmount = 0; // Mock paid amount
     const remainingBalance = grandTotal - paidAmount;
     
     const [paymentAmount, setPaymentAmount] = useState<number>(remainingBalance);
@@ -226,12 +226,6 @@ export default function InvoiceTemplate() {
                                     <span className="text-xl font-bold text-slate-800">Rp{grandTotal.toLocaleString('id-ID')}</span>
                                 </div>
                             </div>
-                            <div className="flex justify-between items-end mb-2">
-                                <span className="text-lg font-medium text-slate-600">Sudah Dibayar</span>
-                                <div className="text-right">
-                                    <span className="text-xl font-bold text-emerald-600">Rp{paidAmount.toLocaleString('id-ID')}</span>
-                                </div>
-                            </div>
                             <div className="flex justify-between items-end">
                                 <span className="text-xl font-bold text-slate-800">Sisa Tagihan</span>
                                 <div className="text-right">
@@ -276,9 +270,17 @@ export default function InvoiceTemplate() {
                             )}
                         </div>
 
-                        <button className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20 mb-6 flex justify-center items-center gap-2">
+                        <button className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20 mb-4 flex justify-center items-center gap-2">
                             <Wallet size={20} />
                             Bayar Rp{paymentAmount.toLocaleString('id-ID')}
+                        </button>
+
+                        <button 
+                            onClick={() => window.open('/invoice-print', '_blank')}
+                            className="w-full bg-white text-indigo-600 border-2 border-indigo-600 font-bold py-4 rounded-xl hover:bg-indigo-50 transition-colors mb-6 flex justify-center items-center gap-2"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            Print Invoice PDF
                         </button>
 
                         <button className="text-indigo-600 font-bold hover:text-indigo-800 transition-colors w-full text-center mb-6">
@@ -290,25 +292,7 @@ export default function InvoiceTemplate() {
                             Due Date : 16 Juni 2026
                         </div>
                         
-                        {/* Riwayat Pembayaran */}
-                        <div className="mt-8 border-t border-slate-100 pt-6">
-                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                <Check size={18} className="text-emerald-500" />
-                                Riwayat Pembayaran
-                            </h3>
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center bg-emerald-50 p-3 rounded-lg border border-emerald-100">
-                                    <div>
-                                        <p className="text-sm font-bold text-slate-800">Pembayaran 1</p>
-                                        <p className="text-xs text-slate-500">14 Juni 2026 • BCA</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-sm font-bold text-emerald-600">Rp1.000.000</p>
-                                        <p className="text-[10px] font-bold text-emerald-500 uppercase">Sukses</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+
                     </motion.div>
                 </div>
             </div>

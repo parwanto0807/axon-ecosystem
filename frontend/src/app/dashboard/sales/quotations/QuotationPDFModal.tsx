@@ -29,6 +29,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
 
     const [busy, setBusy] = useState(false)
     const [showProductImages, setShowProductImages] = useState(false)
+    const [showTotals, setShowTotals] = useState(true)
     const c = quotation.customer
     const sc = STATUS_CFG[quotation.status] || STATUS_CFG.DRAFT
 
@@ -220,23 +221,25 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             y = (doc as any).lastAutoTable.finalY + 8
 
             // Check page break for Totals
-            if (y > 250) { doc.addPage(); y = 20 }
+            if (showTotals) {
+                if (y > 250) { doc.addPage(); y = 20 }
 
-            // Totals
-            const bx = W - M - 80
-            const tots: [string, string][] = [['Subtotal', fr(quotation.subtotal)]]
-            if (quotation.discount > 0) tots.push([`Diskon (${quotation.discount}%)`, `- ${fr(quotation.discountAmt)}`])
-            tots.push([`PPN (${quotation.tax}%)`, `+ ${fr(quotation.taxAmt)}`])
-            doc.setFontSize(8)
-            tots.forEach(([k, v]) => {
-                doc.setFont('helvetica', 'normal').setTextColor(...gray).text(k, bx, y)
-                doc.setFont('helvetica', 'bold').setTextColor(...dark).text(v, W - M, y, { align: 'right' })
-                y += 5
-            })
-            doc.setDrawColor(...indigo).setLineWidth(0.5).line(bx, y, W - M, y); y += 5
-            doc.setFont('helvetica', 'bold').setFontSize(11).setTextColor(...indigo)
-            doc.text('TOTAL', bx, y).text(fr(quotation.grandTotal), W - M, y, { align: 'right' })
-            y += 10
+                // Totals
+                const bx = W - M - 80
+                const tots: [string, string][] = [['Subtotal', fr(quotation.subtotal)]]
+                if (quotation.discount > 0) tots.push([`Diskon (${quotation.discount}%)`, `- ${fr(quotation.discountAmt)}`])
+                tots.push([`PPN (${quotation.tax}%)`, `+ ${fr(quotation.taxAmt)}`])
+                doc.setFontSize(8)
+                tots.forEach(([k, v]) => {
+                    doc.setFont('helvetica', 'normal').setTextColor(...gray).text(k, bx, y)
+                    doc.setFont('helvetica', 'bold').setTextColor(...dark).text(v, W - M, y, { align: 'right' })
+                    y += 5
+                })
+                doc.setDrawColor(...indigo).setLineWidth(0.5).line(bx, y, W - M, y); y += 5
+                doc.setFont('helvetica', 'bold').setFontSize(11).setTextColor(...indigo)
+                doc.text('TOTAL', bx, y).text(fr(quotation.grandTotal), W - M, y, { align: 'right' })
+                y += 10
+            }
 
             // Notes & Terms - Bottom Fixed
             if (quotation.notes) {
@@ -313,6 +316,14 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-4 px-4 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Totals</span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked={showTotals} onChange={(e) => setShowTotals(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600"></div>
+                                </label>
+                            </div>
+                            <div className="w-px h-4 bg-slate-300"></div>
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Gambar Produk</span>
                                 <label className="relative inline-flex items-center cursor-pointer">
@@ -443,22 +454,24 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         </table>
 
                         {/* Totals */}
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-                            <div style={{ width: 300, fontSize: 10 }}>
-                                {[['Subtotal', `Rp ${quotation.subtotal?.toLocaleString('id-ID')}`],
-                                ...(quotation.discount > 0 ? [[`Diskon (${quotation.discount}%)`, `- Rp ${quotation.discountAmt?.toLocaleString('id-ID')}`]] : []),
-                                [`PPN (${quotation.tax}%)`, `+ Rp ${quotation.taxAmt?.toLocaleString('id-ID')}`],
-                                ].map(([k, v]) => (
-                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 5, marginBottom: 5 }}>
-                                        <span style={{ color: '#64748b' }}>{k}</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{v}</span>
+                        {showTotals && (
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
+                                <div style={{ width: 300, fontSize: 10 }}>
+                                    {[['Subtotal', `Rp ${quotation.subtotal?.toLocaleString('id-ID')}`],
+                                    ...(quotation.discount > 0 ? [[`Diskon (${quotation.discount}%)`, `- Rp ${quotation.discountAmt?.toLocaleString('id-ID')}`]] : []),
+                                    [`PPN (${quotation.tax}%)`, `+ Rp ${quotation.taxAmt?.toLocaleString('id-ID')}`],
+                                    ].map(([k, v]) => (
+                                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 5, marginBottom: 5 }}>
+                                            <span style={{ color: '#64748b' }}>{k}</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{v}</span>
+                                        </div>
+                                    ))}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid #4f46e5' }}>
+                                        <span style={{ fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: 1 }}>TOTAL</span>
+                                        <span style={{ fontWeight: 900, color: '#4f46e5', fontSize: 15 }}>Rp {quotation.grandTotal?.toLocaleString('id-ID')}</span>
                                     </div>
-                                ))}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid #4f46e5' }}>
-                                    <span style={{ fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: 1 }}>TOTAL</span>
-                                    <span style={{ fontWeight: 900, color: '#4f46e5', fontSize: 15 }}>Rp {quotation.grandTotal?.toLocaleString('id-ID')}</span>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Notes - Bottom */}
                         {quotation.notes && (
