@@ -9,6 +9,7 @@ const withPWA = withPWAInit({
 
 const nextConfig = {
   reactStrictMode: true,
+  turbopack: {},
   images: {
     remotePatterns: [
       {
