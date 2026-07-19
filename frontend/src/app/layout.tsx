@@ -20,6 +20,10 @@ export const metadata: Metadata = {
   title: "Axon Ecosystem Portal",
   description: "Central monitoring and control hub for Axon applications",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+  },
 };
 
 import { Providers } from "@/components/Providers";
