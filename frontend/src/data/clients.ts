@@ -5,6 +5,7 @@ export type ClientData = {
     filterCategory: string;
     badges: string[];
     shortDesc: string;
+    domain: string;
     caseStudy: {
         tantangan: string;
         solusi: string;
@@ -22,6 +23,7 @@ export const clients: ClientData[] = [
         sector: "General Supply & Kontraktor",
         filterCategory: "General Supply & Kontraktor",
         badges: ["ERP", "Procurement", "Multi-Proyek"],
+        domain: "https://rylif-app.com/",
         shortDesc: "PT. Rylif Mikro Mandiri — General Supply & Kontraktor kepercayaan Bank BRI dan berbagai instansi, kini mengelola seluruh alur procurement dan proyek dalam satu sistem terpadu.",
         caseStudy: {
             tantangan: "Sebagai kontraktor dan penyedia general supply untuk klien besar seperti Bank BRI dan berbagai instansi, Rylif menghadapi kompleksitas dalam mengelola banyak proyek dan pesanan secara bersamaan — mulai dari penawaran, pengadaan barang, hingga pelaporan ke klien korporat yang menuntut akurasi tinggi.",
@@ -38,6 +40,7 @@ export const clients: ClientData[] = [
         sector: "Layanan Kesehatan",
         filterCategory: "Kesehatan",
         badges: ["HRM", "Operasional Klinis", "Manajemen Layanan"],
+        domain: "https://yasfina-app.com/",
         shortDesc: "Yayasan Kesehatan Klinik Yasfina — bergerak di bidang kesehatan, mempercayakan pengelolaan operasional dan SDM-nya pada Axon Ecosystem untuk mendukung pelayanan yang lebih responsif.",
         caseStudy: {
             tantangan: "Institusi kesehatan seperti Yasfina membutuhkan sistem yang dapat diandalkan untuk mengelola SDM (tenaga medis & non-medis) serta operasional harian, tanpa mengorbankan fokus utama mereka: pelayanan kepada pasien.",
@@ -54,6 +57,7 @@ export const clients: ClientData[] = [
         sector: "Manufaktur (Sticker Otomotif)",
         filterCategory: "Manufaktur",
         badges: ["ERP", "MRP", "Manufaktur"],
+        domain: "https://grafindo-app.com/portal/login",
         shortDesc: "PT. Grafindo Mitrasemesta — pemain industri sticker otomotif, menggunakan Axon ERP untuk mengintegrasikan produksi, inventory, dan akuntansi dalam satu sistem.",
         caseStudy: {
             tantangan: "Sebagai pelaku industri manufaktur sticker otomotif, Grafindo perlu mengelola alur produksi yang kompleks — dari perhitungan material (BOM), stok bahan baku, hingga pelaporan keuangan — yang jika dilakukan manual rentan terhadap kesalahan dan keterlambatan.",
@@ -70,6 +74,7 @@ export const clients: ClientData[] = [
         sector: "Properti / Perumahan",
         filterCategory: "Properti & Perumahan",
         badges: ["Axon Guard", "Gate System", "IPL Payment"],
+        domain: "https://taman-marunda.id/login",
         shortDesc: "Perum Metland Cibitung Cluster Taman Marunda — cluster perumahan modern yang mengintegrasikan Gate System, manajemen petugas keamanan & kebersihan, hingga pembayaran IPL dalam satu ekosistem digital.",
         caseStudy: {
             tantangan: "Mengelola sebuah cluster perumahan bukan hanya soal keamanan gerbang, tapi juga koordinasi petugas keamanan, kebersihan lingkungan, dan yang paling krusial — transparansi pembayaran Iuran Pengelolaan Lingkungan (IPL) yang seringkali jadi sumber gesekan antara pengelola dan warga.",

@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Target, Lightbulb, TrendingUp, Building2, CheckCircle2 } from "lucide-react"
+import { X, Target, Lightbulb, TrendingUp, Building2, CheckCircle2, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/context/LanguageContext"
 import { ClientData } from "@/data/clients"
@@ -19,14 +19,16 @@ const translations = {
         solutionTitle: "Solusi Axon",
         resultTitle: "Hasil (Outcome)",
         modulesUsed: "Modul yang Dipakai",
-        contactBtn: "Minta Penawaran"
+        contactBtn: "Minta Penawaran",
+        visitApp: "Kunjungi Aplikasi",
     },
     EN: {
         challengeTitle: "The Challenge",
         solutionTitle: "Axon Solution",
         resultTitle: "The Outcome",
         modulesUsed: "Modules Used",
-        contactBtn: "Request a Quote"
+        contactBtn: "Request a Quote",
+        visitApp: "Visit App",
     }
 }
 
@@ -88,6 +90,26 @@ export function ClientDetailModal({ isOpen, onClose, client }: ClientDetailModal
                                     </div>
                                 </div>
 
+                                <div className="mb-8 p-4 rounded-xl border border-primary/15 bg-primary/5 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <ExternalLink size={16} className="text-primary shrink-0" />
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t.visitApp}</p>
+                                            <a href={client.domain} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-primary hover:underline truncate block">
+                                                {client.domain.replace(/^https?:\/\//, '')}
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <a
+                                        href={client.domain}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="shrink-0 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold transition-colors"
+                                    >
+                                        {lang === 'ID' ? 'Buka' : 'Open'}
+                                    </a>
+                                </div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-1 gap-8 mb-8">
                                     <div className="space-y-8">
                                         {/* Tantangan */}
@@ -138,7 +160,7 @@ export function ClientDetailModal({ isOpen, onClose, client }: ClientDetailModal
                                     asChild
                                     className="rounded-xl px-8 h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm transition-colors whitespace-nowrap w-full sm:w-auto"
                                 >
-                                    <Link href={`https://wa.me/6281234567890?text=Halo%20Axon,%20saya%20tertarik%20dengan%20solusi%20untuk%20sektor%20${client.sector}`}>
+                                    <Link href={`https://wa.me/6281280212068?text=Halo%20Axon,%20saya%20tertarik%20dengan%20solusi%20untuk%20${encodeURIComponent(client.name)}`}>
                                         {t.contactBtn}
                                     </Link>
                                 </Button>
