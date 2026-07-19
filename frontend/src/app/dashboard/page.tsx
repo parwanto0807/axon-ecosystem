@@ -49,12 +49,12 @@ import {
   getSalesByCategory
 } from "@/lib/api";
 import { format } from "date-fns";
-import { useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+
 
 const translations: any = {
   ID: {
@@ -232,36 +232,113 @@ interface DashboardCardProps {
   colorClass: string;
 }
 
-const DashboardCard = ({ title, value, icon: Icon, description, trend, trendType, colorClass }: DashboardCardProps) => (
-  <motion.div
-    initial={{ opacity: 0, scale: 0.95 }}
-    animate={{ opacity: 1, scale: 1 }}
-    whileHover={{ y: -8, scale: 1.02 }}
-    transition={{ type: "spring", stiffness: 300, damping: 20 }}
-  >
-    <Card className="relative overflow-hidden border-none shadow-xl bg-white/80 backdrop-blur-md rounded-2xl">
-      <div className={`absolute top-0 right-0 w-24 h-24 -mr-12 -mt-12 rounded-full opacity-10 ${colorClass}`} />
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className={`p-2 rounded-xl ${colorClass.replace('bg-', 'bg-').replace('/10', '/20')} text-primary`}>
-            <Icon className="h-5 w-5" />
-          </div>
-          {trend && (
-            <div className={`flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${trendType === 'up' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-              {trendType === 'up' ? <ArrowUpRight size={12} className="mr-0.5" /> : <ArrowDownRight size={12} className="mr-0.5" />}
-              {trend}
+// Premium animated number counter
+function useAnimatedCounter(targetValue: number, duration = 1500) {
+  const [value, setValue] = useState(0)
+  const hasAnimated = useRef(false)
+
+  useEffect(() => {
+    if (hasAnimated.current || targetValue === 0) return
+    hasAnimated.current = true
+    const steps = 50
+    const increment = targetValue / steps
+    let current = 0
+    const timer = setInterval(() => {
+      current += increment
+      if (current >= targetValue) {
+        setValue(targetValue)
+        clearInterval(timer)
+      } else {
+        setValue(Math.floor(current))
+      }
+    }, duration / steps)
+    return () => clearInterval(timer)
+  }, [targetValue, duration])
+
+  return value
+}
+
+const cardAccents: Record<string, { border: string; icon: string; badge: string; glow: string }> = {
+  "bg-teal-500":    { border: "#00C9A7", icon: "rgba(0,201,167,0.12)",  badge: "rgba(0,201,167,0.1)",  glow: "rgba(0,201,167,0.08)" },
+  "bg-red-500":     { border: "#ef4444", icon: "rgba(239,68,68,0.10)",   badge: "rgba(239,68,68,0.08)",   glow: "rgba(239,68,68,0.05)" },
+  "bg-emerald-500": { border: "#10b981", icon: "rgba(16,185,129,0.12)",  badge: "rgba(16,185,129,0.1)",  glow: "rgba(16,185,129,0.06)" },
+  "bg-amber-500":   { border: "#f59e0b", icon: "rgba(245,158,11,0.12)",  badge: "rgba(245,158,11,0.1)",  glow: "rgba(245,158,11,0.06)" },
+  "bg-indigo-500":  { border: "#00C9A7", icon: "rgba(0,201,167,0.12)",  badge: "rgba(0,201,167,0.1)",  glow: "rgba(0,201,167,0.06)" },
+}
+
+const DashboardCard = ({ title, value, icon: Icon, description, trend, trendType, colorClass }: DashboardCardProps) => {
+  const accent = cardAccents[colorClass] || cardAccents["bg-teal-500"]
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -4, scale: 1.01 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className="relative"
+    >
+      {/* Gradient border effect */}
+      <div
+        className="absolute inset-0 rounded-2xl opacity-60"
+        style={{ background: `linear-gradient(135deg, ${accent.border}20, transparent 60%)` }}
+      />
+
+      <Card
+        className="relative overflow-hidden rounded-2xl border bg-white"
+        style={{
+          borderColor: `${accent.border}25`,
+          boxShadow: `0 1px 3px rgba(0,0,0,0.06), 0 4px 16px ${accent.glow}`
+        }}
+      >
+        {/* Top accent line */}
+        <div
+          className="absolute top-0 left-0 right-0 h-0.5 rounded-t-2xl"
+          style={{ background: `linear-gradient(90deg, ${accent.border}, ${accent.border}40)` }}
+        />
+
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div
+              className="p-2.5 rounded-xl flex-shrink-0"
+              style={{ background: accent.icon }}
+            >
+              <Icon className="h-4 w-4" style={{ color: accent.border }} strokeWidth={2.5} />
             </div>
-          )}
-        </div>
-        <div>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">{title}</p>
-          <div className="text-2xl font-black text-slate-900 tracking-tight">{value}</div>
-          <p className="text-[11px] font-medium text-slate-400 mt-1.5">{description}</p>
-        </div>
-      </CardContent>
-    </Card>
-  </motion.div>
-);
+            {trend && (
+              <div
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black"
+                style={{
+                  background: trendType === 'up' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.08)',
+                  color: trendType === 'up' ? '#10b981' : '#ef4444'
+                }}
+              >
+                {trendType === 'up' ? <ArrowUpRight size={11} className="flex-shrink-0" /> : <ArrowDownRight size={11} className="flex-shrink-0" />}
+                {trend}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p
+              className="text-[10px] font-black uppercase tracking-[0.18em] mb-1.5"
+              style={{ color: accent.border }}
+            >
+              {title}
+            </p>
+            <div
+              className="text-xl font-black tracking-tight leading-tight font-financial"
+              style={{ color: "#0D1117" }}
+            >
+              {value}
+            </div>
+            <p className="text-[11px] font-medium mt-1.5" style={{ color: "#94a3b8" }}>{description}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+};
+
 
 export default function DashboardPage() {
   const { lang } = useLanguage();
@@ -315,13 +392,13 @@ export default function DashboardPage() {
         type: 'line' as const,
         label: t.revenue,
         data: salesData?.monthlySales || [],
-        borderColor: '#6366f1',
-        borderWidth: 4,
+        borderColor: '#00C9A7',
+        borderWidth: 3,
         pointRadius: 5,
         pointHoverRadius: 8,
         pointBackgroundColor: '#fff',
-        pointBorderColor: '#6366f1',
-        pointBorderWidth: 3,
+        pointBorderColor: '#00C9A7',
+        pointBorderWidth: 2.5,
         tension: 0.4,
         fill: true,
         backgroundColor: (context: any) => {
@@ -329,8 +406,8 @@ export default function DashboardPage() {
           const { ctx, chartArea } = chart;
           if (!chartArea) return null;
           const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          gradient.addColorStop(0, 'rgba(99, 102, 241, 0.15)');
-          gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+          gradient.addColorStop(0, 'rgba(0, 201, 167, 0.15)');
+          gradient.addColorStop(1, 'rgba(0, 201, 167, 0)');
           return gradient;
         },
         order: 1,
@@ -344,8 +421,8 @@ export default function DashboardPage() {
           const { ctx, chartArea } = chart;
           if (!chartArea) return null;
           const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          gradient.addColorStop(0, 'rgba(79, 70, 229, 0.4)');
-          gradient.addColorStop(1, 'rgba(79, 70, 229, 0.05)');
+          gradient.addColorStop(0, 'rgba(0, 201, 167, 0.35)');
+          gradient.addColorStop(1, 'rgba(0, 201, 167, 0.05)');
           return gradient;
         },
         borderRadius: 12,
@@ -389,12 +466,15 @@ export default function DashboardPage() {
 
   if (status === 'loading' || (status === 'authenticated' && (session?.user as any)?.role === 'OPERATIONAL')) {
     return (
-      <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "hsl(210, 20%, 97%)" }}>
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 animate-pulse">
-            <TrendingUp size={24} className="text-white" />
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center animate-pulse"
+            style={{ background: "linear-gradient(135deg, #00C9A7, #00A589)", boxShadow: "0 0 24px rgba(0,201,167,0.4)" }}
+          >
+            <TrendingUp size={22} className="text-white" />
           </div>
-          <p className="text-[10px] font-black text-slate-400 max-w-[120px] text-center uppercase tracking-widest leading-loose">
+          <p className="text-[10px] font-black max-w-[120px] text-center uppercase tracking-widest leading-loose" style={{ color: "#94a3b8" }}>
             Syncing Experience...
           </p>
         </div>
@@ -476,11 +556,11 @@ export default function DashboardPage() {
   };
 
   const getLoadingSpinner = () => (
-    <div className="flex justify-center items-center py-4"><RefreshCcw className="animate-spin h-5 w-5 text-indigo-600" /></div>
+    <div className="flex justify-center items-center py-4"><RefreshCcw className="animate-spin h-5 w-5" style={{ color: "#00C9A7" }} /></div>
   );
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-4 lg:p-8 space-y-6 lg:space-y-8">
+    <div className="min-h-screen p-4 lg:p-8 space-y-6 lg:space-y-8" style={{ background: "hsl(210, 20%, 97%)" }}>
       {/* Header Section */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
@@ -488,34 +568,41 @@ export default function DashboardPage() {
         className="flex flex-col lg:flex-row lg:items-center justify-between gap-6"
       >
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 flex-shrink-0">
-            <TrendingUp size={22} className="text-white" />
+          <div
+            className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{ background: "linear-gradient(135deg, #00C9A7, #00A589)", boxShadow: "0 0 20px rgba(0,201,167,0.35)" }}
+          >
+            <TrendingUp size={20} className="text-white" />
           </div>
           <div>
-            <h1 className="text-xl lg:text-2xl font-black text-slate-900 tracking-tight leading-tight">
-              {t.enterprise} <span className="text-indigo-600">{t.enterpriseDashboard}</span>
+            <h1 className="text-xl lg:text-2xl font-black tracking-tight leading-tight" style={{ color: "#0D1117" }}>
+              {t.enterprise} <span style={{ color: "#00C9A7" }}>{t.enterpriseDashboard}</span>
             </h1>
-            <p className="text-xs font-semibold text-slate-400">{t.analyticsSubtitle}</p>
+            <p className="text-xs font-semibold" style={{ color: "#94a3b8" }}>{t.analyticsSubtitle}</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2 lg:gap-3">
           <Button
             onClick={handleRefresh}
             variant="outline"
-            className="flex-1 lg:flex-none rounded-2xl border-slate-200 bg-white shadow-sm hover:bg-slate-50 transition-all font-black text-[10px] uppercase tracking-widest px-3 lg:px-5 h-10"
+            className="flex-1 lg:flex-none rounded-xl border bg-white shadow-sm transition-all font-black text-[10px] uppercase tracking-widest px-3 lg:px-5 h-10"
+            style={{ borderColor: "#e2e8f0", color: "#64748b" }}
           >
             <RefreshCcw size={14} className={`mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
             {t.syncDashboard}
           </Button>
-          <Button className="flex-1 lg:flex-none rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest px-3 lg:px-7 h-10 shadow-xl shadow-indigo-600/30 transition-all active:scale-95">
+          <Button
+            className="flex-1 lg:flex-none rounded-xl text-white font-black text-[10px] uppercase tracking-widest px-3 lg:px-7 h-10 transition-all active:scale-95"
+            style={{ background: "linear-gradient(135deg, #00C9A7, #00A589)", boxShadow: "0 8px 20px rgba(0,201,167,0.35)" }}
+          >
             {t.intelligenceReport}
           </Button>
         </div>
       </motion.header>
 
       {/* Main Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5">
         <DashboardCard
           title={t.totalRevenue}
           value={isLoadingSales ? getLoadingSpinner() : `Rp ${((salesData?.rawData as any[]) || []).reduce((sum: number, inv: any) => sum + (inv.totalAmount || 0), 0).toLocaleString()}`}
@@ -523,7 +610,7 @@ export default function DashboardPage() {
           description={t.grossRevenueDesc}
           trend="+12.5%"
           trendType="up"
-          colorClass="bg-indigo-500"
+          colorClass="bg-teal-500"
         />
         <DashboardCard
           title={t.operatingExpenses}
@@ -557,15 +644,18 @@ export default function DashboardPage() {
       {/* Analytics & Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sales Performance Chart */}
-        <Card className="lg:col-span-2 border-none shadow-xl rounded-2xl bg-white overflow-hidden">
+        <Card className="lg:col-span-2 border shadow-lg rounded-2xl bg-white overflow-hidden" style={{ borderColor: "rgba(0,201,167,0.12)" }}>
           <CardHeader className="p-4 lg:p-6 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle className="text-lg font-black text-slate-900 tracking-tight">{t.salesPerformance}</CardTitle>
-              <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em]">{t.revenueGrowthDesc}</p>
+              <CardTitle className="text-lg font-black tracking-tight" style={{ color: "#0D1117" }}>{t.salesPerformance}</CardTitle>
+              <p className="text-[10px] font-bold mt-1 uppercase tracking-[0.2em]" style={{ color: "#94a3b8" }}>{t.revenueGrowthDesc}</p>
             </div>
             <div className="flex">
-              <span className="flex items-center gap-1.5 text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">
-                <Activity size={14} /> {t.live}
+              <span
+                className="flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-full"
+                style={{ color: "#00C9A7", background: "rgba(0,201,167,0.1)" }}
+              >
+                <Activity size={13} /> {t.live}
               </span>
             </div>
           </CardHeader>

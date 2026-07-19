@@ -444,13 +444,18 @@ export function Sidebar() {
 
     return (
         <>
-            {/* Desktop Sidebar */}
+            {/* Desktop Sidebar — Dark Obsidian */}
             <motion.div
                 animate={{
                     width: isCollapsed ? 80 : 280,
                     x: 0
                 }}
-                className="hidden lg:flex fixed left-0 top-0 bottom-0 glass border-r border-border/40 z-50 flex-col transition-all duration-300 shadow-2xl shadow-indigo-500/5"
+                className="hidden lg:flex fixed left-0 top-0 bottom-0 z-50 flex-col transition-all duration-300"
+                style={{
+                    background: "#0D1117",
+                    borderRight: "1px solid rgba(255,255,255,0.06)",
+                    boxShadow: "4px 0 24px rgba(0,0,0,0.3)"
+                }}
             >
                 <div className="flex flex-col h-full overflow-hidden">
                     <SidebarContent
@@ -484,7 +489,8 @@ export function Sidebar() {
                             animate={{ x: 0 }}
                             exit={{ x: -280 }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="lg:hidden fixed left-0 top-0 bottom-0 w-[280px] bg-white z-[101] flex flex-col shadow-2xl"
+                            className="lg:hidden fixed left-0 top-0 bottom-0 w-[280px] z-[101] flex flex-col"
+                            style={{ background: "#0D1117", boxShadow: "8px 0 32px rgba(0,0,0,0.5)" }}
                         >
                             <div className="flex flex-col h-full overflow-hidden">
                                 <SidebarContent
@@ -538,7 +544,13 @@ function SidebarContent({
 
     return (
         <>
-            <div className={`p-8 flex items-center justify-between ${isMobile ? 'border-b border-slate-100 bg-slate-50/50 mb-4' : ''}`}>
+            {/* Logo / Header */}
+            <div
+                className={`flex items-center justify-between flex-shrink-0 ${
+                    isCollapsed ? 'px-4 py-6 justify-center' : 'px-6 py-6'
+                }`}
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+            >
                 <AnimatePresence mode="wait">
                     {!isCollapsed && (
                         <motion.div
@@ -547,50 +559,100 @@ function SidebarContent({
                             exit={{ opacity: 0, x: -20 }}
                             className="flex items-center gap-3"
                         >
-                            <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
-                                <BarChart3 className="text-white w-5 h-5" />
+                            <div
+                                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                                style={{
+                                    background: "linear-gradient(135deg, #00C9A7, #00A589)",
+                                    boxShadow: "0 0 16px rgba(0,201,167,0.35)"
+                                }}
+                            >
+                                <BarChart3 className="text-white w-4 h-4" strokeWidth={2.5} />
+                            </div>
+                            <div>
+                                <span className="font-black text-lg tracking-tighter text-white">AXON</span>
                                 {isLoading && (
-                                    <motion.div
-                                        animate={{ rotate: 360 }}
-                                        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                                        className="absolute inset-0 border-2 border-white/20 border-t-white rounded-xl"
-                                    />
+                                    <span className="block text-[9px] font-semibold uppercase tracking-widest" style={{ color: "#00C9A7" }}>SYNCING...</span>
                                 )}
                             </div>
-                            <span className="font-black text-2xl tracking-tighter text-slate-900">AXON</span>
+                        </motion.div>
+                    )}
+                    {isCollapsed && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            className="w-9 h-9 rounded-xl flex items-center justify-center"
+                            style={{
+                                background: "linear-gradient(135deg, #00C9A7, #00A589)",
+                                boxShadow: "0 0 16px rgba(0,201,167,0.35)"
+                            }}
+                        >
+                            <BarChart3 className="text-white w-4 h-4" strokeWidth={2.5} />
                         </motion.div>
                     )}
                 </AnimatePresence>
-                {isMobile ? (
-                    <button
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 rounded-2xl shadow-sm transition-all active:scale-95 flex items-center justify-center"
-                    >
-                        <ChevronLeft size={20} />
-                    </button>
-                ) : (
+
+                {!isCollapsed && (
+                    isMobile ? (
+                        <button
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="p-2 rounded-xl transition-colors"
+                            style={{ color: "rgba(255,255,255,0.4)" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                        >
+                            <ChevronLeft size={18} />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={toggleSidebar}
+                            className="p-2 rounded-xl transition-colors"
+                            style={{ color: "rgba(255,255,255,0.35)" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                        >
+                            {isCollapsed ? <Menu size={18} /> : <ChevronLeft size={18} />}
+                        </button>
+                    )
+                )}
+
+                {isCollapsed && !isMobile && (
                     <button
                         onClick={toggleSidebar}
-                        className="p-2.5 hover:bg-slate-100 rounded-xl transition-colors text-slate-400"
+                        className="absolute bottom-[140px] right-[-12px] w-6 h-6 rounded-full flex items-center justify-center z-10"
+                        style={{
+                            background: "#1C2333",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                            color: "rgba(255,255,255,0.5)"
+                        }}
                     >
-                        {isCollapsed ? <Menu size={20} /> : <ChevronLeft size={20} />}
+                        <Menu size={12} />
                     </button>
                 )}
             </div>
 
-            <nav className="flex-1 px-4 space-y-1 overflow-y-auto no-scrollbar pb-10">
+            {/* Navigation */}
+            <nav className="flex-1 px-3 pt-4 overflow-y-auto no-scrollbar pb-10 space-y-0.5">
                 {filteredMenuItems.map((item: any) => (
                     item.isHeader ? (
                         !isCollapsed && (
-                            <div key={item.id} className="px-4 pt-6 pb-2">
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{item.label}</span>
+                            <div key={item.id} className="px-3 pt-5 pb-1.5">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-1 h-1 rounded-full" style={{ background: "rgba(0,201,167,0.6)" }} />
+                                    <span
+                                        className="text-[9px] font-black uppercase tracking-[0.22em]"
+                                        style={{ color: "rgba(255,255,255,0.28)" }}
+                                    >
+                                        {item.label}
+                                    </span>
+                                </div>
                             </div>
                         )
                     ) : (
-                        <MenuItem 
-                            key={item.id} 
-                            item={item} 
-                            isCollapsed={isCollapsed} 
+                        <MenuItem
+                            key={item.id}
+                            item={item}
+                            isCollapsed={isCollapsed}
                             isMobile={isMobile}
                             toggleMobileMenu={() => setMobileMenuOpen(false)}
                         />
@@ -598,30 +660,60 @@ function SidebarContent({
                 ))}
             </nav>
 
-            <div className={`p-6 mt-auto ${isCollapsed ? 'items-center flex flex-col gap-4' : ''}`}>
-                <div className={`p-4 rounded-3xl flex items-center gap-3 border border-slate-100 bg-slate-50/50 ${isCollapsed ? 'justify-center w-12 h-12 p-0 overflow-hidden' : 'w-full'}`}>
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 border-2 border-white flex-shrink-0 shadow-sm" />
-                    {!isCollapsed && (
+            {/* User Card + Logout */}
+            <div
+                className="px-3 pb-5 pt-4 mt-auto flex-shrink-0"
+                style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+            >
+                {!isCollapsed ? (
+                    <div
+                        className="flex items-center gap-3 p-3 rounded-xl mb-2"
+                        style={{ background: "rgba(255,255,255,0.04)" }}
+                    >
+                        <div
+                            className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-xs font-black text-white"
+                            style={{ background: "linear-gradient(135deg, #00C9A7, #0099FF)" }}
+                        >
+                            {(userName || 'A').charAt(0).toUpperCase()}
+                        </div>
                         <div className="overflow-hidden flex-1">
-                            <p className="text-sm font-black text-slate-900 truncate uppercase tracking-tight">{userName || 'System Admin'}</p>
-                            <p className="text-[10px] font-bold text-slate-400 truncate uppercase tracking-widest mt-0.5">
+                            <p className="text-sm font-bold text-white truncate tracking-tight">{userName || 'System Admin'}</p>
+                            <p className="text-[9px] font-semibold uppercase tracking-widest truncate mt-0.5"
+                                style={{ color: "rgba(255,255,255,0.3)" }}>
                                 {isLoading ? 'SYNCING...' : `${userRole} • ${userDept}`}
                             </p>
                         </div>
-                    )}
-                </div>
+                    </div>
+                ) : (
+                    <div
+                        className="w-9 h-9 rounded-xl mx-auto mb-2 flex items-center justify-center text-xs font-black text-white"
+                        style={{ background: "linear-gradient(135deg, #00C9A7, #0099FF)" }}
+                    >
+                        {(userName || 'A').charAt(0).toUpperCase()}
+                    </div>
+                )}
 
                 <button
                     onClick={onLogout}
-                    className={`
-                        flex items-center gap-3 p-4 rounded-3xl transition-all duration-200 group mt-4
-                        ${isCollapsed
-                            ? 'justify-center w-12 h-12 bg-slate-50 border border-slate-100 text-slate-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100'
-                            : 'w-full text-slate-400 hover:text-red-600 hover:bg-red-50 font-black'}
-                    `}
+                    className={`flex items-center gap-2.5 rounded-xl transition-all duration-200 group ${
+                        isCollapsed
+                            ? 'justify-center w-9 h-9 mx-auto'
+                            : 'w-full px-3 py-2.5'
+                    }`}
+                    style={{ color: "rgba(255,255,255,0.3)" }}
+                    onMouseEnter={e => {
+                        e.currentTarget.style.background = "rgba(239,68,68,0.08)"
+                        e.currentTarget.style.color = "#ef4444"
+                    }}
+                    onMouseLeave={e => {
+                        e.currentTarget.style.background = "transparent"
+                        e.currentTarget.style.color = "rgba(255,255,255,0.3)"
+                    }}
                 >
-                    <LogOut size={isCollapsed ? 20 : 20} />
-                    {!isCollapsed && <span className="text-[11px] font-black uppercase tracking-widest">{t.signOut}</span>}
+                    <LogOut size={16} strokeWidth={2} />
+                    {!isCollapsed && (
+                        <span className="text-[11px] font-bold uppercase tracking-widest">{t.signOut}</span>
+                    )}
                 </button>
             </div>
         </>
@@ -668,20 +760,42 @@ function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobile
                     }
                 }}
                 className={`
-                    flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-200
-                    ${isActive
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 active-scale'
-                        : item.isSpecial
-                            ? 'bg-amber-500/10 text-amber-600 font-black border border-amber-500/20 hover:bg-amber-500/20'
-                            : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}
-                    ${isCollapsed ? 'justify-center px-0 h-11 w-11 mx-auto' : 'mb-1'}
+                    flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-200 relative
+                    ${isCollapsed ? 'justify-center px-0 h-10 w-10 mx-auto' : 'mb-0.5'}
                 `}
+                style={isActive ? {
+                    background: "rgba(0,201,167,0.1)",
+                    borderLeft: "2px solid #00C9A7",
+                    paddingLeft: isCollapsed ? undefined : "10px",
+                    color: "#00C9A7",
+                } : item.isSpecial ? {
+                    background: "rgba(251,191,36,0.08)",
+                    border: "1px solid rgba(251,191,36,0.18)",
+                    color: "#f59e0b",
+                } : {
+                    color: "rgba(255,255,255,0.45)",
+                }}
+                onMouseEnter={e => {
+                    if (!isActive && !item.isSpecial) {
+                        e.currentTarget.style.background = "rgba(255,255,255,0.05)"
+                        e.currentTarget.style.color = "rgba(255,255,255,0.9)"
+                    }
+                }}
+                onMouseLeave={e => {
+                    if (!isActive && !item.isSpecial) {
+                        e.currentTarget.style.background = "transparent"
+                        e.currentTarget.style.color = "rgba(255,255,255,0.45)"
+                    }
+                }}
             >
                 {Icon && (
-                    <div className="relative">
-                        <Icon size={isCollapsed ? 20 : 18} strokeWidth={isActive ? 2.5 : 2} />
+                    <div className="relative flex-shrink-0">
+                        <Icon size={isCollapsed ? 18 : 16} strokeWidth={isActive ? 2.5 : 2} />
                         {item.children && isCollapsed && (
-                            <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-indigo-400 border border-white" />
+                            <div
+                                className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full"
+                                style={{ background: "#00C9A7" }}
+                            />
                         )}
                     </div>
                 )}
@@ -694,11 +808,14 @@ function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobile
                             exit={{ opacity: 0, x: -10 }}
                             className="flex-1 flex items-center justify-between overflow-hidden"
                         >
-                            <span className="font-semibold text-[13.5px] whitespace-nowrap tracking-tight">{item.label}</span>
+                            <span className="font-semibold text-[13px] whitespace-nowrap tracking-tight">{item.label}</span>
                             {item.children && (
                                 <ChevronRight
-                                    size={14}
-                                    className={`transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`}
+                                    size={13}
+                                    className={`transition-transform duration-300 flex-shrink-0 ${
+                                        isOpen ? 'rotate-90' : ''
+                                    }`}
+                                    style={{ color: "rgba(255,255,255,0.2)" }}
                                 />
                             )}
                         </motion.div>
@@ -714,23 +831,27 @@ function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobile
                 )}
             </div>
 
-            {/* Collapsed Flyout/Tooltip Menu */}
+            {/* Collapsed Flyout/Tooltip Menu — Dark */}
             {isCollapsed && isHovered && !isMobile && (
                 <motion.div
                     initial={{ opacity: 0, x: 10, scale: 0.95 }}
                     animate={{ opacity: 1, x: 0, scale: 1 }}
-                    className="fixed left-[75px] z-[100] min-w-[220px] bg-white rounded-2xl shadow-2xl border border-slate-100 py-3 px-2 flex flex-col gap-1 pointer-events-auto"
+                    className="fixed left-[75px] z-[100] min-w-[220px] rounded-2xl py-3 px-2 flex flex-col gap-1 pointer-events-auto"
                     style={{
                         top: 'auto',
-                        marginTop: '-44px'
+                        marginTop: '-40px',
+                        background: "#161B22",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        boxShadow: "0 20px 60px rgba(0,0,0,0.5)"
                     }}
                 >
                     {/* Transparent Bridge to maintain hover */}
                     <div className="absolute -left-4 top-0 bottom-0 w-4 bg-transparent" />
 
-                    <div className="px-3 py-2 mb-1 border-b border-slate-50 flex items-center justify-between">
-                        <span className="font-bold text-slate-800 text-sm tracking-tight">{item.label}</span>
-                        {item.icon && <item.icon size={14} className="text-slate-300" />}
+                    <div className="px-3 py-2 mb-1 flex items-center justify-between"
+                        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                        <span className="font-bold text-white text-sm tracking-tight">{item.label}</span>
+                        {item.icon && <item.icon size={13} style={{ color: "#00C9A7" }} />}
                     </div>
                     <div className="flex flex-col gap-0.5 max-h-[70vh] overflow-y-auto no-scrollbar">
                         {item.children ? (
@@ -738,33 +859,47 @@ function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobile
                                 <div key={child.id} className="flex flex-col gap-0.5">
                                     <Link
                                         href={child.path || '#'}
-                                        className={`
-                                            flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all
-                                            ${pathname === child.path
-                                                ? 'bg-indigo-50 text-indigo-700 font-bold'
-                                                : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}
-                                        `}
+                                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all"
+                                        style={{
+                                            color: pathname === child.path ? '#00C9A7' : 'rgba(255,255,255,0.55)',
+                                            background: pathname === child.path ? 'rgba(0,201,167,0.08)' : 'transparent',
+                                            fontWeight: pathname === child.path ? 700 : 500,
+                                        }}
+                                        onMouseEnter={e => {
+                                            if (pathname !== child.path) {
+                                                e.currentTarget.style.background = "rgba(255,255,255,0.05)"
+                                                e.currentTarget.style.color = "rgba(255,255,255,0.9)"
+                                            }
+                                        }}
+                                        onMouseLeave={e => {
+                                            if (pathname !== child.path) {
+                                                e.currentTarget.style.background = "transparent"
+                                                e.currentTarget.style.color = "rgba(255,255,255,0.55)"
+                                            }
+                                        }}
                                     >
-                                        {child.icon && <child.icon size={16} strokeWidth={pathname === child.path ? 2.5 : 2} />}
+                                        {child.icon && <child.icon size={15} strokeWidth={pathname === child.path ? 2.5 : 2} />}
                                         <span className="flex-1">{child.label}</span>
-                                        {child.children && <ChevronRight size={12} className="text-slate-300" />}
+                                        {child.children && <ChevronRight size={11} style={{ color: "rgba(255,255,255,0.2)" }} />}
                                     </Link>
 
                                     {/* Handle Nested Children in Flyout (flattened with indentation) */}
                                     {child.children && (
-                                        <div className="ml-4 pl-3 border-l border-slate-100 flex flex-col gap-0.5 my-1">
+                                        <div className="ml-4 pl-3 flex flex-col gap-0.5 my-1"
+                                            style={{ borderLeft: "1px solid rgba(255,255,255,0.06)" }}>
                                             {child.children.map((subChild: any) => (
                                                 <Link
                                                     key={subChild.id}
                                                     href={subChild.path || '#'}
-                                                    className={`
-                                                        flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] transition-all
-                                                        ${pathname === subChild.path
-                                                            ? 'text-indigo-700 font-bold'
-                                                            : 'text-slate-400 hover:text-indigo-500'}
-                                                    `}
+                                                    className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-[13px] transition-all"
+                                                    style={{
+                                                        color: pathname === subChild.path ? '#00C9A7' : 'rgba(255,255,255,0.35)',
+                                                        fontWeight: pathname === subChild.path ? 700 : 400,
+                                                    }}
+                                                    onMouseEnter={e => { e.currentTarget.style.color = "rgba(255,255,255,0.75)" }}
+                                                    onMouseLeave={e => { e.currentTarget.style.color = pathname === subChild.path ? '#00C9A7' : "rgba(255,255,255,0.35)" }}
                                                 >
-                                                    {subChild.icon && <subChild.icon size={14} />}
+                                                    {subChild.icon && <subChild.icon size={13} />}
                                                     <span>{subChild.label}</span>
                                                 </Link>
                                             ))}
@@ -774,21 +909,22 @@ function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobile
                             ))
                         ) : (
                             <div className="px-3 py-1">
-                                <span className="text-xs text-slate-400">Click to open page</span>
+                                <span className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>Click to open page</span>
                             </div>
                         )}
                     </div>
                 </motion.div>
             )}
 
-            {/* Expanded Submenu */}
+            {/* Expanded Submenu — Dark */}
             <AnimatePresence>
                 {isOpen && !isCollapsed && item.children && (
                     <motion.div
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden ml-4 flex flex-col border-l border-slate-100 mt-1 mb-2"
+                        className="overflow-hidden ml-3 flex flex-col mt-0.5 mb-1 pl-3"
+                        style={{ borderLeft: "1px solid rgba(0,201,167,0.2)" }}
                     >
                         {item.children.map((child: any) => (
                             <MenuItem

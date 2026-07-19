@@ -1,49 +1,77 @@
 @import "tailwindcss";
 
+/* ============================================
+   AXON ECOSYSTEM — PREMIUM DESIGN SYSTEM
+   Electric Teal + Obsidian Dark Theme
+   ============================================ */
+
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  /* === LIGHT MODE === */
+  --background: 210 20% 97%;
+  --foreground: 220 35% 10%;
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --card-foreground: 220 35% 10%;
   --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 262.1 83.3% 57.8%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 262.1 83.3% 57.8%;
+  --popover-foreground: 220 35% 10%;
+
+  /* PRIMARY: Electric Teal — distinctive, not overused */
+  --primary: 168 100% 39%;          /* #00C9A7 */
+  --primary-foreground: 0 0% 100%;
+  --primary-dark: 168 100% 28%;     /* #008F78 hover */
+  --primary-glow: 168 100% 39%;
+
+  --secondary: 210 18% 93%;
+  --secondary-foreground: 220 35% 15%;
+  --muted: 210 15% 94%;
+  --muted-foreground: 215 15% 50%;
+  --accent: 168 80% 94%;
+  --accent-foreground: 168 100% 28%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 215 20% 88%;
+  --input: 215 20% 88%;
+  --ring: 168 100% 39%;
   --radius: 0.75rem;
   --sidebar-width: 280px;
+
+  /* === SIDEBAR (always dark) === */
+  --sidebar-bg: 222 20% 7%;         /* #0D1117 obsidian */
+  --sidebar-fg: 210 15% 70%;        /* muted text */
+  --sidebar-fg-active: 0 0% 100%;
+  --sidebar-item-hover: 222 20% 12%;
+  --sidebar-item-active: 222 20% 14%;
+  --sidebar-border: 222 20% 14%;
+  --sidebar-header: 210 12% 42%;
+
+  /* === BRAND EXTRAS === */
+  --teal: 168 100% 39%;
+  --teal-glow: rgba(0, 201, 167, 0.15);
+  --teal-border: rgba(0, 201, 167, 0.3);
+  --obsidian: #0D1117;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --card-shadow-hover: 0 4px 20px rgba(0,201,167,0.12), 0 1px 4px rgba(0,0,0,0.08);
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 263.4 70% 50.4%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 263.4 70% 50.4%;
+  --background: 222 20% 7%;
+  --foreground: 0 0% 94%;
+  --card: 222 20% 10%;
+  --card-foreground: 0 0% 94%;
+  --popover: 222 20% 10%;
+  --popover-foreground: 0 0% 94%;
+  --primary: 168 100% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 222 20% 14%;
+  --secondary-foreground: 0 0% 94%;
+  --muted: 222 20% 14%;
+  --muted-foreground: 215 12% 55%;
+  --accent: 168 60% 15%;
+  --accent-foreground: 168 100% 60%;
+  --destructive: 0 62% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 222 20% 17%;
+  --input: 222 20% 17%;
+  --ring: 168 100% 42%;
 }
 
 @theme inline {
@@ -70,79 +98,264 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
   --font-sans: var(--font-inter);
-  --font-mono: var(--font-geist-mono);
-
-  /* Dark mode selector configuration */
+  --font-mono: var(--font-jetbrains-mono), var(--font-geist-mono), ui-monospace, monospace;
   --dark: selector(.dark);
 }
 
+/* ============================================
+   BASE STYLES
+   ============================================ */
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: hsl(var(--primary) / 0.18);
+  color: hsl(var(--primary));
+}
+
+/* ============================================
+   PREMIUM UTILITY CLASSES
+   ============================================ */
 @layer utilities {
-  .glass {
-    background: rgba(255, 255, 255, 0.4);
-    backdrop-filter: blur(80px) saturate(150%);
-    -webkit-backdrop-filter: blur(80px) saturate(150%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 0 8px 32px 0 rgba(99, 102, 241, 0.05);
+  .text-balance {
+    text-wrap: balance;
   }
 
-  :is(.dark .glass) {
-    background: rgba(15, 23, 42, 0.6);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  /* Dot pattern background */
+  .section-dot {
+    background-image: radial-gradient(circle, hsl(var(--border)) 1px, transparent 1px);
+    background-size: 24px 24px;
   }
 
-  .glass-card {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(0, 0, 0, 0.05);
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  /* ── Hero Light: base + soft gradient blobs ── */
+  .hero-mesh {
+    --mesh-color: rgba(16, 185, 129, 0.04);
+    background:
+      radial-gradient(ellipse 80% 65% at 82% 12%, rgba(167,243,208,0.30) 0%, rgba(167,243,208,0.10) 35%, transparent 60%),
+      radial-gradient(ellipse 45% 55% at 95% 55%, rgba(16,185,129,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse 40% 40% at 8% 85%, rgba(167,243,208,0.08) 0%, transparent 50%)
+    ;
+    background-color: #F2FAF7;
+    position: relative;
   }
-
-  :is(.dark .glass-card) {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.4) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
-  }
-
-  .neon-border {
-    border-color: rgba(99, 102, 241, 0.3);
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
-  }
-
-  .glowing-grid {
+  .dark .hero-mesh {
+    background-color: hsl(222 20% 7%);
     background-image:
-      linear-gradient(to right, rgba(99, 102, 241, 0.03) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+      radial-gradient(ellipse 80% 65% at 82% 12%, rgba(0,201,167,0.10) 0%, rgba(0,201,167,0.03) 35%, transparent 60%),
+      radial-gradient(ellipse 45% 55% at 95% 55%, rgba(0,201,167,0.05) 0%, transparent 50%),
+      radial-gradient(ellipse 40% 40% at 8% 85%, rgba(0,201,167,0.04) 0%, transparent 50%)
+    ;
+  }
+
+  /* ── Section backgrounds: light ── */
+  .section-bg-pain     { background-color: hsl(210,15%,94%); background-image: radial-gradient(ellipse 70% 50% at 5% 20%, rgba(167,243,208,0.12) 0%, transparent 55%); }
+  .section-bg-dual     { background-color: hsl(210,20%,97%); background-image: radial-gradient(ellipse 60% 40% at 90% 10%, rgba(167,243,208,0.15) 0%, transparent 50%), radial-gradient(ellipse 50% 35% at 5% 90%, rgba(16,185,129,0.06) 0%, transparent 50%); }
+  .section-bg-solutions{ background-color: hsl(210,15%,94%); background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(167,243,208,0.10) 0%, transparent 50%), radial-gradient(ellipse 50% 45% at 50% 100%, rgba(16,185,129,0.05) 0%, transparent 50%); }
+  .section-bg-spectrum { background-color: hsl(210,20%,97%); background-image: radial-gradient(ellipse 50% 40% at 10% 50%, rgba(167,243,208,0.08) 0%, transparent 50%), radial-gradient(ellipse 50% 40% at 90% 50%, rgba(16,185,129,0.05) 0%, transparent 50%); }
+  .section-bg-matrix   { background-color: hsl(210,15%,94%); background-image: radial-gradient(ellipse 60% 45% at 85% 20%, rgba(167,243,208,0.10) 0%, transparent 50%), radial-gradient(ellipse 40% 35% at 5% 80%, rgba(16,185,129,0.04) 0%, transparent 50%); }
+  .section-bg-pricing  { background-color: hsl(210,20%,97%); background-image: radial-gradient(ellipse 70% 60% at 5% 50%, rgba(167,243,208,0.10) 0%, transparent 50%), radial-gradient(ellipse 50% 40% at 95% 50%, rgba(16,185,129,0.05) 0%, transparent 50%); }
+  .section-bg-cta      { background-color: hsl(210,20%,97%); background-image: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(167,243,208,0.12) 0%, transparent 55%); }
+  .section-bg-faq      { background-color: hsl(210,20%,97%); background-image: radial-gradient(ellipse 60% 40% at 50% 100%, rgba(167,243,208,0.08) 0%, transparent 50%); }
+
+  /* ── Section backgrounds: dark ── */
+  .dark .section-bg-pain     { background-color: hsl(222,15%,10%); background-image: radial-gradient(ellipse 70% 50% at 5% 20%, rgba(0,201,167,0.08) 0%, transparent 55%); }
+  .dark .section-bg-dual     { background-color: hsl(222,20%,7%);  background-image: radial-gradient(ellipse 60% 40% at 90% 10%, rgba(0,201,167,0.10) 0%, transparent 50%), radial-gradient(ellipse 50% 35% at 5% 90%, rgba(0,201,167,0.04) 0%, transparent 50%); }
+  .dark .section-bg-solutions{ background-color: hsl(222,15%,10%); background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,201,167,0.07) 0%, transparent 50%), radial-gradient(ellipse 50% 45% at 50% 100%, rgba(0,201,167,0.04) 0%, transparent 50%); }
+  .dark .section-bg-spectrum { background-color: hsl(222,20%,7%);  background-image: radial-gradient(ellipse 50% 40% at 10% 50%, rgba(0,201,167,0.05) 0%, transparent 50%), radial-gradient(ellipse 50% 40% at 90% 50%, rgba(0,201,167,0.03) 0%, transparent 50%); }
+  .dark .section-bg-matrix   { background-color: hsl(222,15%,10%); background-image: radial-gradient(ellipse 60% 45% at 85% 20%, rgba(0,201,167,0.07) 0%, transparent 50%), radial-gradient(ellipse 40% 35% at 5% 80%, rgba(0,201,167,0.03) 0%, transparent 50%); }
+  .dark .section-bg-pricing  { background-color: hsl(222,20%,7%);  background-image: radial-gradient(ellipse 70% 60% at 5% 50%, rgba(0,201,167,0.07) 0%, transparent 50%), radial-gradient(ellipse 50% 40% at 95% 50%, rgba(0,201,167,0.04) 0%, transparent 50%); }
+  .dark .section-bg-cta      { background-color: hsl(222,20%,7%);  background-image: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,201,167,0.08) 0%, transparent 55%); }
+  .dark .section-bg-faq      { background-color: hsl(222,20%,7%);  background-image: radial-gradient(ellipse 60% 40% at 50% 100%, rgba(0,201,167,0.05) 0%, transparent 50%); }
+
+  /* ── Section Ornaments ── */
+  .ornament-dots {
+    background-image:
+      radial-gradient(circle, hsl(var(--primary) / 0.10) 0.8px, transparent 0.8px),
+      radial-gradient(circle, hsl(var(--primary) / 0.06) 1.5px, transparent 1.5px);
+    background-size: 36px 36px, 72px 72px;
+    background-position: 0 0, 18px 18px;
+  }
+  .ornament-cross {
+    background-image:
+      linear-gradient(45deg, hsl(var(--border) / 0.4) 0.5px, transparent 0.5px),
+      linear-gradient(-45deg, hsl(var(--border) / 0.4) 0.5px, transparent 0.5px);
+    background-size: 50px 50px;
+  }
+  .ornament-diagonal {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent,
+      transparent 18px,
+      hsl(var(--primary) / 0.04) 18px,
+      hsl(var(--primary) / 0.04) 18.5px
+    );
+  }
+  .ornament-circles {
+    background-image:
+      radial-gradient(ellipse at 15% 25%, hsl(var(--primary) / 0.07) 0%, transparent 35%),
+      radial-gradient(ellipse at 85% 75%, hsl(var(--primary) / 0.05) 0%, transparent 35%),
+      radial-gradient(ellipse at 50% 50%, hsl(var(--primary) / 0.03) 0%, transparent 50%);
+  }
+  .ornament-grid-light {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.15) 0.5px, transparent 0.5px),
+      linear-gradient(90deg, hsl(var(--border) / 0.15) 0.5px, transparent 0.5px);
+    background-size: 48px 48px;
+  }
+
+  /* Teal mesh pattern for dark panels */
+  .mesh-pattern {
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(0, 201, 167, 0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(0, 201, 167, 0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 60% 80%, rgba(0, 145, 255, 0.05) 0%, transparent 50%);
+  }
+
+  /* Grid overlay for dark panels */
+  .grid-pattern {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
     background-size: 40px 40px;
   }
 
-  .glow-button {
-    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);
-    animation: pulse-glow-light 2s infinite;
+  /* Glass card — light */
+  .glass {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
 
-  .hero-glow {
-    background: radial-gradient(circle at center, rgba(99, 102, 241, 0.1) 0%, transparent 70%);
+  /* Glass card — dark */
+  .glass-dark {
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
 
-  @keyframes pulse-glow-light {
-    0% {
-      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);
-    }
+  /* Teal glow border */
+  .neon-border {
+    border: 1px solid var(--teal-border);
+    box-shadow: 0 0 0 1px var(--teal-border), inset 0 0 20px rgba(0, 201, 167, 0.03);
+  }
 
-    50% {
-      box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
-    }
+  /* Premium card shadow */
+  .card-premium {
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 0.3s ease, transform 0.2s ease;
+  }
+  .card-premium:hover {
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-1px);
+  }
 
-    100% {
-      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2);
-    }
+  /* Teal gradient text */
+  .text-gradient-teal {
+    background: linear-gradient(135deg, #00C9A7 0%, #00E5C9 50%, #00B8D9 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Gradient text white-to-teal for dark backgrounds */
+  .text-gradient-white {
+    background: linear-gradient(135deg, #ffffff 0%, #a8ffed 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Active sidebar item with teal left border */
+  .sidebar-item-active {
+    background: var(--teal-glow);
+    border-left: 2px solid #00C9A7;
+    color: #00C9A7 !important;
+  }
+
+  /* Monospace for financial numbers */
+  .font-financial {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Hide scrollbar utility */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  overflow-x: hidden;
+/* ============================================
+   PREMIUM ANIMATIONS
+   ============================================ */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 201, 167, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(0, 201, 167, 0);
+  }
+}
+
+@keyframes float-subtle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes counter-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes teal-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes border-glow {
+  0%, 100% { border-color: rgba(0,201,167,0.3); }
+  50% { border-color: rgba(0,201,167,0.7); }
+}
+
+/* Custom padding utilities */
+.py-4\.5 {
+  padding-top: 0.875rem;
+  padding-bottom: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  .py-4\.5 {
+    padding-top: 1.125rem;
+    padding-bottom: 1.125rem;
+  }
 }
