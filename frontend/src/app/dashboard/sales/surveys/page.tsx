@@ -7,7 +7,8 @@ import {
     CheckCircle2, AlertCircle, RefreshCw,
     MapPin, Clock, Check, Ban, Receipt,
     Briefcase, Users, DollarSign, ChevronRight,
-    Filter, SlidersHorizontal, ArrowLeft, MoreVertical
+    Filter, SlidersHorizontal, ArrowLeft, MoreVertical,
+    Home, ChevronRight as ArrowRight, Building2, Calendar
 } from "lucide-react"
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -21,17 +22,17 @@ interface FieldSurvey {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string; icon: React.ElementType }> = {
-    PLANNED: { label: 'Planned', bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400', icon: Clock },
-    IN_PROGRESS: { label: 'In Progress', bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-500', icon: MapPin },
-    COMPLETED: { label: 'Completed', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', icon: CheckCircle2 },
-    CANCELLED: { label: 'Cancelled', bg: 'bg-rose-50', text: 'text-rose-600', dot: 'bg-rose-400', icon: Ban },
+    PLANNED: { label: 'Planned', bg: 'bg-slate-200', text: 'text-slate-700', dot: 'bg-slate-400', icon: Clock },
+    IN_PROGRESS: { label: 'In Progress', bg: 'bg-blue-100', text: 'text-blue-800', dot: 'bg-blue-500', icon: MapPin },
+    COMPLETED: { label: 'Completed', bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500', icon: CheckCircle2 },
+    CANCELLED: { label: 'Cancelled', bg: 'bg-rose-100', text: 'text-rose-800', dot: 'bg-rose-400', icon: Ban },
 }
 
 const EXPENSE_STATUS: Record<string, { label: string; bg: string; text: string }> = {
-    PENDING: { label: 'Pending', bg: 'bg-amber-50', text: 'text-amber-700' },
-    APPROVED: { label: 'Approved', bg: 'bg-emerald-50', text: 'text-emerald-700' },
-    REJECTED: { label: 'Rejected', bg: 'bg-rose-50', text: 'text-rose-700' },
-    POSTED: { label: 'Posted', bg: 'bg-indigo-50', text: 'text-indigo-700' },
+    PENDING: { label: 'Pending', bg: 'bg-amber-100', text: 'text-amber-800' },
+    APPROVED: { label: 'Approved', bg: 'bg-emerald-100', text: 'text-emerald-800' },
+    REJECTED: { label: 'Rejected', bg: 'bg-rose-100', text: 'text-rose-800' },
+    POSTED: { label: 'Posted', bg: 'bg-indigo-100', text: 'text-indigo-800' },
 }
 
 const EXPENSE_CATEGORIES = ['TRANSPORT', 'MEAL', 'ACCOMMODATION', 'OFFICE', 'OTHER']
@@ -41,8 +42,6 @@ const CATEGORY_EMOJI: Record<string, string> = {
 
 const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
-const fmtShort = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })
-
 // ─── TOAST ────────────────────────────────────────────────────────────────────
 function Toast({ toast }: { toast: { type: 'success' | 'error'; msg: string } | null }) {
     return (
@@ -53,7 +52,7 @@ function Toast({ toast }: { toast: { type: 'success' | 'error'; msg: string } | 
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 80, scale: 0.9 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[500] flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold whitespace-nowrap
+                    className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-500 flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold whitespace-nowrap
                         ${toast.type === 'success'
                             ? 'bg-slate-900 text-white'
                             : 'bg-rose-600 text-white'}`}
@@ -65,131 +64,6 @@ function Toast({ toast }: { toast: { type: 'success' | 'error'; msg: string } | 
                 </motion.div>
             )}
         </AnimatePresence>
-    )
-}
-
-// ─── STAT PILL ────────────────────────────────────────────────────────────────
-function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) {
-    return (
-        <div className={`flex-1 rounded-2xl p-3.5 ${color}`}>
-            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1">{label}</p>
-            <p className="text-xl font-black leading-none">{value}</p>
-            {sub && <p className="text-[10px] opacity-60 mt-1 font-medium">{sub}</p>}
-        </div>
-    )
-}
-
-// ─── SURVEY CARD ──────────────────────────────────────────────────────────────
-function SurveyCard({ survey, onEdit, onDelete }: { survey: FieldSurvey; onEdit: () => void; onDelete: () => void }) {
-    const sc = STATUS_CONFIG[survey.status] || STATUS_CONFIG.PLANNED
-    const Icon = sc.icon
-    const totalExp = survey.expenses?.reduce((sum, e) => sum + e.amount, 0) || 0
-    const [menuOpen, setMenuOpen] = useState(false)
-
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden active:scale-[0.98] transition-transform"
-        >
-            {/* Top stripe by status */}
-            <div className={`h-1 w-full ${sc.dot}`} />
-
-            <div className="p-4">
-                {/* Row 1: Number + Status + Menu */}
-                <div className="flex items-start justify-between mb-3">
-                    <div>
-                        <span className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.15em] bg-indigo-50 px-2 py-0.5 rounded-lg">
-                            {survey.number}
-                        </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${sc.bg} ${sc.text}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                            {sc.label}
-                        </span>
-                        <div className="relative">
-                            <button
-                                onClick={() => setMenuOpen(!menuOpen)}
-                                className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 active:bg-slate-200 transition-colors"
-                            >
-                                <MoreVertical size={16} />
-                            </button>
-                            <AnimatePresence>
-                                {menuOpen && (
-                                    <motion.div
-                                        initial={{ opacity: 0, scale: 0.9, y: -4 }}
-                                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.9 }}
-                                        className="absolute right-0 top-9 z-50 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden w-36"
-                                        onMouseLeave={() => setMenuOpen(false)}
-                                    >
-                                        <button onClick={() => { onEdit(); setMenuOpen(false) }} className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-                                            <Edit size={14} className="text-indigo-500" /> Edit
-                                        </button>
-                                        <div className="h-px bg-slate-100" />
-                                        <button onClick={() => { onDelete(); setMenuOpen(false) }} className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-colors">
-                                            <Trash2 size={14} /> Delete
-                                        </button>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Row 2: Customer + Location */}
-                <div className="mb-3">
-                    <p className="font-bold text-slate-900 text-[15px] md:text-base leading-tight break-words whitespace-normal">{survey.customer?.name}</p>
-                    <div className="flex items-start gap-1.5 mt-1.5">
-                        <MapPin size={12} className="text-slate-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-[13px] text-slate-500 font-medium leading-snug line-clamp-2">{survey.location}</p>
-                    </div>
-                </div>
-
-                {/* Row 3: Project badge + Date */}
-                <div className="flex items-center justify-between mb-4">
-                    {survey.project ? (
-                        <span className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg">
-                            <Briefcase size={9} />
-                            {survey.project.number}
-                        </span>
-                    ) : (
-                        <span className="text-[10px] text-slate-400 font-medium italic">No project</span>
-                    )}
-                    <span className="text-[11px] text-slate-400 font-semibold flex items-center gap-1">
-                        <Clock size={10} />
-                        {fmtShort(survey.date)}
-                    </span>
-                </div>
-
-                {/* Row 4: Expenses summary */}
-                {survey.expenses && survey.expenses.length > 0 ? (
-                    <div className="bg-slate-50 rounded-xl p-3 flex items-center justify-between">
-                        <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Total Biaya</p>
-                            <p className="text-base font-black text-slate-900">{fmt(totalExp)}</p>
-                        </div>
-                        <div className="flex gap-1">
-                            {['PENDING', 'APPROVED', 'REJECTED'].map(st => {
-                                const count = survey.expenses.filter(e => e.status === st).length
-                                if (!count) return null
-                                const es = EXPENSE_STATUS[st]
-                                return (
-                                    <span key={st} className={`text-[9px] font-black px-2 py-1 rounded-lg ${es.bg} ${es.text}`}>
-                                        {count} {st.charAt(0)}
-                                    </span>
-                                )
-                            })}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="bg-slate-50 rounded-xl p-3 text-center">
-                        <p className="text-[10px] text-slate-400 font-medium">Belum ada biaya tercatat</p>
-                    </div>
-                )}
-            </div>
-        </motion.div>
     )
 }
 
@@ -216,7 +90,7 @@ export default function SurveysPage() {
             const [sR, cR, pR] = await Promise.all([
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/surveys`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`)
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`, { headers: { 'x-user-role': 'SUPER_ADMIN' } })
             ])
             setSurveys(await sR.json())
             setCustomers(await cR.json())
@@ -243,140 +117,236 @@ export default function SurveysPage() {
     const completedCount = surveys.filter(s => s.status === 'COMPLETED').length
 
     return (
-        <div className="min-h-screen bg-slate-50 relative pb-28">
-
-            {/* ─── HEADER (iOS-style sticky) */}
-            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm border-b border-slate-100 safe-area-top shadow-sm">
-                <div className="max-w-screen-2xl mx-auto">
-                    <div className="flex items-center justify-between px-4 md:px-8 pt-4 pb-3">
-                        <div>
-                            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-none">Field Surveys</h1>
-                            <p className="text-[11px] md:text-xs text-slate-400 font-medium mt-1">{surveys.length} survei terdaftar</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setShowSearch(!showSearch)}
-                                className="w-9 h-9 md:w-11 md:h-11 flex items-center justify-center rounded-full bg-slate-100 text-slate-600 active:bg-slate-200 hover:bg-slate-200 transition-colors"
-                            >
-                                <Search size={18} />
-                            </button>
-                            <button
-                                onClick={load}
-                                className="w-9 h-9 md:w-11 md:h-11 flex items-center justify-center rounded-full bg-slate-100 text-slate-600 active:bg-slate-200 hover:bg-slate-200 transition-colors"
-                            >
-                                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                            </button>
+        <div className="min-h-screen bg-white">
+            {/* ─── HEADER ─── */}
+            <header className="sticky top-16 lg:top-0 z-40 bg-white border-b border-slate-200 px-4 lg:px-5 py-3">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2.5">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm">
+                                <MapPin size={20} className="text-white" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 mb-1">
+                                    <span className="hover:text-slate-600 transition-colors cursor-pointer">Dashboard</span>
+                                    <span className="text-slate-300">›</span>
+                                    <span className="hover:text-slate-600 transition-colors cursor-pointer">Sales</span>
+                                    <span className="text-slate-300">›</span>
+                                    <span className="text-indigo-600 font-semibold">Field Surveys</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <h1 className="text-lg font-bold text-slate-900 leading-none">Surveys</h1>
+                                    <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                        {surveys.length} survei
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    {/* Search bar */}
-                    <AnimatePresence>
-                        {showSearch && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                className="overflow-hidden px-4 md:px-8 pb-3"
-                            >
-                                <div className="relative">
-                                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input
-                                        autoFocus
-                                        value={search}
-                                        onChange={e => setSearch(e.target.value)}
-                                        placeholder="Cari nomor, lokasi, pelanggan..."
-                                        className="w-full pl-11 pr-10 py-3 text-sm bg-slate-100/80 focus:bg-slate-100 rounded-2xl outline-none placeholder:text-slate-400 text-slate-800 transition-colors border border-slate-200/50 focus:border-indigo-300"
-                                    />
-                                    {search && (
-                                        <button onClick={() => setSearch('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 p-1 bg-white rounded-full shadow-sm">
-                                            <X size={14} />
-                                        </button>
-                                    )}
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {/* Status filter pills */}
-                    <div className="flex flex-wrap items-center gap-2 px-4 md:px-8 pb-4">
-                        {['ALL', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map(s => {
-                            const isActive = filterStatus === s
-                            const label = s === 'ALL' ? 'Semua' : STATUS_CONFIG[s]?.label || s
-                            return (
-                                <button
-                                    key={s}
-                                    onClick={() => setFilterStatus(s)}
-                                    className={`flex-1 md:flex-none px-3 md:px-4 py-2 md:py-2.5 rounded-xl md:rounded-full text-[10px] md:text-xs font-bold transition-all shadow-sm whitespace-nowrap
-                                        ${isActive
-                                            ? 'bg-slate-900 text-white shadow-slate-900/20 shadow-md ring-2 ring-slate-900/20 ring-offset-1'
-                                            : 'bg-white border border-slate-200/60 text-slate-500 hover:bg-slate-50'}`}
-                                >
-                                    {label}
-                                    {s !== 'ALL' && (
-                                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-md text-[9px] ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                                            {surveys.filter(sv => sv.status === s).length}
-                                        </span>
-                                    )}
-                                </button>
-                            )
-                        })}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => { setEditing(null); setModalOpen(true) }}
+                            className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all text-sm font-semibold shadow-sm"
+                        >
+                            <Plus size={16} />
+                            Survei Baru
+                        </button>
+                        <button
+                            onClick={() => setShowSearch(!showSearch)}
+                            className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                        >
+                            <Search size={16} />
+                        </button>
+                        <button
+                            onClick={load}
+                            className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                        >
+                            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                        </button>
                     </div>
                 </div>
-            </div>
 
-            {/* ─── CONTENT */}
-            <div className="max-w-screen-2xl mx-auto px-4 md:px-8 pt-4 md:pt-6 pb-32 space-y-4 md:space-y-6">
+                {/* Search bar */}
+                <AnimatePresence>
+                    {showSearch && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden mt-3"
+                        >
+                            <div className="relative">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    autoFocus
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="Cari nomor, lokasi, pelanggan..."
+                                    className="w-full pl-10 pr-10 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all placeholder:text-slate-400"
+                                />
+                                {search && (
+                                    <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 p-0.5">
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Status filter pills */}
+                <div className="flex items-center gap-2 mt-3">
+                    {['ALL', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map(s => {
+                        const isActive = filterStatus === s
+                        const label = s === 'ALL' ? 'Semua' : STATUS_CONFIG[s]?.label || s
+                        return (
+                            <button
+                                key={s}
+                                onClick={() => setFilterStatus(s)}
+                                className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap
+                                    ${isActive
+                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                            >
+                                {label}
+                                {s !== 'ALL' && (
+                                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                        {surveys.filter(sv => sv.status === s).length}
+                                    </span>
+                                )}
+                            </button>
+                        )
+                    })}
+                </div>
+            </header>
+
+            {/* ─── CONTENT ─── */}
+            <div className="px-4 lg:px-5 pt-4 pb-32 space-y-4">
 
                 {/* Stats row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                    <StatCard label="Total Survei" value={surveys.length} sub={`${completedCount} selesai`} color="bg-white text-slate-900 border border-slate-200 shadow-sm" />
-                    <StatCard label="Total Biaya" value={totalExpAll > 0 ? `${(totalExpAll / 1_000_000).toFixed(1)}M` : '0'} sub="Rp" color="bg-indigo-600 text-white shadow-md shadow-indigo-600/20" />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-white rounded-xl p-4 border border-slate-200">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Total Survei</p>
+                        <p className="text-xl font-black text-slate-900">{surveys.length}</p>
+                        <p className="text-[10px] text-slate-500 mt-1 font-medium">{completedCount} selesai</p>
+                    </div>
+                    <div className="bg-indigo-600 rounded-xl p-4">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/60 mb-1">Total Biaya</p>
+                        <p className="text-xl font-black text-white">{totalExpAll > 0 ? `${(totalExpAll / 1_000_000).toFixed(1)}M` : '0'}</p>
+                        <p className="text-[10px] text-white/60 mt-1 font-medium">Rp</p>
+                    </div>
                 </div>
 
-                {/* List */}
+                {/* Table */}
                 {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="bg-white rounded-2xl h-40 animate-pulse border border-slate-100" />
-                        ))}
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div className="p-6 text-center text-sm text-slate-400 animate-pulse">Memuat...</div>
                     </div>
                 ) : filtered.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 text-center">
-                        <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center mb-4">
-                            <MapPin size={36} className="text-slate-300" />
+                        <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center mb-4">
+                            <MapPin size={28} className="text-slate-300" />
                         </div>
-                        <p className="font-bold text-slate-400 text-sm">Tidak ada survei ditemukan</p>
-                        <p className="text-xs text-slate-300 mt-1">Coba ubah filter atau kata kunci pencarian</p>
+                        <p className="font-semibold text-slate-500 text-sm">Tidak ada survei ditemukan</p>
+                        <p className="text-xs text-slate-400 mt-1">Coba ubah filter atau kata kunci pencarian</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-                        {filtered.map((s) => (
-                            <SurveyCard
-                                key={s.id}
-                                survey={s}
-                                onEdit={() => { setEditing(s); setModalOpen(true) }}
-                                onDelete={() => handleDelete(s.id)}
-                            />
-                        ))}
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-slate-50 border-b border-slate-200">
+                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Survey</th>
+                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pelanggan</th>
+                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Lokasi</th>
+                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-center">Status</th>
+                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-center">Proyek</th>
+                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Biaya</th>
+                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Tanggal</th>
+                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filtered.map((s, idx) => {
+                                        const sc = STATUS_CONFIG[s.status] || STATUS_CONFIG.PLANNED
+                                        const StatusIcon = sc.icon
+                                        const totalExp = s.expenses?.reduce((a, e) => a + e.amount, 0) || 0
+                                        return (
+                                            <motion.tr
+                                                key={s.id}
+                                                initial={{ opacity: 0, y: 5 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: idx * 0.02 }}
+                                                className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-100">
+                                                        {s.number}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className="font-semibold text-slate-800 text-sm">{s.customer?.name || '-'}</span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-1">
+                                                        <MapPin size={11} className="text-slate-400 shrink-0" />
+                                                        <span className="text-sm text-slate-600 truncate max-w-45">{s.location}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-[20px] text-[10px] font-semibold ${sc.bg} ${sc.text}`}>
+                                                        <StatusIcon size={10} />
+                                                        {sc.label}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {s.project ? (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
+                                                            <Briefcase size={9} />
+                                                            {s.project.number}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <span className="font-semibold text-slate-800 text-sm">{totalExp > 0 ? fmt(totalExp) : '—'}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <span className="text-sm text-slate-500">{fmtDate(s.date)}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <button onClick={() => { setEditing(s); setModalOpen(true) }} aria-label="Edit" className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-indigo-600 hover:text-white transition-all">
+                                                            <Edit size={11} />
+                                                        </button>
+                                                        <button onClick={() => handleDelete(s.id)} aria-label="Delete" className="w-7 h-7 flex items-center justify-center rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all">
+                                                            <Trash2 size={11} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </motion.tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* ─── FAB */}
-            <div className="fixed bottom-6 md:bottom-10 right-4 md:right-10 z-40">
-                <motion.button
-                    whileTap={{ scale: 0.94 }}
-                    onClick={() => { setEditing(null); setModalOpen(true) }}
-                    className="w-14 h-14 md:w-16 md:h-16 bg-indigo-600 rounded-2xl md:rounded-[1.5rem] flex items-center justify-center shadow-xl shadow-indigo-600/30 active:bg-indigo-700 hover:bg-indigo-700 transition-colors"
-                >
-                    <Plus size={24} className="text-white md:w-7 md:h-7" />
-                </motion.button>
-            </div>
+            {/* ─── FAB (mobile) ─── */}
+            <button
+                onClick={() => { setEditing(null); setModalOpen(true) }}
+                className="md:hidden fixed bottom-6 right-4 w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-600/30 active:bg-indigo-700 z-200"
+            >
+                <Plus size={24} className="text-white" />
+            </button>
 
-            {/* ─── TOAST */}
+            {/* ─── TOAST ─── */}
             <Toast toast={toast} />
 
-            {/* ─── MODAL */}
+            {/* ─── MODAL ─── */}
             <AnimatePresence>
                 {modalOpen && (
                     <SurveyFormModal
@@ -414,9 +384,10 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
     const [expenses, setExpenses] = useState<Partial<SurveyExpense>[]>(survey?.expenses || [])
     const [saving, setSaving] = useState(false)
     const [step, setStep] = useState<'info' | 'expenses'>('info')
+    const [modalToast, setModalToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
     const addExpense = () => {
-        setExpenses([...expenses, { category: 'TRANSPORT', amount: 0, description: '', status: 'PENDING' }])
+        setExpenses([...expenses, { category: 'TRANSPORT', amount: 0, description: '', status: 'APPROVED' }])
     }
 
     const removeExpense = (index: number) => {
@@ -433,21 +404,27 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...form, expenses })
             })
-            if (res.ok) onSuccess()
+            if (res.ok) { onSuccess(); return }
+            const err = await res.json().catch(() => ({ message: 'Gagal menyimpan survei' }))
+            throw new Error(err.message)
+        } catch (e: any) {
+            const errMsg = e?.message || 'Gagal menyimpan survei';
+            setModalToast({ type: 'error', msg: errMsg })
+            setTimeout(() => setModalToast(null), 3500)
         } finally { setSaving(false) }
     }
 
     const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
 
-    const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:bg-white transition-all text-slate-800 placeholder:text-slate-400"
-    const labelCls = "block text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-1.5"
+    const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:bg-white transition-all text-slate-800 placeholder:text-slate-400"
+    const labelCls = "block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1"
 
     return (
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex flex-col justify-end sm:justify-center sm:items-center sm:p-4"
+            className="fixed inset-0 z-100 bg-slate-900/40 backdrop-blur-sm flex flex-col justify-end sm:justify-center sm:items-center sm:p-4"
             onClick={onClose}
         >
             <motion.div
@@ -456,7 +433,7 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', stiffness: 350, damping: 35, mass: 0.8 }}
                 onClick={e => e.stopPropagation()}
-                className="w-full sm:max-w-lg lg:max-w-xl bg-white rounded-t-[1.5rem] sm:rounded-[1.5rem] overflow-hidden max-h-[90vh] sm:max-h-[85vh] flex flex-col shadow-2xl"
+                className="w-full sm:max-w-lg lg:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden max-h-[90vh] sm:max-h-[85vh] flex flex-col shadow-2xl border border-slate-200"
             >
                 {/* Handle bar (mobile) */}
                 <div className="flex justify-center pt-3 pb-2 sm:hidden bg-white">
@@ -464,23 +441,23 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                 </div>
 
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-white">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-white">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-600/20">
+                        <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm">
                             <MapPin size={16} className="text-white" />
                         </div>
                         <div>
-                            <h2 className="font-black text-slate-900 text-base leading-none">{isEdit ? 'Edit Survey' : 'Survei Baru'}</h2>
-                            <p className="text-[11px] text-slate-400 mt-0.5">{isEdit ? survey?.number : 'Buat catatan survei lapangan'}</p>
+                            <h2 className="font-bold text-slate-900 text-base leading-none">{isEdit ? 'Edit Survey' : 'Survei Baru'}</h2>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{isEdit ? survey?.number : 'Buat catatan survei lapangan'}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 active:bg-slate-200">
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200">
                         <X size={16} />
                     </button>
                 </div>
 
                 {/* Step tabs */}
-                <div className="flex border-b border-slate-100 bg-white px-5">
+                <div className="flex border-b border-slate-200 bg-white px-5">
                     {(['info', 'expenses'] as const).map(s => (
                         <button
                             key={s}
@@ -576,7 +553,7 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
 
                             <button
                                 onClick={() => setStep('expenses')}
-                                className="w-full flex items-center justify-between px-4 py-3.5 bg-indigo-50 rounded-xl text-indigo-600 font-bold text-sm active:bg-indigo-100 transition-colors"
+                                className="w-full flex items-center justify-between px-4 py-3 bg-indigo-50 rounded-lg text-indigo-600 font-semibold text-sm hover:bg-indigo-100 transition-colors"
                             >
                                 <span>Lanjut ke Biaya Operasional</span>
                                 <ChevronRight size={18} />
@@ -584,23 +561,22 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                         </div>
                     ) : (
                         <div className="p-5 space-y-3">
-                            {/* Expenses summary */}
                             {expenses.length > 0 && (
-                                <div className="bg-slate-50 rounded-xl p-3.5 flex items-center justify-between mb-1">
+                                <div className="bg-slate-50 rounded-lg p-3.5 flex items-center justify-between border border-slate-100 mb-1">
                                     <p className="text-xs text-slate-500 font-medium">Total biaya</p>
-                                    <p className="text-base font-black text-slate-900">{fmt(totalExpenses)}</p>
+                                    <p className="text-base font-bold text-slate-900">{fmt(totalExpenses)}</p>
                                 </div>
                             )}
 
                             {expenses.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-2xl">
+                                <div className="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-xl border border-slate-100">
                                     <Receipt size={32} className="text-slate-300 mb-3" />
                                     <p className="text-xs text-slate-400 font-medium">Belum ada biaya</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
                                     {expenses.map((exp, idx) => (
-                                        <div key={idx} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                        <div key={idx} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                                             <div className="flex items-center gap-2 mb-3">
                                                 <span className="text-lg">{CATEGORY_EMOJI[exp.category || 'OTHER'] || '📦'}</span>
                                                 <select
@@ -608,7 +584,7 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                                                     onChange={e => {
                                                         const newE = [...expenses]; newE[idx].category = e.target.value; setExpenses(newE)
                                                     }}
-                                                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold uppercase outline-none"
+                                                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold uppercase outline-none"
                                                 >
                                                     {EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
                                                 </select>
@@ -648,7 +624,7 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
 
                             <button
                                 onClick={addExpense}
-                                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:border-indigo-300 hover:text-indigo-500 transition-colors active:bg-slate-50 flex items-center justify-center gap-2"
+                                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-lg text-sm font-semibold text-slate-500 hover:border-indigo-300 hover:text-indigo-500 transition-colors active:bg-slate-50 flex items-center justify-center gap-2"
                             >
                                 <Plus size={16} /> Tambah Biaya
                             </button>
@@ -657,17 +633,14 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                 </div>
 
                 {/* Footer CTA */}
-                <div className="px-5 py-4 border-t border-slate-100 bg-white flex gap-3 safe-area-bottom">
-                    <button
-                        onClick={onClose}
-                        className="flex-none px-5 py-3.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-500 active:bg-slate-50 transition-colors"
-                    >
+                <div className="px-5 py-4 border-t border-slate-200 bg-white flex gap-3">
+                    <button onClick={onClose} className="flex-none px-5 py-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
                         Batal
                     </button>
                     <button
                         onClick={handleSubmit}
                         disabled={saving || !form.customerId || !form.location}
-                        className="flex-1 py-3.5 rounded-xl bg-indigo-600 text-white text-sm font-bold shadow-lg shadow-indigo-600/20 active:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="flex-1 py-3 rounded-lg bg-indigo-600 text-white text-sm font-semibold shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
                         {saving ? 'Menyimpan...' : isEdit ? 'Perbarui Survey' : 'Buat Survey'}
                     </button>

@@ -457,6 +457,27 @@ export function Sidebar() {
                     boxShadow: "4px 0 24px rgba(0,0,0,0.3)"
                 }}
             >
+                {/* Floating Desktop Toggle */}
+                <button
+                    onClick={toggleSidebar}
+                    className="absolute -right-3 top-7 w-6 h-6 flex items-center justify-center rounded-full z-50 transition-colors shadow-md border"
+                    style={{
+                        background: "#161B22",
+                        borderColor: "rgba(255,255,255,0.15)",
+                        color: "rgba(255,255,255,0.5)"
+                    }}
+                    onMouseEnter={e => {
+                        e.currentTarget.style.color = "#fff"
+                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"
+                    }}
+                    onMouseLeave={e => {
+                        e.currentTarget.style.color = "rgba(255,255,255,0.5)"
+                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"
+                    }}
+                >
+                    {isCollapsed ? <Menu size={12} /> : <ChevronLeft size={12} />}
+                </button>
+
                 <div className="flex flex-col h-full overflow-hidden">
                     <SidebarContent
                         isCollapsed={isCollapsed}
@@ -482,14 +503,14 @@ export function Sidebar() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setMobileMenuOpen(false)}
-                            className="lg:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100]"
+                            className="lg:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-100"
                         />
                         <motion.div
                             initial={{ x: -280 }}
                             animate={{ x: 0 }}
                             exit={{ x: -280 }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="lg:hidden fixed left-0 top-0 bottom-0 w-[280px] z-[101] flex flex-col"
+                            className="lg:hidden fixed left-0 top-0 bottom-0 w-70 z-101 flex flex-col"
                             style={{ background: "#0D1117", boxShadow: "8px 0 32px rgba(0,0,0,0.5)" }}
                         >
                             <div className="flex flex-col h-full overflow-hidden">
@@ -546,7 +567,7 @@ function SidebarContent({
         <>
             {/* Logo / Header */}
             <div
-                className={`flex items-center justify-between flex-shrink-0 ${
+                className={`flex items-center justify-between shrink-0 ${
                     isCollapsed ? 'px-4 py-6 justify-center' : 'px-6 py-6'
                 }`}
                 style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
@@ -560,7 +581,7 @@ function SidebarContent({
                             className="flex items-center gap-3"
                         >
                             <div
-                                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
                                 style={{
                                     background: "linear-gradient(135deg, #00C9A7, #00A589)",
                                     boxShadow: "0 0 16px rgba(0,201,167,0.35)"
@@ -592,8 +613,7 @@ function SidebarContent({
                     )}
                 </AnimatePresence>
 
-                {!isCollapsed && (
-                    isMobile ? (
+                {isMobile && (
                         <button
                             onClick={() => setMobileMenuOpen(false)}
                             className="p-2 rounded-xl transition-colors"
@@ -603,32 +623,7 @@ function SidebarContent({
                         >
                             <ChevronLeft size={18} />
                         </button>
-                    ) : (
-                        <button
-                            onClick={toggleSidebar}
-                            className="p-2 rounded-xl transition-colors"
-                            style={{ color: "rgba(255,255,255,0.35)" }}
-                            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
-                            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                        >
-                            {isCollapsed ? <Menu size={18} /> : <ChevronLeft size={18} />}
-                        </button>
-                    )
-                )}
-
-                {isCollapsed && !isMobile && (
-                    <button
-                        onClick={toggleSidebar}
-                        className="absolute bottom-[140px] right-[-12px] w-6 h-6 rounded-full flex items-center justify-center z-10"
-                        style={{
-                            background: "#1C2333",
-                            border: "1px solid rgba(255,255,255,0.1)",
-                            color: "rgba(255,255,255,0.5)"
-                        }}
-                    >
-                        <Menu size={12} />
-                    </button>
-                )}
+                    )}
             </div>
 
             {/* Navigation */}
@@ -662,7 +657,7 @@ function SidebarContent({
 
             {/* User Card + Logout */}
             <div
-                className="px-3 pb-5 pt-4 mt-auto flex-shrink-0"
+                className="px-3 pb-5 pt-4 mt-auto shrink-0"
                 style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
             >
                 {!isCollapsed ? (
@@ -671,7 +666,7 @@ function SidebarContent({
                         style={{ background: "rgba(255,255,255,0.04)" }}
                     >
                         <div
-                            className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-xs font-black text-white"
+                            className="w-9 h-9 rounded-xl shrink-0 flex items-center justify-center text-xs font-black text-white"
                             style={{ background: "linear-gradient(135deg, #00C9A7, #0099FF)" }}
                         >
                             {(userName || 'A').charAt(0).toUpperCase()}
@@ -789,7 +784,7 @@ function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobile
                 }}
             >
                 {Icon && (
-                    <div className="relative flex-shrink-0">
+                    <div className="relative shrink-0">
                         <Icon size={isCollapsed ? 18 : 16} strokeWidth={isActive ? 2.5 : 2} />
                         {item.children && isCollapsed && (
                             <div
@@ -812,7 +807,7 @@ function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobile
                             {item.children && (
                                 <ChevronRight
                                     size={13}
-                                    className={`transition-transform duration-300 flex-shrink-0 ${
+                                    className={`transition-transform duration-300 shrink-0 ${
                                         isOpen ? 'rotate-90' : ''
                                     }`}
                                     style={{ color: "rgba(255,255,255,0.2)" }}
@@ -836,7 +831,7 @@ function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobile
                 <motion.div
                     initial={{ opacity: 0, x: 10, scale: 0.95 }}
                     animate={{ opacity: 1, x: 0, scale: 1 }}
-                    className="fixed left-[75px] z-[100] min-w-[220px] rounded-2xl py-3 px-2 flex flex-col gap-1 pointer-events-auto"
+                    className="fixed left-18.75 z-100 min-w-55 rounded-2xl py-3 px-2 flex flex-col gap-1 pointer-events-auto"
                     style={{
                         top: 'auto',
                         marginTop: '-40px',

@@ -118,7 +118,7 @@ export default function InvoicesPage() {
         try {
             const [invRes, prjRes, soRes, doRes, custRes, cntRes, coRes, bankRes, coaRes] = await Promise.all([
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/invoices`).then(r => r.json()),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`).then(r => r.json()),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`, { headers: { 'x-user-role': userRole } }).then(r => r.json()),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`).then(r => r.json()),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery-orders`).then(r => r.json()),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`).then(r => r.json()),

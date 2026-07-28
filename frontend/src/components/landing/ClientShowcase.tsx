@@ -44,8 +44,8 @@ export function ClientShowcase() {
     return (
         <section className="py-12 md:py-20 border-t border-border relative overflow-hidden" style={{ background: "hsl(210,15%,94%)" }}>
             {/* Background elements */}
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/[0.02] rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-            <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-primary/[0.02] rounded-full blur-3xl translate-y-1/3 -translate-x-1/3" />
+            <div className="absolute top-0 right-0 w-125 h-125 bg-primary/2 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+            <div className="absolute bottom-0 left-0 w-100 h-100 bg-primary/2 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3" />
 
             <div className="mx-auto max-w-7xl px-6 relative z-10">
                 <div className="text-center mb-12 max-w-4xl mx-auto">
@@ -118,7 +118,7 @@ export function ClientShowcase() {
                                     </div>
                                 </div>
 
-                                <div className="mb-6 flex-grow relative z-10">
+                                <div className="mb-6 grow relative z-10">
                                     <p className="text-sm font-medium text-muted-foreground leading-relaxed italic border-l-4 border-muted pl-4">
                                         &ldquo;{client.shortDesc}&rdquo;
                                     </p>

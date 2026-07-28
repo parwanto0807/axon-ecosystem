@@ -439,7 +439,7 @@ export function LandingPage() {
                             onClick={() => setIsReadyModalOpen(true)}
                             className="group cursor-pointer rounded-2xl border border-border bg-card p-8 md:p-10 hover:border-primary/40 hover:shadow-xl transition-all duration-300 relative overflow-hidden"
                         >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/[0.03] rounded-bl-full" />
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/3 rounded-bl-full" />
                             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                                 <Clock className="w-6 h-6 text-primary group-hover:text-primary-foreground" />
                             </div>
@@ -468,7 +468,7 @@ export function LandingPage() {
                             onClick={() => setIsCustomModalOpen(true)}
                             className="group cursor-pointer rounded-2xl border border-border bg-card p-8 md:p-10 hover:border-primary/40 hover:shadow-xl transition-all duration-300 relative overflow-hidden"
                         >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/[0.03] rounded-bl-full" />
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/3 rounded-bl-full" />
                             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                                 <Wrench className="w-6 h-6 text-primary group-hover:text-primary-foreground" />
                             </div>
@@ -588,9 +588,9 @@ export function LandingPage() {
                                                 {product.features.map((_, fi) => {
                                                     if (fi === product.features.length - 1) return null
                                                     return (
-                                                        <div key={`conn-${fi}`} className="flex items-center h-5 ml-[66px]">
-                                                            <div className="w-px h-full bg-gradient-to-b from-primary/30 to-primary/10" />
-                                                            <div className="w-2 h-2 rounded-full bg-primary/20 -ml-[5px]" />
+                                                        <div key={`conn-${fi}`} className="flex items-center h-5 ml-16.5">
+                                                            <div className="w-px h-full bg-linear-to-b from-primary/30 to-primary/10" />
+                                                            <div className="w-2 h-2 rounded-full bg-primary/20 -ml-1.25" />
                                                         </div>
                                                     )
                                                 })}
@@ -637,7 +637,7 @@ export function LandingPage() {
                                 initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }}
                                 onClick={() => setExpandedLevel(expandedLevel === i ? null : i)}
                                 className={`rounded-xl border transition-all duration-300 cursor-pointer overflow-hidden ${
-                                    expandedLevel === i ? "border-primary/40 bg-primary/[0.02]" : "border-border bg-card hover:border-primary/20"
+                                    expandedLevel === i ? "border-primary/40 bg-primary/2" : "border-border bg-card hover:border-primary/20"
                                 }`}
                             >
                                 <div className="flex items-center gap-4 p-5">
@@ -700,7 +700,7 @@ export function LandingPage() {
 
                     <MatrixTableWrapper>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse min-w-[800px]">
+                            <table className="w-full text-left border-collapse min-w-200">
                                 <thead>
                                     <tr className="text-xs font-bold uppercase tracking-[0.15em] text-muted-foreground">
                                         <th className="px-8 py-6 border-b border-border font-semibold">{lang === 'ID' ? 'Modul & Fitur' : 'Modules & Features'}</th>
@@ -852,7 +852,7 @@ export function LandingPage() {
                         <div className="relative border-l border-slate-700/40 ml-4 space-y-8 pl-10 py-2">
                             {t.about.milestones.map((m, i) => (
                                 <div key={i} className="relative">
-                                    <div className="absolute -left-[44px] top-1 w-3 h-3 rounded-full bg-primary border-2 border-primary/40" />
+                                    <div className="absolute -left-11 top-1 w-3 h-3 rounded-full bg-primary border-2 border-primary/40" />
                                     <span className="text-slate-400/60 font-bold text-sm tracking-wider mb-1 block">{m.y}</span>
                                     <p className="text-slate-300/80 font-medium">{m.t}</p>
                                 </div>

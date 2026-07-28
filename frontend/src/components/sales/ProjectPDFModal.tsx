@@ -53,7 +53,7 @@ export default function ProjectPDFModal({ isOpen, onClose, project, companyProfi
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 sm:p-6">
+            <div className="fixed inset-0 z-500 flex items-center justify-center p-4 sm:p-6">
                 <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -121,3 +121,4 @@ export default function ProjectPDFModal({ isOpen, onClose, project, companyProfi
         </AnimatePresence>
     )
 }
+

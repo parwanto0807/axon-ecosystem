@@ -47,10 +47,10 @@ export function ClientDetailModal({ isOpen, onClose, client }: ClientDetailModal
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-[100] cursor-pointer"
+                        className="fixed inset-0 bg-foreground/40 backdrop-blur-sm z-100 cursor-pointer"
                     />
 
-                    <div className="fixed inset-0 flex items-center justify-center z-[101] pointer-events-none p-4">
+                    <div className="fixed inset-0 flex items-center justify-center z-101 pointer-events-none p-4">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.96, y: 16 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -77,7 +77,7 @@ export function ClientDetailModal({ isOpen, onClose, client }: ClientDetailModal
                                         <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight mb-2">{client.name}</h2>
                                     </div>
                                 </div>
-                                
+
                                 <div className="mb-8">
                                     <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground mb-4">{t.modulesUsed}</h3>
                                     <div className="flex flex-wrap gap-2">
@@ -153,7 +153,7 @@ export function ClientDetailModal({ isOpen, onClose, client }: ClientDetailModal
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div className="mt-auto p-8 border-t border-border bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-4">
                                 <p className="text-sm font-bold text-foreground max-w-md text-center sm:text-left">{client.ctaText}</p>
                                 <Button

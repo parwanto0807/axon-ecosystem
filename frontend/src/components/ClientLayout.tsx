@@ -5,7 +5,8 @@ import { MobileNav } from "@/components/MobileNav";
 import { FloatingOperationalNav } from "@/components/FloatingOperationalNav";
 import { useUIStore } from "@/store/uiStore";
 import { useState, useEffect } from "react"
-import { BarChart3, Search, Bell } from "lucide-react"
+import { useSession, signOut } from "next-auth/react"
+import { BarChart3, Search, Bell, User, LogOut } from "lucide-react"
 import { useLocationTracker } from "@/hooks/useLocationTracker"
 
 
@@ -15,6 +16,10 @@ export function ClientLayout({
     children: React.ReactNode;
 }) {
     const { isSidebarCollapsed, shouldBlurBackground } = useUIStore()
+    const { data: session } = useSession()
+    const userName = session?.user?.name || 'User'
+    const userEmail = session?.user?.email || 'user@example.com'
+    const userImage = session?.user?.image
     const [mounted, setMounted] = useState(false)
 
     // Silent background location tracker — runs for all non-admin users during work hours
@@ -53,6 +58,32 @@ export function ClientLayout({
                 </header>
 
                 <Sidebar />
+                
+                {/* Desktop Top Navbar - Temporary */}
+                <header className="hidden lg:flex sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-2xl border-b border-slate-200 px-8 items-center justify-end shadow-sm">
+                    <div className="flex items-center gap-4">
+                        <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors relative">
+                            <Bell size={20} />
+                            <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+                        </button>
+                        <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+                            <div className="text-right">
+                                <p className="text-xs font-bold text-slate-900 leading-none">{userName}</p>
+                                <p className="text-[10px] font-semibold text-slate-500 mt-0.5">{userEmail}</p>
+                            </div>
+                            <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center overflow-hidden border border-slate-200">
+                                {userImage ? (
+                                    <img src={userImage} alt={userName} className="w-full h-full object-cover" />
+                                ) : (
+                                    <User size={16} className="text-indigo-600" />
+                                )}
+                            </div>
+                            <button onClick={() => signOut()} className="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center transition-colors shadow-sm ml-2" title="Logout">
+                                <LogOut size={16} />
+                            </button>
+                        </div>
+                    </div>
+                </header>
                 
                 <main className="flex-1 transition-all duration-300 ease-in-out pb-32 mt-14 lg:mt-0">
                     <div className="w-full h-full">

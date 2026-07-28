@@ -154,8 +154,8 @@ export function Hero() {
                         className="relative hidden lg:block"
                     >
                         <div className="relative">
-                            <div className="absolute -inset-4 bg-primary/[0.02] rounded-[2.5rem] -rotate-2" />
-                            <div className="absolute -inset-4 bg-primary/[0.02] rounded-[2.5rem] rotate-1" />
+                            <div className="absolute -inset-4 bg-primary/2 rounded-[2.5rem] -rotate-2" />
+                            <div className="absolute -inset-4 bg-primary/2 rounded-[2.5rem] rotate-1" />
 
                             {/* Simulated Dashboard UI */}
                             <div className="relative rounded-2xl border border-border bg-card shadow-xl overflow-hidden p-4 md:p-5">
@@ -207,7 +207,7 @@ export function Hero() {
                                             />
                                         ))}
                                     </div>
-                                    <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                                    <div className="absolute bottom-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-primary/30 to-transparent" />
                                 </div>
 
                                 {/* Bottom Row */}

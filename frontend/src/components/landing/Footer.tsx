@@ -168,7 +168,7 @@ export function Footer() {
 
     return (
         <footer className="bg-slate-900 text-slate-100">
-            <div className="mx-auto max-w-[120rem] px-6 py-16 md:py-20">
+            <div className="mx-auto max-w-480 px-6 py-16 md:py-20">
                 {/* Top: Logo + Social */}
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-12">
                     <div className="flex flex-col gap-3">

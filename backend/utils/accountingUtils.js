@@ -9,38 +9,36 @@ const prisma = new PrismaClient();
  * @param {string} params.description - Description for the journal item
  * @param {string} params.reference - Reference doc number (e.g. INV-001)
  * @param {string} params.type - Entry type (e.g. 'INVOICE')
+ * @param {Object} params.prismaTx - Optional Prisma transaction client (tx from $transaction callback). If omitted, uses global prisma client.
  */
 async function postJournalFromSystemKey(params) {
-    const { systemKey, amount, description, reference, type = 'GENERAL', counterSystemKey } = params;
+    const { systemKey, amount, description, reference, type = 'GENERAL', counterSystemKey, prismaTx } = params;
+    const tx = prismaTx || prisma;
 
     try {
         // 1. Resolve accounts from system keys
-        const mainAccount = await prisma.systemAccount.findUnique({
+        const mainAccount = await tx.systemAccount.findUnique({
             where: { key: systemKey },
             include: { coa: true }
         });
 
-        if (!mainAccount) throw new Error(`System Account key not found: ${systemKey}`);
+        if (!mainAccount) {
+            console.error(`[Accounting] SystemAccount key not found: ${systemKey} — skipping journal entry`);
+            return null;
+        }
 
         let counterAccount = null;
         if (counterSystemKey) {
-            counterAccount = await prisma.systemAccount.findUnique({
+            counterAccount = await tx.systemAccount.findUnique({
                 where: { key: counterSystemKey },
                 include: { coa: true }
             });
-            if (!counterAccount) throw new Error(`Counter System Account key not found: ${counterSystemKey}`);
         }
 
-        // Generate entry sequence
-        const count = await prisma.journalEntry.count();
-        const number = `JV-${new Date().getFullYear()}-${(count + 1).toString().padStart(4, '0')}`;
-
         // Prepare items (Basic double entry logic)
-        // Note: This logic assumes a simple mapping. Complex transactions should use manual multi-item posting.
         const items = [];
-        
+
         // Refactored Logic: First key (systemKey) is DEBIT, second (counterSystemKey) is CREDIT.
-        // This is the standard way to handle automated mapping for simple double-entry.
         items.push({
             coaId: mainAccount.coaId,
             description: description,
@@ -57,8 +55,22 @@ async function postJournalFromSystemKey(params) {
             });
         }
 
+        // Generate entry sequence — find last entry to get highest sequence
+        const year = new Date().getFullYear();
+        const basePrefix = `JV-${year}-`;
+        const lastEntry = await tx.journalEntry.findFirst({
+            where: { number: { startsWith: basePrefix } },
+            orderBy: { number: 'desc' }
+        });
+        let seq = 1;
+        if (lastEntry) {
+            const lastSeq = parseInt(lastEntry.number.split('-').pop(), 10);
+            seq = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
+        }
+        const number = `${basePrefix}${seq.toString().padStart(4, '0')}`;
+
         // Create the entry
-        return await prisma.journalEntry.create({
+        return await tx.journalEntry.create({
             data: {
                 number,
                 date: new Date(),
@@ -73,8 +85,9 @@ async function postJournalFromSystemKey(params) {
         });
 
     } catch (error) {
-        console.error('Accounting Engine Error:', error);
-        throw error;
+        console.error('[Accounting] Journal posting failed:', error.message);
+        // Non-blocking: don't throw, just log — stock operations should still succeed
+        return null;
     }
 }
 
@@ -83,13 +96,13 @@ async function postJournalFromSystemKey(params) {
  */
 async function createJournalEntry(data) {
     const { number, description, reference, type, items } = data;
-    
+
     // Validate balance
     const totalDebit = items.reduce((sum, item) => sum + (item.debit || 0), 0);
     const totalCredit = items.reduce((sum, item) => sum + (item.credit || 0), 0);
-    
+
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
-        throw new Error('Journal items do not balance (Debit != Credit)');
+        throw new Error('Journal items don\'t balance (Debit != Credit)');
     }
 
     return await prisma.journalEntry.create({
