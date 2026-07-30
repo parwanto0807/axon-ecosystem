@@ -1,7 +1,7 @@
-import NextAuth from "next-auth"
+import NextAuth, { NextAuthOptions } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const authOptions: NextAuthOptions = {
     providers: [
         Credentials({
             name: "Credentials",
@@ -62,4 +62,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     pages: {
         signIn: '/login',
     }
-})
+}
+
+const handler = NextAuth(authOptions)
+export const handlers = { GET: handler, POST: handler }
+
