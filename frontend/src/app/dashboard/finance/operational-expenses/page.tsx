@@ -198,6 +198,8 @@ export default function OperationalExpensesPage() {
                     month: new Date().getMonth() + 1,
                     year: new Date().getFullYear(),
                     coaId: '',
+                    workOrderId: '',
+                    projectId: '',
                     attachment: null,
                     repeatMonths: 6,
                     autoPost: true

@@ -72,6 +72,7 @@ export default function LoginPage() {
     const [isMounted, setIsMounted] = useState(false)
     const [focusedField, setFocusedField] = useState<string | null>(null)
 
+
     useEffect(() => {
         setIsMounted(true)
     }, [])
@@ -82,22 +83,11 @@ export default function LoginPage() {
         setError("")
 
         try {
-            const result = await signIn("credentials", {
+            signIn("credentials", {
                 email,
                 password,
-                redirect: false,
+                callbackUrl: "/dashboard",
             })
-
-            if (result?.error) {
-                setError("Email atau password salah. Silakan coba lagi.")
-                setIsLoading(false)
-            } else {
-                setSuccess(true)
-                setTimeout(() => {
-                    router.push("/dashboard")
-                    router.refresh()
-                }, 1000)
-            }
         } catch (err) {
             setError("Terjadi kesalahan. Silakan coba lagi.")
             setIsLoading(false)
