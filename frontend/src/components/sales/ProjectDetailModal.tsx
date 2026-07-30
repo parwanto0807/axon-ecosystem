@@ -161,6 +161,31 @@ export default function ProjectDetailModal({ project, stats, onClose }: ProjectD
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8">
+                    {(!project.salesOrders || project.salesOrders.length === 0) && (
+                        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center gap-3 shadow-xs">
+                            <span className="relative flex h-3 w-3 shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.9)]"></span>
+                            </span>
+                            <div>
+                                <p className="text-xs font-black text-rose-900">Belum Ada Pesanan Penjualan (Sales Order)</p>
+                                <p className="text-[11px] font-semibold text-rose-700 mt-0.5">Project ini belum memiliki Sales Order yang terbit.</p>
+                            </div>
+                        </div>
+                    )}
+                    {(!project.invoices || project.invoices.length === 0) && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 shadow-xs">
+                            <span className="relative flex h-3 w-3 shrink-0">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.9)]"></span>
+                            </span>
+                            <div>
+                                <p className="text-xs font-black text-amber-900">Belum Ada Invoice (Tagihan)</p>
+                                <p className="text-[11px] font-semibold text-amber-700 mt-0.5">Project ini belum memiliki Invoice yang terbit.</p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Stats Summary */}
                     <div className="grid grid-cols-2 gap-3 md:gap-4">
                         <div className="bg-white p-4 md:p-5 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm">

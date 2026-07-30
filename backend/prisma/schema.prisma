@@ -313,6 +313,7 @@ model PreSalesProject {
   workOrders     WorkOrder[]
   businessCategoryId String?
   businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
+  operationalExpenses OperationalExpense[]
 }
 
 model QuotationItem {
@@ -478,6 +479,7 @@ model WorkOrder {
   customerId      String?
   assignedTo      String?
   location        String?
+  operationalExpenses OperationalExpense[]
   scheduledStart  DateTime?
   scheduledEnd    DateTime?
   actualStart     DateTime?
@@ -751,10 +753,14 @@ model JournalEntry {
   description String?
   reference   String?
   type        String        @default("GENERAL")
-  status      String        @default("POSTED")
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  items       JournalItem[]
+  status        String        @default("POSTED")
+  createdBy     String?
+  attachmentUrl String?
+  voidedAt      DateTime?
+  voidedBy      String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  items         JournalItem[]
 }
 
 model JournalItem {
@@ -1332,6 +1338,12 @@ model OperationalExpense {
   
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+
+  workOrderId     String?
+  workOrder       WorkOrder?     @relation(fields: [workOrderId], references: [id])
+  
+  projectId       String?
+  project         PreSalesProject? @relation(fields: [projectId], references: [id])
 }
 
 

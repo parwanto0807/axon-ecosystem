@@ -127,7 +127,10 @@ export default function StockOutPage() {
     }, [form.workOrderId, skus, form.warehouseId, workOrders])
 
     const totalValue = items.reduce((s, i) => s + i.qty * i.unitCost, 0)
-    const hasOverIssue = items.some(i => i.qty > i.availableQty && i.availableQty > 0)
+    const hasOverIssue = items.some(i => {
+        const avail = form.warehouseId ? getAvailableQty(i.skuId, form.warehouseId) : 0;
+        return !!i.skuId && !!form.warehouseId && i.qty > avail;
+    })
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault(); setSaving(true)
@@ -550,7 +553,8 @@ export default function StockOutPage() {
                                                 </div>
                                             ) : (
                                                 items.map((item, idx) => {
-                                                    const isOver = item.qty > item.availableQty && item.availableQty > 0
+                                                    const availableQty = form.warehouseId ? getAvailableQty(item.skuId, form.warehouseId) : 0
+                                                    const isOver = !!item.skuId && !!form.warehouseId && item.qty > availableQty
                                                     return (
                                                         <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} key={idx} className={`flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-4 p-4 rounded-2xl border items-start md:items-center transition-all ${isOver ? 'bg-rose-50/30 border-rose-200 shadow-rose-500/5' : 'bg-white border-slate-100 md:hover:border-slate-200 shadow-sm'}`}>
                                                             <div className="w-full md:col-span-5">
@@ -565,7 +569,7 @@ export default function StockOutPage() {
                                                             <div className="w-full md:col-span-2 relative">
                                                                 <div className="flex md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Jumlah (Qty)</div>
                                                                 <input type="number" min="0.01" step="any" placeholder="Qty" value={item.qty} onChange={e => updateItem(idx, 'qty', +e.target.value)} className={`w-full md:text-center bg-slate-50 border border-slate-100 md:border-none rounded-xl px-4 py-3 md:py-2.5 text-xs font-black outline-none ${isOver ? 'text-rose-600 border-rose-200 ring-2 ring-rose-500/20' : 'text-slate-700'}`} />
-                                                                {item.availableQty > 0 && <p className="text-[9px] md:text-center font-bold text-slate-400 mt-1.5 uppercase tracking-tighter">AVL: {item.availableQty}</p>}
+                                                                {item.skuId && <p className={`text-[9px] md:text-center font-bold mt-1.5 uppercase tracking-tighter ${isOver ? 'text-rose-600' : 'text-slate-400'}`}>AVL: {form.warehouseId ? availableQty : 'Pilih Gudang'}</p>}
                                                             </div>
                                                             <div className="w-full md:col-span-3 relative">
                                                                 <div className="flex md:hidden text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Unit Cost (HPP)</div>
@@ -603,7 +607,7 @@ export default function StockOutPage() {
                                     </div>
                                     <div className="flex gap-3 w-full md:w-auto">
                                         <Button type="button" variant="outline" onClick={() => setModalOpen(false)} className="flex-[1] md:flex-none bg-white rounded-xl md:rounded-2xl h-12 md:h-14 md:px-8 font-black uppercase tracking-[0.2em] text-[10px] border-slate-200 hover:bg-slate-50 transition-all">Batal</Button>
-                                        <Button onClick={handleSubmit} disabled={saving || items.length === 0} className="flex-[2] md:flex-none rounded-xl md:rounded-2xl h-12 md:h-14 md:px-10 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-[0.2em] text-[10px] shadow-xl shadow-rose-600/30 transition-all active:scale-95 disabled:opacity-70 disabled:shadow-none">
+                                        <Button onClick={handleSubmit} disabled={saving || items.length === 0 || !form.warehouseId || hasOverIssue} className="flex-[2] md:flex-none rounded-xl md:rounded-2xl h-12 md:h-14 md:px-10 bg-rose-600 hover:bg-rose-700 text-white font-black uppercase tracking-[0.2em] text-[10px] shadow-xl shadow-rose-600/30 transition-all active:scale-95 disabled:opacity-70 disabled:shadow-none">
                                             {saving ? 'Menyimpan...' : 'Simpan Draft'}
                                         </Button>
                                     </div>

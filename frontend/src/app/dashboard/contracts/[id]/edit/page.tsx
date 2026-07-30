@@ -67,9 +67,9 @@ export default function EditContractPage() {
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`).then(r => r.json()),
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/${id}`).then(r => r.json())
                 ])
-                setProjects(p)
-                setCustomers(c)
-                setVendors(v)
+                setProjects(Array.isArray(p) ? p : [])
+                setCustomers(Array.isArray(c) ? c : [])
+                setVendors(Array.isArray(v) ? v : [])
                 
                 if (contract) {
                     setFormData({

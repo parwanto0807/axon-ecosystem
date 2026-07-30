@@ -62,8 +62,8 @@ export function SectionPattern({ variant, fadeDir = "right", dark = false }: Sec
                 <pattern id="p-rad" width="100" height="100" patternUnits="userSpaceOnUse">
                     {Array.from({ length: 12 }, (_, i) => {
                         const angle = (i * 30 * Math.PI) / 180
-                        const x2 = 50 + 45 * Math.cos(angle)
-                        const y2 = 50 + 45 * Math.sin(angle)
+                        const x2 = Number((50 + 45 * Math.cos(angle)).toFixed(4))
+                        const y2 = Number((50 + 45 * Math.sin(angle)).toFixed(4))
                         return <line key={i} x1="50" y1="50" x2={x2} y2={y2} stroke={lineColor} strokeWidth="0.4" strokeOpacity="0.5" />
                     })}
                     <circle cx="50" cy="50" r="8" fill="none" stroke={lineColor} strokeWidth="0.5" />

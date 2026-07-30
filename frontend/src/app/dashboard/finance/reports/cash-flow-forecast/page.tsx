@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     TrendingUp, TrendingDown, Calendar, Wallet,
-    ArrowUpCircle, ArrowDownCircle, Info, RefreshCw,
+    ArrowUpCircle, ArrowDownCircle, Info, RefreshCw, Plus,
     ChevronDown, ChevronRight, Building2, CheckCircle2,
-    AlertCircle, Clock, BarChart3, Zap, Eye, X
+    AlertCircle, Clock, BarChart3, Zap, Eye, X, Users
 } from "lucide-react"
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
@@ -31,6 +32,13 @@ interface OpexDetail {
     date: string;
     status: string;
 }
+interface PayrollDetail {
+    id: string;
+    type: string;
+    amount: number;
+    date: string;
+    status: string;
+}
 interface ForecastMonth {
     month: string;
     monthType: 'ACTUAL' | 'CURRENT' | 'PROJECTED';
@@ -45,11 +53,13 @@ interface ForecastMonth {
         projectedInflowAmt: number;
         projectedBillAmt: number;
         projectedOpexAmt: number;
+        projectedPayrollAmt: number;
     };
     details: {
         invoices: InvoiceDetail[];
         bills: BillDetail[];
         opex: OpexDetail[];
+        payroll: PayrollDetail[];
     };
 }
 interface ForecastData {
@@ -137,6 +147,11 @@ export default function CashFlowForecastPage() {
         )
     }
     if (!data) return <div className="flex justify-center p-20 text-slate-400">Gagal memuat data.</div>
+    if (!data.forecast || data.forecast.length === 0) return (
+        <div className="flex justify-center items-center p-20 text-slate-400 text-sm">
+            Tidak ada data proyeksi tersedia.
+        </div>
+    )
 
     const currentMonth = data.forecast[selectedMonth]
     const totalForecastInflow = data.forecast.reduce((s, m) => s + m.inflow, 0)
@@ -163,9 +178,14 @@ export default function CashFlowForecastPage() {
                         </p>
                     </div>
                 </div>
-                <button onClick={loadData} className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-4 md:px-5 md:py-3 bg-white text-slate-700 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all shadow-sm border border-slate-200 active:scale-95">
-                    <RefreshCw size={14} className="md:w-4 md:h-4" /> Refresh Data
-                </button>
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                    <Link href="/dashboard/finance/operational-expenses" className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3.5 md:py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] md:text-xs font-black uppercase tracking-widest rounded-2xl transition-all shadow-md shadow-indigo-600/20 active:scale-95">
+                        <Plus size={14} className="md:w-4 md:h-4" /> Input Proyeksi Rutin
+                    </Link>
+                    <button onClick={loadData} className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3.5 md:py-3 bg-white text-slate-700 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-slate-50 transition-all shadow-sm border border-slate-200 active:scale-95">
+                        <RefreshCw size={14} className="md:w-4 md:h-4" /> Refresh Data
+                    </button>
+                </div>
             </header>
 
             {/* ── Summary Cards ── */}
@@ -228,6 +248,7 @@ export default function CashFlowForecastPage() {
                             {data.forecast.map((m, idx) => {
                                 const hIn = Math.max((m.inflow / maxBarVal) * 100, 2);
                                 const hOut = Math.max((m.outflow / maxBarVal) * 100, 2);
+                                const hBalance = Math.max((Math.abs(m.closingBalance) / maxBarVal) * 100, 1);
                                 const isSelected = selectedMonth === idx;
                                 const isDeficit = m.netChange < 0;
                                 return (
@@ -251,7 +272,7 @@ export default function CashFlowForecastPage() {
                                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> Masuk
                                                     </span>
                                                     <span className="text-[10px] font-black text-emerald-300">
-                                                        {m.inflow >= 1000000 ? `${(m.inflow/1000000).toFixed(1)}M` : fmt(m.inflow)}
+                                                        {fmt(m.inflow)}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
@@ -259,23 +280,19 @@ export default function CashFlowForecastPage() {
                                                         <span className="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block" /> Keluar
                                                     </span>
                                                     <span className="text-[10px] font-black text-rose-300">
-                                                        {m.outflow >= 1000000 ? `${(m.outflow/1000000).toFixed(1)}M` : fmt(m.outflow)}
+                                                        {fmt(m.outflow)}
                                                     </span>
                                                 </div>
                                                 <div className={`flex justify-between items-center pt-1 border-t border-slate-700`}>
                                                     <span className="text-[10px] text-slate-300">Net</span>
                                                     <span className={`text-[10px] font-black ${isDeficit ? 'text-rose-300' : 'text-emerald-300'}`}>
-                                                        {isDeficit ? '-' : '+'}{m.netChange >= 1000000 || m.netChange <= -1000000
-                                                            ? `${(Math.abs(m.netChange)/1000000).toFixed(1)}M`
-                                                            : fmt(m.netChange)}
+                                                        {isDeficit ? '-' : '+'}{fmt(Math.abs(m.netChange))}
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-[10px] text-slate-300">Saldo Akhir</span>
                                                     <span className={`text-[10px] font-black ${m.closingBalance < 0 ? 'text-rose-300' : 'text-white'}`}>
-                                                        {m.closingBalance >= 1000000 || m.closingBalance <= -1000000
-                                                            ? `${(Math.abs(m.closingBalance)/1000000).toFixed(1)}M`
-                                                            : fmt(m.closingBalance)}
+                                                        {m.closingBalance < 0 ? '-' : ''}{fmt(Math.abs(m.closingBalance))}
                                                     </span>
                                                 </div>
                                             </div>
@@ -306,6 +323,14 @@ export default function CashFlowForecastPage() {
                                             {/* Outflow bar */}
                                             <motion.div initial={{ height: 0 }} animate={{ height: `${hOut}%` }}
                                                 className={`${isMobile ? 'w-2.5' : 'w-4'} rounded-t-lg transition-all ${isSelected ? 'bg-rose-500 shadow-lg shadow-rose-500/30' : 'bg-rose-200 group-hover:bg-rose-400'}`} />
+                                            {/* Closing Balance bar */}
+                                            <motion.div initial={{ height: 0 }} animate={{ height: `${hBalance}%` }}
+                                                title={`Saldo: ${fmt(m.closingBalance)}`}
+                                                className={`${isMobile ? 'w-1' : 'w-1.5'} rounded-t-sm transition-all ${
+                                                    m.closingBalance >= 0
+                                                        ? (isSelected ? 'bg-indigo-500 shadow-lg shadow-indigo-500/30' : 'bg-indigo-200 group-hover:bg-indigo-400')
+                                                        : (isSelected ? 'bg-rose-700' : 'bg-rose-300 group-hover:bg-rose-600')
+                                                }`} />
                                         </div>
                                         <div className="text-center">
                                             <p className={`text-[9px] font-black uppercase leading-none ${isSelected ? 'text-indigo-600' : 'text-slate-400'}`}>
@@ -363,6 +388,7 @@ export default function CashFlowForecastPage() {
                                 { label: 'Kas Keluar Aktual', val: currentMonth.breakdown.actualOut, color: 'text-rose-500' },
                                 { label: 'Tagihan Proyeksi', val: currentMonth.breakdown.projectedBillAmt, color: 'text-rose-600' },
                                 { label: 'Biaya Operasional', val: currentMonth.breakdown.projectedOpexAmt, color: 'text-orange-600' },
+                                { label: 'Gaji Karyawan', val: currentMonth.breakdown.projectedPayrollAmt, color: 'text-fuchsia-600' },
                             ].map(r => (
                                 <div key={r.label} className="flex justify-between">
                                     <span className="text-slate-500">{r.label}</span>
@@ -464,7 +490,7 @@ export default function CashFlowForecastPage() {
                                     <p className={`text-sm font-black truncate ${m.closingBalance >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>{fmt(m.closingBalance)}</p>
                                 </div>
                                 <div className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider ${m.netChange >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                    {m.netChange >= 0 ? '+' : ''}{fmt(m.netChange)}
+                                    {m.netChange >= 0 ? '+' : '-'}{fmt(m.netChange)}
                                 </div>
                             </div>
                         </div>
@@ -490,7 +516,7 @@ export default function CashFlowForecastPage() {
                 <AnimatePresence>
                     {expandedDetail !== null && (
                         <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
-                            <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
 
                                 {/* Invoice Inflows */}
                                 <DetailSection
@@ -580,6 +606,21 @@ export default function CashFlowForecastPage() {
                                                 <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{exp.status}</span>
                                             </div>
                                             <p className="text-xs font-black text-orange-700">{fmt(exp.amount)}</p>
+                                        </div>
+                                    )}
+                                />
+
+                                {/* Payroll */}
+                                <DetailSection
+                                    icon={Users} title="Gaji Karyawan (Payroll)" colorClass="text-fuchsia-500"
+                                    items={currentMonth.details.payroll || []} emptyMsg="Tidak ada jadwal gaji bulan ini"
+                                    renderItem={(p: PayrollDetail, i) => (
+                                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-fuchsia-50/30 border border-fuchsia-100/50">
+                                            <div>
+                                                <p className="text-xs font-black text-slate-800">{p.type === 'SALARY' ? 'Gaji Rutin' : p.type}</p>
+                                                <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{p.status}</span>
+                                            </div>
+                                            <p className="text-xs font-black text-fuchsia-700">{fmt(p.amount)}</p>
                                         </div>
                                     )}
                                 />

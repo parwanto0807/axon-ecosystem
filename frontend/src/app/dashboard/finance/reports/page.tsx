@@ -9,6 +9,13 @@ import Link from "next/link"
 
 const reports = [
     {
+        title: "Executive Summary",
+        description: "Ringkasan eksekutif konsolidasi Neraca, Laba Rugi & Arus Kas",
+        icon: TrendingUp,
+        path: "/dashboard/finance/reports/executive-summary",
+        color: "bg-indigo-600"
+    },
+    {
         title: "Buku Besar",
         description: "Detail transaksi per akun perkiraan (General Ledger)",
         icon: BookOpen,

@@ -6,7 +6,8 @@ import { Plus, Receipt, Search, FileText, Calendar, Loader2, PlayCircle, Edit } 
 import Link from "next/link"
 import EditVendorBillModal from "@/components/purchasing/EditVendorBillModal"
 import VendorBillDetailModal from "@/components/purchasing/VendorBillDetailModal"
-import { Eye } from "lucide-react"
+import VendorBillPaymentModal from "@/components/purchasing/VendorBillPaymentModal"
+import { Eye, CheckCircle2 } from "lucide-react"
 
 interface PurchaseInvoice {
     id: string;
@@ -27,6 +28,7 @@ export default function VendorBillsPage() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false)
     const [viewingInvoice, setViewingInvoice] = useState<any>(null)
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
+    const [payingInvoice, setPayingInvoice] = useState<any>(null)
 
     const fetchInvoices = async () => {
         setLoading(true)
@@ -191,6 +193,14 @@ export default function VendorBillsPage() {
                                                     </button>
                                                 </div>
                                             )}
+                                            {inv.status === 'POSTED' && (
+                                                <div className="flex flex-col gap-2">
+                                                    <button onClick={() => setPayingInvoice(inv)}
+                                                        className="flex items-center gap-2 justify-center w-full px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg font-bold transition-all text-xs border border-indigo-200 shadow-sm">
+                                                        <CheckCircle2 size={14} /> Mark as Paid
+                                                    </button>
+                                                </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -258,6 +268,12 @@ export default function VendorBillsPage() {
                                         {postingId === inv.id ? <Loader2 size={13} className="animate-spin" /> : <PlayCircle size={13} />} Post GL
                                     </button>
                                 </>)}
+                                {inv.status === 'POSTED' && (
+                                    <button onClick={() => setPayingInvoice(inv)}
+                                        className="h-9 px-3 rounded-xl bg-indigo-50 text-indigo-600 flex items-center gap-1.5 border border-indigo-200 text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all">
+                                        <CheckCircle2 size={13} /> Pay
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </motion.div>
@@ -284,6 +300,17 @@ export default function VendorBillsPage() {
                     setViewingInvoice(null)
                 }}
             />
+
+            {payingInvoice && (
+                <VendorBillPaymentModal
+                    invoice={payingInvoice}
+                    onClose={() => setPayingInvoice(null)}
+                    onSuccess={() => {
+                        setPayingInvoice(null)
+                        fetchInvoices()
+                    }}
+                />
+            )}
         </div>
     )
 }

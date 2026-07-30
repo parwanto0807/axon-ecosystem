@@ -36,17 +36,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
-        <Providers>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            enableSystem={false}
-            disableTransitionOnChange
-          >
+      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`} suppressHydrationWarning>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <Providers>
             {children}
-          </ThemeProvider>
-        </Providers>
+          </Providers>
+        </ThemeProvider>
       </body>
     </html>
   );

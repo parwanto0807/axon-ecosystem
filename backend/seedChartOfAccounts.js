@@ -330,6 +330,17 @@ const coaData = [
     status: 'ACTIVE'
   },
   {
+    code: '1-10403',
+    name: 'Biaya Provisi/Administrasi Pinjaman (Ditangguhkan)',
+    description: 'Biaya provisi bank yang dibayar di muka saat pencairan pinjaman dan diamortisasi selama masa pinjaman.',
+    type: 'ASET',
+    normalBalance: 'DEBIT',
+    postingType: 'POSTING',
+    cashflowType: 'OPERATING',
+    isReconcilable: false,
+    status: 'ACTIVE'
+  },
+  {
     code: '1-20000',
     name: 'Aset Tetap',
     description: 'Akun Induk untuk semua Aset Jangka Panjang.',
@@ -678,6 +689,28 @@ const coaData = [
     code: '2-10108',
     name: 'Utang Asuransi',
     description: 'Kewajiban atas premi asuransi yang belum dibayarkan.',
+    type: 'LIABILITAS',
+    normalBalance: 'CREDIT',
+    postingType: 'POSTING',
+    cashflowType: 'OPERATING',
+    isReconcilable: false,
+    status: 'ACTIVE'
+  },
+  {
+    code: '2-10109',
+    name: 'Bagian Lancar Utang Jangka Panjang',
+    description: 'Porsi utang bank jangka panjang yang akan jatuh tempo dalam 12 bulan ke depan (Current Portion of Long-Term Debt).',
+    type: 'LIABILITAS',
+    normalBalance: 'CREDIT',
+    postingType: 'POSTING',
+    cashflowType: 'FINANCING',
+    isReconcilable: false,
+    status: 'ACTIVE'
+  },
+  {
+    code: '2-10110',
+    name: 'Bunga yang Masih Harus Dibayar',
+    description: 'Kewajiban bunga pinjaman yang sudah menjadi beban namun belum dibayarkan kepada kreditur (Accrued Interest Payable).',
     type: 'LIABILITAS',
     normalBalance: 'CREDIT',
     postingType: 'POSTING',

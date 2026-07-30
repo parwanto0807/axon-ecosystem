@@ -2950,7 +2950,7 @@ app.post('/api/work-orders/:id/reports', upload.array('photos', 10), async (req,
       }
 
       return r;
-    });
+    }, { maxWait: 10000, timeout: 30000 });
 
     res.status(201).json(report);
   } catch (e) { 
@@ -3481,7 +3481,8 @@ app.patch('/api/invoices/:id/pay', async (req, res) => {
 
 app.put('/api/invoices/:id', async (req, res) => {
   try {
-    const { items = [], ...data } = req.body;
+    // BUG FIX: Destructure `status` out of req.body so it can't be maliciously updated via PUT
+    const { items = [], status, ...data } = req.body;
     const { id } = req.params;
     const result = await prisma.$transaction(async (tx) => {
       await tx.invoice.update({
@@ -3937,7 +3938,7 @@ app.get('/api/reports/sales-by-category', async (req, res) => {
 // Helper for aggregation
 async function getAccountTypeBalance(types, endDate, startDate = null) {
   const coas = await prisma.chartOfAccounts.findMany({
-    where: { type: { in: types } }
+    where: { type: { in: types }, postingType: 'POSTING' }
   });
 
   const items = await prisma.journalItem.groupBy({
@@ -3957,7 +3958,10 @@ async function getAccountTypeBalance(types, endDate, startDate = null) {
     const movement = items.find(i => i.coaId === coa.id) || { _sum: { debit: 0, credit: 0 } };
     const debit = movement._sum.debit || 0;
     const credit = movement._sum.credit || 0;
-    const balance = coa.normalBalance === 'DEBIT' ? (debit - credit) : (credit - debit);
+    
+    // Default group behavior
+    const isDebitType = ['ASET', 'BEBAN', 'BEBAN_LAIN', 'HPP'].includes(coa.type);
+    const balance = isDebitType ? (debit - credit) : (credit - debit);
 
     return { id: coa.id, code: coa.code, name: coa.name, balance };
   }).filter(a => a.balance !== 0);
@@ -4097,12 +4101,31 @@ app.get('/api/reports/cash-flow-forecast', async (req, res) => {
     // ── 6. Unpaid Operational Expenses (Outflow Projection) ───────────────────
     // These are recurring costs (utilities, rent, etc.) not captured as purchase invoices
     // ExpenseStatus valid values: DRAFT, PENDING, APPROVED, REJECTED, POSTED, PAID
+    // NOTE: `date` field = creation timestamp (@default(now())), NOT the planned month.
+    //       Use `month` + `year` integer fields for correct scheduling.
+    const endForecastYear = endForecast.getFullYear();
+    const endForecastMonth = endForecast.getMonth() + 1; // 1-indexed
     const unpaidOpex = await prisma.operationalExpense.findMany({
       where: {
-        status: { notIn: ['PAID', 'REJECTED'] },  // REJECTED = void/cancelled
-        date: { lte: endForecast }
+        status: { notIn: ['PAID', 'REJECTED'] },  // REJECTED = void/cancelled, DRAFT = projection
+        // Filter to within the 7-month forecast window using month/year integers
+        OR: [
+          { year: { lt: endForecastYear } },
+          { year: endForecastYear, month: { lte: endForecastMonth } }
+        ]
       },
-      select: { amount: true, date: true, name: true, category: true, status: true }
+      select: { amount: true, month: true, year: true, name: true, category: true, status: true }
+    });
+
+    const unpaidPayroll = await prisma.payrollRun.findMany({
+      where: {
+        status: { notIn: ['PAID'] },
+        OR: [
+          { year: { lt: endForecastYear } },
+          { year: endForecastYear, month: { lte: endForecastMonth } }
+        ]
+      },
+      select: { totalAmount: true, month: true, year: true, type: true, status: true, id: true }
     });
 
     // ── 7. Build monthly forecast ─────────────────────────────────────────────
@@ -4144,9 +4167,15 @@ app.get('/api/reports/cash-flow-forecast', async (req, res) => {
         bill.dueDate && bill.dueDate >= monthStart && bill.dueDate <= monthEnd
       );
 
-      // D. Projected Outflows: Operational expenses due this month
+      // D. Projected Outflows: Operational expenses planned for this month
+      // Compare using month (1-indexed) and year integers — NOT the `date` creation timestamp
+      const currentMonthNum = d.getMonth() + 1; // 1-indexed
+      const currentYearNum = d.getFullYear();
       let projectedOpex = unpaidOpex.filter(exp =>
-        exp.date >= monthStart && exp.date <= monthEnd
+        exp.year === currentYearNum && exp.month === currentMonthNum
+      );
+      let projectedPayroll = unpaidPayroll.filter(p =>
+        p.year === currentYearNum && p.month === currentMonthNum
       );
 
       // E. Overdue items — push all to first month (month index 0)
@@ -4157,20 +4186,30 @@ app.get('/api/reports/cash-flow-forecast', async (req, res) => {
         const overdueBills = outstandingBills.filter(bill =>
           !bill.dueDate || bill.dueDate < monthStart
         );
-        const overdueOpex = unpaidOpex.filter(exp => exp.date < monthStart);
+        // Overdue opex: planned month/year is before current month
+        const overdueOpex = unpaidOpex.filter(exp =>
+          exp.year < currentYearNum ||
+          (exp.year === currentYearNum && exp.month < currentMonthNum)
+        );
+        const overduePayroll = unpaidPayroll.filter(p =>
+          p.year < currentYearNum ||
+          (p.year === currentYearNum && p.month < currentMonthNum)
+        );
 
         projectedInvoices = [...projectedInvoices, ...overdueInvoices];
         projectedBills = [...projectedBills, ...overdueBills];
         projectedOpex = [...projectedOpex, ...overdueOpex];
+        projectedPayroll = [...projectedPayroll, ...overduePayroll];
       }
 
       // F. Totals
       const projectedInflowAmt = projectedInvoices.reduce((s, inv) => s + inv.grandTotal, 0);
       const projectedBillAmt = projectedBills.reduce((s, b) => s + b.grandTotal, 0);
       const projectedOpexAmt = projectedOpex.reduce((s, e) => s + e.amount, 0);
+      const projectedPayrollAmt = projectedPayroll.reduce((s, p) => s + p.totalAmount, 0);
 
       const totalInflow = projectedInflowAmt + actualIn;
-      const totalOutflow = projectedBillAmt + projectedOpexAmt + actualOut;
+      const totalOutflow = projectedBillAmt + projectedOpexAmt + projectedPayrollAmt + actualOut;
       const netChange = totalInflow - totalOutflow;
 
       const currentOpening = runningBalance;
@@ -4196,6 +4235,7 @@ app.get('/api/reports/cash-flow-forecast', async (req, res) => {
           projectedInflowAmt,
           projectedBillAmt,
           projectedOpexAmt,
+          projectedPayrollAmt,
         },
         details: {
           invoices: projectedInvoices.map(inv => ({
@@ -4216,8 +4256,15 @@ app.get('/api/reports/cash-flow-forecast', async (req, res) => {
             name: e.name,
             category: e.category,
             amount: e.amount,
-            date: e.date,
+            date: `${e.year}-${String(e.month).padStart(2, '0')}`,  // e.g. "2026-08"
             status: e.status
+          })),
+          payroll: projectedPayroll.map(p => ({
+            id: p.id,
+            type: p.type,
+            amount: p.totalAmount,
+            date: `${p.year}-${String(p.month).padStart(2, '0')}`,
+            status: p.status
           }))
         }
       });
@@ -4232,6 +4279,365 @@ app.get('/api/reports/cash-flow-forecast', async (req, res) => {
     });
   } catch (e) {
     console.error('[CASH FLOW FORECAST ERROR]', e);
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ── 7. FINANCIAL RATIO CONFIG & EXECUTIVE SUMMARY ───────────────────────────
+let financialRatioConfig = {
+  currentRatio: { healthy: 1.5, warning: 1.0 },
+  quickRatio: { healthy: 1.0, warning: 0.8 },
+  netProfitMargin: { healthy: 10, warning: 5 },
+  roa: { healthy: 5, warning: 2 },
+  roe: { healthy: 12, warning: 5 },
+  debtToEquity: { healthy: 1.5, warning: 2.5 }
+};
+
+app.get('/api/reports/financial-ratio-config', (req, res) => {
+  res.json(financialRatioConfig);
+});
+
+app.put('/api/reports/financial-ratio-config', (req, res) => {
+  if (req.body) {
+    financialRatioConfig = { ...financialRatioConfig, ...req.body };
+  }
+  res.json(financialRatioConfig);
+});
+
+app.get('/api/reports/executive-summary', async (req, res) => {
+  try {
+    const { period = 'month', startDate, endDate } = req.query;
+    const end = endDate ? new Date(endDate + 'T23:59:59.999') : new Date();
+    
+    let start = startDate ? new Date(startDate + 'T00:00:00') : new Date(end.getFullYear(), end.getMonth(), 1);
+    if (!startDate) {
+      if (period === 'quarter') {
+        const currentQuarterMonth = Math.floor(end.getMonth() / 3) * 3;
+        start = new Date(end.getFullYear(), currentQuarterMonth, 1);
+      } else if (period === 'year') {
+        start = new Date(end.getFullYear(), 0, 1);
+      }
+    }
+
+    // Previous period for comparison
+    const duration = end.getTime() - start.getTime();
+    const prevEnd = new Date(start.getTime() - 1);
+    const prevStart = new Date(prevEnd.getTime() - duration);
+
+    // ── 1. Unposted Draft Check ───────────────────────────────────────────────
+    const unpostedCount = await prisma.journalEntry.count({
+      where: {
+        status: { in: ['DRAFT', 'PENDING'] },
+        date: { gte: start, lte: end }
+      }
+    });
+    const hasUnpostedDrafts = unpostedCount > 0;
+
+    // ── 2. Balance Sheet Metrics (Current & Previous) ─────────────────────────
+    const assets = await getAccountTypeBalance(['ASET'], end);
+    const liabilities = await getAccountTypeBalance(['LIABILITAS'], end);
+    const equity = await getAccountTypeBalance(['EKUITAS'], end);
+
+    const totalAssets = assets.reduce((s, a) => s + a.balance, 0);
+    const totalLiabilities = liabilities.reduce((s, a) => s + a.balance, 0);
+
+    // Cash & Bank
+    const systemCash = await prisma.systemAccount.findMany({ where: { key: { in: ['PETTY_CASH', 'CASH'] } } });
+    const cashAccounts = await prisma.chartOfAccounts.findMany({
+      where: {
+        type: 'ASET',
+        OR: [
+          { name: { contains: 'Kas', mode: 'insensitive' } },
+          { name: { contains: 'Bank', mode: 'insensitive' } },
+          { id: { in: systemCash.map(a => a.coaId) } }
+        ],
+        postingType: 'POSTING'
+      }
+    });
+    const cashAccountIds = cashAccounts.map(a => a.id);
+
+    const cashBalanceItems = await prisma.journalItem.groupBy({
+      by: ['coaId'],
+      where: {
+        coaId: { in: cashAccountIds },
+        journalEntry: { date: { lte: end }, status: { notIn: ['DRAFT', 'CANCELLED', 'VOID'] } }
+      },
+      _sum: { debit: true, credit: true }
+    });
+    let cashAndEquivalents = 0;
+    cashBalanceItems.forEach(b => { cashAndEquivalents += (b._sum.debit || 0) - (b._sum.credit || 0); });
+
+    const arAccounts = assets.filter(a => a.name.toLowerCase().includes('piutang'));
+    const totalAR = arAccounts.reduce((s, a) => s + a.balance, 0);
+
+    const inventoryAccounts = assets.filter(a => a.name.toLowerCase().includes('persediaan'));
+    const totalInventory = inventoryAccounts.reduce((s, a) => s + a.balance, 0);
+
+    const currentAssets = assets.filter(a => 
+      a.name.toLowerCase().includes('kas') || 
+      a.name.toLowerCase().includes('bank') || 
+      a.name.toLowerCase().includes('piutang') || 
+      a.name.toLowerCase().includes('persediaan') || 
+      a.code.startsWith('1-1')
+    ).reduce((s, a) => s + a.balance, 0) || (cashAndEquivalents + totalAR + totalInventory);
+
+    const nonCurrentAssets = Math.max(0, totalAssets - currentAssets);
+    const currentLiabilities = liabilities.filter(l => 
+      l.name.toLowerCase().includes('utang') || 
+      l.name.toLowerCase().includes('lancar') || 
+      l.code.startsWith('2-1')
+    ).reduce((s, l) => s + l.balance, 0) || totalLiabilities;
+
+    const nonCurrentLiabilities = Math.max(0, totalLiabilities - currentLiabilities);
+    const workingCapital = currentAssets - currentLiabilities;
+
+    // ── 3. Income Statement Metrics ──────────────────────────────────────────
+    const startOfYear = new Date(end.getFullYear(), 0, 1);
+    const revenues = await getAccountTypeBalance(['PENDAPATAN', 'PENDAPATAN_LAIN'], end, start);
+    const cogs = await getAccountTypeBalance(['HPP'], end, start);
+    const expenses = await getAccountTypeBalance(['BEBAN', 'BEBAN_LAIN'], end, start);
+
+    const totalRevenue = revenues.reduce((sum, r) => sum + r.balance, 0);
+    const totalCOGS = cogs.reduce((sum, c) => sum + c.balance, 0);
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.balance, 0);
+
+    const grossProfit = totalRevenue - totalCOGS;
+    const netProfit = grossProfit - totalExpenses;
+
+    const grossProfitMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+    const netProfitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    // Net Profit YTD for Equity
+    const revenuesYTD = await getAccountTypeBalance(['PENDAPATAN', 'PENDAPATAN_LAIN'], end, startOfYear);
+    const cogsYTD = await getAccountTypeBalance(['HPP'], end, startOfYear);
+    const expensesYTD = await getAccountTypeBalance(['BEBAN', 'BEBAN_LAIN'], end, startOfYear);
+    const netProfitYTD = revenuesYTD.reduce((s, r) => s + r.balance, 0) - cogsYTD.reduce((s, c) => s + c.balance, 0) - expensesYTD.reduce((s, e) => s + e.balance, 0);
+
+    const baseEquity = equity.reduce((s, e) => s + e.balance, 0);
+    const totalEquity = baseEquity + netProfitYTD;
+
+    // ── 4. Cash Flow Metrics ──────────────────────────────────────────────────
+    const operatingCashItems = await prisma.journalItem.findMany({
+      where: {
+        coaId: { in: cashAccountIds },
+        journalEntry: { date: { gte: start, lte: end }, status: { notIn: ['DRAFT', 'CANCELLED', 'VOID'] } }
+      }
+    });
+    let netOperatingCashFlow = 0;
+    let operatingInflow = 0;
+    let operatingOutflow = 0;
+    operatingCashItems.forEach(item => {
+      operatingInflow += item.debit || 0;
+      operatingOutflow += item.credit || 0;
+    });
+    netOperatingCashFlow = operatingInflow - operatingOutflow;
+    const freeCashFlow = netOperatingCashFlow; // Simplified Capex deduction for now
+
+    // ── 5. Comparison Metrics (Prev Period) ──────────────────────────────────
+    const prevRevenues = await getAccountTypeBalance(['PENDAPATAN', 'PENDAPATAN_LAIN'], prevEnd, prevStart);
+    const prevCogs = await getAccountTypeBalance(['HPP'], prevEnd, prevStart);
+    const prevExpenses = await getAccountTypeBalance(['BEBAN', 'BEBAN_LAIN'], prevEnd, prevStart);
+    const prevTotalRevenue = prevRevenues.reduce((sum, r) => sum + r.balance, 0);
+    const prevNetProfit = prevTotalRevenue - prevCogs.reduce((sum, c) => sum + c.balance, 0) - prevExpenses.reduce((sum, e) => sum + e.balance, 0);
+
+    const prevAssets = await getAccountTypeBalance(['ASET'], prevEnd);
+    const prevTotalAssets = prevAssets.reduce((s, a) => s + a.balance, 0);
+
+    const prevLiabilities = await getAccountTypeBalance(['LIABILITAS'], prevEnd);
+    const prevTotalLiabilities = prevLiabilities.reduce((s, l) => s + l.balance, 0);
+
+    const growthRevenue = prevTotalRevenue > 0 ? ((totalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100 : 0;
+    const growthNetProfit = prevNetProfit !== 0 ? ((netProfit - prevNetProfit) / Math.abs(prevNetProfit)) * 100 : 0;
+    const growthAssets = prevTotalAssets > 0 ? ((totalAssets - prevTotalAssets) / prevTotalAssets) * 100 : 0;
+    const growthLiabilities = prevTotalLiabilities > 0 ? ((totalLiabilities - prevTotalLiabilities) / prevTotalLiabilities) * 100 : 0;
+
+    // ── 6. Ratios ─────────────────────────────────────────────────────────────
+    const cfg = financialRatioConfig;
+    const hasNoShortTermDebt = currentLiabilities === 0;
+
+    let currentRatioVal = hasNoShortTermDebt ? 999 : (currentAssets / currentLiabilities);
+    let quickRatioVal = hasNoShortTermDebt ? 999 : ((currentAssets - totalInventory) / currentLiabilities);
+    let currentRatioStatus = hasNoShortTermDebt ? 'HEALTHY' : (currentRatioVal >= cfg.currentRatio.healthy ? 'HEALTHY' : currentRatioVal >= cfg.currentRatio.warning ? 'WARNING' : 'CRITICAL');
+    let quickRatioStatus = hasNoShortTermDebt ? 'HEALTHY' : (quickRatioVal >= cfg.quickRatio.healthy ? 'HEALTHY' : quickRatioVal >= cfg.quickRatio.warning ? 'WARNING' : 'CRITICAL');
+
+    const roa = totalAssets > 0 ? (netProfit / totalAssets) * 100 : 0;
+    const roe = totalEquity > 0 ? (netProfit / totalEquity) * 100 : 0;
+    const debtToEquity = totalEquity > 0 ? totalLiabilities / totalEquity : 0;
+
+    let cashConversionVal = netProfit > 0 ? (netOperatingCashFlow / netProfit) : 0;
+    let cashConversionStatus = netProfit <= 0 ? 'N/A' : (cashConversionVal >= 0.8 ? 'HEALTHY' : cashConversionVal >= 0.5 ? 'WARNING' : 'CRITICAL');
+
+    const ratios = [
+      {
+        id: 'currentRatio',
+        name: 'Current Ratio',
+        category: 'Likuiditas',
+        value: hasNoShortTermDebt ? 'N/A (Tanpa Utang)' : Number(currentRatioVal.toFixed(2)),
+        formula: 'Aset Lancar / Liabilitas Lancar',
+        status: currentRatioStatus,
+        description: hasNoShortTermDebt ? 'Sangat Aman - Tidak ada liabilitas lancar' : 'Kemampuan membayar utang jangka pendek'
+      },
+      {
+        id: 'quickRatio',
+        name: 'Quick Ratio',
+        category: 'Likuiditas',
+        value: hasNoShortTermDebt ? 'N/A (Tanpa Utang)' : Number(quickRatioVal.toFixed(2)),
+        formula: '(Aset Lancar - Persediaan) / Liabilitas Lancar',
+        status: quickRatioStatus,
+        description: hasNoShortTermDebt ? 'Sangat Aman - Tidak ada liabilitas lancar' : 'Likuiditas cepat tanpa tergantung persediaan'
+      },
+      {
+        id: 'netProfitMargin',
+        name: 'Net Profit Margin',
+        category: 'Profitabilitas',
+        value: Number(netProfitMargin.toFixed(1)),
+        isPercent: true,
+        formula: 'Laba Bersih / Total Pendapatan',
+        status: netProfitMargin >= cfg.netProfitMargin.healthy ? 'HEALTHY' : netProfitMargin >= cfg.netProfitMargin.warning ? 'WARNING' : 'CRITICAL',
+        description: 'Persentase laba bersih dari setiap penjualan'
+      },
+      {
+        id: 'roa',
+        name: 'Return on Assets (ROA)',
+        category: 'Profitabilitas',
+        value: Number(roa.toFixed(1)),
+        isPercent: true,
+        formula: 'Laba Bersih / Total Aset',
+        status: roa >= cfg.roa.healthy ? 'HEALTHY' : roa >= cfg.roa.warning ? 'WARNING' : 'CRITICAL',
+        description: 'Efisiensi penggunaan aset menghasilkan laba'
+      },
+      {
+        id: 'roe',
+        name: 'Return on Equity (ROE)',
+        category: 'Profitabilitas',
+        value: Number(roe.toFixed(1)),
+        isPercent: true,
+        formula: 'Laba Bersih / Total Ekuitas',
+        status: roe >= cfg.roe.healthy ? 'HEALTHY' : roe >= cfg.roe.warning ? 'WARNING' : 'CRITICAL',
+        description: 'Imbal hasil bagi modal pemilik perusahaan'
+      },
+      {
+        id: 'debtToEquity',
+        name: 'Debt to Equity Ratio (DER)',
+        category: 'Solvabilitas',
+        value: Number(debtToEquity.toFixed(2)),
+        formula: 'Total Liabilitas / Total Ekuitas',
+        status: debtToEquity <= cfg.debtToEquity.healthy ? 'HEALTHY' : debtToEquity <= cfg.debtToEquity.warning ? 'WARNING' : 'CRITICAL',
+        description: 'Tingkat ketergantungan perusahaan pada utang'
+      },
+      {
+        id: 'cashConversion',
+        name: 'Cash Conversion Ratio',
+        category: 'Efisiensi Kas',
+        value: netProfit <= 0 ? 'N/A (Rugi)' : Number(cashConversionVal.toFixed(2)),
+        formula: 'Arus Kas Operasi / Laba Bersih',
+        status: cashConversionStatus,
+        description: netProfit <= 0 ? 'Perusahaan dalam posisi rugi (N/A)' : 'Kualitas laba didukung arus kas riil'
+      }
+    ];
+
+    // ── 7. Monthly Trend (6 Months) ──────────────────────────────────────────
+    const monthlyTrend = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(end.getFullYear(), end.getMonth() - i, 1);
+      const mStart = new Date(d.getFullYear(), d.getMonth(), 1);
+      const mEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+      const monthName = mStart.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' });
+
+      const mRev = await getAccountTypeBalance(['PENDAPATAN', 'PENDAPATAN_LAIN'], mEnd, mStart);
+      const mCogs = await getAccountTypeBalance(['HPP'], mEnd, mStart);
+      const mExp = await getAccountTypeBalance(['BEBAN', 'BEBAN_LAIN'], mEnd, mStart);
+
+      const revVal = mRev.reduce((s, r) => s + r.balance, 0);
+      const cogsVal = mCogs.reduce((s, c) => s + c.balance, 0);
+      const expVal = mExp.reduce((s, e) => s + e.balance, 0);
+      const npVal = revVal - cogsVal - expVal;
+
+      monthlyTrend.push({ month: monthName, revenue: revVal, netProfit: npVal });
+    }
+
+    // ── 8. Rule-Based Insights ────────────────────────────────────────────────
+    const insights = [];
+    if (growthNetProfit > 0) {
+      insights.push({ type: 'POSITIVE', title: 'Pertumbuhan Laba Positif', text: `Laba bersih meningkat ${growthNetProfit.toFixed(1)}% dibanding periode sebelumnya.` });
+    } else if (growthNetProfit < 0) {
+      insights.push({ type: 'NEGATIVE', title: 'Penurunan Laba Bersih', text: `Laba bersih turun ${Math.abs(growthNetProfit).toFixed(1)}% dibanding periode sebelumnya. Evaluasi efisiensi beban operasional.` });
+    }
+
+    if (hasNoShortTermDebt) {
+      insights.push({ type: 'HEALTHY', title: 'Likuiditas Sangat Safe', text: `Perusahaan tidak memiliki utang jangka pendek (Liabilities = Rp 0). Bebas dari risiko likuiditas jangka pendek.` });
+    } else if (currentRatioVal < cfg.currentRatio.warning) {
+      insights.push({ type: 'CRITICAL', title: 'Peringatan Likuiditas', text: `Current Ratio ${currentRatioVal.toFixed(2)} berada di bawah batas aman (${cfg.currentRatio.warning}). Potensi risiko pembayaran utang jangka pendek.` });
+    } else {
+      insights.push({ type: 'HEALTHY', title: 'Likuiditas Sehat', text: `Current Ratio ${currentRatioVal.toFixed(2)} berada dalam kondisi aman untuk pemenuhan kewajiban jangka pendek.` });
+    }
+
+    if (netOperatingCashFlow < 0) {
+      insights.push({ type: 'WARNING', title: 'Arus Kas Operasi Negatif', text: `Arus kas operasi bernilai negatif (-Rp ${Math.abs(netOperatingCashFlow).toLocaleString('id-ID')}). Tingkatkan efektivitas penagihan piutang.` });
+    }
+
+    if (debtToEquity > cfg.debtToEquity.warning) {
+      insights.push({ type: 'WARNING', title: 'Rasio Utang Tinggi', text: `Debt to Equity Ratio (DER) mencapai ${debtToEquity.toFixed(2)}, lebih tinggi dari ambang batas aman ${cfg.debtToEquity.warning}.` });
+    }
+
+    // Top accounts for Balance sheet
+    const topAssets = [...assets].sort((a, b) => b.balance - a.balance).slice(0, 5);
+    const topLiabilities = [...liabilities].sort((a, b) => b.balance - a.balance).slice(0, 5);
+
+    res.json({
+      period,
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+      hasUnpostedDrafts,
+      unpostedCount,
+      highlights: {
+        revenue: { value: totalRevenue, growth: growthRevenue },
+        netProfit: { value: netProfit, growth: growthNetProfit },
+        totalAssets: { value: totalAssets, growth: growthAssets },
+        cashAndEquivalents: { value: cashAndEquivalents },
+        netOperatingCashFlow: { value: netOperatingCashFlow },
+        totalLiabilities: { value: totalLiabilities, growth: growthLiabilities }
+      },
+      balanceSheetSummary: {
+        currentAssets,
+        nonCurrentAssets,
+        totalAssets,
+        currentLiabilities,
+        nonCurrentLiabilities,
+        totalLiabilities,
+        totalEquity,
+        workingCapital,
+        topAssets,
+        topLiabilities
+      },
+      incomeStatementSummary: {
+        totalRevenue,
+        totalCOGS,
+        grossProfit,
+        totalExpenses,
+        netProfit,
+        grossProfitMargin: Number(grossProfitMargin.toFixed(1)),
+        netProfitMargin: Number(netProfitMargin.toFixed(1)),
+        waterfall: [
+          { label: 'Pendapatan', value: totalRevenue, type: 'positive' },
+          { label: 'HPP', value: -totalCOGS, type: 'negative' },
+          { label: 'Laba Kotor', value: grossProfit, type: 'subtotal' },
+          { label: 'Beban Operasional', value: -totalExpenses, type: 'negative' },
+          { label: 'Laba Bersih', value: netProfit, type: 'total' }
+        ]
+      },
+      cashFlowSummary: {
+        operatingInflow,
+        operatingOutflow,
+        netOperatingCashFlow,
+        freeCashFlow
+      },
+      monthlyTrend,
+      ratios,
+      insights
+    });
+  } catch (e) {
+    console.error('[EXECUTIVE SUMMARY REPORT ERROR]', e);
     res.status(500).json({ message: e.message });
   }
 });
@@ -4930,6 +5336,86 @@ app.patch('/api/purchase-invoices/:id/post', async (req, res) => {
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
+app.patch('/api/purchase-invoices/:id/pay', async (req, res) => {
+  try {
+    const invoiceId = req.params.id;
+    const { bankAccountId } = req.body;
+    
+    const invoice = await prisma.purchaseInvoice.findUnique({
+      where: { id: invoiceId },
+      include: { vendor: true }
+    });
+
+    if (!invoice) throw new Error('Invoice not found');
+    if (invoice.status === 'PAID') throw new Error('Invoice already paid');
+    if (invoice.status !== 'POSTED') throw new Error('Invoice must be POSTED before it can be paid');
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Resolve Accounts
+      const apAcc = await tx.systemAccount.findUnique({ where: { key: 'ACCOUNTS_PAYABLE' }, include: { coa: true } });
+      if (!apAcc) throw new Error('System Account ACCOUNTS_PAYABLE not mapped');
+
+      let targetCoaId = null;
+      let bankName = 'CASH';
+      if (bankAccountId) {
+        const bank = await tx.bankAccount.findUnique({
+          where: { id: bankAccountId },
+          include: { coa: true }
+        });
+        if (bank?.coaId) {
+          targetCoaId = bank.coaId;
+          bankName = bank.bankName;
+        }
+      }
+
+      if (!targetCoaId) {
+        const cashAcc = await tx.systemAccount.findUnique({ where: { key: 'CASH' }, include: { coa: true } });
+        if (!cashAcc) throw new Error('CASH system account not mapped and no valid bank provided');
+        targetCoaId = cashAcc.coaId;
+      }
+
+      // 2. Create Journal Entry
+      const je = await tx.journalEntry.create({
+        data: {
+          number: `JV-PI-PAY-${invoice.number}`,
+          date: new Date(),
+          description: `Pembayaran Vendor Bill: ${invoice.number} (${invoice.vendor.name}) via ${bankName}`,
+          reference: invoice.number,
+          type: 'PAYMENT_OUT',
+          status: 'POSTED',
+          items: {
+            create: [
+              {
+                coaId: apAcc.coaId,
+                debit: invoice.grandTotal,
+                credit: 0,
+                description: `Pelunasan Hutang Usaha (Vendor: ${invoice.vendor.name})`
+              },
+              {
+                coaId: targetCoaId,
+                debit: 0,
+                credit: invoice.grandTotal,
+                description: `Pengeluaran Kas/Bank untuk Bill ${invoice.number}`
+              }
+            ]
+          }
+        }
+      });
+
+      // 3. Update Invoice Status
+      const updatedInvoice = await tx.purchaseInvoice.update({
+        where: { id: invoiceId },
+        data: { status: 'PAID' },
+        include: { vendor: true, items: true }
+      });
+
+      return updatedInvoice;
+    });
+
+    res.json(result);
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
 // --- CONTRACTS ---
 
 app.get('/api/contracts', async (req, res) => {
@@ -5014,6 +5500,8 @@ app.put('/api/contracts/:id', async (req, res) => {
         startDate: body.startDate ? new Date(body.startDate) : undefined,
         endDate: body.endDate ? new Date(body.endDate) : undefined,
         amount: body.amount !== undefined ? Number(body.amount) : undefined,
+        currency: body.currency,
+        billingCycle: body.billingCycle,
         billingDay: body.billingDay !== undefined ? Number(body.billingDay) : undefined,
         dueDay: body.dueDay !== undefined ? Number(body.dueDay) : undefined,
         autoBilling: body.autoBilling,
@@ -5022,12 +5510,15 @@ app.put('/api/contracts/:id', async (req, res) => {
         terms: body.terms,
         firstPartyName: body.firstPartyName,
         firstPartyTitle: body.firstPartyTitle,
+        firstPartyAddress: body.firstPartyAddress,
         secondPartyName: body.secondPartyName,
         secondPartyTitle: body.secondPartyTitle,
+        secondPartyAddress: body.secondPartyAddress,
         customerId: body.customerId,
         vendorId: body.vendorId,
         projectId: body.projectId,
         userId: body.userId,
+        clauses: body.clauses,
       },
       include: { customer: true, vendor: true, project: true }
     });
@@ -5052,6 +5543,106 @@ app.post('/api/contracts/:id/generate-bill', async (req, res) => {
       res.status(400).json({ message: result.message });
     }
   } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+app.post('/api/contracts/:id/generate-projections', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { months } = req.body;
+    const contract = await prisma.contract.findUnique({
+      where: { id },
+      include: { invoices: true, purchaseInvoices: true }
+    });
+
+    if (!contract) return res.status(404).json({ message: 'Contract not found' });
+
+    let generated = 0;
+    let skipped = 0;
+    const today = new Date();
+    
+    for (let i = 0; i < months; i++) {
+      const targetDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
+      const targetMonth = targetDate.getMonth();
+      const targetYear = targetDate.getFullYear();
+      const billingMonthLabel = targetDate.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+
+      const invDate = new Date(targetYear, targetMonth, contract.billingDay || today.getDate());
+      let invDueDate = new Date(targetYear, targetMonth, contract.dueDay || (today.getDate() + 7));
+      if (contract.dueDay && contract.billingDay && contract.dueDay <= contract.billingDay) {
+        invDueDate.setMonth(invDueDate.getMonth() + 1);
+      }
+
+      let exists = false;
+      if (contract.vendorId) {
+        exists = contract.purchaseInvoices.some(pi => {
+          const d = new Date(pi.date);
+          return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+        });
+      } else if (contract.customerId) {
+        exists = contract.invoices.some(inv => {
+          const d = new Date(inv.date);
+          return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+        });
+      }
+
+      if (exists) {
+        skipped++;
+        continue;
+      }
+
+      if (contract.vendorId) {
+        const count = await prisma.purchaseInvoice.count();
+        const number = `PI-PROJ-${targetYear}-${String(count + 1).padStart(3, '0')}-${Math.floor(Math.random() * 1000)}`;
+        await prisma.purchaseInvoice.create({
+          data: {
+            number,
+            date: invDate,
+            dueDate: invDueDate,
+            status: 'DRAFT',
+            vendorId: contract.vendorId,
+            contractId: contract.id,
+            grandTotal: contract.amount,
+            subtotal: contract.amount,
+            notes: `Projection from Contract ${contract.number} for ${billingMonthLabel}`,
+            items: {
+              create: [{ no: 1, description: `${contract.subject} - ${billingMonthLabel}`, qty: 1, unit: 'month', unitPrice: contract.amount, amount: contract.amount }]
+            }
+          }
+        });
+      } else if (contract.customerId) {
+        const count = await prisma.invoice.count();
+        const number = `INV-PROJ-${targetYear}-${String(count + 1).padStart(3, '0')}-${Math.floor(Math.random() * 1000)}`;
+        await prisma.invoice.create({
+          data: {
+            number,
+            date: invDate,
+            dueDate: invDueDate,
+            status: 'DRAFT',
+            customerId: contract.customerId,
+            projectId: contract.projectId,
+            contractId: contract.id,
+            grandTotal: contract.amount,
+            subtotal: contract.amount,
+            notes: `Projection from Contract ${contract.number} for ${billingMonthLabel}`,
+            items: {
+              create: [{ no: 1, description: `${contract.subject} - ${billingMonthLabel}`, qty: 1, unit: 'month', unitPrice: contract.amount, amount: contract.amount }]
+            }
+          }
+        });
+      }
+      generated++;
+    }
+
+    await prisma.contract.update({
+      where: { id },
+      data: { autoBilling: false }
+    });
+
+    res.json({ success: true, generated, skipped });
+  } catch (e) {
+    console.error('Projection Error:', e);
     res.status(500).json({ message: e.message });
   }
 });
@@ -6264,7 +6855,7 @@ app.post('/api/hr/payroll/:id/pay', async (req, res) => {
 app.get('/api/finance/operational-expenses', async (req, res) => {
   try {
     const expenses = await prisma.operationalExpense.findMany({
-      include: { coa: true },
+      include: { coa: true, workOrder: true, project: true },
       orderBy: { createdAt: 'desc' }
     });
     res.json(expenses);
@@ -6276,7 +6867,7 @@ app.get('/api/finance/all-operational-expenses', async (req, res) => {
   try {
     // Fetch regular operational expenses
     const opexes = await prisma.operationalExpense.findMany({
-      include: { coa: true },
+      include: { coa: true, workOrder: true, project: true },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -6329,19 +6920,36 @@ app.post('/api/finance/operational-expenses', upload.single('attachment'), async
       attachmentPath = await processOperasionalImage(req.file);
     }
 
-    const expense = await prisma.operationalExpense.create({
-      data: {
-        name: req.body.name,
-        category: req.body.category,
-        amount: Number(req.body.amount),
-        month: Number(req.body.month),
-        year: Number(req.body.year),
-        coaId: req.body.coaId,
-        attachment: attachmentPath,
-        status: 'DRAFT'
-      }
-    });
-    res.json(expense);
+    const startMonth = Number(req.body.month);
+    const startYear = Number(req.body.year);
+    const repeatMonths = Math.max(1, Math.min(24, Number(req.body.repeatMonths) || 1));
+    const isAutoPost = req.body.autoPost === 'true' || req.body.status === 'POSTED';
+    const initialStatus = isAutoPost ? 'POSTED' : 'DRAFT';
+
+    const createdExpenses = [];
+
+    for (let i = 0; i < repeatMonths; i++) {
+      const targetMonth = ((startMonth - 1 + i) % 12) + 1;
+      const targetYear = startYear + Math.floor((startMonth - 1 + i) / 12);
+
+      const expense = await prisma.operationalExpense.create({
+        data: {
+          name: req.body.name,
+          category: req.body.category,
+          amount: Number(req.body.amount),
+          month: targetMonth,
+          year: targetYear,
+          coaId: req.body.coaId,
+          attachment: i === 0 ? attachmentPath : null,
+          status: initialStatus,
+          workOrderId: req.body.workOrderId || null,
+          projectId: req.body.projectId || null
+        }
+      });
+      createdExpenses.push(expense);
+    }
+
+    res.json(repeatMonths === 1 ? createdExpenses[0] : createdExpenses);
   } catch (e) { 
     console.error("[API Error] Creating operational expense:", e);
     res.status(500).json({ message: e.message }); 
@@ -6727,6 +7335,162 @@ app.post('/api/hr/holidays/import', async (req, res) => {
       count++;
     }
     res.json({ success: true, count });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ==========================================
+// MANUAL JOURNAL ROUTES
+// ==========================================
+
+app.get('/api/journals', async (req, res) => {
+  try {
+    const { startDate, endDate, search, type } = req.query;
+    
+    let where = {};
+    if (type) where.type = type;
+    else where.type = 'GENERAL'; // Default to manual journals
+    
+    if (startDate && endDate) {
+      where.date = { gte: new Date(startDate), lte: new Date(endDate) };
+    }
+    
+    if (search) {
+      where.OR = [
+        { number: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { reference: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const journals = await prisma.journalEntry.findMany({
+      where,
+      orderBy: { date: 'desc' },
+      include: {
+        items: {
+          include: { coa: true }
+        }
+      }
+    });
+    res.json(journals);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+app.post('/api/journals', async (req, res) => {
+  try {
+    const { date, description, reference, items, attachmentUrl, createdBy } = req.body;
+    
+    if (!items || items.length < 2) {
+      return res.status(400).json({ message: 'Jurnal minimal harus memiliki 2 baris' });
+    }
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    // Validate items
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const d = Number(item.debit) || 0;
+      const c = Number(item.credit) || 0;
+      
+      if (d === 0 && c === 0) {
+        return res.status(400).json({ message: `Baris ke-${i+1} kosong` });
+      }
+      if (d > 0 && c > 0) {
+        return res.status(400).json({ message: `Baris ke-${i+1} tidak boleh terisi debit dan kredit sekaligus` });
+      }
+      
+      const coa = await prisma.chartOfAccounts.findUnique({ where: { id: item.coaId } });
+      if (!coa) return res.status(400).json({ message: `COA tidak ditemukan di baris ke-${i+1}` });
+      if (coa.postingType !== 'POSTING') {
+        return res.status(400).json({ message: `Akun ${coa.code} adalah Header, pilih akun yang bersifat POSTING.` });
+      }
+
+      totalDebit += d;
+      totalCredit += c;
+    }
+
+    if (Math.abs(totalDebit - totalCredit) > 0.01) {
+      return res.status(400).json({ message: 'Total Debit dan Kredit tidak seimbang (Balance)' });
+    }
+
+    // Generate Journal Number
+    const year = new Date().getFullYear();
+    const lastEntry = await prisma.journalEntry.findFirst({
+      where: { number: { startsWith: `JU-${year}-` } },
+      orderBy: { number: 'desc' }
+    });
+    
+    let seq = 1;
+    if (lastEntry) {
+      const parts = lastEntry.number.split('-');
+      const lastSeq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastSeq)) seq = lastSeq + 1;
+    }
+    const journalNumber = `JU-${year}-${String(seq).padStart(4, '0')}`;
+
+    const journal = await prisma.journalEntry.create({
+      data: {
+        number: journalNumber,
+        date: date ? new Date(date) : new Date(),
+        description,
+        reference,
+        type: 'GENERAL',
+        status: 'POSTED',
+        attachmentUrl,
+        createdBy,
+        items: {
+          create: items.map(item => ({
+            coaId: item.coaId,
+            description: item.description,
+            debit: Number(item.debit) || 0,
+            credit: Number(item.credit) || 0
+          }))
+        }
+      },
+      include: { items: { include: { coa: true } } }
+    });
+
+    res.json({ success: true, journal });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+app.put('/api/journals/:id/void', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { voidedBy } = req.body;
+
+    const journal = await prisma.journalEntry.findUnique({ where: { id } });
+    if (!journal) return res.status(404).json({ message: 'Jurnal tidak ditemukan' });
+    if (journal.status === 'VOID') return res.status(400).json({ message: 'Jurnal sudah dibatalkan' });
+    if (journal.type !== 'GENERAL') return res.status(400).json({ message: 'Hanya jurnal manual yang bisa dibatalkan dari sini' });
+
+    // Mark as void and zero out the items so it doesn't affect ledger
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Mark header as void
+      const voided = await tx.journalEntry.update({
+        where: { id },
+        data: {
+          status: 'VOID',
+          voidedAt: new Date(),
+          voidedBy: voidedBy || 'System'
+        }
+      });
+      // 2. Zero out items
+      await tx.journalItem.updateMany({
+        where: { journalEntryId: id },
+        data: { debit: 0, credit: 0, description: 'VOIDED' }
+      });
+      
+      return voided;
+    });
+
+    res.json({ success: true, journal: result });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }

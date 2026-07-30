@@ -25,6 +25,7 @@ import {
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api`
 const MONTHS = [
@@ -37,13 +38,19 @@ const CATEGORIES = [
     { name: "Rent", icon: Landmark, color: "text-blue-500", bg: "bg-blue-50" },
     { name: "Internet & Telecom", icon: Globe, color: "text-indigo-500", bg: "bg-indigo-50" },
     { name: "Server & Provider", icon: Server, color: "text-rose-500", bg: "bg-rose-50" },
+    { name: "Hutang & Cicilan", icon: CreditCard, color: "text-purple-500", bg: "bg-purple-50" },
     { name: "Others", icon: Info, color: "text-slate-500", bg: "bg-slate-50" }
 ]
 
 export default function OperationalExpensesPage() {
+    const { data: session } = useSession()
+    const userRole = (session?.user as any)?.role || 'STAFF'
+
     const [expenses, setExpenses] = useState<any[]>([])
     const [coaList, setCoaList] = useState<any[]>([])
     const [bankAccounts, setBankAccounts] = useState<any[]>([])
+    const [workOrders, setWorkOrders] = useState<any[]>([])
+    const [projects, setProjects] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [showModal, setShowModal] = useState(false)
     const [showPayModal, setShowPayModal] = useState(false)
@@ -59,7 +66,11 @@ export default function OperationalExpensesPage() {
         month: new Date().getMonth() + 1,
         year: new Date().getFullYear(),
         coaId: '',
-        attachment: null as File | null
+        workOrderId: '',
+        projectId: '',
+        attachment: null as File | null,
+        repeatMonths: 1,
+        autoPost: true
     })
     const [selectedImage, setSelectedImage] = useState<string | null>(null)
     const [isMobile, setIsMobile] = useState(false)
@@ -80,7 +91,11 @@ export default function OperationalExpensesPage() {
         fetchExpenses()
         fetchCoa()
         fetchBankAccounts()
-    }, [])
+        fetchWorkOrders()
+        if (userRole) {
+            fetchProjects()
+        }
+    }, [userRole])
 
     const fetchExpenses = async () => {
         try {
@@ -108,6 +123,30 @@ export default function OperationalExpensesPage() {
         } catch (e) {
             console.error(e)
         }
+    }
+
+    const fetchWorkOrders = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/work-orders`)
+            if (res.ok) {
+                const data = await res.json()
+                setWorkOrders(Array.isArray(data) ? data : [])
+            }
+        } catch (e) { console.error(e) }
+    }
+
+    const fetchProjects = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/projects`, {
+                headers: {
+                    'x-user-role': userRole
+                }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setProjects(Array.isArray(data) ? data : [])
+            }
+        } catch (e) { console.error(e) }
     }
 
     const fetchBankAccounts = async () => {
@@ -138,6 +177,10 @@ export default function OperationalExpensesPage() {
             formData.append('month', String(newExpense.month))
             formData.append('year', String(newExpense.year))
             formData.append('coaId', newExpense.coaId)
+            if (newExpense.workOrderId) formData.append('workOrderId', newExpense.workOrderId)
+            if (newExpense.projectId) formData.append('projectId', newExpense.projectId)
+            formData.append('repeatMonths', String(newExpense.repeatMonths || 1))
+            formData.append('autoPost', String(newExpense.autoPost))
             if (newExpense.attachment) {
                 formData.append('attachment', newExpense.attachment)
             }
@@ -155,7 +198,9 @@ export default function OperationalExpensesPage() {
                     month: new Date().getMonth() + 1,
                     year: new Date().getFullYear(),
                     coaId: '',
-                    attachment: null
+                    attachment: null,
+                    repeatMonths: 6,
+                    autoPost: true
                 })
                 fetchExpenses()
             }
@@ -341,9 +386,13 @@ export default function OperationalExpensesPage() {
                                         </div>
                                     </td>
                                     <td className="p-3">
-                                        <div className="flex items-center gap-2">
-                                            {getIcon(expense.category)}
-                                            <span className="text-[10px] font-black text-slate-600 uppercase">{expense.category}</span>
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                {getIcon(expense.category)}
+                                                <span className="text-[10px] font-black text-slate-600 uppercase">{expense.category}</span>
+                                            </div>
+                                            {expense.workOrder && <div className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded w-fit">WO: {expense.workOrder.number}</div>}
+                                            {expense.project && <div className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded w-fit">PRJ: {expense.project.number}</div>}
                                         </div>
                                     </td>
                                     <td className="p-3">
@@ -419,9 +468,13 @@ export default function OperationalExpensesPage() {
                                 </div>
                             </div>
 
-                            <div className="z-10 bg-slate-50/80 p-2.5 rounded-lg border border-slate-100/50 flex items-center gap-2">
-                                {getIcon(expense.category)}
-                                <span className="text-[11px] font-bold text-slate-700 uppercase">{expense.category}</span>
+                            <div className="z-10 bg-slate-50/80 p-2.5 rounded-lg border border-slate-100/50 flex flex-col gap-2">
+                                <div className="flex items-center gap-2">
+                                    {getIcon(expense.category)}
+                                    <span className="text-[11px] font-bold text-slate-700 uppercase">{expense.category}</span>
+                                </div>
+                                {expense.workOrder && <div className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded w-fit uppercase">WO: {expense.workOrder.number}</div>}
+                                {expense.project && <div className="text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded w-fit uppercase">PRJ: {expense.project.number}</div>}
                             </div>
 
                             <div className="flex flex-col gap-3 z-10">
@@ -553,6 +606,72 @@ export default function OperationalExpensesPage() {
                                                 <option key={acc.id} value={acc.id}>{acc.code} - {acc.name}</option>
                                             ))}
                                         </select>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Relasi Work Order <span className="text-slate-300 font-medium">(Opsional)</span></label>
+                                            <select
+                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                                value={newExpense.workOrderId}
+                                                onChange={e => setNewExpense({ ...newExpense, workOrderId: e.target.value })}
+                                            >
+                                                <option value="">-- Tanpa Relasi WO --</option>
+                                                {workOrders.map(wo => (
+                                                    <option key={wo.id} value={wo.id}>{wo.number} - {wo.title}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Relasi Proyek <span className="text-slate-300 font-medium">(Opsional)</span></label>
+                                            <select
+                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                                value={newExpense.projectId}
+                                                onChange={e => setNewExpense({ ...newExpense, projectId: e.target.value })}
+                                            >
+                                                <option value="">-- Tanpa Relasi Proyek --</option>
+                                                {projects.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.number} - {p.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Proyeksi 6-Bulan Generator Block */}
+                                    <div className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <label className="text-[10px] font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                                                <Calendar size={13} className="text-indigo-600 shrink-0" />
+                                                Proyeksi Rutin
+                                            </label>
+                                            <select
+                                                className="bg-white border border-indigo-200 px-3 py-1.5 rounded-lg text-[11px] font-black text-indigo-700 outline-none shadow-sm"
+                                                value={newExpense.repeatMonths}
+                                                onChange={e => setNewExpense({ ...newExpense, repeatMonths: Number(e.target.value) })}
+                                            >
+                                                <option value={1}>1 Bulan Saja</option>
+                                                <option value={3}>3 Bulan Kedepan</option>
+                                                <option value={6}>6 Bulan Kedepan (Proyeksi Kas)</option>
+                                                <option value={12}>12 Bulan (1 Tahun)</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-2 border-t border-indigo-100/80">
+                                            <span className="text-[10px] font-bold text-indigo-900">Langsung Masuk Proyeksi Kas?</span>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={newExpense.autoPost}
+                                                    onChange={e => setNewExpense({ ...newExpense, autoPost: e.target.checked })}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                                            </label>
+                                        </div>
+                                        <p className="text-[9px] text-indigo-700/80 font-medium leading-relaxed">
+                                            {newExpense.repeatMonths > 1
+                                                ? `Akan membuat ${newExpense.repeatMonths} pengeluaran rutin berturut-turut yang otomatis masuk ke Proyeksi Kas Laporan Keuangan.`
+                                                : `Data pengeluaran untuk 1 bulan ini.`}
+                                        </p>
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Bukti Pembayaran (Nota/Kwitansi)</label>

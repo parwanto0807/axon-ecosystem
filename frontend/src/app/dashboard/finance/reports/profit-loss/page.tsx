@@ -453,10 +453,9 @@ export default function ProfitLossPage() {
                                         <span className="opacity-40 text-lg md:text-3xl font-light">Rp</span>
                                         <span className="truncate">{netProfit.toLocaleString('id-ID')}</span>
                                     </div>
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 blur-[100px] rounded-full -mr-20 -mt-20 pointer-events-none" />
+                                    <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 blur-[80px] rounded-full -ml-20 -mb-20 pointer-events-none" />
                                 </td>
-                                {/* Decorative elements */}
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 blur-[100px] rounded-full -mr-20 -mt-20" />
-                                <div className="absolute bottom-0 left-0 w-48 h-48 bg-black/10 blur-[80px] rounded-full -ml-20 -mb-20" />
                             </tr>
                         </tbody>
                     </table>

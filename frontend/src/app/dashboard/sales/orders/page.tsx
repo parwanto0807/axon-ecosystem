@@ -7,11 +7,16 @@ import {
     CheckCircle2, AlertCircle, RefreshCw,
     Send, Check, Ban, Clock, ShoppingCart, Truck, Package,
     Paperclip, Image as ImageIcon, FileImage, Briefcase,
-    ChevronLeft, ChevronRight
+    ChevronLeft, ChevronRight, TrendingUp
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import SalesOrderPDFModal from "./SalesOrderPDFModal"
+import { Bar } from "react-chartjs-2"
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from "chart.js"
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 interface Customer { id: string; name: string; code: string; address: string | null; taxId: string | null; phone: string | null; email: string | null; pics: Array<{ name: string; department: string | null }> }
@@ -37,9 +42,9 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
     PROCESSING: { label: 'Processing', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: Package },
     PARTIAL: { label: 'Partial', color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: Truck },
     SHIPPED: { label: 'Shipped', color: 'bg-purple-50 text-purple-700 border-purple-200', icon: Truck },
-    DELIVERED: { label: 'Delivered', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
+    DELIVERED: { label: 'Delivered', color: 'bg-cyan-50 text-cyan-700 border-cyan-200', icon: CheckCircle2 },
     CANCELLED: { label: 'Cancelled', color: 'bg-rose-50 text-rose-700 border-rose-200', icon: Ban },
-    COMPLETED: { label: 'Completed', color: 'bg-teal-50 text-teal-700 border-teal-200', icon: CheckCircle2 },
+    COMPLETED: { label: 'Completed', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: CheckCircle2 },
 }
 const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -60,6 +65,8 @@ const ImagePreviewModal = ({ url, onClose }: { url: string; onClose: () => void 
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function SalesOrdersPage() {
+    const router = useRouter()
+    const { data: session } = useSession()
     const [orders, setOrders] = useState<SalesOrder[]>([])
     const [customers, setCustomers] = useState<Customer[]>([])
     const [products, setProducts] = useState<any[]>([])
@@ -152,6 +159,54 @@ export default function SalesOrdersPage() {
         totalValue: orders.reduce((s, o) => s + o.grandTotal, 0)
     }
 
+    const today = new Date();
+    const last6Months = Array.from({length: 6}, (_, i) => {
+        const d = new Date(today.getFullYear(), today.getMonth() - 5 + i, 1);
+        return d.toLocaleDateString('id-ID', { month: 'short' });
+    });
+
+    const chartData = {
+        labels: last6Months,
+        datasets: [{
+            label: 'Total Penjualan',
+            data: last6Months.map((_, i) => {
+                const targetDate = new Date(today.getFullYear(), today.getMonth() - 5 + i, 1);
+                const month = targetDate.getMonth();
+                const year = targetDate.getFullYear();
+                return orders.reduce((sum, o) => {
+                    if (o.status === 'CANCELLED' || o.status === 'DRAFT') return sum;
+                    const d = new Date(o.date);
+                    if (d.getMonth() === month && d.getFullYear() === year) {
+                        return sum + o.grandTotal;
+                    }
+                    return sum;
+                }, 0);
+            }),
+            backgroundColor: '#4f46e5',
+            borderRadius: 6,
+            barThickness: 32
+        }]
+    };
+
+    const sparklineOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context: any) {
+                        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(context.parsed.y);
+                    }
+                }
+            }
+        },
+        scales: {
+            x: { display: false },
+            y: { display: false }
+        }
+    };
+
     return (
         <div className="px-4 py-6 space-y-6 w-full">
             <AnimatePresence>
@@ -163,46 +218,31 @@ export default function SalesOrdersPage() {
                 )}
             </AnimatePresence>
 
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20">
-                        <ShoppingCart size={20} className="text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Pesanan Penjualan</h1>
-                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Sales Order Management</p>
-                    </div>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Pesanan Penjualan</h1>
+                    <p className="text-sm font-bold text-slate-400 mt-1">Kelola dan lacak siklus pemesanan hingga pengiriman.</p>
                 </div>
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <Button variant="outline" onClick={load} className="flex-1 md:flex-none rounded-xl border-slate-200 text-slate-600 h-10 px-4 text-xs font-bold uppercase tracking-wider">
-                        <RefreshCw size={13} className="mr-2" /> Reload
-                    </Button>
-                    <Button onClick={() => { setEditing(null); setModalOpen(true) }}
-                        className="flex-1 md:flex-none rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 px-6 text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20">
-                        <Plus size={15} className="mr-2" /> New Order
-                    </Button>
-                </div>
-            </header>
+                <Button onClick={() => router.push('/dashboard/sales/orders/new')} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-600/20 rounded-xl px-6 py-2.5 font-bold">
+                    <Plus size={16} className="mr-2" /> Pesanan Baru
+                </Button>
+            </div>
 
-            {/* Project Highlight Title */}
-            {filterProject !== 'ALL' && (
-                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                    className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-3xl p-6 md:p-8 text-white shadow-2xl shadow-indigo-600/20 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                        <Briefcase size={120} />
-                    </div>
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-black uppercase tracking-widest">Active Project</span>
-                            <span className="text-indigo-200 text-[10px] font-bold uppercase tracking-widest"># {projects.find(p => p.id === filterProject)?.number}</span>
+            {loading && !filtered.length ? null : (
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                    className="bg-gradient-to-br from-indigo-900 to-indigo-950 rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-2xl">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+                    
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                            <p className="text-indigo-200 text-[10px] font-bold uppercase tracking-widest mb-1">Total Piutang Berjalan</p>
+                            <h2 className="text-4xl md:text-5xl font-black tracking-tight">{fmt(filtered.reduce((s, o) => s + (o.grandTotal - (o.status === 'PAID' ? o.grandTotal : 0)), 0))}</h2>
                         </div>
-                        <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-2 drop-shadow-sm pr-10 md:pr-0 break-words whitespace-normal">
-                            {projects.find(p => p.id === filterProject)?.name}
-                        </h2>
-                        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 mt-4">
+                        <div className="flex flex-col md:flex-row gap-4 md:gap-8 bg-black/20 p-4 md:p-6 rounded-2xl backdrop-blur-sm border border-white/10 relative">
                             <div className="flex flex-col">
-                                <span className="text-indigo-200 text-[9px] font-bold uppercase tracking-widest">Customer</span>
-                                <span className="text-sm font-bold">{projects.find(p => p.id === filterProject)?.customer?.name}</span>
+                                <span className="text-indigo-200 text-[9px] font-bold uppercase tracking-widest">Active Orders</span>
+                                <span className="text-xl font-black">{filtered.filter(o => !['CANCELLED', 'COMPLETED'].includes(o.status)).length}</span>
                             </div>
                             <div className="hidden md:block w-px h-8 bg-white/10" />
                             <div className="flex flex-col">
@@ -217,18 +257,25 @@ export default function SalesOrdersPage() {
                 </motion.div>
             )}
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
                 {[
                     { label: 'Total Orders', value: stats.total },
                     { label: 'Processing', value: stats.processing },
                     { label: 'Pending', value: stats.pending },
                     { label: 'Total Order Value', value: fmt(stats.totalValue), big: true },
                 ].map(s => (
-                    <div key={s.label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5">
+                    <div key={s.label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5 flex flex-col justify-center">
                         <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate">{s.label}</p>
                         <p className={`font-extrabold mt-1 ${s.big ? 'text-sm md:text-base' : 'text-2xl md:text-3xl'} text-slate-900 truncate`}>{s.value}</p>
                     </div>
                 ))}
+                
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5 flex flex-col justify-center col-span-2 md:col-span-1">
+                    <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate mb-1">Tren Penjualan (6 Bln)</p>
+                    <div className="h-10 w-full mt-auto">
+                        <Bar data={chartData} options={sparklineOptions as any} />
+                    </div>
+                </div>
             </div>
 
             <div className="flex flex-col md:flex-row md:items-center gap-3">

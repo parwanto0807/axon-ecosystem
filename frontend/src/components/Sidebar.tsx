@@ -16,6 +16,8 @@ import {
     TableProperties,
     ChevronDown,
     ChevronRight,
+    ChevronsUpDown,
+    ChevronsLeftRight,
     Tag,
     Building2,
     FileText,
@@ -52,6 +54,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useSession, signOut } from "next-auth/react"
 import { useLanguage } from "@/context/LanguageContext"
+import { CommandPaletteTrigger } from "@/components/CommandPalette"
 
 const translations: any = {
     ID: {
@@ -95,6 +98,7 @@ const translations: any = {
         cashFlow: 'Arus Kas',
         cashProjection: 'Proyeksi Kas',
         coa: 'Bagan Akun (COA)',
+        journals: 'Jurnal Umum',
         openingBalances: 'Saldo Awal',
         operationalApprovals: 'Persetujuan Ops',
         accountabilityReports: 'Laporan Pertanggungjawaban',
@@ -161,6 +165,7 @@ const translations: any = {
         cashFlow: 'Cash Flow',
         cashProjection: 'Cash Projection',
         coa: 'Chart of Accounts',
+        journals: 'General Journal',
         openingBalances: 'Opening Balances',
         operationalApprovals: 'Operational Approvals',
         accountabilityReports: 'Accountability Reports',
@@ -330,6 +335,7 @@ const getMenuItems = (t: any) => [
                 label: t.financialReports,
                 isSpecial: true,
                 children: [
+                    { id: 'executive-summary', label: 'Executive Summary', icon: TrendingUp, path: '/dashboard/finance/reports/executive-summary' },
                     { id: 'ledger', label: t.generalLedger, icon: BookOpen, path: '/dashboard/finance/reports/ledger' },
                     { id: 'balance-sheet', label: t.balanceSheet, icon: PieChart, path: '/dashboard/finance/reports/balance-sheet' },
                     { id: 'profit-loss', label: t.profitLoss, icon: TrendingUp, path: '/dashboard/finance/reports/profit-loss' },
@@ -338,6 +344,7 @@ const getMenuItems = (t: any) => [
                 ]
             },
             { id: 'coa', icon: TableProperties, label: t.coa, path: '/dashboard/finance/coa' },
+            { id: 'journals', icon: BookOpen, label: t.journals, path: '/dashboard/finance/journals' },
             { id: 'opening-balances', icon: LayoutGrid, label: t.openingBalances, path: '/dashboard/finance/opening-balances' },
             { id: 'system-accounts', icon: Settings, label: t.systemSettings, path: '/dashboard/finance/system-accounts' },
             { id: 'banks', icon: Landmark, label: t.bankAccounts, path: '/dashboard/finance/banks' },
@@ -562,6 +569,60 @@ function SidebarContent({
     t
 }: SidebarContentProps) {
     const { setMobileMenuOpen } = useUIStore()
+    const pathname = usePathname()
+    const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({})
+    const allParentIds = useRef<string[]>([])
+
+    // Collect all parent menu IDs (menus with children)
+    useEffect(() => {
+        const ids: string[] = []
+        const collect = (items: any[]) => {
+            items.forEach(item => {
+                if (item.children && item.children.length > 0) {
+                    ids.push(item.id)
+                    collect(item.children)
+                }
+            })
+        }
+        collect(filteredMenuItems)
+        allParentIds.current = ids
+    }, [filteredMenuItems])
+
+    // Auto-open active menu path submenus
+    useEffect(() => {
+        const initial: Record<string, boolean> = {}
+        const findActive = (items: any[]) => {
+            items.forEach(item => {
+                if (item.children) {
+                    const hasActive = item.children.some((child: any) =>
+                        child.path === pathname || child.children?.some((sub: any) => sub.path === pathname)
+                    )
+                    if (hasActive) {
+                        initial[item.id] = true
+                    }
+                    findActive(item.children)
+                }
+            })
+        }
+        findActive(filteredMenuItems)
+        setOpenSubmenus(prev => ({ ...initial, ...prev }))
+    }, [pathname, filteredMenuItems])
+
+    const isAllExpanded = allParentIds.current.length > 0 && allParentIds.current.every(id => !!openSubmenus[id])
+
+    const toggleExpandAll = () => {
+        if (isAllExpanded) {
+            setOpenSubmenus({})
+        } else {
+            const nextState: Record<string, boolean> = {}
+            allParentIds.current.forEach(id => { nextState[id] = true })
+            setOpenSubmenus(nextState)
+        }
+    }
+
+    const toggleSubmenu = (id: string) => {
+        setOpenSubmenus(prev => ({ ...prev, [id]: !prev[id] }))
+    }
 
     return (
         <>
@@ -626,17 +687,47 @@ function SidebarContent({
                     )}
             </div>
 
+            {/* Command Palette Trigger */}
+            <div className={`shrink-0 ${isCollapsed ? 'px-2.5 py-3 flex justify-center' : 'px-3 py-3'}`}
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <CommandPaletteTrigger isCollapsed={isCollapsed} />
+            </div>
+
+            {/* Expand / Collapse All Toggle Button */}
+            {!isCollapsed && (
+                <div className="px-3 pt-2 pb-2 flex items-center justify-between gap-1 shrink-0 border-b border-white/[0.04]">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-white/30">Submenu</span>
+                    <button
+                        type="button"
+                        onClick={toggleExpandAll}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all text-white/70 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] hover:border-white/20 active:scale-95 shadow-sm"
+                        title={isAllExpanded ? "Tutup semua submenu" : "Buka semua submenu"}
+                    >
+                        {isAllExpanded ? (
+                            <>
+                                <ChevronsLeftRight size={12} className="text-[#38BDF8]" />
+                                <span>Collapse All</span>
+                            </>
+                        ) : (
+                            <>
+                                <ChevronsUpDown size={12} className="text-[#00C9A7]" />
+                                <span>Expand All</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+            )}
+
             {/* Navigation */}
             <nav className="flex-1 px-3 pt-4 overflow-y-auto no-scrollbar pb-10 space-y-0.5">
                 {filteredMenuItems.map((item: any) => (
                     item.isHeader ? (
                         !isCollapsed && (
-                            <div key={item.id} className="px-3 pt-5 pb-1.5">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-1 h-1 rounded-full" style={{ background: "rgba(0,201,167,0.6)" }} />
+                            <div key={item.id} className="px-3 pt-6 pb-2 mt-2 first:mt-0 first:pt-3 border-t first:border-t-0 border-white/[0.06]">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-1.5 h-3 rounded-full bg-gradient-to-b from-[#00C9A7] to-[#38BDF8] shadow-[0_0_10px_rgba(0,201,167,0.6)]" />
                                     <span
-                                        className="text-[9px] font-black uppercase tracking-[0.22em]"
-                                        style={{ color: "rgba(255,255,255,0.28)" }}
+                                        className="text-[10px] font-black uppercase tracking-[0.2em] text-[#38BDF8]"
                                     >
                                         {item.label}
                                     </span>
@@ -650,6 +741,8 @@ function SidebarContent({
                             isCollapsed={isCollapsed}
                             isMobile={isMobile}
                             toggleMobileMenu={() => setMobileMenuOpen(false)}
+                            openSubmenus={openSubmenus}
+                            toggleSubmenu={toggleSubmenu}
                         />
                     )
                 ))}
@@ -715,17 +808,28 @@ function SidebarContent({
     )
 }
 
-function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobileMenu }: { item: any, isCollapsed: boolean, level?: number, isMobile?: boolean, toggleMobileMenu?: () => void }) {
+function MenuItem({
+    item,
+    isCollapsed,
+    level = 0,
+    isMobile = false,
+    toggleMobileMenu,
+    openSubmenus,
+    toggleSubmenu
+}: {
+    item: any
+    isCollapsed: boolean
+    level?: number
+    isMobile?: boolean
+    toggleMobileMenu?: () => void
+    openSubmenus: Record<string, boolean>
+    toggleSubmenu: (id: string) => void
+}) {
     const pathname = usePathname()
-    const [isOpen, setIsOpen] = useState(false)
     const [isHovered, setIsHovered] = useState(false)
     const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const isActive = pathname === item.path || (item.children?.some((child: any) => pathname === child.path))
-
-    // Handle initial state for submenus
-    useEffect(() => {
-        if (!isCollapsed && isActive) setIsOpen(true)
-    }, [isCollapsed, isActive])
+    const isOpen = !!openSubmenus[item.id]
 
     const Icon = item.icon
 
@@ -749,7 +853,7 @@ function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobile
             <div
                 onClick={() => {
                     if (item.children) {
-                        setIsOpen(!isOpen)
+                        toggleSubmenu(item.id)
                     } else if (item.path) {
                         if (isMobile && toggleMobileMenu) toggleMobileMenu()
                     }
@@ -929,6 +1033,8 @@ function MenuItem({ item, isCollapsed, level = 0, isMobile = false, toggleMobile
                                 isCollapsed={isCollapsed}
                                 isMobile={isMobile}
                                 toggleMobileMenu={toggleMobileMenu}
+                                openSubmenus={openSubmenus}
+                                toggleSubmenu={toggleSubmenu}
                             />
                         ))}
                     </motion.div>

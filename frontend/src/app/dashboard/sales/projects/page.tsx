@@ -52,6 +52,7 @@ interface PreSalesProject {
     purchaseOrders: any[];
     workOrders: (WorkOrder & { items: any[]; surveyExpenses: any[] })[];
     surveyExpenses: any[];
+    invoices?: any[];
     createdAt: string; updatedAt?: string; deadline?: string; priority?: 'HIGH' | 'MEDIUM' | 'LOW';
     businessCategoryId?: string | null;
     businessCategory?: BusinessCategory | null;
@@ -281,7 +282,7 @@ export default function ProjectsPage() {
     const [selectedBusinessCategoryId, setSelectedBusinessCategoryId] = useState<string>('')
     const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
     const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'all'>('all')
-    const [sortBy, setSortBy] = useState<'date' | 'name' | 'revenue' | 'progress'>('date')
+    const [sortBy, setSortBy] = useState<'date' | 'name' | 'revenue' | 'progress' | 'no_so'>('no_so')
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
     const [page, setPage] = useState(1)
@@ -378,10 +379,18 @@ export default function ProjectsPage() {
                 (selectedPriority === 'ALL' || p.priority === selectedPriority)
         })
         .sort((a, b) => {
-            const aLost = a.status === 'LOST' ? 1 : 0
-            const bLost = b.status === 'LOST' ? 1 : 0
-            if (aLost !== bLost) return aLost - bLost
+            const aDone = ['COMPLETED', 'LOST'].includes(a.status) ? 1 : 0
+            const bDone = ['COMPLETED', 'LOST'].includes(b.status) ? 1 : 0
+            if (aDone !== bDone) return aDone - bDone
 
+            if (sortBy === 'no_so') {
+                const aHasSO = (a.salesOrders && a.salesOrders.length > 0) ? 1 : 0
+                const bHasSO = (b.salesOrders && b.salesOrders.length > 0) ? 1 : 0
+                if (aHasSO !== bHasSO) {
+                    return sortOrder === 'desc' ? aHasSO - bHasSO : bHasSO - aHasSO
+                }
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            }
             if (sortBy === 'date') {
                 return sortOrder === 'desc'
                     ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -572,8 +581,13 @@ export default function ProjectsPage() {
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Sort</p>
-                                        <div className="flex gap-1.5">
-                                            {[{ id: 'date', label: 'Date' }, { id: 'name', label: 'Name' }, { id: 'revenue', label: 'Revenue' }].map(s => (
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                                { id: 'no_so', label: '🔴 Belum SO First' },
+                                                { id: 'date', label: 'Date' },
+                                                { id: 'name', label: 'Name' },
+                                                { id: 'revenue', label: 'Revenue' }
+                                            ].map(s => (
                                                 <button key={s.id} onClick={() => { if (sortBy === s.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else { setSortBy(s.id as any); setSortOrder('desc'); } }} aria-pressed={sortBy === s.id}
                                                     className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all flex items-center gap-1 ${sortBy === s.id ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
                                                     {s.label}
@@ -680,6 +694,8 @@ export default function ProjectsPage() {
                                 const StatusIcon = sc.icon
                                 const priority = p.priority ? PRIORITY_CONFIG[p.priority] : null
                                 const PriorityIcon = priority?.icon
+                                const hasSalesOrder = Boolean(p.salesOrders && p.salesOrders.length > 0)
+                                const hasInvoice = Boolean(p.invoices && p.invoices.length > 0)
 
                                 return (
                                     <motion.div
@@ -692,12 +708,30 @@ export default function ProjectsPage() {
                                         <div className="p-4 border-b border-slate-100">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5 mb-1">
+                                                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
                                                         <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider bg-indigo-50 px-1.5 py-0.5 rounded-md">{p.number}</span>
                                                         {PriorityIcon && (
                                                             <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider ${priority.color}`}>
                                                                 <PriorityIcon size={8} />
                                                                 {p.priority}
+                                                            </span>
+                                                        )}
+                                                        {!hasSalesOrder && (
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200" title="Project belum memiliki Pesanan Penjualan (Sales Order)">
+                                                                <span className="relative flex h-2 w-2 shrink-0">
+                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.9)]"></span>
+                                                                </span>
+                                                                <span>Belum SO</span>
+                                                            </span>
+                                                        )}
+                                                        {!hasInvoice && (
+                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-amber-50 text-amber-600 border border-amber-200" title="Project belum diinvoice (No Invoice)">
+                                                                <span className="relative flex h-2 w-2 shrink-0">
+                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.9)]"></span>
+                                                                </span>
+                                                                <span>Belum INV</span>
                                                             </span>
                                                         )}
                                                     </div>
@@ -771,6 +805,8 @@ export default function ProjectsPage() {
                                 const stats = calcProjectStats(p)
                                 const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.PROSPECTING
                                 const StatusIcon = sc.icon
+                                const hasSalesOrder = Boolean(p.salesOrders && p.salesOrders.length > 0)
+                                const hasInvoice = Boolean(p.invoices && p.invoices.length > 0)
 
                                 return (
                                     <motion.div
@@ -784,10 +820,28 @@ export default function ProjectsPage() {
                                             <StatusIcon size={14} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1.5 mb-0.5">
+                                            <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                                                 <span className="text-[8px] font-bold text-indigo-600 uppercase tracking-wider">{p.number}</span>
                                                 <span className="text-[8px] text-slate-400">•</span>
                                                 <span className="text-[8px] text-slate-500 font-medium">{fmtDate(p.createdAt)}</span>
+                                                {!hasSalesOrder && (
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200" title="Project belum memiliki Pesanan Penjualan (Sales Order)">
+                                                        <span className="relative flex h-2 w-2 shrink-0">
+                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.9)]"></span>
+                                                        </span>
+                                                        <span>Belum SO</span>
+                                                    </span>
+                                                )}
+                                                {!hasInvoice && (
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-amber-50 text-amber-600 border border-amber-200" title="Project belum diinvoice (No Invoice)">
+                                                        <span className="relative flex h-2 w-2 shrink-0">
+                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.9)]"></span>
+                                                        </span>
+                                                        <span>Belum INV</span>
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <h3 className="font-semibold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">{p.name}</h3>
@@ -851,6 +905,8 @@ export default function ProjectsPage() {
                                         const StatusIcon = sc.icon
                                         const priority = p.priority ? PRIORITY_CONFIG[p.priority] : null
                                         const PriorityIcon = priority?.icon
+                                        const hasSalesOrder = Boolean(p.salesOrders && p.salesOrders.length > 0)
+                                        const hasInvoice = Boolean(p.invoices && p.invoices.length > 0)
 
                                         return (
                                             <motion.tr
@@ -862,7 +918,27 @@ export default function ProjectsPage() {
                                             >
                                                 <td className="px-4 py-3">
                                                     <div className="flex flex-col gap-0.5">
-                                                        <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider">{p.number}</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider">{p.number}</span>
+                                                            {!hasSalesOrder && (
+                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200" title="Project belum memiliki Pesanan Penjualan (SO)">
+                                                                    <span className="relative flex h-2 w-2 shrink-0">
+                                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.9)]"></span>
+                                                                    </span>
+                                                                    <span>Belum SO</span>
+                                                                </span>
+                                                            )}
+                                                            {!hasInvoice && (
+                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-amber-50 text-amber-600 border border-amber-200" title="Project belum diinvoice (No Invoice)">
+                                                                    <span className="relative flex h-2 w-2 shrink-0">
+                                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.9)]"></span>
+                                                                    </span>
+                                                                    <span>Belum INV</span>
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <span className="font-semibold text-slate-900 text-xs leading-tight group-hover:text-indigo-600 transition-colors">{p.name}</span>
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-[9px] text-slate-400 flex items-center gap-0.5"><Calendar size={8} /> {fmtDate(p.createdAt)}</span>

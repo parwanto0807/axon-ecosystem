@@ -26,8 +26,14 @@ export const getSalesData = async (): Promise<{ monthlySales: number[], months: 
     }
 
     sales.forEach((invoice: any) => {
-      const invoiceDate = new Date(invoice.createdAt);
+      // Only include POSTED or PAID invoices (skip DRAFT/projections)
+      if (invoice.status === 'DRAFT') return;
+
+      // Use the actual invoice date, not the creation timestamp
+      const invoiceDate = new Date(invoice.date || invoice.createdAt);
       const monthDiff = (today.getFullYear() - invoiceDate.getFullYear()) * 12 + (today.getMonth() - invoiceDate.getMonth());
+      
+      // Only include if within the last 12 months (including current month = 0)
       if (monthDiff >= 0 && monthDiff < 12) {
         monthlySales[11 - monthDiff] += invoice.totalAmount;
       }

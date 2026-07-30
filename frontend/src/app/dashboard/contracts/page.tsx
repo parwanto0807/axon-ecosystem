@@ -6,7 +6,7 @@ import {
     FileText, Plus, Search, Filter, MoreVertical,
     Calendar, User, Building2, TrendingUp, ArrowRight,
     CheckCircle2, Clock, AlertCircle, XCircle, Trash2, Edit3, Eye,
-    RefreshCw, Download, FilePlus, Printer, CreditCard, Copy
+    RefreshCw, Download, FilePlus, Printer, CreditCard, Copy, CalendarPlus
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -64,6 +64,7 @@ export default function ContractListPage() {
     const [showPreview, setShowPreview] = useState(false)
     const [selectedContract, setSelectedContract] = useState<Contract | null>(null)
     const [company, setCompany] = useState<Company>({})
+    const [projectionModal, setProjectionModal] = useState({ isOpen: false, contractId: "", months: 6, loading: false })
 
     const handleDuplicate = (c: Contract) => {
         const { id, number, date, lastBillingDate, createdAt, updatedAt, invoices, purchaseInvoices, ...rest } = c as any;
@@ -73,6 +74,55 @@ export default function ContractListPage() {
             status: "DRAFT"
         }));
         router.push('/dashboard/contracts/new');
+    }
+
+    const handleDelete = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm("Hapus kontrak ini secara permanen?")) return;
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setContracts(contracts.filter(c => c.id !== id));
+            } else {
+                const err = await res.json();
+                alert(`Gagal menghapus: ${err.message}`);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Error koneksi");
+        }
+    }
+
+    const handleGenerateProjections = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setProjectionModal({ isOpen: true, contractId: id, months: 6, loading: false });
+    }
+
+    const submitProjection = async () => {
+        const { contractId, months } = projectionModal;
+        if (months <= 0) return alert("Bulan harus lebih dari 0");
+        
+        try {
+            setProjectionModal(prev => ({ ...prev, loading: true }));
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/contracts/${contractId}/generate-projections`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ months })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                alert(`Berhasil membuat ${data.generated} invoice proyeksi. (${data.skipped} di-skip karena sudah ada)`);
+                setProjectionModal({ isOpen: false, contractId: "", months: 6, loading: false });
+                loadData();
+            } else {
+                const err = await res.json();
+                alert(`Gagal: ${err.message}`);
+            }
+        } catch (err) {
+            alert("Error koneksi");
+        } finally {
+            setProjectionModal(prev => ({ ...prev, loading: false }));
+        }
     }
 
     const loadData = async () => {
@@ -345,6 +395,13 @@ export default function ContractListPage() {
                                                     >
                                                         <TrendingUp size={16} />
                                                     </button>
+                                                    <button 
+                                                        onClick={(e) => handleGenerateProjections(c.id, e)}
+                                                        className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl shadow-lg shadow-transparent hover:shadow-indigo-600/10 border border-transparent hover:border-slate-100 transition-all"
+                                                        title="Buat Proyeksi"
+                                                    >
+                                                        <CalendarPlus size={16} />
+                                                    </button>
                                                     <Link 
                                                         href={`/dashboard/contracts/${c.id}/edit`}
                                                         onClick={(e) => e.stopPropagation()}
@@ -353,6 +410,15 @@ export default function ContractListPage() {
                                                     >
                                                         <Edit3 size={16} />
                                                     </Link>
+                                                    {real.total === 0 && (
+                                                        <button 
+                                                            onClick={(e) => handleDelete(c.id, e)}
+                                                            className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-white rounded-xl shadow-lg shadow-transparent hover:shadow-rose-600/10 border border-transparent hover:border-slate-100 transition-all"
+                                                            title="Hapus"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </motion.tr>
@@ -444,7 +510,11 @@ export default function ContractListPage() {
                                     <button onClick={() => handlePrint(c)} className="w-8 h-8 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 flex items-center justify-center"><Printer size={14} /></button>
                                     <button onClick={() => handleDuplicate(c)} className="w-8 h-8 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-600 flex items-center justify-center"><Copy size={14} /></button>
                                     <button onClick={() => handleGenerateBill(c.id)} className="w-8 h-8 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-600 flex items-center justify-center"><TrendingUp size={14} /></button>
+                                    <button onClick={(e) => handleGenerateProjections(c.id, e)} className="w-8 h-8 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 flex items-center justify-center"><CalendarPlus size={14} /></button>
                                     <Link href={`/dashboard/contracts/${c.id}/edit`} className="w-8 h-8 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-600 flex items-center justify-center"><Edit3 size={14} /></Link>
+                                    {real.total === 0 && (
+                                        <button onClick={(e) => handleDelete(c.id, e)} className="w-8 h-8 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 flex items-center justify-center"><Trash2 size={14} /></button>
+                                    )}
                                 </div>
                             </div>
                         </motion.div>
@@ -470,6 +540,82 @@ export default function ContractListPage() {
                         company={company}
                         onClose={() => setShowPreview(false)}
                     />
+                )}
+            </AnimatePresence>
+
+            {/* Projection Modal */}
+            <AnimatePresence>
+                {projectionModal.isOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                            onClick={() => !projectionModal.loading && setProjectionModal(prev => ({ ...prev, isOpen: false }))}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
+                        >
+                            <div className="p-6 md:p-8 flex flex-col gap-6">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="text-xl font-black text-slate-900 tracking-tight">Proyeksi Tagihan</h3>
+                                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mt-1">Buat Invoice di Awal</p>
+                                    </div>
+                                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                                        <CalendarPlus size={24} />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Jumlah Bulan (Ke Depan)</label>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="number" 
+                                            value={projectionModal.months || ""}
+                                            onChange={(e) => setProjectionModal(prev => ({ ...prev, months: parseInt(e.target.value) || 0 }))}
+                                            className="w-full text-center text-2xl font-black text-slate-900 bg-slate-50 border border-slate-100 rounded-2xl py-3 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                                            min="1"
+                                            max="60"
+                                        />
+                                        <span className="text-xs font-bold text-slate-400">Bulan</span>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-2 pt-2">
+                                        {[3, 6, 12, 24].map(n => (
+                                            <button
+                                                key={n}
+                                                onClick={() => setProjectionModal(prev => ({ ...prev, months: n }))}
+                                                className={`py-2 rounded-xl text-xs font-black transition-all ${projectionModal.months === n ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 mt-2">
+                                    <button 
+                                        onClick={() => setProjectionModal(prev => ({ ...prev, isOpen: false }))}
+                                        disabled={projectionModal.loading}
+                                        className="flex-1 py-3.5 bg-slate-50 text-slate-600 hover:bg-slate-100 text-xs font-black uppercase tracking-widest rounded-xl transition-all"
+                                    >
+                                        Batal
+                                    </button>
+                                    <button 
+                                        onClick={submitProjection}
+                                        disabled={projectionModal.loading || projectionModal.months <= 0}
+                                        className="flex-1 py-3.5 bg-indigo-600 text-white hover:bg-indigo-700 text-xs font-black uppercase tracking-widest rounded-xl shadow-xl shadow-indigo-600/20 transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+                                    >
+                                        {projectionModal.loading ? <RefreshCw className="animate-spin" size={16} /> : 'Buat'}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
 

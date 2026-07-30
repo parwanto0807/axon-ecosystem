@@ -274,7 +274,7 @@ export default function WorkOrdersPage() {
         setModalOpen(true)
     }
 
-    const openDetail = async (wo: WO) => {
+    const openDetail = async (wo: WO, autoOpenReport: boolean = false) => {
         setLoading(true)
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/work-orders/${wo.id}`, {
@@ -286,7 +286,12 @@ export default function WorkOrdersPage() {
             } else {
                 setViewing(wo)
             }
-            setActiveTab('INFO')
+            if (autoOpenReport) {
+                setActiveTab('REPORTS')
+                setReportModalOpen(true)
+            } else {
+                setActiveTab('INFO')
+            }
             setDetailOpen(true)
         } finally {
             setLoading(false)
@@ -391,7 +396,8 @@ export default function WorkOrdersPage() {
             setReportModalOpen(false)
             setReportForm({ description: '', progress: '0', reportedBy: '', taskId: '', checklist: {} })
             setReportPhotos([])
-            openDetail(viewing)
+            await openDetail(viewing)
+            setActiveTab('REPORTS')
             load()
         } catch (err: any) {
             showToast('error', err.message)
@@ -652,8 +658,10 @@ export default function WorkOrdersPage() {
                                             <td className="px-5 py-4 text-center">
                                                 {pct !== null ? (
                                                     <div>
-                                                        <div className="w-16 h-1.5 bg-slate-100 rounded-full mx-auto"><div className="h-full bg-amber-500 rounded-full" style={{ width: `${pct}%` }} /></div>
-                                                        <p className="text-[9px] font-bold text-slate-400 mt-1">{doneTasks}/{totalTasks}</p>
+                                                        <div className="w-16 h-1.5 bg-slate-100 rounded-full mx-auto">
+                                                            <div className={`h-full rounded-full ${doneTasks === totalTasks && totalTasks > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }} />
+                                                        </div>
+                                                        <p className={`text-[9px] font-bold mt-1 ${doneTasks === totalTasks && totalTasks > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>{doneTasks}/{totalTasks}</p>
                                                     </div>
                                                 ) : <span className="text-[9px] text-slate-300">—</span>}
                                             </td>
@@ -738,16 +746,16 @@ export default function WorkOrdersPage() {
                                         <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100/50">
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="flex items-center gap-1.5">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                                    <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${doneTasks === totalTasks && totalTasks > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                                                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Job Progress</span>
                                                 </div>
-                                                <span className="text-[10px] font-black text-amber-600">{doneTasks}/{totalTasks} Task</span>
+                                                <span className={`text-[10px] font-black ${doneTasks === totalTasks && totalTasks > 0 ? 'text-emerald-600' : 'text-amber-600'}`}>{doneTasks}/{totalTasks} Task</span>
                                             </div>
                                             <div className="h-2 bg-slate-200/50 rounded-full overflow-hidden">
                                                 <motion.div
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${pct}%` }}
-                                                    className="h-full bg-gradient-to-r from-amber-500 to-amber-400 rounded-full transition-all shadow-[0_0_8px_rgba(245,158,11,0.3)]"
+                                                    className={`h-full rounded-full transition-all ${doneTasks === totalTasks && totalTasks > 0 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.3)]' : 'bg-gradient-to-r from-amber-500 to-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.3)]'}`}
                                                 />
                                             </div>
                                         </div>
@@ -839,7 +847,7 @@ export default function WorkOrdersPage() {
 
                                         {viewing.tasks.length > 0 && (
                                             <div>
-                                                <p className={lc + ' flex items-center gap-2'}><ClipboardList size={12} /> Checklist Pekerjaan ({viewing.tasks.filter(t => t.isDone).length}/{viewing.tasks.length})</p>
+                                                <p className={lc + ` flex items-center gap-2 ${viewing.tasks.filter((t: any) => t.isDone).length === viewing.tasks.length ? 'text-emerald-600' : ''}`}><ClipboardList size={12} /> Checklist Pekerjaan ({viewing.tasks.filter((t: any) => t.isDone).length}/{viewing.tasks.length})</p>
                                                 <div className="space-y-2">
                                                     {viewing.tasks.map(task => (
                                                         <div key={task.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${task.isDone ? 'bg-emerald-50/50 border-emerald-100' : 'bg-white border-slate-100'}`}>
@@ -881,7 +889,16 @@ export default function WorkOrdersPage() {
                                             <p className={lc}>Ubah Status</p>
                                             <div className="flex gap-2 flex-wrap">
                                                 {STATUS_TRANSITIONS[viewing.status]?.map(t => (
-                                                    <button key={t.next} onClick={() => { handleStatusChange(viewing, t.next); setDetailOpen(false) }}
+                                                    <button key={t.next} onClick={async () => { 
+                                                        await handleStatusChange(viewing, t.next);
+                                                        if (t.next === 'COMPLETED') {
+                                                            setActiveTab('REPORTS');
+                                                            setReportForm({ description: '', progress: '100', reportedBy: '', taskId: '', checklist: {} });
+                                                            setReportModalOpen(true);
+                                                        } else {
+                                                            setDetailOpen(false); 
+                                                        }
+                                                    }}
                                                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white text-xs font-bold uppercase tracking-wider ${t.color}`}>
                                                         <t.icon size={13} /> {t.label}
                                                     </button>

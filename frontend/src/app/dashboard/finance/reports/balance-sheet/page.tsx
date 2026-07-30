@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { motion } from "framer-motion"
 import {
     PieChart, Printer, Download, Search,
-    RefreshCw, Calendar, ArrowRight, ShieldCheck
+    RefreshCw, Calendar, ArrowRight, ShieldCheck, AlertTriangle
 } from "lucide-react"
 
 interface Account {
@@ -121,19 +121,26 @@ export default function BalanceSheetPage() {
                                 <tbody className="divide-y divide-slate-50">
                                     {loading ? (
                                         <tr><td className="py-20 text-center"><RefreshCw className="animate-spin text-slate-200 mx-auto" /></td></tr>
-                                    ) : data.assets.map(acc => (
-                                        <tr key={acc.id} className="hover:bg-slate-50/50 transition-colors">
+                                    ) : data.assets.map(acc => {
+                                        const isAbnormal = acc.balance < 0 && !acc.name.toLowerCase().includes('akumulasi') && !acc.name.toLowerCase().includes('amortisasi');
+                                        return (
+                                        <tr key={acc.id} className={`hover:bg-slate-50/50 transition-colors ${isAbnormal ? 'bg-rose-50/50' : ''}`}>
                                             <td className="px-5 md:px-8 py-3 md:py-4">
                                                 <div className="flex items-center gap-2 md:gap-3">
                                                     <span className="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{acc.code}</span>
-                                                    <span className="font-bold text-slate-700 leading-tight">{acc.name}</span>
+                                                    <span className={`font-bold leading-tight ${isAbnormal ? 'text-rose-600' : 'text-slate-700'}`}>{acc.name}</span>
+                                                    {isAbnormal && (
+                                                        <span title="Saldo abnormal: aset tidak seharusnya negatif" className="flex items-center gap-1 text-[9px] font-black text-rose-500 bg-rose-100 px-1.5 py-0.5 rounded-full">
+                                                            <AlertTriangle size={9} /> ABNORMAL
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
-                                            <td className="px-5 md:px-8 py-3 md:py-4 text-right font-mono font-black text-slate-900">
+                                            <td className={`px-5 md:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-rose-600' : 'text-slate-900'}`}>
                                                 {acc.balance.toLocaleString('id-ID')}
                                             </td>
                                         </tr>
-                                    ))}
+                                    )})}
                                 </tbody>
                             </table>
                         </div>
@@ -153,19 +160,26 @@ export default function BalanceSheetPage() {
                         </div>
                         <table className="w-full text-xs">
                             <tbody className="divide-y divide-slate-50">
-                                {data.liabilities.map(acc => (
-                                    <tr key={acc.id} className="hover:bg-slate-50/50 transition-colors">
+                                {data.liabilities.map(acc => {
+                                    const isAbnormal = acc.balance < 0;
+                                    return (
+                                    <tr key={acc.id} className={`hover:bg-slate-50/50 transition-colors ${isAbnormal ? 'bg-amber-50/50' : ''}`}>
                                         <td className="px-5 md:px-8 py-3 md:py-4">
                                             <div className="flex items-center gap-2 md:gap-3">
                                                 <span className="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{acc.code}</span>
-                                                <span className="font-bold text-slate-700 leading-tight">{acc.name}</span>
+                                                <span className={`font-bold leading-tight ${isAbnormal ? 'text-amber-600' : 'text-slate-700'}`}>{acc.name}</span>
+                                                {isAbnormal && (
+                                                    <span title="Saldo abnormal: kewajiban tidak seharusnya negatif" className="flex items-center gap-1 text-[9px] font-black text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                                                        <AlertTriangle size={9} /> ABNORMAL
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
-                                        <td className="px-5 md:px-8 py-3 md:py-4 text-right font-mono font-black text-slate-900">
+                                        <td className={`px-5 md:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-amber-600' : 'text-slate-900'}`}>
                                             {acc.balance.toLocaleString('id-ID')}
                                         </td>
                                     </tr>
-                                ))}
+                                )})}
                             </tbody>
                         </table>
                         <div className="px-5 md:px-8 py-3 md:py-4 bg-slate-900 text-slate-100 flex items-center justify-between border-t border-slate-700">
@@ -181,19 +195,30 @@ export default function BalanceSheetPage() {
                         </div>
                         <table className="w-full text-xs">
                             <tbody className="divide-y divide-slate-50">
-                                {data.equity.map(acc => (
-                                    <tr key={acc.id} className="hover:bg-slate-50/50 transition-colors">
+                                {data.equity.map(acc => {
+                                    // Net Profit (Laba Tahun Berjalan) bisa negatif jika rugi - bukan anomali
+                                    const isAbnormal = acc.balance < 0 && acc.id !== 'NET_PROFIT';
+                                    return (
+                                    <tr key={acc.id} className={`hover:bg-slate-50/50 transition-colors ${isAbnormal ? 'bg-amber-50/50' : ''}`}>
                                         <td className="px-5 md:px-8 py-3 md:py-4">
                                             <div className="flex items-center gap-2 md:gap-3">
                                                 <span className="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{acc.code}</span>
-                                                <span className="font-bold text-slate-700 leading-tight">{acc.name}</span>
+                                                <span className={`font-bold leading-tight ${isAbnormal ? 'text-amber-600' : acc.id === 'NET_PROFIT' && acc.balance < 0 ? 'text-rose-500' : 'text-slate-700'}`}>{acc.name}</span>
+                                                {isAbnormal && (
+                                                    <span title="Saldo abnormal: ekuitas tidak seharusnya negatif" className="flex items-center gap-1 text-[9px] font-black text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                                                        <AlertTriangle size={9} /> ABNORMAL
+                                                    </span>
+                                                )}
+                                                {acc.id === 'NET_PROFIT' && acc.balance < 0 && (
+                                                    <span className="text-[9px] font-black text-rose-400 bg-rose-100 px-1.5 py-0.5 rounded-full">RUGI</span>
+                                                )}
                                             </div>
                                         </td>
-                                        <td className="px-5 md:px-8 py-3 md:py-4 text-right font-mono font-black text-slate-900">
+                                        <td className={`px-5 md:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-amber-600' : acc.id === 'NET_PROFIT' && acc.balance < 0 ? 'text-rose-500' : 'text-slate-900'}`}>
                                             {acc.balance.toLocaleString('id-ID')}
                                         </td>
                                     </tr>
-                                ))}
+                                )})}
                             </tbody>
                         </table>
                         <div className="px-5 md:px-8 py-3 md:py-4 bg-slate-900 text-slate-100 flex items-center justify-between border-t border-slate-700">

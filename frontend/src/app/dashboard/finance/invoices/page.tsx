@@ -82,6 +82,8 @@ export default function InvoicesPage() {
     const [editMode, setEditMode] = useState(false)
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [search, setSearch] = useState('')
+    const [currentPage, setCurrentPage] = useState(1)
+    const itemsPerPage = 20
 
     const [saving, setSaving] = useState(false)
     const [viewModal, setViewModal] = useState<Invoice | null>(null)
@@ -278,7 +280,10 @@ export default function InvoicesPage() {
         )
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
-    const groupedInvoices = filtered.reduce((groups: Record<string, { month: string, total: number, invoices: Invoice[] }>, inv) => {
+    const totalPages = Math.ceil(filtered.length / itemsPerPage)
+    const paginatedFiltered = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+
+    const groupedInvoices = paginatedFiltered.reduce((groups: Record<string, { month: string, total: number, invoices: Invoice[] }>, inv) => {
         const date = new Date(inv.date)
         const monthHeader = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
         if (!groups[monthHeader]) {
@@ -320,10 +325,13 @@ export default function InvoicesPage() {
             {/* Stats Summary */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total Invoices', val: invoices.length, icon: FileText, color: 'text-blue-600' },
-                    { label: 'Paid Invoices', val: invoices.filter(i => i.status === 'PAID').length, icon: CheckCircle2, color: 'text-emerald-600' },
-                    { label: 'Pending / Unpaid', val: invoices.filter(i => i.status !== 'PAID' && i.status !== 'CANCELLED').length, icon: Clock, color: 'text-amber-600' },
-                    { label: 'Total Receivables', val: fmt(invoices.filter(i => i.status !== 'PAID' && i.status !== 'CANCELLED').reduce((a, b) => a + b.grandTotal, 0)), icon: DollarSign, color: 'text-rose-600' },
+                    { label: 'Jml. Dokumen Invoice', val: `${invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED').length} Dok.`, icon: FileText, color: 'text-indigo-600' },
+                    { label: 'Total Keseluruhan Tagihan', val: fmt(invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED').reduce((sum, inv) => sum + inv.grandTotal, 0)), icon: FileText, color: 'text-blue-600' },
+                    { label: 'Sudah Dibayar (PAID)', val: fmt(invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED').reduce((sum, inv) => sum + (inv.payments?.filter(p => p.status === 'SUCCESS').reduce((s, p) => s + p.amount, 0) || 0), 0)), icon: CheckCircle2, color: 'text-emerald-600' },
+                    { label: 'Belum Dibayar (UNPAID)', val: fmt(invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED').reduce((sum, inv) => {
+                        const paid = inv.payments?.filter(p => p.status === 'SUCCESS').reduce((s, p) => s + p.amount, 0) || 0;
+                        return sum + (inv.grandTotal - paid);
+                    }, 0)), icon: DollarSign, color: 'text-rose-600' },
                 ].map((s, i) => (
                     <motion.div
                         key={i}
@@ -348,7 +356,7 @@ export default function InvoicesPage() {
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                         <input
                             type="text" placeholder="Cari nomor Invoice atau Customer..."
-                            value={search} onChange={e => setSearch(e.target.value)}
+                            value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
                             className="w-full pl-12 pr-4 h-12 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-emerald-600/20 font-medium transition-all"
                         />
                     </div>
@@ -358,6 +366,7 @@ export default function InvoicesPage() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50">
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground w-12 text-center">No</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Invoice Info</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Customer & Kontrak</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground text-right">Total Tagihan</th>
@@ -369,7 +378,7 @@ export default function InvoicesPage() {
                             {Object.entries(groupedInvoices).map(([month, data]) => (
                                 <React.Fragment key={month}>
                                     <tr className="bg-slate-50/80 border-y border-border/50">
-                                        <td colSpan={5} className="px-6 py-3">
+                                        <td colSpan={6} className="px-6 py-3">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
                                                     <Calendar size={14} className="text-emerald-600" />
@@ -387,6 +396,9 @@ export default function InvoicesPage() {
                                     </tr>
                                     {data.invoices.map((inv) => (
                                         <tr key={inv.id} className="hover:bg-emerald-600/[0.02] transition-colors group">
+                                            <td className="px-6 py-5 text-center text-xs font-bold text-slate-400">
+                                                {filtered.indexOf(inv) + 1}
+                                            </td>
                                             <td className="px-6 py-5">
                                                 <p className="font-black text-foreground group-hover:text-emerald-600 transition-colors tracking-tight">{inv.number}</p>
                                                 <div className="flex items-center gap-2 mt-1">
@@ -586,6 +598,34 @@ export default function InvoicesPage() {
                         </div>
                     ))}
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-border/50 gap-4 bg-white">
+                        <div className="text-xs text-muted-foreground font-medium">
+                            Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filtered.length)} dari {filtered.length} invoice
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline" size="sm"
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                                className="h-8 rounded-lg"
+                            >
+                                Prev
+                            </Button>
+                            <span className="text-xs font-bold px-3 py-1 bg-slate-100 rounded-lg">{currentPage} / {totalPages}</span>
+                            <Button
+                                variant="outline" size="sm"
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                                className="h-8 rounded-lg"
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Modal Form */}

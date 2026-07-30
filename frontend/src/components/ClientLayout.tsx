@@ -3,6 +3,7 @@
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
 import { FloatingOperationalNav } from "@/components/FloatingOperationalNav";
+import { CommandPalette } from "@/components/CommandPalette";
 import { useUIStore } from "@/store/uiStore";
 import { useState, useEffect } from "react"
 import { useSession, signOut } from "next-auth/react"
@@ -32,6 +33,8 @@ export function ClientLayout({
 
     return (
         <div className="flex min-h-screen bg-[#f8fafc] relative font-sans">
+            {/* Global Command Palette — Ctrl+K anywhere */}
+            <CommandPalette />
             {/* Main Application Container with Dynamic Blur */}
             <div 
                 className={`flex-1 flex flex-col min-h-screen transition-all duration-700 ease-in-out ${
@@ -47,7 +50,11 @@ export function ClientLayout({
                         <span className="font-black text-2xl tracking-tighter text-slate-900">AXON</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button className="p-2.5 text-slate-400 hover:text-indigo-600 transition-colors">
+                        <button
+                            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))}
+                            className="p-2.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                            title="Cari menu (Ctrl+K)"
+                        >
                             <Search size={22} />
                         </button>
                         <button className="p-2.5 text-slate-400 hover:text-indigo-600 transition-colors relative">
@@ -62,6 +69,15 @@ export function ClientLayout({
                 {/* Desktop Top Navbar - Temporary */}
                 <header className="hidden lg:flex sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-2xl border-b border-slate-200 px-8 items-center justify-end shadow-sm">
                     <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-slate-300 transition-all text-slate-400 hover:text-slate-600 group"
+                            title="Cari menu (Ctrl+K)"
+                        >
+                            <Search size={15} />
+                            <span className="text-[11px] font-medium hidden xl:block">Cari menu...</span>
+                            <kbd className="hidden xl:flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-white border border-slate-200 text-slate-400">Ctrl K</kbd>
+                        </button>
                         <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors relative">
                             <Bell size={20} />
                             <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
