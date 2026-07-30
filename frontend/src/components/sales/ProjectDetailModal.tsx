@@ -10,13 +10,14 @@ import {
 
 interface ProjectDetailModalProps {
     project: any
+    stats?: any
     onClose: () => void
 }
 
 const fmt = (n: number) => `Rp ${n?.toLocaleString('id-ID')}`
 const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
 
-export default function ProjectDetailModal({ project, onClose }: ProjectDetailModalProps) {
+export default function ProjectDetailModal({ project, stats, onClose }: ProjectDetailModalProps) {
     // Collect all timeline items from project relations
     const timelineItems = [
         ...(project.surveys || []).map((s: any) => ({
@@ -135,7 +136,7 @@ export default function ProjectDetailModal({ project, onClose }: ProjectDetailMo
     ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
     return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-end bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-110 flex items-center justify-end bg-black/40 backdrop-blur-sm">
             <motion.div
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
@@ -171,6 +172,24 @@ export default function ProjectDetailModal({ project, onClose }: ProjectDetailMo
                             <p className="text-base md:text-lg font-black text-slate-900 leading-tight">{fmtDate(project.createdAt)}</p>
                         </div>
                     </div>
+                    
+                    {/* Financial Stats */}
+                    {stats && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                            <div className="bg-white p-4 md:p-5 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm">
+                                <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Pendapatan / Revenue</p>
+                                <p className="text-base md:text-lg font-black text-emerald-600 leading-tight">{fmt(stats.revenue)}</p>
+                            </div>
+                            <div className="bg-white p-4 md:p-5 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm">
+                                <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Pengeluaran Total</p>
+                                <p className="text-base md:text-lg font-black text-rose-600 leading-tight">{fmt((stats.cogs || 0) + (stats.operationalExpenses || 0))}</p>
+                            </div>
+                            <div className="bg-white p-4 md:p-5 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm">
+                                <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 md:mb-1">Margin Profit</p>
+                                <p className={`text-base md:text-lg font-black leading-tight ${stats.margin > 20 ? 'text-emerald-600' : stats.margin > 10 ? 'text-amber-600' : 'text-rose-600'}`}>{stats.margin.toFixed(1)}%</p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Timeline Section */}
                     <section>
@@ -179,7 +198,7 @@ export default function ProjectDetailModal({ project, onClose }: ProjectDetailMo
                             Journey Timeline
                         </h3>
 
-                        <div className="relative pl-6 md:pl-8 space-y-6 md:space-y-8 before:absolute before:left-[11px] md:before:left-[15px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                        <div className="relative pl-6 md:pl-8 space-y-6 md:space-y-8 before:absolute before:left-2.75 md:before:left-3.75 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
                             {timelineItems.length === 0 ? (
                                 <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-3xl">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Belum ada transaksi</p>
@@ -187,7 +206,7 @@ export default function ProjectDetailModal({ project, onClose }: ProjectDetailMo
                             ) : timelineItems.map((item, idx) => (
                                 <div key={idx} className="relative">
                                     {/* Timeline Dot */}
-                                    <div className={`absolute -left-[21px] md:-left-[25px] top-1 w-3 h-3 md:w-4 md:h-4 rounded-full border-[3px] md:border-4 border-slate-50 ${item.color} shadow-sm z-10`} />
+                                    <div className={`absolute -left-5.25 md:-left-6.25 top-1 w-3 h-3 md:w-4 md:h-4 rounded-full border-[3px] md:border-4 border-slate-50 ${item.color} shadow-sm z-10`} />
 
                                     <div className="bg-white rounded-xl md:rounded-2xl p-4 md:p-5 border border-slate-100 shadow-sm hover:shadow-md transition-shadow group">
                                         <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-3 md:gap-4">
@@ -230,3 +249,4 @@ export default function ProjectDetailModal({ project, onClose }: ProjectDetailMo
         </div>
     )
 }
+

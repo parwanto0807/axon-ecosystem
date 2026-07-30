@@ -56,10 +56,20 @@ export default function QuotationsPage() {
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
     const [company, setCompany] = useState<Record<string, string>>({})
     const [projects, setProjects] = useState<any[]>([])
+    const [openStatusId, setOpenStatusId] = useState<string | null>(null)
 
     const showToast = useCallback((type: 'success' | 'error', msg: string) => {
         setToast({ type, msg }); setTimeout(() => setToast(null), 4000)
     }, [])
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            const target = e.target as HTMLElement
+            if (openStatusId && !target.closest('.status-dropdown')) setOpenStatusId(null)
+        }
+        if (openStatusId) document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [openStatusId])
 
     const load = useCallback(async () => {
         if (!userRole) return
@@ -70,7 +80,7 @@ export default function QuotationsPage() {
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`, { headers: { 'x-user-role': userRole } }),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`, { headers: { 'x-user-role': userRole } }),
             ])
             setQuotations(await qR.json())
             setCustomers(await cR.json())
@@ -101,7 +111,14 @@ export default function QuotationsPage() {
         return (q.number.toLowerCase().includes(s) || q.customer?.name?.toLowerCase().includes(s) || q.subject?.toLowerCase().includes(s)) &&
             (filterStatus === 'ALL' || q.status === filterStatus) &&
             (filterProject === 'ALL' || q.projectId === filterProject)
-    }).sort((a, b) => (a.projectId || '').localeCompare(b.projectId || ''))
+    }).sort((a, b) => {
+        const pA = projects.find(p => p.id === a.projectId)
+        const pB = projects.find(p => p.id === b.projectId)
+        const dA = pA?.createdAt ? new Date(pA.createdAt).getTime() : 0
+        const dB = pB?.createdAt ? new Date(pB.createdAt).getTime() : 0
+        if (dA !== dB) return dB - dA
+        return new Date(b.date).getTime() - new Date(a.date).getTime()
+    })
 
     const stats = {
         total: quotations.length,
@@ -282,18 +299,20 @@ export default function QuotationsPage() {
                                                     <p className="text-[9px] text-slate-400">{q.items?.length || 0} items</p>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <div className="relative group/status inline-block">
-                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border cursor-pointer ${sc.color}`}>
+                                                    <div className="relative status-dropdown inline-block">
+                                                        <span onClick={() => setOpenStatusId(openStatusId === q.id ? null : q.id)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border cursor-pointer ${sc.color}`}>
                                                             <Icon size={9} /> {sc.label}
                                                         </span>
-                                                        <div className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 bg-white shadow-xl rounded-xl border border-slate-100 p-1 hidden group-hover/status:block min-w-[120px]">
-                                                            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                                                                <button key={k} onClick={() => handleStatus(q.id, k)}
-                                                                    className={`w-full text-left px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors ${q.status === k ? 'text-indigo-600' : 'text-slate-600'}`}>
-                                                                    {v.label}
-                                                                </button>
-                                                            ))}
-                                                        </div>
+                                                        {openStatusId === q.id && (
+                                                            <div className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 bg-white shadow-xl rounded-xl border border-slate-100 p-1 min-w-[120px]">
+                                                                {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                                                                    <button key={k} onClick={() => { handleStatus(q.id, k); setOpenStatusId(null); }}
+                                                                        className={`w-full text-left px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors ${q.status === k ? 'text-indigo-600' : 'text-slate-600'}`}>
+                                                                        {v.label}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
@@ -489,7 +508,7 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                             <label className={lc}>Project (Payung ID)</label>
                             <select value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })} className={ic + " text-indigo-700 font-bold border-indigo-200 bg-indigo-50/20"}>
                                 <option value="">-- No Project --</option>
-                                {projects.filter(p => p.customerId === form.customerId || !form.customerId).map(p => <option key={p.id} value={p.id}>{p.number} — {p.name}</option>)}
+                                {(Array.isArray(projects) ? projects : []).map(p => <option key={p.id} value={p.id}>{p.number} — {p.name}{p.customer ? ` (${p.customer.name})` : ''}</option>)}
                             </select>
                         </div>
                         <div>

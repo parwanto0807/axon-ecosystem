@@ -1,14 +1,16 @@
 "use client"
 
-import { useState, useEffect, useCallback, Fragment } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Plus, FileText, Search, Eye, Edit, Trash2, X, Save,
     CheckCircle2, AlertCircle, RefreshCw,
     Send, Check, Ban, Clock, ShoppingCart, Truck, Package,
-    Paperclip, Image as ImageIcon, FileImage, Briefcase
+    Paperclip, Image as ImageIcon, FileImage, Briefcase,
+    ChevronLeft, ChevronRight
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useSession } from "next-auth/react"
 import SalesOrderPDFModal from "./SalesOrderPDFModal"
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -75,10 +77,22 @@ export default function SalesOrdersPage() {
     const [projects, setProjects] = useState<any[]>([])
     const [businessCategories, setBusinessCategories] = useState<any[]>([])
     const [filterBusinessCategory, setFilterBusinessCategory] = useState("ALL")
+    const [openStatusId, setOpenStatusId] = useState<string | null>(null)
+    const [page, setPage] = useState(1)
+    const perPage = 10
 
     const showToast = useCallback((type: 'success' | 'error', msg: string) => {
         setToast({ type, msg }); setTimeout(() => setToast(null), 4000)
     }, [])
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            const target = e.target as HTMLElement
+            if (openStatusId && !target.closest('.status-dropdown')) setOpenStatusId(null)
+        }
+        if (openStatusId) document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [openStatusId])
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -89,7 +103,7 @@ export default function SalesOrdersPage() {
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations`),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`, { headers: { 'x-user-role': 'ADMIN' } }),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`),
             ])
             setOrders(await oR.json())
@@ -124,7 +138,12 @@ export default function SalesOrdersPage() {
             (filterStatus === 'ALL' || o.status === filterStatus) &&
             (filterProject === 'ALL' || o.projectId === filterProject) &&
             (filterBusinessCategory === 'ALL' || o.businessCategoryId === filterBusinessCategory)
-    }).sort((a, b) => (a.projectId || '').localeCompare(b.projectId || ''))
+    }).sort((a, b) => (b.project?.number || '').localeCompare(a.project?.number || ''))
+
+    useEffect(() => { setPage(1) }, [search, filterStatus, filterProject, filterBusinessCategory])
+
+    const totalPages = Math.ceil(filtered.length / perPage)
+    const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
     const stats = {
         total: orders.length,
@@ -249,206 +268,194 @@ export default function SalesOrdersPage() {
                 </div>
             ) : (
                 <>
-                {/* Desktop View */}
+                {/* Desktop Table */}
                 <div className="hidden md:block overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400 border-b border-slate-100 bg-slate-50/80">
-                                <th className="px-6 py-4">PO Proof</th>
-                                <th className="px-6 py-4">SO Number</th>
-                                <th className="px-6 py-4">Business Unit</th>
-                                <th className="px-6 py-4">Customer / PO#</th>
-                                <th className="px-6 py-4">Subject</th>
-                                <th className="px-6 py-4">Date</th>
-                                <th className="px-6 py-4 text-right">Grand Total</th>
-                                <th className="px-6 py-4 text-center">Status</th>
-                                <th className="px-6 py-4 text-right">Actions</th>
+                                <th className="px-5 py-3.5">SO Number</th>
+                                <th className="px-5 py-3.5">Customer</th>
+                                <th className="px-5 py-3.5">Date</th>
+                                <th className="px-5 py-3.5 text-right">Grand Total</th>
+                                <th className="px-5 py-3.5 text-center">Status</th>
+                                <th className="px-5 py-3.5 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.length > 0 && (() => {
-                                let lastProject: string | null = "INITIAL";
-                                return filtered.map((o, idx) => {
-                                    const sc = STATUS_CONFIG[o.status] || STATUS_CONFIG.DRAFT
-                                    const Icon = sc.icon
-                                    const showHeader = o.projectId !== lastProject;
-                                    lastProject = o.projectId || null;
-
-                                    return (
-                                        <Fragment key={o.id}>
-                                            {showHeader && (
-                                                <tr className="bg-slate-50/50">
-                                                    <td colSpan={8} className="px-6 py-2 border-y border-slate-100 italic">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-1 h-4 bg-indigo-500 rounded-full" />
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Project:</span>
-                                                            <span className="text-[11px] font-black text-indigo-600 uppercase tracking-widest">
-                                                                {o.project ? `${o.project.number} — ${o.project.name}` : 'No Project / Regular Sales'}
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                            <motion.tr initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * .03 }}
-                                                className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
-                                                <td className="px-6 py-4">
-                                                    {o.poProof ? (
-                                                        <button onClick={() => setPreviewImage(`${process.env.NEXT_PUBLIC_API_URL}${o.poProof}`)}
-                                                            className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden shadow-sm hover:shadow-md hover:scale-105 transition-all duration-300 active:scale-95 group/thumb">
-                                                            <img src={`${process.env.NEXT_PUBLIC_API_URL}${o.poProof}`} alt="PO Proof" className="w-full h-full object-cover grayscale group-hover/thumb:grayscale-0 transition-all" />
-                                                        </button>
-                                                    ) : (
-                                                        <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
-                                                            <FileImage size={18} />
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{o.number}</p>
-                                                    {o.quotation && (
-                                                        <div className="flex items-center gap-1 mt-1 text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded cursor-help" title="Based on Quotation">
-                                                            <FileText size={8} /> {o.quotation.number}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    {o.businessCategory ? (
-                                                        <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-wider border border-indigo-100">
-                                                            {o.businessCategory.name}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-300 text-[10px] font-bold uppercase tracking-widest italic">Generic</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className="font-bold text-slate-800 text-sm">{o.customer?.name}</p>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">PO: {o.poNumber || '-'}</p>
-                                                        {o.poProof && (
-                                                            <button onClick={() => setPreviewImage(`${process.env.NEXT_PUBLIC_API_URL}${o.poProof}`)}
-                                                                className="flex items-center gap-1 text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded hover:bg-indigo-100 transition-colors">
-                                                                <ImageIcon size={8} /> Preview
+                            {paginated.map((o, idx) => {
+                                const sc = STATUS_CONFIG[o.status] || STATUS_CONFIG.DRAFT
+                                const Icon = sc.icon
+                                return (
+                                    <motion.tr key={o.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * .03 }}
+                                        className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                                        <td className="px-5 py-4">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{o.number}</span>
+                                                {o.businessCategory && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100">
+                                                        {o.businessCategory.name}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                                {o.project && (
+                                                    <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
+                                                        {o.project.number}
+                                                    </span>
+                                                )}
+                                                {o.quotation && (
+                                                    <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded cursor-help" title="Based on Quotation">
+                                                        <FileText size={8} className="inline mr-0.5" />{o.quotation.number}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-5 py-4">
+                                            <p className="font-bold text-slate-800 text-sm">{o.customer?.name}</p>
+                                            <div className="flex items-center gap-1.5 mt-1">
+                                                <span className="text-[10px] text-slate-400 font-medium">PO: {o.poNumber || '-'}</span>
+                                                {o.poProof && (
+                                                    <button onClick={() => setPreviewImage(`${process.env.NEXT_PUBLIC_API_URL}${o.poProof}`)}
+                                                        className="text-indigo-500 hover:text-indigo-700" title="View PO Proof">
+                                                        <ImageIcon size={12} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-5 py-4 text-[11px] text-slate-500 font-medium">{fmtDate(o.date)}</td>
+                                        <td className="px-5 py-4 text-right">
+                                            <p className="font-bold text-slate-900 text-sm">{fmt(o.grandTotal)}</p>
+                                            <p className="text-[9px] text-slate-400">{o.items?.length || 0} items</p>
+                                        </td>
+                                        <td className="px-5 py-4 text-center">
+                                            <div className="relative status-dropdown inline-block">
+                                                <span onClick={() => setOpenStatusId(openStatusId === o.id ? null : o.id)}
+                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border cursor-pointer ${sc.color}`}>
+                                                    <Icon size={9} /> {sc.label}
+                                                </span>
+                                                {openStatusId === o.id && (
+                                                    <div className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 bg-white shadow-xl rounded-xl border border-slate-100 p-1 min-w-[120px]">
+                                                        {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                                                            <button key={k} onClick={() => { handleStatus(o.id, k); setOpenStatusId(null); }}
+                                                                className={`w-full text-left px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors ${o.status === k ? 'text-indigo-600' : 'text-slate-600'}`}>
+                                                                {v.label}
                                                             </button>
-                                                        )}
+                                                        ))}
                                                     </div>
-                                                </td>
-                                                <td className="px-6 py-4 max-w-[200px]"><p className="text-sm text-slate-700 truncate font-medium">{o.subject}</p></td>
-                                                <td className="px-6 py-4 text-[11px] text-slate-500 font-medium">{fmtDate(o.date)}</td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <p className="font-bold text-slate-900 text-sm">{fmt(o.grandTotal)}</p>
-                                                    <p className="text-[9px] text-slate-400">{o.items?.length || 0} items</p>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <div className="relative group/status inline-block">
-                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border cursor-pointer ${sc.color}`}>
-                                                            <Icon size={9} /> {sc.label}
-                                                        </span>
-                                                        <div className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 bg-white shadow-xl rounded-xl border border-slate-100 p-1 hidden group-hover/status:block min-w-[120px]">
-                                                            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                                                                <button key={k} onClick={() => handleStatus(o.id, k)}
-                                                                    className={`w-full text-left px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors ${o.status === k ? 'text-indigo-600' : 'text-slate-600'}`}>
-                                                                    {v.label}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                                        <button onClick={() => setViewModal(o)} title="Preview / Download PDF"
-                                                            className="w-7 h-7 rounded-lg text-emerald-600 hover:bg-emerald-50 flex items-center justify-center transition-colors"><Eye size={14} /></button>
-                                                        <button onClick={() => { setEditing(o); setModalOpen(true) }} title="Edit"
-                                                            className="w-7 h-7 rounded-lg text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors"><Edit size={14} /></button>
-                                                        <button onClick={() => handleDelete(o.id)} title="Delete"
-                                                            className="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"><Trash2 size={14} /></button>
-                                                    </div>
-                                                </td>
-                                            </motion.tr>
-                                        </Fragment>
-                                    )
-                                })
-                            })()}
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-5 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-1">
+                                                <button onClick={() => setViewModal(o)} title="View PDF"
+                                                    className="w-7 h-7 rounded-lg text-emerald-600 hover:bg-emerald-50 flex items-center justify-center transition-colors"><Eye size={14} /></button>
+                                                <button onClick={() => { setEditing(o); setModalOpen(true) }} title="Edit"
+                                                    className="w-7 h-7 rounded-lg text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors"><Edit size={14} /></button>
+                                                <button onClick={() => handleDelete(o.id)} title="Delete"
+                                                    className="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"><Trash2 size={14} /></button>
+                                            </div>
+                                        </td>
+                                    </motion.tr>
+                                )
+                            })}
                         </tbody>
                     </table>
                 </div>
 
                 {/* Mobile Cards */}
-                <div className="md:hidden space-y-4">
-                    {(() => {
-                        let lastProject: string | null = "INITIAL";
-                        return filtered.map((o, idx) => {
-                            const sc = STATUS_CONFIG[o.status] || STATUS_CONFIG.DRAFT;
-                            const Icon = sc.icon;
-                            const showHeader = o.projectId !== lastProject;
-                            lastProject = o.projectId || null;
-
-                            return (
-                                <Fragment key={o.id}>
-                                    {showHeader && (
-                                        <div className="flex items-start gap-2 mt-6 mb-2">
-                                            <div className="w-1 h-3.5 bg-indigo-500 rounded-full shrink-0 mt-0.5" />
-                                            <span className="flex-1 min-w-0 text-[10px] font-black text-indigo-600 uppercase tracking-widest break-words leading-relaxed">
-                                                {o.project ? `${o.project.number} — ${o.project.name}` : 'Regular Sales'}
+                <div className="md:hidden space-y-3">
+                    {paginated.map((o, idx) => {
+                        const sc = STATUS_CONFIG[o.status] || STATUS_CONFIG.DRAFT;
+                        const Icon = sc.icon;
+                        return (
+                            <motion.div key={o.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
+                                className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{o.number}</span>
+                                            {o.businessCategory && (
+                                                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100">{o.businessCategory.name}</span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                            <h3 className="font-bold text-slate-800 text-sm leading-tight">{o.customer?.name}</h3>
+                                            {o.project && (
+                                                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">{o.project.number}</span>
+                                            )}
+                                        </div>
+                                        {o.quotation && (
+                                            <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded cursor-help inline-block" title="Based on Quotation">
+                                                <FileText size={8} className="inline mr-0.5" />{o.quotation.number}
                                             </span>
-                                        </div>
-                                    )}
-                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
-                                        className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3 relative">
-                                        <div className="flex justify-between items-start mb-1 gap-2">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{o.number}</p>
-                                                    {o.poProof && (
-                                                        <button onClick={() => setPreviewImage(`${process.env.NEXT_PUBLIC_API_URL}${o.poProof}`)}
-                                                            className="text-indigo-500 hover:text-indigo-700">
-                                                            <ImageIcon size={12} />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h3 className="font-bold text-slate-800 text-sm leading-tight">{o.customer?.name}</h3>
-                                                    {o.businessCategory && (
-                                                        <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100 shrink-0">
-                                                            {o.businessCategory.name}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="text-[11px] text-slate-500 line-clamp-1">{o.subject}</p>
-                                            </div>
-                                            <select value={o.status} onChange={(e) => handleStatus(o.id, e.target.value)}
-                                                className={`appearance-none bg-transparent outline-none cursor-pointer pl-2 pr-4 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border text-center ${sc.color}`}>
-                                                {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                                                    <option key={k} value={k} className="text-slate-800 bg-white">{v.label}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 mt-2">
-                                            <div className="bg-slate-50 p-2 rounded-xl">
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">SO Date</p>
-                                                <p className="text-xs font-semibold text-slate-700">{fmtDate(o.date)}</p>
-                                            </div>
-                                            <div className="bg-indigo-50/50 p-2 rounded-xl">
-                                                <p className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest mb-0.5">Grand Total</p>
-                                                <p className="text-xs font-bold text-indigo-700">{fmt(o.grandTotal)}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-1">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] text-slate-400 font-medium">{o.items?.length || 0} items</span>
-                                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider text-ellipsis overflow-hidden max-w-[120px]">PO: {o.poNumber || '-'}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <button onClick={() => setViewModal(o)} className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center"><Eye size={14} /></button>
-                                                <button onClick={() => { setEditing(o); setModalOpen(true) }} className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center"><Edit size={14} /></button>
-                                                <button onClick={() => handleDelete(o.id)} className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center"><Trash2 size={14} /></button>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                </Fragment>
-                            );
-                        });
-                    })()}
+                                        )}
+                                    </div>
+                                    <select value={o.status} onChange={(e) => handleStatus(o.id, e.target.value)}
+                                        className={`appearance-none bg-transparent outline-none cursor-pointer pl-2 pr-4 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border text-center ${sc.color}`}>
+                                        {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                                            <option key={k} value={k} className="text-slate-800 bg-white">{v.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="bg-slate-50 p-2 rounded-xl">
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Date</p>
+                                        <p className="text-xs font-semibold text-slate-700">{fmtDate(o.date)}</p>
+                                    </div>
+                                    <div className="bg-indigo-50/50 p-2 rounded-xl">
+                                        <p className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest mb-0.5">Total</p>
+                                        <p className="text-xs font-bold text-indigo-700">{fmt(o.grandTotal)}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
+                                        <span>{o.items?.length || 0} items</span>
+                                        <span className="text-slate-200">|</span>
+                                        <span className="flex items-center gap-1">
+                                            PO: {o.poNumber || '-'}
+                                            {o.poProof && (
+                                                <button onClick={() => setPreviewImage(`${process.env.NEXT_PUBLIC_API_URL}${o.poProof}`)}
+                                                    className="text-indigo-500 hover:text-indigo-700">
+                                                    <ImageIcon size={12} />
+                                                </button>
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={() => setViewModal(o)} className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center"><Eye size={14} /></button>
+                                        <button onClick={() => { setEditing(o); setModalOpen(true) }} className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center"><Edit size={14} /></button>
+                                        <button onClick={() => handleDelete(o.id)} className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center"><Trash2 size={14} /></button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        );
+                    })}
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3">
+                        <span className="text-[11px] font-medium text-slate-500">
+                            {filtered.length} order{filtered.length !== 1 ? 's' : ''}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                <ChevronLeft size={16} />
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                                <button key={p} onClick={() => setPage(p)}
+                                    className={`min-w-[32px] h-8 px-2 rounded-lg text-[11px] font-bold transition-colors ${page === p ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:bg-slate-100'}`}>
+                                    {p}
+                                </button>
+                            ))}
+                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
                 </>
             )}
 
@@ -605,7 +612,7 @@ function OrderFormModal({ order, customers, products, quotations, projects, busi
                             <label className={lc}>Project (Payung ID)</label>
                             <select value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })} className={ic + " text-indigo-700 font-bold border-indigo-200 bg-indigo-50/20"}>
                                 <option value="">-- No Project --</option>
-                                {Array.isArray(projects) && projects.filter(p => p.customerId === form.customerId || !form.customerId).map(p => <option key={p.id} value={p.id}>{p.number} — {p.name}</option>)}
+                                {Array.isArray(projects) && projects.map(p => <option key={p.id} value={p.id}>{p.number} — {p.name}{p.customer ? ` (${p.customer.name})` : ''}</option>)}
                             </select>
                         </div>
                         <div>

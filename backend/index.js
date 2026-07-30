@@ -1228,6 +1228,12 @@ app.post('/api/quotations', async (req, res) => {
       },
       include: { customer: true, items: { orderBy: { no: 'asc' } }, project: true }
     });
+    if (data.projectId) {
+      await prisma.preSalesProject.update({
+        where: { id: data.projectId },
+        data: { status: 'QUOTATION_STAGE' }
+      }).catch(() => {});
+    }
     res.status(201).json(q);
   } catch (e) { console.error(e); res.status(400).json({ message: e.message }); }
 });
@@ -1248,7 +1254,7 @@ app.put('/api/quotations/:id', async (req, res) => {
     const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, Number(discount), Number(tax));
     const q = await prisma.$transaction(async (tx) => {
       await tx.quotationItem.deleteMany({ where: { quotationId: id } });
-      return tx.quotation.update({
+      const updated = await tx.quotation.update({
         where: { id },
         data: {
           ...data,
@@ -1261,6 +1267,13 @@ app.put('/api/quotations/:id', async (req, res) => {
         },
         include: { customer: true, items: { orderBy: { no: 'asc' } }, project: true }
       });
+      if (data.projectId) {
+        await tx.preSalesProject.update({
+          where: { id: data.projectId },
+          data: { status: 'QUOTATION_STAGE' }
+        }).catch(() => {});
+      }
+      return updated;
     });
     res.json(q);
   } catch (e) { console.error(e); res.status(400).json({ message: e.message }); }
@@ -1453,7 +1466,7 @@ async function generateSurveyNumber() {
   return `${prefix}${String(lastNum + 1).padStart(3, '0')}`;
 }
 
-app.get('/api/projects', async (req, res) => {
+app.get('/api/projects', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'OPERATIONAL', 'USER']), async (req, res) => {
   try {
     const { businessCategoryId } = req.query;
     const projects = await prisma.preSalesProject.findMany({
@@ -1493,7 +1506,7 @@ app.get('/api/projects', async (req, res) => {
   }
 });
 
-app.post('/api/projects', async (req, res) => {
+app.post('/api/projects', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF']), async (req, res) => {
   try {
     const number = await generateProjectNumber();
     const { deadline, ...rest } = req.body;
@@ -1510,7 +1523,7 @@ app.post('/api/projects', async (req, res) => {
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-app.put('/api/projects/:id', async (req, res) => {
+app.put('/api/projects/:id', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF']), async (req, res) => {
   try {
     const { id } = req.params;
     const { 
@@ -1535,17 +1548,42 @@ app.put('/api/projects/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/projects/:id', async (req, res) => {
+app.delete('/api/projects/:id', checkRole(['SUPER_ADMIN', 'ADMIN']), async (req, res) => {
   try {
+    // Check cascade — warn if project has child records
+    const project = await prisma.preSalesProject.findUnique({
+      where: { id: req.params.id },
+      include: {
+        _count: {
+          select: {
+            surveys: true,
+            quotations: true,
+            salesOrders: true,
+            purchaseOrders: true,
+            workOrders: true,
+            proposals: true,
+          }
+        }
+      }
+    });
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+
+    const childCount = project._count.surveys + project._count.quotations + project._count.salesOrders
+      + project._count.purchaseOrders + project._count.workOrders + project._count.proposals;
+    if (childCount > 0) {
+      // Prisma cascades — confirm on frontend handles UX, backend just warns
+      console.warn(`Deleting project ${req.params.id} with ${childCount} child records`);
+    }
+
     await prisma.preSalesProject.delete({ where: { id: req.params.id } });
-    res.json({ success: true });
+    res.json({ success: true, childRecordsRemoved: childCount });
   } catch (e) {
     console.error("DELETE /api/projects/:id error:", e);
     res.status(500).json({ message: e.message });
   }
 });
 
-app.get('/api/projects/:id', async (req, res) => {
+app.get('/api/projects/:id', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'OPERATIONAL', 'USER']), async (req, res) => {
   try {
     const project = await prisma.preSalesProject.findUnique({
       where: { id: req.params.id },
@@ -1621,10 +1659,10 @@ app.put('/api/surveys/:id', async (req, res) => {
       // Update survey
       await tx.fieldSurvey.update({
         where: { id },
-        data: { 
-          ...data, 
+        data: {
+          ...data,
           date: date ? new Date(date) : undefined,
-          projectId: data.projectId || undefined
+          projectId: data.projectId || null
         }
       });
 
@@ -1946,7 +1984,7 @@ app.patch('/api/expenses/:id/post', async (req, res) => {
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-app.patch('/api/projects/:id/status', async (req, res) => {
+app.patch('/api/projects/:id/status', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF']), async (req, res) => {
   try {
     const project = await prisma.preSalesProject.update({
       where: { id: req.params.id },
@@ -2115,7 +2153,7 @@ app.delete('/api/warehouses/:id', async (req, res) => {
 app.get('/api/inventory/stock', async (req, res) => {
   try {
     const skus = await prisma.productSKU.findMany({
-      where: { isActive: true, product: { NOT: { type: 'SERVICE' } } },
+      where: { isActive: true },
       include: {
         product: { include: { category: true } },
         warehouseStocks: { include: { warehouse: true } },
@@ -2175,7 +2213,7 @@ app.get('/api/inventory/stock/:skuId/movements', async (req, res) => {
 app.get('/api/inventory/low-stock', async (req, res) => {
   try {
     const skus = await prisma.productSKU.findMany({
-      where: { isActive: true, product: { NOT: { type: 'SERVICE' } } },
+      where: { isActive: true },
       include: {
         product: true,
         warehouseStocks: { include: { warehouse: true } }
@@ -2362,7 +2400,8 @@ app.post('/api/stock-movements/:id/confirm', async (req, res) => {
              amount,
              description: `Stock IN: ${result.number} - ${item.sku.name}`,
              reference: result.number,
-             type: 'STOCK_MOVEMENT'
+             type: 'STOCK_MOVEMENT',
+             prismaTx: tx
            });
         } else if (result.type === 'OUT') {
            // Fallback or handle based on other keys if necessary
@@ -2372,7 +2411,8 @@ app.post('/api/stock-movements/:id/confirm', async (req, res) => {
              amount,
              description: `Stock OUT: ${result.number} - ${item.sku.name}`,
              reference: result.number,
-             type: 'INVENTORY'
+             type: 'INVENTORY',
+             prismaTx: tx
            });
         }
       }
@@ -2390,6 +2430,52 @@ app.patch('/api/stock-movements/:id/cancel', async (req, res) => {
       data: { status: 'CANCELLED' }
     });
     res.json(movement);
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+// Revert confirmed movement back to DRAFT (also reverses warehouse stock changes)
+app.patch('/api/stock-movements/:id/revert', async (req, res) => {
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const movement = await tx.stockMovement.findUnique({
+        where: { id: req.params.id },
+        include: { items: true }
+      });
+      if (!movement) throw new Error('Movement not found');
+      if (movement.status !== 'CONFIRMED') throw new Error('Only confirmed movements can be reverted');
+
+      // Reverse warehouse stock changes
+      const reverseStock = async (warehouseId, skuId, delta) => {
+        const existing = await tx.warehouseStock.findUnique({
+          where: { warehouseId_skuId: { warehouseId, skuId } }
+        });
+        if (existing) {
+          await tx.warehouseStock.update({
+            where: { warehouseId_skuId: { warehouseId, skuId } },
+            data: { quantity: Math.max(0, existing.quantity + delta) }
+          });
+        }
+      };
+
+      for (const item of movement.items) {
+        if (movement.type === 'IN' || movement.type === 'BEGINNING') {
+          await reverseStock(movement.warehouseId, item.skuId, -item.qty);
+        } else if (movement.type === 'OUT') {
+          await reverseStock(movement.warehouseId, item.skuId, item.qty);
+        } else if (movement.type === 'TRANSFER') {
+          await reverseStock(movement.warehouseId, item.skuId, item.qty);
+          if (movement.toWarehouseId) {
+            await reverseStock(movement.toWarehouseId, item.skuId, -item.qty);
+          }
+        }
+      }
+
+      return tx.stockMovement.update({
+        where: { id: req.params.id },
+        data: { status: 'DRAFT', confirmedAt: null, confirmedBy: null }
+      });
+    });
+    res.json(result);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 

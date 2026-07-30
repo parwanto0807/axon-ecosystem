@@ -65,7 +65,7 @@ export default function NewContractPage() {
         const fetchRefs = async () => {
             try {
                 const [p, c, v] = await Promise.all([
-                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`).then(r => r.json()),
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`, { headers: { 'x-user-role': 'ADMIN' } }).then(r => r.json()),
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`).then(r => r.json()),
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`).then(r => r.json())
                 ])
@@ -382,7 +382,7 @@ export default function NewContractPage() {
                                     onChange={(e) => setFormData({...formData, projectId: e.target.value})}
                                 >
                                     <option value="">-- Tanpa Project --</option>
-                                    {projects.map(p => (
+                                    {(Array.isArray(projects) ? projects : []).map(p => (
                                         <option key={p.id} value={p.id}>[{p.number}] {p.title}</option>
                                     ))}
                                 </select>
