@@ -43,6 +43,8 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
     PARTIAL: { label: 'Partial', color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: Truck },
     SHIPPED: { label: 'Shipped', color: 'bg-purple-50 text-purple-700 border-purple-200', icon: Truck },
     DELIVERED: { label: 'Delivered', color: 'bg-cyan-50 text-cyan-700 border-cyan-200', icon: CheckCircle2 },
+    INVOICED: { label: 'Invoiced', color: 'bg-orange-50 text-orange-700 border-orange-200', icon: FileText },
+    PAID: { label: 'Paid', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
     CANCELLED: { label: 'Cancelled', color: 'bg-rose-50 text-rose-700 border-rose-200', icon: Ban },
     COMPLETED: { label: 'Completed', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: CheckCircle2 },
 }

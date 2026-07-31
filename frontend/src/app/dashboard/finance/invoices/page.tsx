@@ -45,7 +45,7 @@ interface InvoiceItem {
     unitPrice: number; discount: number; amount: number;
 }
 
-interface Ref { id: string; number: string; name?: string; customer?: { name: string }; grandTotal?: number; items: any[] }
+interface Ref { id: string; number: string; name?: string; customer?: { name: string }; grandTotal?: number; items: any[]; salesOrderId?: string }
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
@@ -261,11 +261,13 @@ export default function InvoicesPage() {
                 amount: it.amount
             }))
             const totals = calculateTotals(items, 11, 0)
+            const linkedDo = deliveryOrders.find(d => d.salesOrderId === soId)
             setForm(prev => ({
                 ...prev,
                 customerId: (so as any).customerId || '',
                 projectId: (so as any).projectId || '',
                 salesOrderId: soId,
+                deliveryOrderId: linkedDo?.id || prev.deliveryOrderId,
                 items,
                 ...totals
             }))

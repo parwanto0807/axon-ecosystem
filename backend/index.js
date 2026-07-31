@@ -1308,6 +1308,45 @@ async function generateSalesOrderNumber() {
   return `${prefix}${String(lastNum + 1).padStart(3, '0')}`;
 }
 
+const SO_STATUS_RANK = { DRAFT: 0, PENDING: 1, PROCESSING: 2, PARTIAL: 3, SHIPPED: 4, DELIVERED: 5, INVOICED: 6, PAID: 7, COMPLETED: 8 };
+
+async function advanceSalesOrderStatus(tx, salesOrderId, nextStatus) {
+  if (!salesOrderId) return;
+  const so = await tx.salesOrder.findUnique({
+    where: { id: salesOrderId },
+    select: { status: true }
+  });
+  if (!so || so.status === 'CANCELLED') return;
+  if ((SO_STATUS_RANK[nextStatus] ?? -1) > (SO_STATUS_RANK[so.status] ?? -1)) {
+    await tx.salesOrder.update({ where: { id: salesOrderId }, data: { status: nextStatus } });
+  }
+}
+
+const DO_STATUS_RANK = { DRAFT: 0, SHIPPED: 1, DELIVERED: 2, INVOICED: 3, PAID: 4 };
+
+async function advanceDeliveryOrderStatus(tx, deliveryOrderId, nextStatus) {
+  if (!deliveryOrderId) return;
+  const d = await tx.deliveryOrder.findUnique({
+    where: { id: deliveryOrderId },
+    select: { status: true }
+  });
+  if (!d || d.status === 'CANCELLED') return;
+  if ((DO_STATUS_RANK[nextStatus] ?? -1) > (DO_STATUS_RANK[d.status] ?? -1)) {
+    await tx.deliveryOrder.update({ where: { id: deliveryOrderId }, data: { status: nextStatus } });
+  }
+}
+
+async function resolveDeliveryOrder(tx, salesOrderId, deliveryOrderId) {
+  if (deliveryOrderId) return deliveryOrderId;
+  if (!salesOrderId) return null;
+  const d = await tx.deliveryOrder.findFirst({
+    where: { salesOrderId, status: { not: 'CANCELLED' } },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true }
+  });
+  return d ? d.id : null;
+}
+
 app.post('/api/orders/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
@@ -3017,21 +3056,25 @@ app.post('/api/delivery-orders', async (req, res) => {
   try {
     const { items = [], ...data } = req.body;
     const number = await generateDONumber();
-    const doRec = await prisma.deliveryOrder.create({
-      data: {
-        ...data,
-        number,
-        date: data.date ? new Date(data.date) : new Date(),
-        items: {
-          create: items.map((it, idx) => ({
-            no: idx + 1,
-            description: it.description,
-            qty: Number(it.qty) || 1,
-            unit: it.unit || 'pcs'
-          }))
-        }
-      },
-      include: DO_INCLUDE
+    const doRec = await prisma.$transaction(async (tx) => {
+      const rec = await tx.deliveryOrder.create({
+        data: {
+          ...data,
+          number,
+          date: data.date ? new Date(data.date) : new Date(),
+          items: {
+            create: items.map((it, idx) => ({
+              no: idx + 1,
+              description: it.description,
+              qty: Number(it.qty) || 1,
+              unit: it.unit || 'pcs'
+            }))
+          }
+        },
+        include: DO_INCLUDE
+      });
+      await advanceSalesOrderStatus(tx, data.salesOrderId, 'SHIPPED');
+      return rec;
     });
     res.status(201).json(doRec);
   } catch (e) { res.status(400).json({ message: e.message }); }
@@ -3049,6 +3092,7 @@ app.put('/api/delivery-orders/:id', async (req, res) => {
           date: data.date ? new Date(data.date) : undefined
         }
       });
+      await advanceSalesOrderStatus(tx, data.salesOrderId, 'SHIPPED');
       await tx.deliveryOrderItem.deleteMany({ where: { deliveryOrderId: id } });
       if (items.length > 0) {
         await tx.deliveryOrderItem.createMany({
@@ -3071,6 +3115,28 @@ app.delete('/api/delivery-orders/:id', async (req, res) => {
   try {
     await prisma.deliveryOrder.delete({ where: { id: req.params.id } });
     res.json({ message: 'Deleted' });
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.patch('/api/delivery-orders/:id/status', async (req, res) => {
+  try {
+    const { status } = req.body;
+    const result = await prisma.$transaction(async (tx) => {
+      const doRec = await tx.deliveryOrder.findUnique({
+        where: { id: req.params.id },
+        select: { id: true, salesOrderId: true }
+      });
+      if (!doRec) throw new Error('Not found');
+      const updated = await tx.deliveryOrder.update({
+        where: { id: req.params.id },
+        data: { status },
+        include: DO_INCLUDE
+      });
+      const soStatus = status === 'DELIVERED' ? 'DELIVERED' : status === 'SHIPPED' ? 'SHIPPED' : null;
+      if (soStatus) await advanceSalesOrderStatus(tx, doRec.salesOrderId, soStatus);
+      return updated;
+    });
+    res.json(result);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
@@ -3241,36 +3307,41 @@ app.post('/api/invoices', async (req, res) => {
   try {
     const { items = [], ...data } = req.body;
     const number = await generateInvoiceNumber();
-    const inv = await prisma.invoice.create({
-      data: {
-        ...data,
-        number,
-        status: 'DRAFT',
-        date: data.date ? new Date(data.date) : new Date(),
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
-        subtotal: Number(data.subtotal) || 0,
-        tax: Number(data.tax) || 11,
-        discount: Number(data.discount) || 0,
-        discountAmt: Number(data.discountAmt) || 0,
-        taxAmt: Number(data.taxAmt) || 0,
-        grandTotal: Number(data.grandTotal) || 0,
-        contractId: data.contractId || null,
-        bankAccountId: data.bankAccountId || null,
-        signerName: data.signerName || null,
-        signerPosition: data.signerPosition || null,
-        items: {
-          create: items.map((it, idx) => ({
-            no: idx + 1,
-            description: it.description,
-            qty: Number(it.qty) || 1,
-            unit: it.unit || 'pcs',
-            unitPrice: Number(it.unitPrice) || 0,
-            discount: Number(it.discount) || 0,
-            amount: Number(it.amount) || 0
-          }))
-        }
-      },
-      include: INV_INCLUDE
+    const inv = await prisma.$transaction(async (tx) => {
+      const rec = await tx.invoice.create({
+        data: {
+          ...data,
+          number,
+          status: 'DRAFT',
+          date: data.date ? new Date(data.date) : new Date(),
+          dueDate: data.dueDate ? new Date(data.dueDate) : null,
+          subtotal: Number(data.subtotal) || 0,
+          tax: Number(data.tax) || 11,
+          discount: Number(data.discount) || 0,
+          discountAmt: Number(data.discountAmt) || 0,
+          taxAmt: Number(data.taxAmt) || 0,
+          grandTotal: Number(data.grandTotal) || 0,
+          contractId: data.contractId || null,
+          bankAccountId: data.bankAccountId || null,
+          signerName: data.signerName || null,
+          signerPosition: data.signerPosition || null,
+          items: {
+            create: items.map((it, idx) => ({
+              no: idx + 1,
+              description: it.description,
+              qty: Number(it.qty) || 1,
+              unit: it.unit || 'pcs',
+              unitPrice: Number(it.unitPrice) || 0,
+              discount: Number(it.discount) || 0,
+              amount: Number(it.amount) || 0
+            }))
+          }
+        },
+        include: INV_INCLUDE
+      });
+      await advanceSalesOrderStatus(tx, data.salesOrderId, 'INVOICED');
+      await advanceDeliveryOrderStatus(tx, await resolveDeliveryOrder(tx, data.salesOrderId, data.deliveryOrderId), 'INVOICED');
+      return rec;
     });
     res.status(201).json(inv);
   } catch (e) { res.status(400).json({ message: e.message }); }
@@ -3285,6 +3356,9 @@ app.patch('/api/invoices/:id/post', async (req, res) => {
         data: { status: 'POSTED' },
         include: INV_INCLUDE
       });
+
+      await advanceSalesOrderStatus(tx, result.salesOrderId, 'INVOICED');
+      await advanceDeliveryOrderStatus(tx, await resolveDeliveryOrder(tx, result.salesOrderId, result.deliveryOrderId), 'INVOICED');
 
       // 1. Resolve Required System Accounts
       const [arAcc, revAcc, vatAcc] = await Promise.all([
@@ -3427,6 +3501,9 @@ app.patch('/api/invoices/:id/pay', async (req, res) => {
         include: { ...INV_INCLUDE, payments: true }
       });
 
+      await advanceSalesOrderStatus(tx, result.salesOrderId, newStatus === 'PAID' ? 'PAID' : 'PARTIAL');
+      await advanceDeliveryOrderStatus(tx, await resolveDeliveryOrder(tx, result.salesOrderId, result.deliveryOrderId), newStatus === 'PAID' ? 'PAID' : 'INVOICED');
+
       const paymentRecord = await tx.invoicePayment.create({
         data: {
           invoiceId: id,
@@ -3503,6 +3580,8 @@ app.put('/api/invoices/:id', async (req, res) => {
           signerPosition: data.signerPosition || null,
         }
       });
+      await advanceSalesOrderStatus(tx, data.salesOrderId, 'INVOICED');
+      await advanceDeliveryOrderStatus(tx, await resolveDeliveryOrder(tx, data.salesOrderId, data.deliveryOrderId), 'INVOICED');
       await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
       if (items.length > 0) {
         await tx.invoiceItem.createMany({
@@ -6589,12 +6668,7 @@ app.get('/api/hr/payroll/accounts', async (req, res) => {
   try {
     const accounts = await prisma.chartOfAccounts.findMany({
       where: {
-        OR: [
-          { code: { startsWith: '1-100' } }, // Specific Bank/Cash codes
-          { code: { startsWith: '1-1000' } }, 
-          { name: { contains: 'Bank', mode: 'insensitive' } },
-          { name: { contains: 'Kas', mode: 'insensitive' } }
-        ],
+        code: { startsWith: '1-100' }, // Only Kas & Bank accounts
         status: 'ACTIVE'
       },
       orderBy: { code: 'asc' }
@@ -7059,6 +7133,28 @@ app.post('/api/finance/operational-expenses/:id/pay', async (req, res) => {
     const lastJournal = await prisma.journalEntry.count();
     const journalNumber = `JV-OPP-${expense.year}${String(expense.month).padStart(2,'0')}-${String(lastJournal + 1).padStart(3, '0')}`;
 
+    // If expense was never posted (no accrual journal), create accrual first so payable stays balanced
+    let accrualJournalId = expense.journalId;
+    if (!accrualJournalId) {
+      const accNumber = `JV-OPE-${expense.year}${String(expense.month).padStart(2,'0')}-${String(lastJournal + 2).padStart(3, '0')}`;
+      const acc = await prisma.journalEntry.create({
+        data: {
+          number: accNumber,
+          date: date ? new Date(date) : new Date(),
+          description: `Beban Operasional: ${expense.name} - ${expense.month}/${expense.year}`,
+          type: 'OPERATIONAL',
+          status: 'POSTED',
+          items: {
+            create: [
+              { coaId: expense.coaId, description: `Beban Operasional: ${expense.name}`, debit: expense.amount, credit: 0 },
+              { coaId: payableAcc.coa.id, description: `Hutang Akrual - ${expense.name}`, debit: 0, credit: expense.amount }
+            ]
+          }
+        }
+      });
+      accrualJournalId = acc.id;
+    }
+
     const journal = await prisma.journalEntry.create({
       data: {
         number: journalNumber,
@@ -7091,7 +7187,8 @@ app.post('/api/finance/operational-expenses/:id/pay', async (req, res) => {
         status: 'PAID',
         paidAt: date ? new Date(date) : new Date(),
         paymentJournalId: journal.id,
-        paymentCoaId: coaId
+        paymentCoaId: coaId,
+        journalId: accrualJournalId
       }
     });
 

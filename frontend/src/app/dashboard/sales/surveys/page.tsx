@@ -18,7 +18,8 @@ interface SurveyExpense { id: string; category: string; amount: number; descript
 interface FieldSurvey {
     id: string; number: string; date: string; location: string; status: string; findings: string | null;
     customerId: string; customer: Customer; projectId: string | null; project: Project | null;
-    expenses: SurveyExpense[]; createdAt: string
+    expenses: SurveyExpense[]; createdAt: string;
+    latitude?: number | null; longitude?: number | null
 }
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string; icon: React.ElementType }> = {
@@ -366,6 +367,27 @@ export default function SurveysPage() {
     )
 }
 
+function SurveyMap({ lat, lon, className = "" }: { lat: number; lon: number; className?: string }) {
+    if (!lat || !lon) return null
+    const mapUrl = `https://maps.google.com/maps?ll=${lat},${lon}&q=${lat},${lon}&hl=id&t=&z=16&ie=UTF8&iwloc=&output=embed`
+    return (
+        <div className={`overflow-hidden rounded-xl border border-slate-200 bg-slate-100 ${className}`}>
+            <iframe key={`${lat}-${lon}`} src={mapUrl} title="Peta Lokasi Survey" className="w-full h-full" loading="lazy" />
+        </div>
+    )
+}
+
+const geocodeLocation = async (query: string): Promise<{ lat: number; lon: number } | null> => {
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`)
+        const data = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+            return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) }
+        }
+    } catch { }
+    return null
+}
+
 // ─── BOTTOM SHEET MODAL ───────────────────────────────────────────────────────
 function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
     survey: FieldSurvey | null; customers: Customer[]; projects: Project[];
@@ -377,6 +399,8 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
         customerId: survey?.customerId || '',
         projectId: survey?.projectId || '',
         location: survey?.location || '',
+        latitude: survey?.latitude?.toString() || '',
+        longitude: survey?.longitude?.toString() || '',
         findings: survey?.findings || '',
         date: survey?.date ? survey.date.split('T')[0] : today,
         status: survey?.status || 'PLANNED'
@@ -385,6 +409,44 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
     const [saving, setSaving] = useState(false)
     const [step, setStep] = useState<'info' | 'expenses'>('info')
     const [modalToast, setModalToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+    const [geoBusy, setGeoBusy] = useState(false)
+
+    const showModalToast = (type: 'success' | 'error', msg: string) => {
+        setModalToast({ type, msg })
+        setTimeout(() => setModalToast(null), 3500)
+    }
+
+    const applyGeo = async () => {
+        if (!form.location.trim()) return showModalToast('error', 'Isi Lokasi dulu')
+        setGeoBusy(true)
+        try {
+            const coords = await geocodeLocation(form.location)
+            if (coords) {
+                setForm(f => ({ ...f, latitude: coords.lat.toFixed(6), longitude: coords.lon.toFixed(6) }))
+                showModalToast('success', 'Koordinat ditemukan dari Lokasi')
+            } else {
+                showModalToast('error', 'Lokasi tidak ditemukan, coba detailkan alamatnya')
+            }
+        } finally { setGeoBusy(false) }
+    }
+
+    const useMyLocation = () => {
+        if (!navigator.geolocation) return showModalToast('error', 'Browser tidak mendukung geolokasi')
+        setGeoBusy(true)
+        navigator.geolocation.getCurrentPosition(async pos => {
+            if (form.location.trim()) {
+                const coords = await geocodeLocation(form.location)
+                if (coords) {
+                    setForm(f => ({ ...f, latitude: coords.lat.toFixed(6), longitude: coords.lon.toFixed(6) }))
+                    showModalToast('success', 'Koordinat diarahkan ke alamat Lokasi')
+                    setGeoBusy(false)
+                    return
+                }
+            }
+            setForm(f => ({ ...f, latitude: pos.coords.latitude.toFixed(6), longitude: pos.coords.longitude.toFixed(6) }))
+            setGeoBusy(false)
+        }, () => { setGeoBusy(false); showModalToast('error', 'Gagal mengambil lokasi') })
+    }
 
     const addExpense = () => {
         setExpenses([...expenses, { category: 'TRANSPORT', amount: 0, description: '', status: 'APPROVED' }])
@@ -402,7 +464,12 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
             const res = await fetch(url, {
                 method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...form, expenses })
+                body: JSON.stringify({
+                    ...form,
+                    latitude: form.latitude ? parseFloat(form.latitude.replace(',', '.')) : null,
+                    longitude: form.longitude ? parseFloat(form.longitude.replace(',', '.')) : null,
+                    expenses
+                })
             })
             if (res.ok) { onSuccess(); return }
             const err = await res.json().catch(() => ({ message: 'Gagal menyimpan survei' }))
@@ -515,6 +582,54 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                                     className={inputCls}
                                 />
                             </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className={labelCls}>Latitude</label>
+                                    <input
+                                        value={form.latitude}
+                                        onChange={e => setForm({ ...form, latitude: e.target.value })}
+                                        placeholder="-6.200000"
+                                        className={inputCls}
+                                    />
+                                </div>
+                                <div>
+                                    <label className={labelCls}>Longitude</label>
+                                    <input
+                                        value={form.longitude}
+                                        onChange={e => setForm({ ...form, longitude: e.target.value })}
+                                        placeholder="106.800000"
+                                        className={inputCls}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-3">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Peta Lokasi</p>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={applyGeo}
+                                        disabled={geoBusy || !form.location.trim()}
+                                        className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 hover:text-indigo-800 flex items-center gap-1 disabled:opacity-50"
+                                    >
+                                        <RefreshCw size={12} className={geoBusy ? 'animate-spin' : ''} /> Cari dari Lokasi
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={useMyLocation}
+                                        disabled={geoBusy}
+                                        className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 hover:text-indigo-800 flex items-center gap-1 disabled:opacity-50"
+                                    >
+                                        <MapPin size={12} /> Pakai Lokasi Saya
+                                    </button>
+                                </div>
+                            </div>
+                            <SurveyMap
+                                lat={parseFloat(form.latitude.replace(',', '.')) || 0}
+                                lon={parseFloat(form.longitude.replace(',', '.')) || 0}
+                                className="h-44"
+                            />
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
@@ -646,6 +761,7 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                     </button>
                 </div>
             </motion.div>
+            <Toast toast={modalToast} />
         </motion.div>
     )
 }

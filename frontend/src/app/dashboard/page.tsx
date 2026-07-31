@@ -37,6 +37,7 @@ import {
   Activity,
   Layers,
   ArrowRight,
+  MapPin,
 } from "lucide-react";
 import { 
   getSalesData, 
@@ -108,6 +109,12 @@ const translations: any = {
     efficiencyDesc: 'Gunakan tombol "Sinkronisasi" di atas untuk menyegarkan semua metrik secara instan.',
     salesByCategory: "Performa Penjualan Per Kategori",
     salesByCategoriesDesc: "Berdasarkan Kategori Bisnis",
+    plannedSurveys: "Rencana Survey",
+    plannedSurveysDesc: "Jadwal survey yang belum dilaksanakan",
+    noPlannedSurveys: "Tidak ada survey terjadwal",
+    schedule: "Jadwal",
+    location: "Lokasi",
+    customer: "Customer",
   },
   EN: {
     enterpriseDashboard: "Dashboard",
@@ -160,6 +167,12 @@ const translations: any = {
     efficiencyDesc: 'Use the "Sync Data" button at the top to refresh all metrics across the command center instantly.',
     salesByCategory: "Sales Performance by Category",
     salesByCategoriesDesc: "By Business Category",
+    plannedSurveys: "Planned Surveys",
+    plannedSurveysDesc: "Upcoming field surveys",
+    noPlannedSurveys: "No scheduled surveys",
+    schedule: "Schedule",
+    location: "Location",
+    customer: "Customer",
   }
 };
 
@@ -364,6 +377,14 @@ export default function DashboardPage() {
     queryKey: ['salesByCategory', startDate, endDate], 
     queryFn: () => getSalesByCategory(startDate, endDate) 
   });
+  const { data: plannedSurveys, isLoading: isLoadingSurveys, refetch: refetchSurveys } = useQuery({
+    queryKey: ['plannedSurveys'],
+    queryFn: async () => {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/surveys`);
+      const data = await res.json();
+      return (data || []).filter((s: any) => s.status === 'PLANNED');
+    }
+  });
 
   const handleRefresh = () => {
     refetchSales();
@@ -374,9 +395,10 @@ export default function DashboardPage() {
     refetchCashFlow();
     refetchActivity();
     refetchCategorySales();
+    refetchSurveys();
   };
 
-  const isLoading = isLoadingSales || isLoadingExpenses || isLoadingInventory || isLoadingLowStock || isLoadingProfitLoss || isLoadingCashFlow || isLoadingActivity;
+  const isLoading = isLoadingSales || isLoadingExpenses || isLoadingInventory || isLoadingLowStock || isLoadingProfitLoss || isLoadingCashFlow || isLoadingActivity || isLoadingSurveys;
 
   const safeTotalRevenue = profitLossReport?.totalRevenue || 0;
   const safeTotalCOGS = profitLossReport?.totalCOGS || 0;
@@ -385,9 +407,37 @@ export default function DashboardPage() {
   const cogsRatio = safeTotalRevenue > 0 ? (safeTotalCOGS / safeTotalRevenue) * 100 : 0;
 
   // Chart Configurations
+  const monthlyExpenses = useMemo(() => {
+    const arr = Array(12).fill(0)
+    const today = new Date()
+    ;(expensesData?.rawData || []).forEach((exp: any) => {
+      const d = new Date(exp.date || exp.createdAt)
+      if (isNaN(d.getTime())) return
+      const monthDiff = (today.getFullYear() - d.getFullYear()) * 12 + (today.getMonth() - d.getMonth())
+      if (monthDiff >= 0 && monthDiff < 12) arr[11 - monthDiff] += Number(exp.amount) || 0
+    })
+    return arr
+  }, [expensesData])
+
   const salesChartData = useMemo(() => ({
     labels: salesData?.months || [],
     datasets: [
+      {
+        type: 'line' as const,
+        label: t.operatingExpenses,
+        data: monthlyExpenses,
+        borderColor: '#ef4444',
+        borderWidth: 2.5,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#fff',
+        pointBorderColor: '#ef4444',
+        pointBorderWidth: 2,
+        tension: 0.4,
+        borderDash: [6, 4],
+        fill: false,
+        order: 0,
+      },
       {
         type: 'line' as const,
         label: t.revenue,
@@ -432,7 +482,7 @@ export default function DashboardPage() {
         order: 2,
       },
     ],
-  }), [salesData, t.revenue]);
+  }), [salesData, monthlyExpenses, t.revenue, t.operatingExpenses]);
 
   const expensePieData = useMemo(() => ({
     labels: expensesData?.categories || [],
@@ -600,6 +650,62 @@ export default function DashboardPage() {
           </Button>
         </div>
       </motion.header>
+
+      {/* Planned Surveys Highlight */}
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-2xl overflow-hidden relative"
+        style={{ background: "linear-gradient(120deg, #312e81, #1e1b4b)", boxShadow: "0 12px 32px rgba(49,46,129,0.25)" }}
+      >
+        <div className="absolute top-0 right-0 w-56 h-56 bg-indigo-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="relative p-5 lg:p-6 flex flex-col lg:flex-row lg:items-center gap-4">
+          <div className="flex items-center gap-3 lg:w-56 lg:shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center shrink-0">
+              <MapPin size={18} className="text-indigo-300" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300 leading-none mb-1.5">{t.plannedSurveys}</p>
+              <p className="text-lg font-black text-white leading-none tracking-tight">{plannedSurveys?.length || 0}</p>
+            </div>
+          </div>
+          <div className="flex-1 flex flex-wrap gap-2 lg:pl-6 lg:border-l border-white/10">
+            {isLoadingSurveys ? (
+              <RefreshCcw className="animate-spin h-5 w-5 text-indigo-300" />
+            ) : plannedSurveys?.length > 0 ? (
+              plannedSurveys.slice(0, 5).map((s: any) => (
+                <Link key={s.id} href="/dashboard/sales/surveys"
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.07] border border-white/10 text-white hover:bg-white/[0.14] transition-all min-w-0">
+                  <span className="text-[9px] font-black text-indigo-300 uppercase whitespace-nowrap">{format(new Date(s.date), 'd MMM')}</span>
+                  <span className="w-1 h-1 rounded-full bg-indigo-400 shrink-0" />
+                  <span className="text-xs font-bold text-white truncate max-w-[140px]">{s.customer?.name || s.location}</span>
+                </Link>
+              ))
+            ) : (
+              <p className="text-xs font-bold text-indigo-200/70 uppercase tracking-widest py-2">{t.noPlannedSurveys}</p>
+            )}
+            <Link href="/dashboard/sales/surveys"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-indigo-900 hover:bg-indigo-50 transition-all text-[10px] font-black uppercase tracking-widest">
+              {t.viewAll} <ArrowRight size={12} />
+            </Link>
+          </div>
+          {(() => {
+            const ms = (plannedSurveys || []).find((s: any) => s.latitude && s.longitude)
+            if (!ms) return null
+            return (
+              <div className="hidden lg:block w-56 h-20 rounded-xl overflow-hidden shrink-0 border border-white/15 bg-white/10">
+                <iframe
+                  key={`${ms.latitude}-${ms.longitude}`}
+                  src={`https://maps.google.com/maps?ll=${ms.latitude},${ms.longitude}&q=${ms.latitude},${ms.longitude}&hl=id&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+                  title="Peta Survey"
+                  className="w-full h-full"
+                  loading="lazy"
+                />
+              </div>
+            )
+          })()}
+        </div>
+      </motion.div>
 
       {/* Main Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5">

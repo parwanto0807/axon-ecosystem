@@ -250,6 +250,8 @@ model FieldSurvey {
   number     String           @unique
   date       DateTime         @default(now())
   location   String
+  latitude   Float?
+  longitude  Float?
   customerId String
   status     SurveyStatus     @default(PLANNED)
   findings   String?
@@ -1148,8 +1150,10 @@ enum SalesOrderStatus {
   PARTIAL
   SHIPPED
   DELIVERED
-  CANCELLED
+  INVOICED
+  PAID
   COMPLETED
+  CANCELLED
 }
 
 enum WarehouseType {
@@ -1210,6 +1214,8 @@ enum DeliveryOrderStatus {
   DRAFT
   SHIPPED
   DELIVERED
+  INVOICED
+  PAID
   CANCELLED
 }
 

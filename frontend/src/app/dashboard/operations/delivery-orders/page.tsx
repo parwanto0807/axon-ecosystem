@@ -37,6 +37,8 @@ const DO_STATUS: Record<string, { label: string; color: string; icon: any }> = {
     DRAFT: { label: 'Draft', color: 'bg-slate-100 text-slate-600 border-slate-200', icon: Clock },
     SHIPPED: { label: 'Shipped', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: PackageCheck },
     DELIVERED: { label: 'Selesai Kirim', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
+    INVOICED: { label: 'Invoiced', color: 'bg-orange-50 text-orange-700 border-orange-200', icon: FileText },
+    PAID: { label: 'Paid', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
     CANCELLED: { label: 'Cancelled', color: 'bg-slate-50 text-slate-400 border-slate-200 line-through', icon: Ban },
 }
 
@@ -66,6 +68,7 @@ export default function DeliveryOrdersPage() {
     const [viewModal, setViewModal] = useState<DO | null>(null)
     const [company, setCompany] = useState<Record<string, string>>({})
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+    const [openStatusId, setOpenStatusId] = useState<string | null>(null)
 
     const showToast = useCallback((type: 'success' | 'error', msg: string) => {
         setToast({ type, msg }); setTimeout(() => setToast(null), 4000)
@@ -106,6 +109,32 @@ export default function DeliveryOrdersPage() {
     }, [])
 
     useEffect(() => { loadData() }, [loadData])
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            const target = e.target as HTMLElement
+            if (openStatusId && !target.closest('.status-dropdown')) setOpenStatusId(null)
+        }
+        if (openStatusId) document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [openStatusId])
+
+    const handleStatus = async (id: string, status: string) => {
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/delivery-orders/${id}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-role': userRole || '',
+                    'x-user-dept': userDept || '',
+                    'x-user-name': userName || ''
+                },
+                body: JSON.stringify({ status })
+            })
+            if (res.ok) { showToast('success', 'Status DO diperbarui'); loadData() }
+            else { const err = await res.json(); showToast('error', err.message || 'Gagal update status') }
+        } catch (e: any) { showToast('error', e.message || 'Terjadi kesalahan sistem') }
+    }
 
     const handleSave = async () => {
         if (!form.customerId || form.items.length === 0) return showToast('error', 'Customer dan Item wajib diisi')
@@ -265,7 +294,22 @@ export default function DeliveryOrdersPage() {
                                         <span className="px-2 py-1 bg-slate-100 text-[10px] font-black rounded-lg">{d.items.length} ITEMS</span>
                                     </td>
                                     <td className="px-6 py-5">
-                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-xl border text-[9px] font-black uppercase tracking-wider ${DO_STATUS[d.status]?.color || ''}`}>{d.status}</span>
+                                        <div className="relative status-dropdown inline-block">
+                                            <span onClick={() => setOpenStatusId(openStatusId === d.id ? null : d.id)}
+                                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl border text-[9px] font-black uppercase tracking-wider cursor-pointer select-none ${DO_STATUS[d.status]?.color || ''}`}>
+                                                {d.status} <ChevronDown size={10} />
+                                            </span>
+                                            {openStatusId === d.id && (
+                                                <div className="absolute z-50 mt-1 bg-white border border-slate-100 shadow-xl rounded-xl p-1 min-w-[140px]">
+                                                    {Object.keys(DO_STATUS).map(k => (
+                                                        <button key={k} onClick={() => { handleStatus(d.id, k); setOpenStatusId(null); }}
+                                                            className={`w-full text-left px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors ${d.status === k ? 'text-indigo-600' : 'text-slate-600'}`}>
+                                                            {DO_STATUS[k].label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-5 text-right">
                                         <div className="flex items-center justify-end gap-1">
@@ -299,7 +343,22 @@ export default function DeliveryOrdersPage() {
                                 <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block">{d.number}</span>
                                 <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1 mt-0.5"><Calendar size={10} />{fmtDate(d.date)}</span>
                             </div>
-                            <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[9px] font-black border ${DO_STATUS[d.status]?.color || ''}`}>{d.status}</span>
+                            <div className="relative status-dropdown inline-block">
+                                <span onClick={() => setOpenStatusId(openStatusId === d.id ? null : d.id)}
+                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black border cursor-pointer select-none ${DO_STATUS[d.status]?.color || ''}`}>
+                                    {d.status} <ChevronDown size={10} />
+                                </span>
+                                {openStatusId === d.id && (
+                                    <div className="absolute right-0 z-50 mt-1 bg-white border border-slate-100 shadow-xl rounded-xl p-1 min-w-[140px]">
+                                        {Object.keys(DO_STATUS).map(k => (
+                                            <button key={k} onClick={() => { handleStatus(d.id, k); setOpenStatusId(null); }}
+                                                className={`w-full text-left px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors ${d.status === k ? 'text-indigo-600' : 'text-slate-600'}`}>
+                                                {DO_STATUS[k].label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <div className="pl-2">
                             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Customer</p>
