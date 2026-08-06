@@ -201,7 +201,7 @@ export default function OperationalExpensesPage() {
                     workOrderId: '',
                     projectId: '',
                     attachment: null,
-                    repeatMonths: 6,
+                    repeatMonths: 1,
                     autoPost: true
                 })
                 fetchExpenses()
