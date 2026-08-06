@@ -1211,7 +1211,9 @@ app.post('/api/quotations', async (req, res) => {
       unit: it.unit || 'pcs',
       unitPrice: Number(it.unitPrice) || 0,
       discount: Number(it.discount) || 0,
-      amount: Number(it.amount) || 0
+      amount: Number(it.amount) || 0,
+      skuId: it.skuId || null,
+      costPrice: Number(it.costPrice) || 0
     }));
     const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, Number(discount), Number(tax));
     const q = await prisma.quotation.create({
@@ -1249,7 +1251,9 @@ app.put('/api/quotations/:id', async (req, res) => {
       unit: it.unit || 'pcs',
       unitPrice: Number(it.unitPrice) || 0,
       discount: Number(it.discount) || 0,
-      amount: Number(it.amount) || 0
+      amount: Number(it.amount) || 0,
+      skuId: it.skuId || null,
+      costPrice: Number(it.costPrice) || 0
     }));
     const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, Number(discount), Number(tax));
     const q = await prisma.$transaction(async (tx) => {
@@ -1516,7 +1520,7 @@ app.get('/api/projects', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 
         customer: true, 
         businessCategory: true,
         surveys: { include: { expenses: true } }, 
-        quotations: true, 
+        quotations: { include: { items: true } }, 
         salesOrders: true,
         purchaseOrders: { include: { vendor: true, items: true } },
         workOrders: {
@@ -1630,7 +1634,7 @@ app.get('/api/projects/:id', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAF
         customer: true, 
         businessCategory: true,
         surveys: { include: { expenses: true } }, 
-        quotations: true, 
+        quotations: { include: { items: true } }, 
         salesOrders: true,
         purchaseOrders: { include: { vendor: true, items: true } },
         workOrders: {
@@ -6999,6 +7003,14 @@ app.post('/api/finance/operational-expenses', upload.single('attachment'), async
     const repeatMonths = Math.max(1, Math.min(24, Number(req.body.repeatMonths) || 1));
     const isAutoPost = req.body.autoPost === 'true' || req.body.status === 'POSTED';
     const initialStatus = isAutoPost ? 'POSTED' : 'DRAFT';
+
+    const selectedCoa = await prisma.chartOfAccounts.findUnique({ where: { id: req.body.coaId } });
+    if (!selectedCoa) {
+      return res.status(400).json({ message: 'COA tidak ditemukan' });
+    }
+    if (selectedCoa.postingType !== 'POSTING') {
+      return res.status(400).json({ message: `COA "${selectedCoa.code} ${selectedCoa.name}" adalah akun induk (HEADER), pilih akun transaksi (POSTING).` });
+    }
 
     const createdExpenses = [];
 

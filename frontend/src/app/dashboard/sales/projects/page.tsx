@@ -137,7 +137,17 @@ const calcProjectStats = (p: PreSalesProject) => {
     const profit = revenue - (cogs + operationalExpenses)
     const margin = revenue > 0 ? (profit / revenue) * 100 : 0
 
-    return { revenue, cogs, materialUsageCosts, directPurchaseCosts, operationalExpenses, profit, margin }
+    // 4. Estimated HPP / Modal from Quotations (current offer value)
+    let quotationRevenue = 0
+    let quotationHpp = 0
+    p.quotations?.forEach((q: any) => {
+        quotationRevenue += (q.subtotal || 0)
+        q.items?.forEach((i: any) => { quotationHpp += (i.costPrice || 0) * (i.qty || 1) })
+    })
+    const quotationProfit = quotationRevenue - quotationHpp
+    const quotationMargin = quotationRevenue > 0 ? (quotationProfit / quotationRevenue) * 100 : 0
+
+    return { revenue, cogs, materialUsageCosts, directPurchaseCosts, operationalExpenses, profit, margin, quotationRevenue, quotationHpp, quotationProfit, quotationMargin }
 }
 
 
@@ -145,6 +155,7 @@ const calcProjectStats = (p: PreSalesProject) => {
 const PullToRefresh = ({ onRefresh, children }: { onRefresh: () => Promise<void>; children: React.ReactNode }) => {
     const [refreshing, setRefreshing] = useState(false)
     const [pullDistance, setPullDistance] = useState(0)
+    const pullRef = useRef(0)
     const startY = useRef(0)
     const containerRef = useRef<HTMLDivElement>(null)
 
@@ -160,17 +171,19 @@ const PullToRefresh = ({ onRefresh, children }: { onRefresh: () => Promise<void>
             const distance = Math.max(0, currentY - startY.current)
             if (distance > 0) {
                 e.preventDefault()
-                setPullDistance(Math.min(distance * 0.5, 80))
+                pullRef.current = Math.min(distance * 0.5, 80)
+                setPullDistance(pullRef.current)
             }
         }
     }
 
     const handleTouchEnd = async () => {
-        if (pullDistance > 60) {
+        if (pullRef.current > 60) {
             setRefreshing(true)
             await onRefresh()
             setRefreshing(false)
         }
+        pullRef.current = 0
         setPullDistance(0)
         startY.current = 0
     }
@@ -187,7 +200,7 @@ const PullToRefresh = ({ onRefresh, children }: { onRefresh: () => Promise<void>
                 el.removeEventListener('touchend', handleTouchEnd)
             }
         }
-    }, [pullDistance])
+    }, [])
 
     return (
         <div ref={containerRef} className="w-full">
@@ -411,12 +424,14 @@ export default function ProjectsPage() {
 
     const totalPages = Math.ceil(filtered.length / perPage)
     const paginated = filtered.slice((page - 1) * perPage, page * perPage)
+    const hasActiveFilters = !!(search || searchTerm || filterStatus !== 'ALL' || dateRange !== 'all' || selectedPriority !== 'ALL')
 
     const stats = {
         total: filtered.length,
         revenue: filtered.reduce((acc, p) => acc + calcProjectStats(p).revenue, 0),
         profit: filtered.reduce((acc, p) => acc + calcProjectStats(p).profit, 0),
         active: filtered.filter(p => !['COMPLETED', 'LOST'].includes(p.status)).length,
+        quotationHpp: filtered.reduce((acc, p) => acc + calcProjectStats(p).quotationHpp, 0),
         avgMargin: filtered.length > 0
             ? filtered.reduce((acc, p) => acc + calcProjectStats(p).margin, 0) / filtered.length
             : 0
@@ -608,7 +623,7 @@ export default function ProjectsPage() {
                     <PullToRefresh onRefresh={load}>
 
                     {/* Stats Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
                         <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
                             <div className="flex justify-between items-start">
                                 <div>
@@ -617,6 +632,17 @@ export default function ProjectsPage() {
                                 </div>
                                 <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                                     <DollarSign size={18} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Est. HPP / Modal (Penawaran)</p>
+                                    <h3 className="text-2xl font-bold text-amber-600 tracking-tight">{formatCurrencyCompact(stats.quotationHpp)}</h3>
+                                </div>
+                                <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                                    <Package size={18} />
                                 </div>
                             </div>
                         </div>
@@ -673,13 +699,13 @@ export default function ProjectsPage() {
                             </div>
                             <h3 className="font-bold text-slate-900 text-base mb-1">No projects found</h3>
                             <p className="text-sm text-slate-500 mb-6 max-w-sm">
-                                {search || filterStatus !== 'ALL' || dateRange !== 'all'
+                                {hasActiveFilters
                                     ? "Try adjusting your filters."
                                     : "Create your first project to get started."}
                             </p>
-                            <button onClick={() => { if (search || filterStatus !== 'ALL' || dateRange !== 'all') { setSearch(''); setFilterStatus('ALL'); setDateRange('all'); } else { setEditing(null); setModalOpen(true); } }}
+                            <button onClick={() => { if (hasActiveFilters) { setSearch(''); setSearchTerm(''); setFilterStatus('ALL'); setDateRange('all'); setSelectedPriority('ALL'); } else { setEditing(null); setModalOpen(true); } }}
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 py-2.5 text-sm font-semibold transition-all flex items-center gap-2">
-                                {search || filterStatus !== 'ALL' || dateRange !== 'all' ? <><RefreshCw size={14} /> Clear Filters</> : <><Plus size={14} /> Create First Project</>}
+                                {hasActiveFilters ? <><RefreshCw size={14} /> Clear Filters</> : <><Plus size={14} /> Create First Project</>}
                             </button>
                         </motion.div>
                     ) : (
@@ -766,7 +792,7 @@ export default function ProjectsPage() {
                                                 <div className="bg-slate-50 rounded-lg px-2.5 py-2">
                                                     <p className="text-[8px] font-semibold text-slate-400 uppercase tracking-wider">Profit</p>
                                                     <p className={`text-[11px] font-bold truncate ${stats.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                        {stats.profit >= 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
+{stats.profit > 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
                                                     </p>
                                                 </div>
                                             </div>
@@ -778,6 +804,13 @@ export default function ProjectsPage() {
                                                     <span className={`text-[10px] font-bold ${stats.margin > 20 ? 'text-emerald-600' : stats.margin > 10 ? 'text-amber-600' : 'text-rose-600'}`}>{stats.margin.toFixed(1)}%</span>
                                                 </div>
                                                 <span className="text-[9px] text-slate-400 font-medium">{fmtDate(p.createdAt)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between bg-amber-50/60 border border-amber-100 rounded-lg px-2.5 py-1.5">
+                                                <span className="text-[8px] font-semibold text-amber-500 uppercase tracking-wider">Est. HPP Penawaran</span>
+                                                <span className="text-[10px] font-bold text-amber-700">{formatCurrencyCompact(stats.quotationHpp)}</span>
+                                                <span className={`text-[10px] font-bold ${stats.quotationProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                    {stats.quotationMargin.toFixed(1)}% est. margin
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-1.5 pt-1">
                                                 <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} className="flex-1 flex items-center justify-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 py-2 rounded-lg text-[9px] font-semibold transition-all">
@@ -861,6 +894,9 @@ export default function ProjectsPage() {
                                             <p className={`text-[11px] font-bold ${stats.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                                 {stats.profit >= 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
                                             </p>
+                                            <p className={'text-[9px] font-semibold ' + (stats.quotationProfit >= 0 ? 'text-emerald-500' : 'text-rose-500')}>
+                                                Est. {formatCurrencyCompact(stats.quotationHpp)} ({stats.quotationMargin.toFixed(0)}%)
+                                            </p>
                                         </div>
                                         <div className="flex items-center gap-1">
                                             <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="View">
@@ -894,6 +930,8 @@ export default function ProjectsPage() {
                                         <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-center">Priority</th>
                                         <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Revenue</th>
                                         <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Expenses</th>
+                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Est. HPP (Quo)</th>
+                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Est. Margin (Quo)</th>
                                         <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Margin</th>
                                         <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Actions</th>
                                     </tr>
@@ -979,9 +1017,22 @@ export default function ProjectsPage() {
                                                     <span className="font-semibold text-rose-600 text-xs">{formatCurrencyCompact(stats.cogs + stats.operationalExpenses)}</span>
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
+                                                    <span className="font-semibold text-amber-600 text-xs">{formatCurrencyCompact(stats.quotationHpp)}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <div className="flex flex-col items-end leading-tight">
+                                                        <span className={`font-semibold text-xs ${stats.quotationProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                            {stats.quotationProfit > 0 ? '+' : ''}{formatCurrencyCompact(stats.quotationProfit)}
+                                                        </span>
+                                                        <span className={'text-[9px] font-medium ' + (stats.quotationMargin > 20 ? 'text-emerald-500' : stats.quotationMargin > 10 ? 'text-amber-500' : 'text-rose-500')}>
+                                                            {stats.quotationMargin.toFixed(1)}%
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
                                                     <div className="flex flex-col items-end leading-tight">
                                                         <span className={`font-semibold text-xs ${stats.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                            {stats.profit >= 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
+{stats.profit > 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
                                                         </span>
                                                         <span className={'text-[9px] font-medium ' + (stats.margin > 20 ? 'text-emerald-500' : stats.margin > 10 ? 'text-amber-500' : 'text-rose-500')}>
                                                             {stats.margin.toFixed(1)}%

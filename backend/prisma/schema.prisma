@@ -328,6 +328,8 @@ model QuotationItem {
   unitPrice   Float     @default(0)
   discount    Float     @default(0)
   amount      Float     @default(0)
+  skuId       String?
+  costPrice   Float     @default(0)
   quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
 }
 

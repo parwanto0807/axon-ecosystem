@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, Fragment } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Plus, FileText, Search, Eye, Edit, Trash2, X, Save,
@@ -13,12 +13,12 @@ import QuotationPDFModal from "./QuotationPDFModal"
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 export interface Customer { id: string; name: string; code: string; address: string | null; taxId: string | null; phone: string | null; email: string | null; pics: Array<{ name: string; department: string | null }> }
-export interface ProductSKU { id: string; code: string; name: string | null; salePrice: number; unit: { name: string } }
+export interface ProductSKU { id: string; code: string; name: string | null; salePrice: number; purchasePrice: number; unit: { name: string } }
 export interface Product { id: string; code: string; name: string; skus: ProductSKU[] }
 
 export interface QuotationItem {
     id?: string; no: number; description: string; qty: number; unit: string
-    unitPrice: number; discount: number; amount: number; _skuId?: string
+    unitPrice: number; discount: number; amount: number; skuId?: string; costPrice?: number
 }
 export interface Quotation {
     id: string; number: string; date: string; validUntil: string; status: string
@@ -254,38 +254,23 @@ export default function QuotationsPage() {
                                 <th className="px-6 py-4">Date</th>
                                 <th className="px-6 py-4">Valid Until</th>
                                 <th className="px-6 py-4 text-right">Grand Total</th>
+                                <th className="px-6 py-4 text-right">Total HPP</th>
+                                <th className="px-6 py-4 text-right">Margin</th>
                                 <th className="px-6 py-4 text-center">Status</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.length > 0 && (() => {
-                                let lastProject: string | null = "INITIAL";
-                                return filtered.map((q, idx) => {
+                            {filtered.map((q, idx) => {
                                     const sc = STATUS_CONFIG[q.status] || STATUS_CONFIG.DRAFT
                                     const Icon = sc.icon
-                                    const showHeader = q.projectId !== lastProject;
-                                    lastProject = q.projectId || null;
 
                                     return (
-                                        <Fragment key={q.id}>
-                                            {showHeader && (
-                                                <tr className="bg-slate-50/50">
-                                                    <td colSpan={8} className="px-6 py-2 border-y border-slate-100 italic">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-1 h-4 bg-indigo-500 rounded-full" />
-                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Project:</span>
-                                                            <span className="text-[11px] font-black text-indigo-600 uppercase tracking-widest">
-                                                                {q.project ? `${q.project.number} — ${q.project.name}` : 'No Project / Regular Sales'}
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                            <motion.tr initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * .03 }}
+                                            <motion.tr key={q.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * .03 }}
                                                 className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
                                                 <td className="px-6 py-4">
                                                     <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{q.number}</p>
+                                                    {q.project && <p className="text-[9px] font-semibold text-slate-400 mt-0.5 truncate max-w-[160px]">{q.project.number}</p>}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <p className="font-bold text-slate-800 text-sm">{q.customer?.name}</p>
@@ -297,6 +282,14 @@ export default function QuotationsPage() {
                                                 <td className="px-6 py-4 text-right">
                                                     <p className="font-bold text-slate-900 text-sm">{fmt(q.grandTotal)}</p>
                                                     <p className="text-[9px] text-slate-400">{q.items?.length || 0} items</p>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <p className="font-semibold text-amber-700 text-sm">{fmt(q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0)}</p>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <p className={`font-bold text-sm ${q.subtotal - (q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0) >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                        {fmt(q.subtotal - (q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0))}
+                                                    </p>
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
                                                     <div className="relative status-dropdown inline-block">
@@ -325,40 +318,26 @@ export default function QuotationsPage() {
                                                             className="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"><Trash2 size={14} /></button>
                                                     </div>
                                                 </td>
-                                            </motion.tr>
-                                        </Fragment>
+                                                </motion.tr>
                                     )
-                                })
-                            })()}
+                                })}
                         </tbody>
                     </table>
                 </div>
 
                 {/* Mobile Cards */}
                 <div className="md:hidden space-y-4">
-                    {(() => {
-                        let lastProject: string | null = "INITIAL";
-                        return filtered.map((q, idx) => {
+                    {filtered.map((q, idx) => {
                             const sc = STATUS_CONFIG[q.status] || STATUS_CONFIG.DRAFT;
                             const Icon = sc.icon;
-                            const showHeader = q.projectId !== lastProject;
-                            lastProject = q.projectId || null;
 
                             return (
-                                <Fragment key={q.id}>
-                                    {showHeader && (
-                                        <div className="flex items-start gap-2 mt-6 mb-2">
-                                            <div className="w-1 h-3.5 bg-indigo-500 rounded-full shrink-0 mt-0.5" />
-                                            <span className="flex-1 min-w-0 text-[10px] font-black text-indigo-600 uppercase tracking-widest break-words leading-relaxed">
-                                                {q.project ? `${q.project.number} — ${q.project.name}` : 'Regular Sales'}
-                                            </span>
-                                        </div>
-                                    )}
-                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
+                                        <motion.div key={q.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
                                         className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3 relative">
                                         <div className="flex justify-between items-start mb-1">
                                             <div>
                                                 <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">{q.number}</p>
+                                                {q.project && <p className="text-[9px] font-semibold text-slate-400 mb-1">{q.project.number}</p>}
                                                 <h3 className="font-bold text-slate-800 text-sm leading-tight">{q.customer?.name}</h3>
                                                 <p className="text-[11px] text-slate-500 line-clamp-1">{q.subject}</p>
                                             </div>
@@ -379,6 +358,16 @@ export default function QuotationsPage() {
                                                 <p className="text-xs font-bold text-indigo-700">{fmt(q.grandTotal)}</p>
                                             </div>
                                         </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="bg-amber-50 p-2 rounded-xl">
+                                                <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-0.5">Total HPP</p>
+                                                <p className="text-xs font-bold text-amber-700">{fmt(q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0)}</p>
+                                            </div>
+                                            <div className="bg-emerald-50 p-2 rounded-xl">
+                                                <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-0.5">Margin</p>
+                                                <p className="text-xs font-bold text-emerald-700">{fmt(q.subtotal - (q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0))}</p>
+                                            </div>
+                                        </div>
                                         <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-1">
                                             <span className="text-[10px] text-slate-400 font-medium">{q.items?.length || 0} items included</span>
                                             <div className="flex items-center gap-1">
@@ -388,10 +377,8 @@ export default function QuotationsPage() {
                                             </div>
                                         </div>
                                     </motion.div>
-                                </Fragment>
                             );
-                        });
-                    })()}
+                        })}
                 </div>
                 </>
             )}
@@ -455,11 +442,13 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
     const fillFromSKU = (idx: number, skuId: string) => {
         for (const p of products) {
             const sku = p.skus?.find(s => s.id === skuId)
-            if (sku) { updateItem(idx, { description: `${p.name}${sku.name ? ' - ' + sku.name : ''} (${sku.code})`, unitPrice: sku.salePrice, unit: sku.unit?.name || 'pcs', _skuId: skuId }); return }
+            if (sku) { updateItem(idx, { description: `${p.name}${sku.name ? ' - ' + sku.name : ''} (${sku.code})`, unitPrice: sku.salePrice, costPrice: sku.purchasePrice, unit: sku.unit?.name || 'pcs', skuId }); return }
         }
     }
 
     const subtotal = items.reduce((s, i) => s + i.amount, 0)
+    const totalCost = items.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0)
+    const totalMargin = subtotal - totalCost
     const discountAmt = subtotal * (Number(form.discount) / 100)
     const taxable = subtotal - discountAmt
     const taxAmt = taxable * (Number(form.tax) / 100)
@@ -550,7 +539,7 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                             </button>
                         </div>
                         <div className="-mx-6 px-6 md:mx-0 md:px-0 pb-4 md:pb-0 overflow-x-auto scrollbar-hide">
-                            <div className="min-w-[800px] rounded-2xl border border-slate-100">
+                            <div className="min-w-[980px] rounded-2xl border border-slate-100">
                                 <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 border-b border-slate-100">
@@ -561,7 +550,9 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                                         <th className="px-3 py-3 w-16">Unit</th>
                                         <th className="px-3 py-3 w-28">Unit Price</th>
                                         <th className="px-3 py-3 w-14">Disc%</th>
+                                        <th className="px-3 py-3 w-28">HPP / Unit</th>
                                         <th className="px-3 py-3 w-28 text-right">Amount</th>
+                                        <th className="px-3 py-3 w-28 text-right">Margin</th>
                                         <th className="px-3 py-3 w-8"></th>
                                     </tr>
                                 </thead>
@@ -600,8 +591,15 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                                                 <input type="number" min="0" max="100" step="0.1" value={it.discount} onChange={e => updateItem(idx, { discount: +e.target.value })}
                                                     className="w-full text-sm bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
                                             </td>
+                                            <td className="px-2 py-2">
+                                                <input type="number" min="0" step="100" value={it.costPrice || 0} onChange={e => updateItem(idx, { costPrice: +e.target.value })}
+                                                    className="w-full text-sm bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 text-right focus:outline-none focus:ring-2 focus:ring-amber-500/20" />
+                                            </td>
                                             <td className="px-3 py-2 text-right">
                                                 <p className="text-sm font-bold text-slate-800">Rp {it.amount.toLocaleString('id-ID')}</p>
+                                            </td>
+                                            <td className="px-3 py-2 text-right">
+                                                <p className={`text-sm font-bold ${it.amount - (it.costPrice || 0) * it.qty >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>Rp {(it.amount - (it.costPrice || 0) * it.qty).toLocaleString('id-ID')}</p>
                                             </td>
                                             <td className="px-2 py-2 text-center">
                                                 {items.length > 1 && (
@@ -628,6 +626,14 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                             <div className="flex justify-between text-sm">
                                 <span className="text-slate-500 font-medium">Subtotal</span>
                                 <span className="font-bold text-slate-800">Rp {subtotal.toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-amber-600 font-medium">Total HPP / Modal</span>
+                                <span className="font-bold text-amber-700">Rp {totalCost.toLocaleString('id-ID')}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-emerald-600 font-medium">Margin {subtotal > 0 ? `(${((totalMargin / subtotal) * 100).toFixed(1)}%)` : ''}</span>
+                                <span className={`font-bold ${totalMargin >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>Rp {totalMargin.toLocaleString('id-ID')}</span>
                             </div>
                             <div className="flex items-center justify-between gap-3">
                                 <span className="text-slate-500 font-medium text-sm">Discount (%)</span>

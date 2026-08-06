@@ -118,7 +118,7 @@ export default function OperationalExpensesPage() {
             const data = await res.json()
             // Filter only expense accounts (6-xxxx)
             if (Array.isArray(data)) {
-                setCoaList(data.filter(acc => acc.code.startsWith('6-')))
+                setCoaList(data.filter(acc => acc.code.startsWith('6-') && acc.postingType === 'POSTING'))
             }
         } catch (e) {
             console.error(e)
