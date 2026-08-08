@@ -470,7 +470,7 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
     return (
         <div className="fixed inset-0 z-[100] flex items-start justify-center md:p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
             <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}
-                className="bg-white min-h-screen md:min-h-0 md:rounded-3xl shadow-2xl w-full max-w-5xl md:my-4 flex flex-col">
+                className="bg-white min-h-screen md:min-h-0 md:rounded-3xl shadow-2xl w-full max-w-7xl md:my-4 flex flex-col">
                 <div className="sticky top-0 z-10 bg-white flex items-center justify-between px-6 py-4 md:px-8 md:py-5 border-b border-slate-100">
                     <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20">
@@ -546,9 +546,9 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                                         <th className="px-3 py-3 w-8">No</th>
                                         <th className="px-3 py-3 w-40">From Product</th>
                                         <th className="px-3 py-3 min-w-[220px]">Description</th>
-                                        <th className="px-3 py-3 w-16">Qty</th>
-                                        <th className="px-3 py-3 w-16">Unit</th>
-                                        <th className="px-3 py-3 w-28">Unit Price</th>
+                                        <th className="px-3 py-3 w-40">Qty</th>
+                                        <th className="px-3 py-3 w-20">Unit</th>
+                                        <th className="px-3 py-3 w-40">Unit Price</th>
                                         <th className="px-3 py-3 w-14">Disc%</th>
                                         <th className="px-3 py-3 w-28">HPP / Unit</th>
                                         <th className="px-3 py-3 w-28 text-right">Amount</th>
@@ -577,7 +577,7 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                                             </td>
                                             <td className="px-2 py-2">
                                                 <input type="number" min="0" step="0.01" value={it.qty} onChange={e => updateItem(idx, { qty: +e.target.value })}
-                                                    className="w-full text-sm bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                                                    className="w-full text-sm bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
                                             </td>
                                             <td className="px-2 py-2">
                                                 <input value={it.unit} onChange={e => updateItem(idx, { unit: e.target.value })}
