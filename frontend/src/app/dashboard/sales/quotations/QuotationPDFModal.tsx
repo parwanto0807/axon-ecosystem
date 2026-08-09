@@ -202,7 +202,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                     if (data.column.index === 1 && data.cell.section === 'body') {
                         const itemIdx = data.row.index
                         const item = sortedItems[itemIdx]
-                        const img = loadedImages[item.id || item.no]
+                        const img = item ? loadedImages[item.id || item.no] : undefined
                         if (img) {
                             try {
                                 const cv = document.createElement('canvas')

@@ -1045,6 +1045,9 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
     }, [])
 
     useEffect(() => {
+        if (!isOpen) return;
+        setSelectedSkuIndex(0);
+        setActiveTab('DETAILS');
         if (product) {
             setFormData({
                 code: product.code,
@@ -1057,7 +1060,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                 skus: product.skus ? [...product.skus] : []
             });
             setImagePreview(product.image ? `${process.env.NEXT_PUBLIC_API_URL}${product.image}` : null);
-            setActiveTab('DETAILS');
+            setImageFile(null);
         } else {
             const autoCode = `PROD-${Date.now().toString().slice(-6)}`;
             setFormData({
@@ -1073,7 +1076,17 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
             setImagePreview(null);
             setImageFile(null);
         }
-    }, [product, units, categories])
+    }, [isOpen, product])
+
+    useEffect(() => {
+        if (!isOpen || product || units.length === 0) return;
+        const defaultUnitId = units.find(u => u.name.toLowerCase() === 'pcs')?.id || units[0].id;
+        setFormData(prev => {
+            const skus = prev.skus || [];
+            if (skus.some(s => s.unitId)) return prev;
+            return { ...prev, skus: skus.map(s => s.unitId ? s : { ...s, unitId: defaultUnitId, purchaseUnitId: defaultUnitId }) };
+        });
+    }, [isOpen, product, units])
 
     const fetchOptions = async () => {
         try {
@@ -1125,6 +1138,14 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+
+        const skus = formData.skus || []
+        if (!formData.name?.trim()) { alert('Product name is required'); return }
+        if (!formData.code?.trim()) { alert('Internal code is required'); return }
+        if (skus.length === 0) { alert('Add at least one SKU variant'); return }
+        if (skus.some(s => !s.code?.trim() || !s.name?.trim())) { alert('Every SKU requires a variant name and code'); return }
+        if (!(formData.businessCategories || []).length) { alert('Select at least one business unit'); return }
+
         const method = product ? 'PUT' : 'POST'
         const url = product
             ? `${process.env.NEXT_PUBLIC_API_URL}/api/products/${product.id}`
@@ -1135,7 +1156,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
             if (['category', 'unit', 'purchaseUnit', 'priceHistory', 'businessCategory', 'businessCategories'].includes(key)) return;
             if (key === 'image' && imageFile) return;
             if (key === 'skus') {
-                formDataPayload.append(key, JSON.stringify(value));
+                formDataPayload.append(key, JSON.stringify(value || []));
                 return;
             }
             if (value !== null && value !== undefined) {
@@ -1147,11 +1168,10 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
             formDataPayload.append('image', imageFile);
         }
 
-        const businessCategoryIds = formData.businessCategories?.map(b => b.id) || [];
+        const businessCategoryIds = formData.businessCategories?.map(b => b.id).filter(Boolean) || [];
         formDataPayload.append('businessCategoryIds', JSON.stringify(businessCategoryIds));
 
         try {
-            console.log("Submitting formData...");
             const res = await fetch(url, {
                 method,
                 body: formDataPayload
@@ -1160,8 +1180,13 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                 onSuccess()
                 onClose()
             } else {
-                const errorData = await res.json();
-                console.error("Update failed:", errorData);
+                let errorData: { message?: string } = {};
+                try {
+                    errorData = await res.json();
+                } catch {
+                    errorData = { message: res.statusText || 'Request failed' };
+                }
+                console.error("Save failed:", errorData);
                 alert(`Error: ${errorData.message || 'Unknown error'}`);
             }
         } catch (error) {
