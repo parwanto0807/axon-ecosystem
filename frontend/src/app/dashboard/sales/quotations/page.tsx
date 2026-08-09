@@ -539,26 +539,26 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                             </button>
                         </div>
                         <div className="-mx-6 px-6 md:mx-0 md:px-0 pb-4 md:pb-0 overflow-x-auto scrollbar-hide">
-                            <div className="min-w-[980px] rounded-2xl border border-slate-100">
+                            <div className="min-w-[1350px] rounded-2xl border border-slate-100">
                                 <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 border-b border-slate-100">
                                         <th className="px-3 py-3 w-8">No</th>
                                         <th className="px-3 py-3 w-40">From Product</th>
-                                        <th className="px-3 py-3 min-w-[220px]">Description</th>
-                                        <th className="px-3 py-3 w-40">Qty</th>
+                                        <th className="px-3 py-3 min-w-[450px]">Description</th>
+                                        <th className="px-3 py-3 w-20">Qty</th>
                                         <th className="px-3 py-3 w-20">Unit</th>
-                                        <th className="px-3 py-3 w-40">Unit Price</th>
-                                        <th className="px-3 py-3 w-14">Disc%</th>
-                                        <th className="px-3 py-3 w-28">HPP / Unit</th>
-                                        <th className="px-3 py-3 w-28 text-right">Amount</th>
-                                        <th className="px-3 py-3 w-28 text-right">Margin</th>
+                                        <th className="px-3 py-3 w-32">Unit Price</th>
+                                        <th className="px-3 py-3 w-16">Disc%</th>
+                                        <th className="px-3 py-3 w-32">HPP / Unit</th>
+                                        <th className="px-3 py-3 w-32 text-right">Amount</th>
+                                        <th className="px-3 py-3 w-32 text-right">Margin</th>
                                         <th className="px-3 py-3 w-8"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {items.map((it, idx) => (
-                                        <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                                        <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 align-top">
                                             <td className="px-3 py-2 text-[11px] font-black text-slate-400 text-center">{it.no}</td>
                                             <td className="px-2 py-2">
                                                 <select onChange={e => fillFromSKU(idx, e.target.value)} defaultValue=""
@@ -572,8 +572,8 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                                                 </select>
                                             </td>
                                             <td className="px-2 py-2">
-                                                <input value={it.description} onChange={e => updateItem(idx, { description: e.target.value })} placeholder="Item description..."
-                                                    className="w-full text-sm bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                                                <textarea value={it.description} onChange={e => updateItem(idx, { description: e.target.value })} placeholder="Item description..." rows={3}
+                                                    className="w-full text-sm bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 resize-y min-h-[60px]" />
                                             </td>
                                             <td className="px-2 py-2">
                                                 <input type="number" min="0" step="0.01" value={it.qty} onChange={e => updateItem(idx, { qty: +e.target.value })}
