@@ -52,6 +52,7 @@ interface PreSalesProject {
     purchaseOrders: any[];
     workOrders: (WorkOrder & { items: any[]; surveyExpenses: any[] })[];
     surveyExpenses: any[];
+    operationalExpenses: any[];
     invoices?: any[];
     createdAt: string; updatedAt?: string; deadline?: string; priority?: 'HIGH' | 'MEDIUM' | 'LOW';
     businessCategoryId?: string | null;
@@ -93,7 +94,7 @@ const calcProjectStats = (p: PreSalesProject) => {
 
     const processExpense = (e: any) => {
         if (!e || !e.id || processedExpenseIds.has(e.id)) return;
-        if (e.status === 'APPROVED' || e.status === 'POSTED') {
+        if (e.status === 'APPROVED' || e.status === 'POSTED' || e.status === 'PAID') {
             if (!e.purchaseOrderId) {
                 operationalExpenses += (e.amount || 0);
             }
@@ -128,10 +129,11 @@ const calcProjectStats = (p: PreSalesProject) => {
         }
     })
 
-    // 3. Operational Expenses
+    // 3. Operational Expenses (survey expenses + finance operational expenses linked to project)
     p.surveys?.forEach(s => s.expenses?.forEach(processExpense))
     p.workOrders?.forEach(wo => wo.surveyExpenses?.forEach(processExpense))
     p.surveyExpenses?.forEach(processExpense)
+    p.operationalExpenses?.forEach(processExpense)
 
     const cogs = materialUsageCosts + directPurchaseCosts
     const profit = revenue - (cogs + operationalExpenses)

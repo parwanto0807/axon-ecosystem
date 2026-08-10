@@ -243,7 +243,7 @@ export const generateProjectPDF = async (project: any, stats: any, company: any,
 
     const addExpenseRow = (exp: any, source: string) => {
         if (!exp || !exp.id || processedExpIds.has(exp.id)) return;
-        if ((exp.status === 'APPROVED' || exp.status === 'POSTED') && !exp.purchaseOrderId) {
+        if ((exp.status === 'APPROVED' || exp.status === 'POSTED' || exp.status === 'PAID') && !exp.purchaseOrderId) {
             expRows.push([
                 source,
                 exp.category || '-',
@@ -264,6 +264,8 @@ export const generateProjectPDF = async (project: any, stats: any, company: any,
     });
 
     (project?.surveyExpenses || []).forEach((e: any) => addExpenseRow(e, `Direct Project Ref`));
+
+    (project?.operationalExpenses || []).forEach((e: any) => addExpenseRow(e, `OpEx Finance`));
 
     if (expRows.length > 0) {
         autoTable(doc, {

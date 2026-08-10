@@ -112,12 +112,10 @@ export default function QuotationsPage() {
             (filterStatus === 'ALL' || q.status === filterStatus) &&
             (filterProject === 'ALL' || q.projectId === filterProject)
     }).sort((a, b) => {
-        const pA = projects.find(p => p.id === a.projectId)
-        const pB = projects.find(p => p.id === b.projectId)
-        const dA = pA?.createdAt ? new Date(pA.createdAt).getTime() : 0
-        const dB = pB?.createdAt ? new Date(pB.createdAt).getTime() : 0
+        const dA = new Date(a.date).getTime() || new Date(a.createdAt).getTime()
+        const dB = new Date(b.date).getTime() || new Date(b.createdAt).getTime()
         if (dA !== dB) return dB - dA
-        return new Date(b.date).getTime() - new Date(a.date).getTime()
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
 
     const stats = {

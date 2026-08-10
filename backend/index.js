@@ -1538,7 +1538,8 @@ app.get('/api/projects', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 
         basts: { include: { items: true } },
         deliveryOrders: { include: { items: true } },
         invoices: { include: { items: true } },
-        surveyExpenses: true
+        surveyExpenses: true,
+        operationalExpenses: true
       },
       orderBy: { createdAt: 'desc' }
     });
