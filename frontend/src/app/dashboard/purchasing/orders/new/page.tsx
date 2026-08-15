@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { Plus, Trash2, Save, FileText, ArrowLeft, Loader2, Search, Calculator, Receipt } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -206,15 +206,15 @@ export default function NewPurchaseOrderPage() {
                                     </div>
                                     <div className="col-span-5 space-y-1">
                                         <label className="text-[10px] font-bold text-slate-500 uppercase">Product Description</label>
-                                        <select
+                                        <SkuSelect
                                             value={item.description}
-                                            onChange={e => {
-                                                const selectedSkuCode = e.target.value;
-                                                const selectedSku = availableSkus.find(s => s.code === selectedSkuCode);
+                                            skus={availableSkus}
+                                            onChange={code => {
+                                                const selectedSku = availableSkus.find(s => s.code === code);
 
                                                 setItems(items.map(i => {
                                                     if (i.id === item.id) {
-                                                        const updated = { ...i, description: selectedSkuCode };
+                                                        const updated = { ...i, description: code };
                                                         if (selectedSku) {
                                                             updated.unitPrice = selectedSku.purchasePrice || selectedSku.salePrice || 0;
                                                             if (selectedSku.unit?.name) {
@@ -231,13 +231,7 @@ export default function NewPurchaseOrderPage() {
                                                     return i;
                                                 }));
                                             }}
-                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20"
-                                        >
-                                            <option value="">-- Choose Product SKU --</option>
-                                            {availableSkus.map(sku => (
-                                                <option key={sku.id} value={sku.code}>{sku.displayLabel}</option>
-                                            ))}
-                                        </select>
+                                        />
                                     </div>
                                     <div className="col-span-2 space-y-1">
                                         <label className="text-[10px] font-bold text-slate-500 uppercase">Qty & Unit</label>
@@ -520,6 +514,67 @@ export default function NewPurchaseOrderPage() {
                     </div>
                 </motion.div>
             </div>
+        </div>
+    )
+}
+
+function SkuSelect({ value, skus, onChange }: { value: string; skus: any[]; onChange: (code: string) => void }) {
+    const [open, setOpen] = useState(false)
+    const [query, setQuery] = useState('')
+    const ref = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [])
+
+    const filtered = skus.filter(s => s.displayLabel.toLowerCase().includes(query.toLowerCase()))
+    const selected = skus.find(s => s.code === value)
+
+    return (
+        <div ref={ref} className="relative w-full">
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                disabled={!skus.length}
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-left flex items-center justify-between gap-2 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
+            >
+                <span className={selected ? 'text-slate-900' : 'text-slate-400'}>{selected?.displayLabel || '-- Choose Product SKU --'}</span>
+                <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+
+            {open && (
+                <div className="absolute z-30 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 bg-slate-50">
+                        <Search size={14} className="text-slate-400 flex-shrink-0" />
+                        <input
+                            autoFocus
+                            value={query}
+                            onChange={e => setQuery(e.target.value)}
+                            placeholder="Cari product / SKU..."
+                            className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+                        />
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                        {filtered.length === 0 && (
+                            <div className="px-3 py-3 text-sm text-slate-400">No product found</div>
+                        )}
+                        {filtered.map(sku => (
+                            <button
+                                key={sku.id}
+                                type="button"
+                                onClick={() => { onChange(sku.code); setOpen(false); setQuery('') }}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 ${sku.code === value ? 'bg-indigo-50 font-semibold' : ''}`}
+                            >
+                                {sku.displayLabel}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

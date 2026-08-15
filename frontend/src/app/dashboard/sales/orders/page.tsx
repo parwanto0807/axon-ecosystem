@@ -11,7 +11,6 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
 import SalesOrderPDFModal from "./SalesOrderPDFModal"
 import { Bar } from "react-chartjs-2"
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from "chart.js"
@@ -67,7 +66,6 @@ const ImagePreviewModal = ({ url, onClose }: { url: string; onClose: () => void 
 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function SalesOrdersPage() {
-    const router = useRouter()
     const { data: session } = useSession()
     const [orders, setOrders] = useState<SalesOrder[]>([])
     const [customers, setCustomers] = useState<Customer[]>([])
@@ -225,7 +223,7 @@ export default function SalesOrdersPage() {
                     <h1 className="text-3xl font-black text-slate-900 tracking-tight">Pesanan Penjualan</h1>
                     <p className="text-sm font-bold text-slate-400 mt-1">Kelola dan lacak siklus pemesanan hingga pengiriman.</p>
                 </div>
-                <Button onClick={() => router.push('/dashboard/sales/orders/new')} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-600/20 rounded-xl px-6 py-2.5 font-bold">
+                <Button onClick={() => { setEditing(null); setModalOpen(true) }} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-600/20 rounded-xl px-6 py-2.5 font-bold">
                     <Plus size={16} className="mr-2" /> Pesanan Baru
                 </Button>
             </div>
@@ -654,7 +652,10 @@ function OrderFormModal({ order, customers, products, quotations, projects, busi
                             <label className={lc}>Berdasarkan Penawaran (Opsional)</label>
                             <select value={form.quotationId} onChange={e => fillFromQuotation(e.target.value)} className={ic + " text-indigo-700 font-bold border-indigo-200 bg-indigo-50/20"}>
                                 <option value="">-- Tanpa Penawaran --</option>
-                                {quotations.filter(q => q.status === 'ACCEPTED').map(q => <option key={q.id} value={q.id}>{q.number} — {q.customer?.name}</option>)}
+                                {quotations.filter(q => q.status === 'ACCEPTED' && (!form.customerId || q.customerId === form.customerId)).map(q => {
+                                    const sub = (q.items || []).reduce((s: number, it: any) => s + (it.qty * it.unitPrice * (1 - (it.discount || 0) / 100)), 0)
+                                    return <option key={q.id} value={q.id}>{q.number} — {q.customer?.name || ''} — {q.subject || ''} ({q.items?.length || 0} item, {fmt(sub)})</option>
+                                })}
                             </select>
                         </div>
                         <div>
