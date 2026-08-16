@@ -64,8 +64,8 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
         try {
             const { default: jsPDF } = await import('jspdf')
             const { default: autoTable } = await import('jspdf-autotable')
-            const doc = new jsPDF({ orientation: showBreakdown ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' })
-            const W = showBreakdown ? 297 : 210; const M = 15
+            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+            const W = 210; const M = 15
             const indigo = [79, 70, 229] as [number, number, number]
             const dark = [15, 23, 42] as [number, number, number]
             const gray = [100, 116, 139] as [number, number, number]
@@ -221,15 +221,15 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             const colStyles: any = showBreakdown ? {
                 0: { halign: 'center', cellWidth: 8 },
                 1: { halign: 'left' },
-                2: { halign: 'center', cellWidth: 12 },
-                3: { halign: 'center', cellWidth: 15 },
-                4: { halign: 'right', cellWidth: 24 },
-                5: { halign: 'right', cellWidth: 24 },
-                6: { halign: 'center', cellWidth: 12 },
-                7: { halign: 'right', cellWidth: 24 },
-                8: { halign: 'right', cellWidth: 24 },
-                9: { halign: 'right', cellWidth: 24 },
-                10: { halign: 'center', cellWidth: 12 }
+                2: { halign: 'center', cellWidth: 10 },
+                3: { halign: 'center', cellWidth: 12 },
+                4: { halign: 'right', cellWidth: 20 },
+                5: { halign: 'right', cellWidth: 20 },
+                6: { halign: 'center', cellWidth: 10 },
+                7: { halign: 'right', cellWidth: 20 },
+                8: { halign: 'right', cellWidth: 20 },
+                9: { halign: 'right', cellWidth: 20 },
+                10: { halign: 'center', cellWidth: 10 }
             } : {
                 0: { halign: 'center', cellWidth: 10 }, 
                 1: { halign: 'left', cellPadding: showProductImages ? { left: 15, top: 3, right: 4, bottom: 3 } : 4 }, 
@@ -418,7 +418,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
 
                 {/* A4 Preview */}
                 <div style={{ padding: '24px', background: '#f1f5f9' }}>
-                    <div id="quo-a4-preview" style={{ background: '#fff', maxWidth: showBreakdown ? 1122 : 794, margin: '0 auto', padding: '40px 48px', fontFamily: 'Arial,sans-serif', fontSize: 11, color: '#0f172a', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,.1)' }}>
+                    <div id="quo-a4-preview" style={{ background: '#fff', maxWidth: 794, margin: '0 auto', padding: '40px 48px', fontFamily: 'Arial,sans-serif', fontSize: 11, color: '#0f172a', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,.1)' }}>
 
                         {/* Header — company left | quotation details right */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #4f46e5', paddingBottom: 18, marginBottom: 0 }}>
