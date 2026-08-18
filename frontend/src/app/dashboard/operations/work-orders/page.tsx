@@ -1043,7 +1043,7 @@ export default function WorkOrdersPage() {
                                             <label className={lc}>Pesanan Penjualan (Opsional)</label>
                                             <select value={form.salesOrderId} onChange={e => handleSalesOrderChange(e.target.value)} className={ic}>
                                                 <option value="">— Pilih Sales Order —</option>
-                                                {salesOrders.map(so => <option key={so.id} value={so.id}>{so.number}</option>)}
+                                                {salesOrders.map(so => <option key={so.id} value={so.id}>{so.number} — {(so as any).items?.map((i: any) => i.description).join(' · ') || '#'}</option>)}
                                             </select>
                                         </div>
                                         <div><label className={lc}>Pelanggan <span className="text-rose-500">*</span></label>

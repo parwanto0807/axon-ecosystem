@@ -48,7 +48,8 @@ import {
     Wallet,
     LogOut,
     Calendar,
-    Network
+    Network,
+    GitBranch
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -123,6 +124,8 @@ const translations: any = {
         networkSettings: 'Pengaturan Jaringan',
         mikrotikMonitoring: 'Monitoring MikroTik',
         invoiceTemplate: 'Template Invoice',
+        development: 'Development',
+        developmentPlanning: 'Planning & Progress',
     },
     EN: {
         overview: 'Overview',
@@ -190,6 +193,8 @@ const translations: any = {
         networkSettings: 'Network Settings',
         mikrotikMonitoring: 'MikroTik Monitoring',
         invoiceTemplate: 'Invoice Template',
+        development: 'Development',
+        developmentPlanning: 'Planning & Progress',
     }
 }
 
@@ -361,6 +366,20 @@ const getMenuItems = (t: any) => [
             { id: 'location-tracking', icon: MapPin, label: t.locationTracking, path: '/dashboard/hr/location-tracking', requiredRoles: ['SUPER_ADMIN'] },
         ]
     },
+    {
+        id: 'development-group',
+        label: t.development,
+        isHeader: true,
+    },
+    {
+        id: 'development',
+        icon: GitBranch,
+        label: t.development,
+        children: [
+            { id: 'dev-planning', icon: Calendar, label: t.developmentPlanning, path: '/dashboard/development' },
+        ]
+    },
+
     {
         id: 'maintenance-group',
         label: 'MAINTENANCE',

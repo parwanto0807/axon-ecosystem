@@ -98,15 +98,15 @@ export default function DeliveryOrdersPage() {
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`, { headers }).then(r => r.json()),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`, { headers }).then(r => r.json())
             ])
-            setDos(doRes)
-            setProjects(prjRes)
-            setSalesOrders(soRes)
-            setWorkOrders(woRes)
-            setCustomers(custRes)
-            setCompany(coRes)
+            setDos(Array.isArray(doRes) ? doRes : [])
+            setProjects(Array.isArray(prjRes) ? prjRes : [])
+            setSalesOrders(Array.isArray(soRes) ? soRes : [])
+            setWorkOrders(Array.isArray(woRes) ? woRes : [])
+            setCustomers(Array.isArray(custRes) ? custRes : [])
+            setCompany(Array.isArray(coRes) ? {} : coRes || {})
         } catch (e) { console.error(e) }
         setLoading(false)
-    }, [])
+    }, [userRole, userDept, userName])
 
     useEffect(() => { loadData() }, [loadData])
 
@@ -196,17 +196,18 @@ export default function DeliveryOrdersPage() {
     const copyFromWorkOrder = (woId: string) => {
         const wo = (workOrders as any[]).find(w => w.id === woId);
         if (wo) {
+            const srcItems = (wo.items && wo.items.length) ? wo.items : (wo.salesOrder?.items || [])
             setForm(prev => ({
                 ...prev,
+                workOrderId: woId,
                 customerId: wo.customerId || '',
                 projectId: wo.projectId || '',
                 salesOrderId: wo.salesOrderId || '',
                 deliveryAddress: wo.customer?.address || prev.deliveryAddress,
-                items: (wo.items || [])
-                    .filter((it: any) => it.type === 'MATERIAL')
+                items: srcItems
                     .map((it: any, i: number) => ({
                         no: i + 1,
-                        description: it.description,
+                        description: it.sku ? `${it.sku.code} - ${it.sku.product.name}` : (it.description || ''),
                         qty: it.qty,
                         unit: it.unit
                     }))
@@ -417,9 +418,12 @@ export default function DeliveryOrdersPage() {
                                             className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-indigo-600/20"
                                         >
                                             <option value="">Pilih Work Order untuk Copy Data...</option>
-                                            {workOrders.filter(w => (w as any).status !== 'CLOSED').map(wo => (
-                                                <option key={wo.id} value={wo.id}>{wo.number} - {wo.name || (wo as any).title}</option>
-                                            ))}
+                                            {workOrders.map((w: any) => {
+                                                const src = (w.items && w.items.length) ? w.items : (w.salesOrder?.items || [])
+                                                return (
+                                                <option key={w.id} value={w.id}>{w.number} — {src.map((it: any) => it.description).join(' · ') || (w.name || w.title)}</option>
+                                                )
+                                            })}
                                         </select>
                                     </div>
 

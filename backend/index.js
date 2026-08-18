@@ -54,6 +54,9 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const soUploadDir = path.join(__dirname, 'public/sales-order');
 if (!fs.existsSync(soUploadDir)) fs.mkdirSync(soUploadDir, { recursive: true });
 
+const meetingUploadDir = path.join(__dirname, 'public/meetings');
+if (!fs.existsSync(meetingUploadDir)) fs.mkdirSync(meetingUploadDir, { recursive: true });
+
 // Multer config for temporary storage
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -2534,7 +2537,7 @@ const generateWONumber = async () => {
 const WO_INCLUDE = {
   project: true,
   businessCategory: true,
-  salesOrder: { include: { customer: true } },
+  salesOrder: { include: { customer: true, items: true } },
   customer: true,
   asset: true,
   items: { 
@@ -8175,4 +8178,198 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// ─── DEVELOPMENT PLANNING & PROGRESS ────────────────────────────────────────
+
+const PLANNING_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'];
+const generatePlanningNumber = async () => {
+  const year = new Date().getFullYear();
+  const count = await prisma.projectPlanning.count();
+  return `DVL-${year}-${String(count + 1).padStart(4, '0')}`;
+};
+
+const PLANNING_INCLUDE = {
+  project: true,
+  salesOrder: { include: { customer: true } },
+  activities: { orderBy: { sortOrder: 'asc' } },
+  meetings: {
+    include: { files: true },
+    orderBy: { date: 'asc' }
+  }
+};
+
+app.get('/api/development-plannings', checkRole(PLANNING_ROLES), async (req, res) => {
+  try {
+    const plannings = await prisma.projectPlanning.findMany({
+      include: PLANNING_INCLUDE,
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(plannings);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.post('/api/development-plannings', checkRole(PLANNING_ROLES), async (req, res) => {
+  try {
+    const { activities = [], ...data } = req.body;
+    const number = await generatePlanningNumber();
+    const planning = await prisma.projectPlanning.create({
+      data: {
+        ...data,
+        number,
+        projectId: data.projectId || null,
+        salesOrderId: data.salesOrderId || null,
+        startDate: data.startDate ? new Date(data.startDate) : null,
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        activities: {
+          create: (activities || []).map((a, idx) => ({
+            activity: a.activity,
+            fase: a.fase || null,
+            modul: a.modul || null,
+            pic: a.pic || null,
+            startDate: a.startDate ? new Date(a.startDate) : null,
+            endDate: a.endDate ? new Date(a.endDate) : null,
+            progress: Number(a.progress) || 0,
+            status: a.status || 'PLANNED',
+            sortOrder: idx
+          }))
+        }
+      },
+      include: PLANNING_INCLUDE
+    });
+    res.status(201).json(planning);
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.put('/api/development-plannings/:id', checkRole(PLANNING_ROLES), async (req, res) => {
+  try {
+    const { activities, ...data } = req.body;
+    const { id } = req.params;
+    const planning = await prisma.$transaction(async (tx) => {
+      const updated = await tx.projectPlanning.update({
+        where: { id },
+        data: {
+          ...data,
+          projectId: data.projectId || null,
+          salesOrderId: data.salesOrderId || null,
+          startDate: data.startDate ? new Date(data.startDate) : undefined,
+          endDate: data.endDate ? new Date(data.endDate) : undefined
+        }
+      });
+      if (activities) {
+        await tx.planningActivity.deleteMany({ where: { planningId: id } });
+        if (activities.length > 0) {
+          await tx.planningActivity.createMany({
+            data: activities.map((a, idx) => ({
+              planningId: id,
+              activity: a.activity,
+              fase: a.fase || null,
+              modul: a.modul || null,
+              pic: a.pic || null,
+              startDate: a.startDate ? new Date(a.startDate) : null,
+              endDate: a.endDate ? new Date(a.endDate) : null,
+              progress: Number(a.progress) || 0,
+              status: a.status || 'PLANNED',
+              sortOrder: idx
+            }))
+          });
+        }
+      }
+      return tx.projectPlanning.findUnique({ where: { id }, include: PLANNING_INCLUDE });
+    });
+    res.json(planning);
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.delete('/api/development-plannings/:id', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER']), async (req, res) => {
+  try {
+    await prisma.projectPlanning.delete({ where: { id: req.params.id } });
+    res.json({ message: 'Deleted' });
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.post('/api/development-plannings/:id/meetings', checkRole(PLANNING_ROLES), async (req, res) => {
+  try {
+    const meeting = await prisma.projectMeeting.create({
+      data: {
+        planningId: req.params.id,
+        title: req.body.title,
+        date: req.body.date ? new Date(req.body.date) : new Date(),
+        location: req.body.location || null,
+        link: req.body.link || null,
+        participants: req.body.participants || null,
+        agenda: req.body.agenda || null,
+        resume: req.body.resume || null,
+        decisions: req.body.decisions || null,
+        followUp: req.body.followUp || null,
+        pic: req.body.pic || null,
+        deadline: req.body.deadline ? new Date(req.body.deadline) : null,
+        status: req.body.status || 'SCHEDULED'
+      },
+      include: { files: true }
+    });
+    res.status(201).json(meeting);
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.put('/api/development-meetings/:id', checkRole(PLANNING_ROLES), async (req, res) => {
+  try {
+    const meeting = await prisma.projectMeeting.update({
+      where: { id: req.params.id },
+      data: {
+        ...req.body,
+        date: req.body.date ? new Date(req.body.date) : undefined,
+        deadline: req.body.deadline ? new Date(req.body.deadline) : null
+      },
+      include: { files: true }
+    });
+    res.json(meeting);
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.delete('/api/development-meetings/:id', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER']), async (req, res) => {
+  try {
+    const meeting = await prisma.projectMeeting.findUnique({ where: { id: req.params.id } });
+    if (!meeting) return res.status(404).json({ message: 'Not found' });
+    for (const f of await prisma.meetingFile.findMany({ where: { meetingId: meeting.id } })) {
+      try { fs.unlinkSync(path.join(__dirname, f.filePath)); } catch { }
+    }
+    await prisma.projectMeeting.delete({ where: { id: meeting.id } });
+    res.json({ message: 'Deleted' });
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.post('/api/development-meetings/:id/files', checkRole(PLANNING_ROLES), upload.array('files', 10), async (req, res) => {
+  try {
+    const saved = [];
+    for (const file of req.files || []) {
+      const ext = path.extname(file.originalname || '').slice(0, 10) || '.bin';
+      const fileName = `mtg-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`;
+      const filePath = path.join(meetingUploadDir, fileName);
+      fs.writeFileSync(filePath, file.buffer);
+      saved.push(await prisma.meetingFile.create({
+        data: {
+          meetingId: req.params.id,
+          fileName: file.originalname || fileName,
+          filePath: `/public/meetings/${fileName}`,
+          fileSize: file.size,
+          mimeType: file.mimetype || null,
+          uploadedBy: req.userName || null
+        }
+      }));
+    }
+    res.status(201).json(saved);
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+app.delete('/api/development-meetings/files/:fileId', checkRole(PLANNING_ROLES), async (req, res) => {
+  try {
+    const file = await prisma.meetingFile.findUnique({ where: { id: req.params.fileId } });
+    if (!file) return res.status(404).json({ message: 'Not found' });
+    try { fs.unlinkSync(path.join(__dirname, file.filePath)); } catch { }
+    await prisma.meetingFile.delete({ where: { id: file.id } });
+    res.json({ message: 'Deleted' });
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+console.log('Development planning routes loaded');
 

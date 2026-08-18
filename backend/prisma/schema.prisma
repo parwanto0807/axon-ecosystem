@@ -316,6 +316,7 @@ model PreSalesProject {
   businessCategoryId String?
   businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
   operationalExpenses OperationalExpense[]
+  plannings          ProjectPlanning[]
 }
 
 model QuotationItem {
@@ -368,6 +369,7 @@ model SalesOrder {
   workOrders     WorkOrder[]
   businessCategoryId String?
   businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
+  plannings      ProjectPlanning[]
 }
 
 model SalesOrderItem {
@@ -1561,4 +1563,75 @@ model MaintenanceTemplateItem {
   isActive   Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+// ─── DEVELOPMENT PLANNING & PROGRESS ─────────────────────────────────────────
+
+model ProjectPlanning {
+  id            String             @id @default(cuid())
+  number        String             @unique
+  projectId     String?
+  salesOrderId  String?
+  title         String
+  description   String?
+  startDate     DateTime?
+  endDate       DateTime?
+  progress      Float              @default(0)
+  status        String             @default("PLANNING") // PLANNING | ONGOING | ON_HOLD | COMPLETED
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  project       PreSalesProject?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  salesOrder    SalesOrder?        @relation(fields: [salesOrderId], references: [id], onDelete: SetNull)
+  activities    PlanningActivity[]
+  meetings      ProjectMeeting[]
+}
+
+model PlanningActivity {
+  id            String           @id @default(cuid())
+  planningId    String
+  fase          String?
+  modul         String?
+  activity      String
+  pic           String?
+  startDate     DateTime?
+  endDate       DateTime?
+  progress      Float            @default(0)
+  status        String           @default("PLANNED") // PLANNED | ONGOING | DONE
+  sortOrder     Int              @default(0)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  planning      ProjectPlanning  @relation(fields: [planningId], references: [id], onDelete: Cascade)
+}
+
+model ProjectMeeting {
+  id            String            @id @default(cuid())
+  planningId    String
+  title         String
+  date          DateTime
+  location      String?
+  link          String?
+  participants  String?           // comma-separated names
+  agenda        String?           // poin yang akan dibahas
+  resume        String?
+  decisions     String?           // keputusan hasil rapat
+  followUp      String?           // tindak lanjut
+  pic           String?
+  deadline      DateTime?
+  status        String            @default("SCHEDULED") // SCHEDULED | DONE | CANCELLED
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  planning      ProjectPlanning   @relation(fields: [planningId], references: [id], onDelete: Cascade)
+  files         MeetingFile[]
+}
+
+model MeetingFile {
+  id        String        @id @default(cuid())
+  meetingId String
+  fileName  String
+  filePath  String
+  fileSize  Int
+  mimeType  String?
+  uploadedBy String?
+  createdAt DateTime      @default(now())
+  meeting   ProjectMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
 }
