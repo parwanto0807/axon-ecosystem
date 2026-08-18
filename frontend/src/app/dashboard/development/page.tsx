@@ -364,7 +364,7 @@ export default function DevelopmentPage() {
                 doc.setFontSize(6.5)
                 doc.setTextColor(...C.slate300)
                 doc.text(`${selected.number} — ${selected.title}`, 12, pageH - 5)
-                doc.text(`Hal ${doc.internal.getCurrentPageInfo().pageNumber}`, pageW - 12, pageH - 5, { align:'right' })
+                doc.text(`Hal ${(doc as any).internal.getCurrentPageInfo().pageNumber}`, pageW - 12, pageH - 5, { align:'right' })
             }
         })
 
@@ -410,7 +410,7 @@ export default function DevelopmentPage() {
                     doc.setFontSize(6.5)
                     doc.setTextColor(...C.slate300)
                     doc.text(`${selected.number} — ${selected.title}`, 12, pageH - 5)
-                    doc.text(`Hal ${doc.internal.getCurrentPageInfo().pageNumber}`, pageW - 12, pageH - 5, { align:'right' })
+                    doc.text(`Hal ${(doc as any).internal.getCurrentPageInfo().pageNumber}`, pageW - 12, pageH - 5, { align:'right' })
                 }
             })
         }
@@ -421,7 +421,7 @@ export default function DevelopmentPage() {
         const lastFinalY = (doc as any).lastAutoTable?.finalY || 0
         if (lastFinalY < pageH - 10) {
             doc.text(`${selected.number} — ${selected.title}`, 12, pageH - 5)
-            doc.text(`Hal ${doc.internal.getCurrentPageInfo().pageNumber}`, pageW - 12, pageH - 5, { align:'right' })
+            doc.text(`Hal ${(doc as any).internal.getCurrentPageInfo().pageNumber}`, pageW - 12, pageH - 5, { align:'right' })
         }
 
         doc.save(`${selected.number} - ${selected.title}.pdf`)
