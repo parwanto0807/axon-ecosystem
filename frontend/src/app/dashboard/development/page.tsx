@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useLanguage } from "@/context/LanguageContext"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -88,6 +89,8 @@ export default function DevelopmentPage() {
     const t: any = lang === 'ID' ? ID : EN
     const userRole = (session?.user as any)?.role
     const userName = session?.user?.name || ''
+    const router = useRouter()
+    const searchParams = useSearchParams()
 
     const [plans, setPlans] = useState<Planning[]>([])
     const [projects, setProjects] = useState<any[]>([])
@@ -100,8 +103,6 @@ export default function DevelopmentPage() {
     const [modalOpen, setModalOpen] = useState(false)
     const [editId, setEditId] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
-    const [meetingModal, setMeetingModal] = useState<Meeting | null>(null)
-    const [newMeeting, setNewMeeting] = useState(false)
     const [uploading, setUploading] = useState(false)
     const [sidebarOpen, setSidebarOpen] = useState(true)
     const [pdfPreview, setPdfPreview] = useState(false)
@@ -126,15 +127,35 @@ export default function DevelopmentPage() {
                 fetch(`${api()}/api/projects`, { headers }).then(r => r.json()),
                 fetch(`${api()}/api/orders`, { headers }).then(r => r.json()),
             ])
-            setPlans(Array.isArray(pRes) ? pRes : [])
+            const validPlans = Array.isArray(pRes) ? pRes : []
+            setPlans(validPlans)
             setProjects(Array.isArray(prjRes) ? prjRes : [])
             setOrders(Array.isArray(ordRes) ? ordRes : [])
-            if (!selectedId && Array.isArray(pRes) && pRes.length > 0) setSelectedId(pRes[0].id)
+
+            const paramPlanning = searchParams.get('planning') || searchParams.get('id')
+            const paramTab = searchParams.get('tab')
+            if (paramTab === 'MEETINGS') setTab('MEETINGS')
+
+            if (validPlans.length > 0) {
+                if (paramPlanning && validPlans.some((p: Planning) => p.id === paramPlanning)) {
+                    setSelectedId(paramPlanning)
+                } else if (!selectedId || !validPlans.some((p: Planning) => p.id === selectedId)) {
+                    setSelectedId(validPlans[0].id)
+                }
+            }
         } catch (e: any) { console.error(e) }
         setLoading(false)
-    }, [userRole, userName, session, selectedId])
+    }, [userRole, userName, session, selectedId, searchParams])
 
     useEffect(() => { load() }, [load])
+
+    // React to query params dynamically
+    useEffect(() => {
+        const paramPlanning = searchParams.get('planning') || searchParams.get('id')
+        const paramTab = searchParams.get('tab')
+        if (paramPlanning) setSelectedId(paramPlanning)
+        if (paramTab === 'MEETINGS') setTab('MEETINGS')
+    }, [searchParams])
 
     const selected = plans.find(p => p.id === selectedId) || null
     const avgProgress = (acts: Activity[]) => acts.length === 0 ? 0 : Math.round(acts.reduce((s,a) => s + (Number(a.progress)||0), 0) / acts.length)
@@ -175,25 +196,6 @@ export default function DevelopmentPage() {
         const res = await fetch(`${api()}/api/development-plannings/${p.id}`, { method:'DELETE', headers:{'x-user-role':userRole||''} })
         if (res.ok) { showToast('success','Planning dihapus'); if (selectedId===p.id) setSelectedId(null); load() }
         else showToast('error','Gagal hapus')
-    }
-    const openNewMeeting = () => { setNewMeeting(true); setMeetingModal({ id:'', title:'', date:new Date().toISOString().slice(0,16), status:'SCHEDULED', files:[], agenda:'' }) }
-    const openEditMeeting = (m: Meeting) => { setNewMeeting(false); setMeetingModal({...m}) }
-    const saveMeeting = async () => {
-        if (!meetingModal) return
-        if (!meetingModal.title) return showToast('error','Judul rapat wajib diisi')
-        setSaving(true)
-        try {
-            const headers: any = { 'Content-Type':'application/json', 'x-user-role':userRole||'', 'x-user-name':userName||'' }
-            let res: Response
-            if (newMeeting) {
-                res = await fetch(`${api()}/api/development-plannings/${selectedId}/meetings`, { method:'POST', headers, body:JSON.stringify({ title:meetingModal.title, date:meetingModal.date, location:meetingModal.location, link:meetingModal.link, participants:meetingModal.participants, agenda:meetingModal.agenda }) })
-            } else {
-                res = await fetch(`${api()}/api/development-meetings/${meetingModal.id}`, { method:'PUT', headers, body:JSON.stringify({ title:meetingModal.title, date:meetingModal.date, location:meetingModal.location, link:meetingModal.link, participants:meetingModal.participants, agenda:meetingModal.agenda, resume:meetingModal.resume, decisions:meetingModal.decisions, followUp:meetingModal.followUp, pic:meetingModal.pic, deadline:meetingModal.deadline, status:meetingModal.status }) })
-            }
-            if (res.ok) { setMeetingModal(null); showToast('success',newMeeting?'Rapat dijadwalkan':'Rapat diperbarui'); load() }
-            else { const e = await res.json().catch(() => ({})); showToast('error',e.message||'Gagal') }
-        } catch (e: any) { showToast('error',e.message) }
-        setSaving(false)
     }
     const deleteMeeting = async (m: Meeting) => {
         if (!confirm(`Hapus rapat "${m.title}"?`)) return
@@ -944,7 +946,7 @@ export default function DevelopmentPage() {
                                                 <h3 className="text-sm font-black text-slate-700">{t.meetingList}</h3>
                                                 <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black">{selected.meetings.length}</span>
                                             </div>
-                                            <Button onClick={openNewMeeting} className="h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold gap-1.5"><Plus size={13} />{t.newMeeting}</Button>
+                                            <Button onClick={() => router.push(`/dashboard/development/meetings/new?planning=${selected.id}`)} className="h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold gap-1.5"><Plus size={13} />{t.newMeeting}</Button>
                                         </div>
                                         {selected.meetings.length===0&&(
                                             <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center">
@@ -977,7 +979,7 @@ export default function DevelopmentPage() {
                                                                         </span>
                                                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                                             <button onClick={() => setMeetingPdfPreview(m)} className="w-7 h-7 rounded-lg hover:bg-indigo-50 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors" title="Preview Surat"><FileText size={12} /></button>
-                                                                            <button onClick={() => openEditMeeting(m)} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"><Edit size={12} /></button>
+                                                                            <button onClick={() => router.push(`/dashboard/development/meetings/${m.id}`)} className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"><Edit size={12} /></button>
                                                                             <button onClick={() => deleteMeeting(m)} className="w-7 h-7 rounded-lg hover:bg-rose-50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={12} /></button>
                                                                         </div>
                                                                     </div>
@@ -1120,92 +1122,6 @@ export default function DevelopmentPage() {
                                 <button onClick={()=>setModalOpen(false)} className="h-10 px-5 rounded-xl border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-100 transition-colors">Batal</button>
                                 <Button onClick={handleSave} disabled={saving} className="h-10 px-6 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 gap-2">
                                     {saving?<Loader2 size={14} className="animate-spin" />:<Save size={14} />}{t.save}
-                                </Button>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-
-            {/* MEETING FORM MODAL */}
-            <AnimatePresence>
-                {(meetingModal&&selected)&&(
-                    <div className="fixed inset-0 z-[150] flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-md overflow-y-auto">
-                        <motion.div initial={{opacity:0,scale:0.96,y:10}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:0.96,y:10}} transition={{duration:0.2}} className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl my-6 overflow-hidden flex flex-col">
-                            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20"><CalendarDays size={16} className="text-white" /></div>
-                                    <div><h2 className="text-lg font-black text-slate-900">{newMeeting?t.newMeeting:t.editMeeting}</h2><p className="text-xs text-slate-500 font-medium">Worksheet Pencatatan Rapat & Notulen</p></div>
-                                </div>
-                                <button onClick={()=>setMeetingModal(null)} className="w-9 h-9 rounded-xl hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors"><X size={18} /></button>
-                            </div>
-                            <div className="p-6 overflow-y-auto" style={{maxHeight:'calc(100vh - 180px)'}}>
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                                    {/* COLUMN 1: METADATA */}
-                                    <div className="lg:col-span-4 space-y-5">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex gap-1">Judul Rapat <span className="text-rose-500">*</span></label>
-                                            <textarea value={meetingModal.title} onChange={e=>setMeetingModal({...meetingModal,title:e.target.value})} rows={2} placeholder="cth: Kick-off Meeting" className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all resize-y" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tanggal & Jam</label>
-                                            <input type="datetime-local" value={meetingModal.date||''} onChange={e=>setMeetingModal({...meetingModal,date:e.target.value})} className="w-full h-11 rounded-xl bg-slate-50 border border-slate-200 px-3 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Status</label>
-                                            <select value={meetingModal.status} onChange={e=>setMeetingModal({...meetingModal,status:e.target.value})} className="w-full h-11 rounded-xl bg-slate-50 border border-slate-200 px-3 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all">
-                                                <option value="SCHEDULED">Terjadwal</option>
-                                                <option value="DONE">Selesai</option>
-                                                <option value="CANCELLED">Dibatalkan</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Lokasi / Ruangan</label>
-                                            <input value={meetingModal.location||''} onChange={e=>setMeetingModal({...meetingModal,location:e.target.value})} className="w-full h-11 rounded-xl bg-slate-50 border border-slate-200 px-3 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Link Online Meeting</label>
-                                            <input value={meetingModal.link||''} onChange={e=>setMeetingModal({...meetingModal,link:e.target.value})} placeholder="https://meet.google.com/..." className="w-full h-11 rounded-xl bg-slate-50 border border-slate-200 px-3 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Peserta (pisahkan koma)</label>
-                                            <textarea value={meetingModal.participants||''} onChange={e=>setMeetingModal({...meetingModal,participants:e.target.value})} rows={3} placeholder="Nama peserta..." className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all resize-y" />
-                                        </div>
-                                    </div>
-
-                                    {/* COLUMN 2: WORKSHEET (AGENDA, RESUME, DLL) */}
-                                    <div className="lg:col-span-8 space-y-5">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Agenda / Poin Pembahasan</label>
-                                            <textarea value={meetingModal.agenda||''} onChange={e=>setMeetingModal({...meetingModal,agenda:e.target.value})} rows={4} placeholder="1. Pembahasan fitur A&#10;2. Persiapan dokumen B" className="w-full rounded-xl bg-indigo-50/30 border border-indigo-100 px-4 py-3 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all resize-y" />
-                                        </div>
-                                        {!newMeeting&&(
-                                            <>
-                                                {[{key:'resume',label:'Resume / Notulen Hasil Rapat',placeholder:'Ringkasan pembahasan dan catatan...',rows:6,color:'emerald'},{key:'decisions',label:'Keputusan / Hasil Kesepakatan',placeholder:'1. ...\n2. ...',rows:4,color:'sky'},{key:'followUp',label:'Tindak Lanjut (Follow Up)',placeholder:'Tugas selanjutnya...',rows:4,color:'amber'}].map(({key,label,placeholder,rows,color})=>(
-                                                    <div key={key} className="space-y-1.5">
-                                                        <label className={`text-[10px] font-black uppercase tracking-widest text-${color}-600`}>{label}</label>
-                                                        <textarea value={(meetingModal as any)[key]||''} onChange={e=>setMeetingModal({...meetingModal,[key]:e.target.value})} rows={rows} placeholder={placeholder} className={`w-full rounded-xl bg-${color}-50/30 border border-${color}-100 px-4 py-3 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-${color}-500/30 focus:border-${color}-400 transition-all resize-y`} />
-                                                    </div>
-                                                ))}
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 rounded-xl border border-slate-100 bg-slate-50/50 mt-4">
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">PIC Tindak Lanjut</label>
-                                                        <input value={meetingModal.pic||''} onChange={e=>setMeetingModal({...meetingModal,pic:e.target.value})} className="w-full h-11 rounded-xl bg-white border border-slate-200 px-3 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all" />
-                                                    </div>
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Deadline</label>
-                                                        <input type="date" value={(meetingModal.deadline||'').slice(0,10)} onChange={e=>setMeetingModal({...meetingModal,deadline:e.target.value})} className="w-full h-11 rounded-xl bg-slate-50 border border-slate-200 px-3 font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition-all" />
-                                                    </div>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-2.5 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-                                <button onClick={()=>setMeetingModal(null)} className="h-10 px-5 rounded-xl border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-100 transition-colors">Batal</button>
-                                <Button onClick={saveMeeting} disabled={saving} className="h-10 px-6 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 gap-2">
-                                    {saving?<Loader2 size={14} className="animate-spin" />:<Save size={14} />}{newMeeting?t.schedule:t.save}
                                 </Button>
                             </div>
                         </motion.div>

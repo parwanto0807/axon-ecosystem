@@ -8184,8 +8184,12 @@ app.use((req, res, next) => {
 const PLANNING_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF'];
 const generatePlanningNumber = async () => {
   const year = new Date().getFullYear();
-  const count = await prisma.projectPlanning.count();
-  return `DVL-${year}-${String(count + 1).padStart(4, '0')}`;
+  const last = await prisma.projectPlanning.findFirst({
+    where: { number: { startsWith: `DVL-${year}-` } },
+    orderBy: { number: 'desc' }
+  });
+  const seq = last ? parseInt(last.number.split('-').pop(), 10) + 1 : 1;
+  return `DVL-${year}-${String(seq).padStart(4, '0')}`;
 };
 
 const PLANNING_INCLUDE = {
@@ -8211,31 +8215,39 @@ app.get('/api/development-plannings', checkRole(PLANNING_ROLES), async (req, res
 app.post('/api/development-plannings', checkRole(PLANNING_ROLES), async (req, res) => {
   try {
     const { activities = [], ...data } = req.body;
-    const number = await generatePlanningNumber();
-    const planning = await prisma.projectPlanning.create({
-      data: {
-        ...data,
-        number,
-        projectId: data.projectId || null,
-        salesOrderId: data.salesOrderId || null,
-        startDate: data.startDate ? new Date(data.startDate) : null,
-        endDate: data.endDate ? new Date(data.endDate) : null,
-        activities: {
-          create: (activities || []).map((a, idx) => ({
-            activity: a.activity,
-            fase: a.fase || null,
-            modul: a.modul || null,
-            pic: a.pic || null,
-            startDate: a.startDate ? new Date(a.startDate) : null,
-            endDate: a.endDate ? new Date(a.endDate) : null,
-            progress: Number(a.progress) || 0,
-            status: a.status || 'PLANNED',
-            sortOrder: idx
-          }))
-        }
-      },
-      include: PLANNING_INCLUDE
-    });
+    let planning;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      try {
+        planning = await prisma.projectPlanning.create({
+          data: {
+            ...data,
+            number: await generatePlanningNumber(),
+            projectId: data.projectId || null,
+            salesOrderId: data.salesOrderId || null,
+            startDate: data.startDate ? new Date(data.startDate) : null,
+            endDate: data.endDate ? new Date(data.endDate) : null,
+            activities: {
+              create: (activities || []).map((a, idx) => ({
+                activity: a.activity,
+                fase: a.fase || null,
+                modul: a.modul || null,
+                pic: a.pic || null,
+                startDate: a.startDate ? new Date(a.startDate) : null,
+                endDate: a.endDate ? new Date(a.endDate) : null,
+                progress: Number(a.progress) || 0,
+                status: a.status || 'PLANNED',
+                sortOrder: idx
+              }))
+            }
+          },
+          include: PLANNING_INCLUDE
+        });
+        break;
+      } catch (e) {
+        if (e.code !== 'P2002') throw e;
+      }
+    }
+    if (!planning) return res.status(400).json({ message: 'Gagal generate nomor' });
     res.status(201).json(planning);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
