@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useLanguage } from "@/context/LanguageContext"
@@ -83,7 +83,7 @@ const daysRemaining = (end?: string) => {
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 
-export default function DevelopmentPage() {
+function DevelopmentContent() {
     const { data: session } = useSession()
     const { lang } = useLanguage()
     const t: any = lang === 'ID' ? ID : EN
@@ -1457,6 +1457,18 @@ export default function DevelopmentPage() {
                 )}
             </AnimatePresence>
         </div>
+    )
+}
+
+export default function DevelopmentPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-8 flex items-center justify-center min-h-[50vh]">
+                <Loader2 className="animate-spin text-indigo-600" size={32} />
+            </div>
+        }>
+            <DevelopmentContent />
+        </Suspense>
     )
 }
 

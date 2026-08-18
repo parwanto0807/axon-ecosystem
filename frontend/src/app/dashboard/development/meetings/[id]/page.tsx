@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, Suspense } from "react"
 import { useSession } from "next-auth/react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useLanguage } from "@/context/LanguageContext"
@@ -252,7 +252,7 @@ const STATUS_CONFIG: Record<string, { labelId: string; labelEn: string; bg: stri
 
 // ─── MAIN COMPONENT ────────────────────────────────────────────────────────────
 
-export default function MeetingDetailPage() {
+function MeetingDetailContent() {
     const params = useParams()
     const searchParams = useSearchParams()
     const router = useRouter()
@@ -1372,5 +1372,17 @@ export default function MeetingDetailPage() {
                 </div>
             )}
         </div>
+    )
+}
+
+export default function MeetingDetailPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-8 flex items-center justify-center min-h-[50vh]">
+                <Loader2 className="animate-spin text-indigo-600" size={32} />
+            </div>
+        }>
+            <MeetingDetailContent />
+        </Suspense>
     )
 }
