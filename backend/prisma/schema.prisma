@@ -317,6 +317,7 @@ model PreSalesProject {
   businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
   operationalExpenses OperationalExpense[]
   plannings          ProjectPlanning[]
+  investorLoans      InvestorLoan[]
 }
 
 model QuotationItem {
@@ -660,6 +661,9 @@ model BankAccount {
   coaId         String?
   coa           ChartOfAccounts? @relation(fields: [coaId], references: [id])
   invoices      Invoice[]
+  investorLoanDisbursements InvestorLoanDisbursement[]
+  investorLoanRepayments    InvestorLoanRepayment[]
+  profitDistributions       ProfitDistribution[]
 }
 
 model BAST {
@@ -1634,4 +1638,79 @@ model MeetingFile {
   uploadedBy String?
   createdAt DateTime      @default(now())
   meeting   ProjectMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+}
+
+// ─── INVESTOR LOANS & PROFIT SHARING ─────────────────────────────────────────
+
+model InvestorLoan {
+  id                   String                    @id @default(cuid())
+  number               String                    @unique
+  projectId            String?
+  investorName         String
+  investorContact      String?
+  principalAmount      Float                     @default(0)
+  profitSharingPercent Float                     @default(0)
+  interestRate         Float                     @default(0)
+  repaymentType        String                    @default("INSTALLMENT") // FULL | INSTALLMENT
+  tenorMonths          Int?
+  dueDate              DateTime?
+  status               String                    @default("DRAFT") // DRAFT | ACTIVE | PARTIAL | PAID | OVERDUE
+  notes                String?
+  createdBy            String?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  project              PreSalesProject?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  disbursements        InvestorLoanDisbursement[]
+  repayments           InvestorLoanRepayment[]
+  profitDistributions  ProfitDistribution[]
+}
+
+model InvestorLoanDisbursement {
+  id              String          @id @default(cuid())
+  investorLoanId  String
+  date            DateTime        @default(now())
+  amount          Float           @default(0)
+  method          String          @default("TRANSFER") // CASH | TRANSFER
+  bankAccountId   String?
+  proofUrl        String?
+  notes           String?
+  journalId       String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  investorLoan    InvestorLoan    @relation(fields: [investorLoanId], references: [id], onDelete: Cascade)
+  bankAccount     BankAccount?    @relation(fields: [bankAccountId], references: [id])
+}
+
+model InvestorLoanRepayment {
+  id                String          @id @default(cuid())
+  investorLoanId    String
+  date              DateTime        @default(now())
+  amount            Float           @default(0)
+  type              String          @default("INSTALLMENT") // FULL | INSTALLMENT
+  installmentNumber Int?
+  bankAccountId     String?
+  proofUrl          String?
+  notes             String?
+  journalId         String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  investorLoan      InvestorLoan    @relation(fields: [investorLoanId], references: [id], onDelete: Cascade)
+  bankAccount       BankAccount?    @relation(fields: [bankAccountId], references: [id])
+}
+
+model ProfitDistribution {
+  id                    String          @id @default(cuid())
+  investorLoanId        String
+  date                  DateTime        @default(now())
+  totalProjectProfit    Float           @default(0)
+  investorSharePercent  Float           @default(0)
+  distributedAmount     Float           @default(0)
+  status                String          @default("PENDING") // PENDING | DISTRIBUTED
+  bankAccountId         String?
+  notes                 String?
+  journalId             String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  investorLoan          InvestorLoan    @relation(fields: [investorLoanId], references: [id], onDelete: Cascade)
+  bankAccount           BankAccount?    @relation(fields: [bankAccountId], references: [id])
 }

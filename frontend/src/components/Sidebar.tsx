@@ -104,6 +104,7 @@ const translations: any = {
         operationalApprovals: 'Persetujuan Ops',
         accountabilityReports: 'Laporan Pertanggungjawaban',
         systemSettings: 'Pengaturan Sistem',
+        investorLoans: 'Pinjaman Investor',
         hrManagement: 'Manajemen SDM',
         employeeData: 'Data Karyawan',
         payrollSystem: 'Sistem Payroll',
@@ -173,6 +174,7 @@ const translations: any = {
         operationalApprovals: 'Operational Approvals',
         accountabilityReports: 'Accountability Reports',
         systemSettings: 'System Settings',
+        investorLoans: 'Investor Loans',
         hrManagement: 'HR Management',
         employeeData: 'Employee Data',
         payrollSystem: 'Payroll System',
@@ -331,6 +333,7 @@ const getMenuItems = (t: any) => [
         requiredDepartment: ['FINANCE'],
         children: [
             { id: 'invoices', icon: Receipt, label: t.customerInvoices, path: '/dashboard/finance/invoices' },
+            { id: 'investor-loans', icon: Landmark, label: t.investorLoans, path: '/dashboard/finance/investor-loans' },
             { id: 'operational-expenses', icon: Wallet, label: t.operationalCosts, path: '/dashboard/finance/operational-expenses' },
             { id: 'approvals', icon: ShieldCheck, label: t.operationalApprovals, path: '/dashboard/finance/approvals' },
             { id: 'expense-reports', icon: Receipt, label: t.accountabilityReports, path: '/dashboard/finance/expenses' },

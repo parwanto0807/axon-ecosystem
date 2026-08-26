@@ -8385,3 +8385,590 @@ app.delete('/api/development-meetings/files/:fileId', checkRole(PLANNING_ROLES),
 
 console.log('Development planning routes loaded');
 
+// ─── INVESTOR LOANS & PROFIT SHARING ─────────────────────────────────────────
+
+const INVESTOR_LOAN_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'FINANCE'];
+
+// Helper: generate INVLN number
+async function generateInvestorLoanNumber(tx) {
+  const year = new Date().getFullYear();
+  const last = await tx.investorLoan.findFirst({
+    where: { number: { startsWith: `INVLN-${year}-` } },
+    orderBy: { number: 'desc' }
+  });
+  let seq = 1;
+  if (last) {
+    const parts = last.number.split('-');
+    const lastSeq = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(lastSeq)) seq = lastSeq + 1;
+  }
+  return `INVLN-${year}-${String(seq).padStart(4, '0')}`;
+}
+
+// Helper: generate journal number for investor loans
+async function generateInvestorJournalNumber(tx, prefix) {
+  const year = new Date().getFullYear();
+  const last = await tx.journalEntry.findFirst({
+    where: { number: { startsWith: `JV-${prefix}-${year}-` } },
+    orderBy: { number: 'desc' }
+  });
+  let seq = 1;
+  if (last) {
+    const parts = last.number.split('-');
+    const lastSeq = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(lastSeq)) seq = lastSeq + 1;
+  }
+  return `JV-${prefix}-${year}-${String(seq).padStart(4, '0')}`;
+}
+
+// GET /api/investor-loans — List all with summary
+app.get('/api/investor-loans', async (req, res) => {
+  try {
+    const { status, projectId } = req.query;
+    const where = {};
+    if (status) where.status = status;
+    if (projectId) where.projectId = projectId;
+
+    const loans = await prisma.investorLoan.findMany({
+      where,
+      include: {
+        project: { select: { id: true, number: true, name: true } },
+        disbursements: { select: { amount: true, date: true } },
+        repayments: { select: { amount: true, date: true, type: true } },
+        profitDistributions: { select: { distributedAmount: true, status: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const summary = loans.map(loan => {
+      const totalDisbursed = loan.disbursements.reduce((s, d) => s + d.amount, 0);
+      const totalRepaid = loan.repayments.reduce((s, r) => s + r.amount, 0);
+      const totalProfitDistributed = loan.profitDistributions
+        .filter(p => p.status === 'DISTRIBUTED')
+        .reduce((s, p) => s + p.distributedAmount, 0);
+      const outstandingBalance = loan.principalAmount - totalRepaid;
+
+      return {
+        ...loan,
+        totalDisbursed,
+        totalRepaid,
+        totalProfitDistributed,
+        outstandingBalance
+      };
+    });
+
+    res.json(summary);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// POST /api/investor-loans — Create new loan
+app.post('/api/investor-loans', checkRole(INVESTOR_LOAN_ROLES), async (req, res) => {
+  try {
+    const {
+      projectId, investorName, investorContact,
+      principalAmount, profitSharingPercent, interestRate,
+      repaymentType, tenorMonths, dueDate, notes
+    } = req.body;
+
+    if (!investorName) return res.status(400).json({ message: 'Nama investor wajib diisi' });
+    if (!principalAmount || principalAmount <= 0) return res.status(400).json({ message: 'Jumlah pinjaman harus lebih dari 0' });
+
+    const loan = await prisma.$transaction(async (tx) => {
+      const number = await generateInvestorLoanNumber(tx);
+      return tx.investorLoan.create({
+        data: {
+          number,
+          projectId: projectId || null,
+          investorName,
+          investorContact: investorContact || null,
+          principalAmount: Number(principalAmount),
+          profitSharingPercent: Number(profitSharingPercent) || 0,
+          interestRate: Number(interestRate) || 0,
+          repaymentType: repaymentType || 'INSTALLMENT',
+          tenorMonths: tenorMonths ? Number(tenorMonths) : null,
+          dueDate: dueDate ? new Date(dueDate) : null,
+          status: 'DRAFT',
+          notes: notes || null,
+          createdBy: req.userName || null
+        },
+        include: {
+          project: { select: { id: true, number: true, name: true } }
+        }
+      });
+    });
+
+    res.status(201).json(loan);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// GET /api/investor-loans/:id — Detail
+app.get('/api/investor-loans/:id', async (req, res) => {
+  try {
+    const loan = await prisma.investorLoan.findUnique({
+      where: { id: req.params.id },
+      include: {
+        project: { select: { id: true, number: true, name: true } },
+        disbursements: { include: { bankAccount: true }, orderBy: { date: 'asc' } },
+        repayments: { include: { bankAccount: true }, orderBy: { date: 'asc' } },
+        profitDistributions: { include: { bankAccount: true }, orderBy: { date: 'asc' } }
+      }
+    });
+
+    if (!loan) return res.status(404).json({ message: 'Pinjaman tidak ditemukan' });
+
+    const totalDisbursed = loan.disbursements.reduce((s, d) => s + d.amount, 0);
+    const totalRepaid = loan.repayments.reduce((s, r) => s + r.amount, 0);
+    const totalProfitDistributed = loan.profitDistributions
+      .filter(p => p.status === 'DISTRIBUTED')
+      .reduce((s, p) => s + p.distributedAmount, 0);
+
+    res.json({
+      ...loan,
+      totalDisbursed,
+      totalRepaid,
+      totalProfitDistributed,
+      outstandingBalance: loan.principalAmount - totalRepaid
+    });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// PATCH /api/investor-loans/:id — Update loan
+app.patch('/api/investor-loans/:id', checkRole(INVESTOR_LOAN_ROLES), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.investorLoan.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ message: 'Pinjaman tidak ditemukan' });
+
+    const {
+      projectId, investorName, investorContact,
+      principalAmount, profitSharingPercent, interestRate,
+      repaymentType, tenorMonths, dueDate, notes, status
+    } = req.body;
+
+    const loan = await prisma.investorLoan.update({
+      where: { id },
+      data: {
+        projectId: projectId !== undefined ? projectId : existing.projectId,
+        investorName: investorName || existing.investorName,
+        investorContact: investorContact !== undefined ? investorContact : existing.investorContact,
+        principalAmount: principalAmount !== undefined ? Number(principalAmount) : existing.principalAmount,
+        profitSharingPercent: profitSharingPercent !== undefined ? Number(profitSharingPercent) : existing.profitSharingPercent,
+        interestRate: interestRate !== undefined ? Number(interestRate) : existing.interestRate,
+        repaymentType: repaymentType || existing.repaymentType,
+        tenorMonths: tenorMonths !== undefined ? (tenorMonths ? Number(tenorMonths) : null) : existing.tenorMonths,
+        dueDate: dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : existing.dueDate,
+        notes: notes !== undefined ? notes : existing.notes,
+        status: status || existing.status
+      },
+      include: {
+        project: { select: { id: true, number: true, name: true } }
+      }
+    });
+
+    res.json(loan);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// DELETE /api/investor-loans/:id
+app.delete('/api/investor-loans/:id', checkRole(INVESTOR_LOAN_ROLES), async (req, res) => {
+  try {
+    const existing = await prisma.investorLoan.findUnique({
+      where: { id: req.params.id },
+      include: { disbursements: true, repayments: true }
+    });
+    if (!existing) return res.status(404).json({ message: 'Pinjaman tidak ditemukan' });
+    if (existing.disbursements.length > 0 || existing.repayments.length > 0) {
+      return res.status(400).json({ message: 'Tidak bisa menghapus pinjaman yang sudah ada transaksi' });
+    }
+    await prisma.investorLoan.delete({ where: { id: req.params.id } });
+    res.json({ message: 'Berhasil dihapus' });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// POST /api/investor-loans/:id/activate — Activate loan
+app.post('/api/investor-loans/:id/activate', checkRole(INVESTOR_LOAN_ROLES), async (req, res) => {
+  try {
+    const loan = await prisma.investorLoan.findUnique({ where: { id: req.params.id } });
+    if (!loan) return res.status(404).json({ message: 'Pinjaman tidak ditemukan' });
+    if (loan.status !== 'DRAFT') return res.status(400).json({ message: 'Hanya pinjaman DRAFT yang bisa diaktifkan' });
+
+    const updated = await prisma.investorLoan.update({
+      where: { id: req.params.id },
+      data: { status: 'ACTIVE' }
+    });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// POST /api/investor-loans/:id/disburse — Record disbursement (pencairan dana)
+app.post('/api/investor-loans/:id/disburse', checkRole(INVESTOR_LOAN_ROLES), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, method, bankAccountId, date, notes, proofUrl } = req.body;
+
+    const loan = await prisma.investorLoan.findUnique({ where: { id } });
+    if (!loan) return res.status(404).json({ message: 'Pinjaman tidak ditemukan' });
+    if (loan.status === 'DRAFT') return res.status(400).json({ message: 'Aktifkan pinjaman terlebih dahulu' });
+    if (loan.status === 'PAID') return res.status(400).json({ message: 'Pinjaman sudah lunas' });
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Jumlah pencairan harus lebih dari 0' });
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Find COA accounts
+      const bankCoa = bankAccountId
+        ? (await tx.bankAccount.findUnique({ where: { id: bankAccountId } }))?.coaId
+        : null;
+      const cashCoa = await tx.chartOfAccounts.findFirst({ where: { code: '1-10101' } }); // Kas
+      const utangInvestorCoa = await tx.chartOfAccounts.findFirst({ where: { code: '2-20102' } }); // Utang Investor
+
+      if (!utangInvestorCoa) throw new Error('Akun Utang Investor (2-20102) belum disetup di COA');
+      const debitCoaId = bankCoa || cashCoa?.id;
+      if (!debitCoaId) throw new Error('Akun Bank/Kas tidak ditemukan');
+
+      // Create journal: Debit Bank/Kas, Credit Utang Investor
+      const journalNumber = await generateInvestorJournalNumber(tx, 'INVDS');
+      const journal = await tx.journalEntry.create({
+        data: {
+          number: journalNumber,
+          date: date ? new Date(date) : new Date(),
+          description: `Pencairan Pinjaman Investor: ${loan.number} - ${loan.investorName}`,
+          reference: loan.number,
+          type: 'GENERAL',
+          status: 'POSTED',
+          items: {
+            create: [
+              {
+                coaId: debitCoaId,
+                description: `Pencairan pinjaman ${loan.number}`,
+                debit: Number(amount),
+                credit: 0
+              },
+              {
+                coaId: utangInvestorCoa.id,
+                description: `Pencairan pinjaman ${loan.number}`,
+                debit: 0,
+                credit: Number(amount)
+              }
+            ]
+          }
+        }
+      });
+
+      // Create disbursement record
+      const disbursement = await tx.investorLoanDisbursement.create({
+        data: {
+          investorLoanId: id,
+          date: date ? new Date(date) : new Date(),
+          amount: Number(amount),
+          method: method || 'TRANSFER',
+          bankAccountId: bankAccountId || null,
+          proofUrl: proofUrl || null,
+          notes: notes || null,
+          journalId: journal.id
+        }
+      });
+
+      // Check if total disbursed equals principal -> update status
+      const totalDisbursed = await tx.investorLoanDisbursement.aggregate({
+        where: { investorLoanId: id },
+        _sum: { amount: true }
+      });
+      const sum = totalDisbursed._sum.amount || 0;
+      if (sum >= loan.principalAmount) {
+        await tx.investorLoan.update({
+          where: { id },
+          data: { status: 'ACTIVE' }
+        });
+      }
+
+      return { disbursement, journal };
+    });
+
+    res.status(201).json(result);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// POST /api/investor-loans/:id/repay — Record repayment (cicilan / full)
+app.post('/api/investor-loans/:id/repay', checkRole(INVESTOR_LOAN_ROLES), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, type, bankAccountId, date, notes, proofUrl } = req.body;
+
+    const loan = await prisma.investorLoan.findUnique({ where: { id } });
+    if (!loan) return res.status(404).json({ message: 'Pinjaman tidak ditemukan' });
+    if (loan.status === 'DRAFT') return res.status(400).json({ message: 'Pinjaman belum aktif' });
+    if (loan.status === 'PAID') return res.status(400).json({ message: 'Pinjaman sudah lunas' });
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Jumlah pembayaran harus lebih dari 0' });
+
+    // Calculate outstanding
+    const totalRepaid = await prisma.investorLoanRepayment.aggregate({
+      where: { investorLoanId: id },
+      _sum: { amount: true }
+    });
+    const currentRepaid = totalRepaid._sum.amount || 0;
+    const outstanding = loan.principalAmount - currentRepaid;
+
+    if (amount > outstanding) {
+      return res.status(400).json({ message: `Jumlah pembayaran (${amount}) melebihi sisa hutang (${outstanding})` });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Find COA accounts
+      const bankCoa = bankAccountId
+        ? (await tx.bankAccount.findUnique({ where: { id: bankAccountId } }))?.coaId
+        : null;
+      const cashCoa = await tx.chartOfAccounts.findFirst({ where: { code: '1-10101' } });
+      const utangInvestorCoa = await tx.chartOfAccounts.findFirst({ where: { code: '2-20102' } });
+
+      if (!utangInvestorCoa) throw new Error('Akun Utang Investor (2-20102) belum disetup di COA');
+      const creditCoaId = bankCoa || cashCoa?.id;
+      if (!creditCoaId) throw new Error('Akun Bank/Kas tidak ditemukan');
+
+      // Determine installment number
+      const installmentCount = await tx.investorLoanRepayment.count({
+        where: { investorLoanId: id }
+      });
+
+      // Create journal: Debit Utang Investor, Credit Bank/Kas
+      const journalNumber = await generateInvestorJournalNumber(tx, 'INVBY');
+      const repayType = type || (amount >= outstanding ? 'FULL' : 'INSTALLMENT');
+      const journal = await tx.journalEntry.create({
+        data: {
+          number: journalNumber,
+          date: date ? new Date(date) : new Date(),
+          description: `Pembayaran Pinjaman Investor: ${loan.number} - ${loan.investorName} (${repayType}${repayType === 'INSTALLMENT' ? ' #' + (installmentCount + 1) : ''})`,
+          reference: loan.number,
+          type: 'GENERAL',
+          status: 'POSTED',
+          items: {
+            create: [
+              {
+                coaId: utangInvestorCoa.id,
+                description: `Pembayaran pinjaman ${loan.number}`,
+                debit: Number(amount),
+                credit: 0
+              },
+              {
+                coaId: creditCoaId,
+                description: `Pembayaran pinjaman ${loan.number}`,
+                debit: 0,
+                credit: Number(amount)
+              }
+            ]
+          }
+        }
+      });
+
+      // Create repayment record
+      const repayment = await tx.investorLoanRepayment.create({
+        data: {
+          investorLoanId: id,
+          date: date ? new Date(date) : new Date(),
+          amount: Number(amount),
+          type: repayType,
+          installmentNumber: repayType === 'INSTALLMENT' ? installmentCount + 1 : null,
+          bankAccountId: bankAccountId || null,
+          proofUrl: proofUrl || null,
+          notes: notes || null,
+          journalId: journal.id
+        }
+      });
+
+      // Check if fully paid
+      const newTotalRepaid = currentRepaid + Number(amount);
+      if (newTotalRepaid >= loan.principalAmount) {
+        await tx.investorLoan.update({
+          where: { id },
+          data: { status: 'PAID' }
+        });
+      } else {
+        await tx.investorLoan.update({
+          where: { id },
+          data: { status: 'PARTIAL' }
+        });
+      }
+
+      return { repayment, journal };
+    });
+
+    res.status(201).json(result);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// POST /api/investor-loans/:id/distribute-profit — Distribute profit
+app.post('/api/investor-loans/:id/distribute-profit', checkRole(INVESTOR_LOAN_ROLES), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { totalProjectProfit, bankAccountId, date, notes } = req.body;
+
+    const loan = await prisma.investorLoan.findUnique({ where: { id } });
+    if (!loan) return res.status(404).json({ message: 'Pinjaman tidak ditemukan' });
+    if (loan.status === 'DRAFT') return res.status(400).json({ message: 'Pinjaman belum aktif' });
+    if (!totalProjectProfit || totalProjectProfit <= 0) {
+      return res.status(400).json({ message: 'Total profit project harus lebih dari 0' });
+    }
+    if (loan.profitSharingPercent <= 0) {
+      return res.status(400).json({ message: 'Persentase bagi hasil belum diatur' });
+    }
+
+    const distributedAmount = (totalProjectProfit * loan.profitSharingPercent) / 100;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Find COA accounts
+      const bankCoa = bankAccountId
+        ? (await tx.bankAccount.findUnique({ where: { id: bankAccountId } }))?.coaId
+        : null;
+      const cashCoa = await tx.chartOfAccounts.findFirst({ where: { code: '1-10101' } });
+      const bebanProfitCoa = await tx.chartOfAccounts.findFirst({ where: { code: '6-11104' } }); // Beban Bagi Hasil Profit
+
+      if (!bebanProfitCoa) throw new Error('Akun Beban Bagi Hasil Profit (6-11104) belum disetup di COA');
+      const creditCoaId = bankCoa || cashCoa?.id;
+      if (!creditCoaId) throw new Error('Akun Bank/Kas tidak ditemukan');
+
+      // Create journal: Debit Beban Bagi Hasil Profit, Credit Bank/Kas
+      const journalNumber = await generateInvestorJournalNumber(tx, 'INVPR');
+      const journal = await tx.journalEntry.create({
+        data: {
+          number: journalNumber,
+          date: date ? new Date(date) : new Date(),
+          description: `Bagi Hasil Profit: ${loan.number} - ${loan.investorName} (${loan.profitSharingPercent}% dari ${totalProjectProfit})`,
+          reference: loan.number,
+          type: 'GENERAL',
+          status: 'POSTED',
+          items: {
+            create: [
+              {
+                coaId: bebanProfitCoa.id,
+                description: `Bagi hasil profit ${loan.number}`,
+                debit: distributedAmount,
+                credit: 0
+              },
+              {
+                coaId: creditCoaId,
+                description: `Bagi hasil profit ${loan.number}`,
+                debit: 0,
+                credit: distributedAmount
+              }
+            ]
+          }
+        }
+      });
+
+      // Create profit distribution record
+      const distribution = await tx.profitDistribution.create({
+        data: {
+          investorLoanId: id,
+          date: date ? new Date(date) : new Date(),
+          totalProjectProfit: Number(totalProjectProfit),
+          investorSharePercent: loan.profitSharingPercent,
+          distributedAmount,
+          status: 'DISTRIBUTED',
+          bankAccountId: bankAccountId || null,
+          notes: notes || null,
+          journalId: journal.id
+        }
+      });
+
+      return { distribution, journal };
+    });
+
+    res.status(201).json(result);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// GET /api/investor-loans/:id/schedule — Generate repayment schedule
+app.get('/api/investor-loans/:id/schedule', async (req, res) => {
+  try {
+    const loan = await prisma.investorLoan.findUnique({
+      where: { id: req.params.id },
+      include: {
+        repayments: { orderBy: { date: 'asc' } }
+      }
+    });
+
+    if (!loan) return res.status(404).json({ message: 'Pinjaman tidak ditemukan' });
+
+    const totalRepaid = loan.repayments.reduce((s, r) => s + r.amount, 0);
+    const outstanding = loan.principalAmount - totalRepaid;
+
+    if (loan.repaymentType === 'FULL') {
+      return res.json({
+        type: 'FULL',
+        principalAmount: loan.principalAmount,
+        outstanding,
+        dueDate: loan.dueDate,
+        schedule: [{
+          installment: 0,
+          amount: outstanding,
+          dueDate: loan.dueDate,
+          status: loan.status === 'PAID' ? 'PAID' : 'PENDING'
+        }]
+      });
+    }
+
+    // INSTALLMENT schedule
+    const tenor = loan.tenorMonths || 12;
+    const monthlyPayment = outstanding / tenor;
+    const schedule = [];
+
+    const startDate = loan.dueDate || new Date();
+    for (let i = 1; i <= tenor; i++) {
+      const dueDate = new Date(startDate);
+      dueDate.setMonth(dueDate.getMonth() + i);
+
+      const paidInThisInstallment = loan.repayments
+        .filter(r => r.type === 'INSTALLMENT' && r.installmentNumber === i)
+        .reduce((s, r) => s + r.amount, 0);
+
+      schedule.push({
+        installment: i,
+        amount: Math.round(monthlyPayment),
+        dueDate: dueDate.toISOString(),
+        status: paidInThisInstallment >= monthlyPayment ? 'PAID' :
+                paidInThisInstallment > 0 ? 'PARTIAL' : 'PENDING',
+        paid: paidInThisInstallment
+      });
+    }
+
+    res.json({
+      type: 'INSTALLMENT',
+      principalAmount: loan.principalAmount,
+      outstanding,
+      tenor,
+      monthlyPayment: Math.round(monthlyPayment),
+      schedule
+    });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// GET /api/investor-loans/summary — Dashboard summary
+app.get('/api/investor-loans/summary', async (req, res) => {
+  try {
+    const loans = await prisma.investorLoan.findMany({
+      include: {
+        disbursements: { select: { amount: true } },
+        repayments: { select: { amount: true } },
+        profitDistributions: { select: { distributedAmount: true, status: true } }
+      }
+    });
+
+    const summary = {
+      totalLoans: loans.length,
+      activeLoans: loans.filter(l => l.status === 'ACTIVE' || l.status === 'PARTIAL').length,
+      totalPrincipal: loans.reduce((s, l) => s + l.principalAmount, 0),
+      totalDisbursed: loans.reduce((s, l) => s + l.disbursements.reduce((ds, d) => ds + d.amount, 0), 0),
+      totalRepaid: loans.reduce((s, l) => s + l.repayments.reduce((rs, r) => rs + r.amount, 0), 0),
+      totalProfitDistributed: loans.reduce((s, l) =>
+        s + l.profitDistributions.filter(p => p.status === 'DISTRIBUTED').reduce((ps, p) => ps + p.distributedAmount, 0), 0),
+      overdueLoans: loans.filter(l => {
+        if (l.status === 'PAID' || l.status === 'DRAFT') return false;
+        if (l.dueDate) return new Date(l.dueDate) < new Date();
+        return false;
+      }).length
+    };
+
+    res.json(summary);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+console.log('Investor loan routes loaded');
+

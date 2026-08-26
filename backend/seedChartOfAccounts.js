@@ -796,6 +796,17 @@ const coaData = [
     isReconcilable: false,
     status: 'ACTIVE'
   },
+  {
+    code: '2-20102',
+    name: 'Utang Investor',
+    description: 'Saldo pinjaman dari investor yang harus dikembalikan.',
+    type: 'LIABILITAS',
+    normalBalance: 'CREDIT',
+    postingType: 'POSTING',
+    cashflowType: 'FINANCING',
+    isReconcilable: false,
+    status: 'ACTIVE'
+  },
 
   // --- EQUITY (3-xxxx) ---
   {
@@ -1489,6 +1500,17 @@ const coaData = [
     code: '6-11102',
     name: 'Beban Bunga Pinjaman',
     description: 'Biaya bunga pinjaman bank and kredit usaha.',
+    type: 'BEBAN',
+    normalBalance: 'DEBIT',
+    postingType: 'POSTING',
+    cashflowType: 'FINANCING',
+    isReconcilable: false,
+    status: 'ACTIVE'
+  },
+  {
+    code: '6-11104',
+    name: 'Beban Bagi Hasil Profit',
+    description: 'Biaya bagi hasil profit kepada investor.',
     type: 'BEBAN',
     normalBalance: 'DEBIT',
     postingType: 'POSTING',
