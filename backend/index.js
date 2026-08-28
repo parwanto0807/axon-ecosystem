@@ -1405,7 +1405,7 @@ app.get('/api/orders/:id', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
   try {
-    const { items = [], discount = 0, tax = 11, businessCategory, quotation, customer, ...data } = req.body;
+    const { items = [], discount = 0, discountType = 'PERCENTAGE', tax = 11, businessCategory, quotation, customer, ...data } = req.body;
     const number = await generateSalesOrderNumber();
     const parsedItems = items.map((it, idx) => ({
       no: idx + 1,
@@ -1416,11 +1416,12 @@ app.post('/api/orders', async (req, res) => {
       discount: Number(it.discount) || 0,
       amount: Number(it.amount) || 0
     }));
-    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, 'PERCENTAGE', Number(discount), Number(tax));
+    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, discountType, Number(discount), Number(tax));
     const o = await prisma.salesOrder.create({
       data: {
         ...data,
         number,
+        discountType,
         discount: Number(discount),
         tax: Number(tax),
         subtotal, discountAmt, taxAmt, grandTotal,
@@ -1440,7 +1441,7 @@ app.post('/api/orders', async (req, res) => {
 app.put('/api/orders/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { items = [], discount = 0, tax = 11, id: _, createdAt, updatedAt, customer, quotation, businessCategory, ...data } = req.body;
+    const { items = [], discount = 0, discountType = 'PERCENTAGE', tax = 11, id: _, createdAt, updatedAt, customer, quotation, businessCategory, ...data } = req.body;
     const parsedItems = items.map((it, idx) => ({
       no: idx + 1,
       description: it.description,
@@ -1450,14 +1451,14 @@ app.put('/api/orders/:id', async (req, res) => {
       discount: Number(it.discount) || 0,
       amount: Number(it.amount) || 0
     }));
-    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, 'PERCENTAGE', Number(discount), Number(tax));
+    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, discountType, Number(discount), Number(tax));
     const o = await prisma.$transaction(async (tx) => {
       await tx.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
       return tx.salesOrder.update({
         where: { id },
         data: {
           ...data,
-          discount: Number(discount), tax: Number(tax),
+          discountType, discount: Number(discount), tax: Number(tax),
           subtotal, discountAmt, taxAmt, grandTotal,
           date: data.date ? new Date(data.date) : undefined,
           poProof: data.poProof || undefined,

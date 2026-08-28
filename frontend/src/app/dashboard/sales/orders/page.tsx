@@ -19,7 +19,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 interface Customer { id: string; name: string; code: string; address: string | null; taxId: string | null; phone: string | null; email: string | null; pics: Array<{ name: string; department: string | null }> }
-interface Quotation { id: string; number: string; subject: string; status: string; customerId: string; customer: { name: string }; items: any[]; discount: number; tax: number; paymentTerms: string | null; deliveryTerms: string | null; currency: string; attn: string | null; notes: string | null; projectId?: string }
+interface Quotation { id: string; number: string; subject: string; status: string; customerId: string; customer: { name: string }; items: any[]; discountType?: string; discount: number; tax: number; paymentTerms: string | null; deliveryTerms: string | null; currency: string; attn: string | null; notes: string | null; projectId?: string }
 interface OrderItem {
     id?: string; no: number; description: string; qty: number; unit: string
     unitPrice: number; discount: number; amount: number; _skuId?: string
@@ -28,7 +28,7 @@ interface SalesOrder {
     id: string; number: string; poNumber: string | null; date: string; status: string
     customerId: string; customer: Customer; attn: string | null; subject: string
     notes: string | null; paymentTerms: string | null; deliveryTerms: string | null
-    currency: string; discount: number; tax: number
+    currency: string; discountType: string; discount: number; tax: number
     subtotal: number; discountAmt: number; taxAmt: number; grandTotal: number
     createdAt: string; items: OrderItem[]; quotationId?: string; quotation?: { number: string }
     poProof?: string | null; projectId?: string; project?: { number: string; name: string }
@@ -371,7 +371,9 @@ export default function SalesOrdersPage() {
                                         </td>
                                         <td className="px-5 py-4 text-[11px] text-slate-500 font-medium">{fmtDate(o.date)}</td>
                                         <td className="px-5 py-4 text-right">
-                                            <p className="font-bold text-slate-900 text-sm">{fmt(o.grandTotal)}</p>
+                                            <p className="text-[10px] text-slate-500">Sblm Disc: {fmt(o.subtotal)}</p>
+                                            {o.discountAmt > 0 && <p className="text-[10px] text-rose-500">Disc: -{fmt(o.discountAmt)}</p>}
+                                            <p className="font-bold text-slate-900 text-sm mt-0.5">{fmt(o.grandTotal)}</p>
                                             <p className="text-[9px] text-slate-400">{o.items?.length || 0} items</p>
                                         </td>
                                         <td className="px-5 py-4 text-center">
@@ -547,6 +549,7 @@ function OrderFormModal({ order, customers, products, quotations, projects, busi
         deliveryTerms: order?.deliveryTerms || 'FOB Jakarta',
         notes: order?.notes || '',
         currency: order?.currency || 'IDR',
+        discountType: order?.discountType || 'PERCENTAGE',
         discount: order?.discount ?? 0,
         tax: order?.tax ?? 11,
         quotationId: order?.quotationId || '',
@@ -585,6 +588,7 @@ function OrderFormModal({ order, customers, products, quotations, projects, busi
             deliveryTerms: q.deliveryTerms || f.deliveryTerms,
             notes: q.notes || f.notes,
             currency: q.currency || f.currency,
+            discountType: q.discountType || f.discountType,
             discount: q.discount ?? f.discount,
             tax: q.tax ?? f.tax,
             quotationId: qId,
@@ -604,8 +608,10 @@ function OrderFormModal({ order, customers, products, quotations, projects, busi
     }
 
     const subtotal = items.reduce((s, i) => s + i.amount, 0)
-    const discountAmt = subtotal * (Number(form.discount) / 100)
-    const taxable = subtotal - discountAmt
+    const discountAmt = form.discountType === 'PERCENTAGE' 
+        ? subtotal * (Number(form.discount) / 100) 
+        : Number(form.discount);
+    const taxable = Math.max(0, subtotal - discountAmt)
     const taxAmt = taxable * (Number(form.tax) / 100)
     const grandTotal = taxable + taxAmt
 
@@ -829,9 +835,15 @@ function OrderFormModal({ order, customers, products, quotations, projects, busi
                             </div>
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-slate-500 font-medium text-sm">Disc%</span>
-                                    <input type="number" min="0" max="100" step="0.1" value={form.discount} onChange={e => setForm({ ...form, discount: +e.target.value })}
-                                        className="w-16 text-xs bg-white border border-slate-200 rounded-lg px-2 py-1 text-center font-bold" />
+                                    <span className="text-slate-500 font-medium text-sm">Diskon</span>
+                                    <select value={form.discountType} onChange={e => setForm({ ...form, discountType: e.target.value, discount: 0 })}
+                                        className="text-xs bg-white border border-slate-200 rounded-lg px-1 py-1 font-bold outline-none text-slate-600">
+                                        <option value="PERCENTAGE">%</option>
+                                        <option value="AMOUNT">Rp</option>
+                                    </select>
+                                    <input type="number" min="0" max={form.discountType === 'PERCENTAGE' ? 100 : undefined} step={form.discountType === 'PERCENTAGE' ? "0.1" : "1"} 
+                                        value={form.discount || ''} onChange={e => setForm({ ...form, discount: +e.target.value })}
+                                        className="w-24 text-xs bg-white border border-slate-200 rounded-lg px-2 py-1 text-right font-bold focus:outline-none focus:border-indigo-500" />
                                 </div>
                                 <span className="font-semibold text-rose-600 text-sm">- {fmt(discountAmt)}</span>
                             </div>

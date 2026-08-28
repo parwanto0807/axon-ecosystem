@@ -10,7 +10,7 @@ interface SalesOrder {
     id: string; number: string; poNumber: string | null; date: string; status: string
     customer: Customer; attn: string | null; subject: string; notes: string | null
     paymentTerms: string | null; deliveryTerms: string | null; currency: string
-    discount: number; tax: number; subtotal: number; discountAmt: number; taxAmt: number; grandTotal: number
+    discountType: string; discount: number; tax: number; subtotal: number; discountAmt: number; taxAmt: number; grandTotal: number
     items: SalesOrderItem[]
 }
 
@@ -141,7 +141,7 @@ export default function SalesOrderPDFModal({ order, company, onClose }:
             // Totals
             const bx = W - M - 80
             const tots: [string, string][] = [['Subtotal', fr(order.subtotal)]]
-            if (order.discount > 0) tots.push([`Diskon (${order.discount}%)`, `- ${fr(order.discountAmt)}`])
+            if (order.discountAmt > 0) tots.push([order.discountType === 'AMOUNT' ? 'Diskon (Nominal)' : `Diskon (${order.discount}%)`, `- ${fr(order.discountAmt)}`])
             tots.push([`PPN (${order.tax}%)`, `+ ${fr(order.taxAmt)}`])
             doc.setFontSize(8)
             tots.forEach(([k, v]) => {
@@ -308,7 +308,7 @@ export default function SalesOrderPDFModal({ order, company, onClose }:
                             <div style={{ width: 300, fontSize: 10 }}>
                                 {[
                                     ['Subtotal', `Rp ${order.subtotal?.toLocaleString('id-ID')}`],
-                                    ...(order.discount > 0 ? [[`Diskon (${order.discount}%)`, `- Rp ${order.discountAmt?.toLocaleString('id-ID')}`]] : []),
+                                    ...(order.discountAmt > 0 ? [[order.discountType === 'AMOUNT' ? 'Diskon (Nominal)' : `Diskon (${order.discount}%)`, `- Rp ${order.discountAmt?.toLocaleString('id-ID')}`]] : []),
                                     [`PPN (${order.tax}%)`, `+ Rp ${order.taxAmt?.toLocaleString('id-ID')}`],
                                 ].map(([k, v]) => (
                                     <div key={k} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 5, marginBottom: 5 }}>
