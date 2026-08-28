@@ -230,6 +230,7 @@ model Quotation {
   paymentTerms  String?
   deliveryTerms String?
   currency      String           @default("IDR")
+  discountType  String           @default("PERCENTAGE")
   discount      Float            @default(0)
   tax           Float            @default(11)
   subtotal      Float            @default(0)

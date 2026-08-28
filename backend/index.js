@@ -1173,9 +1173,9 @@ async function generateQuotationNumber() {
   return `${prefix}${String(lastNum + 1).padStart(3, '0')}`;
 }
 
-function calcTotals(items, discountPct, taxPct) {
+function calcTotals(items, discountType, discountValue, taxPct) {
   const subtotal = items.reduce((s, i) => s + i.amount, 0);
-  const discountAmt = subtotal * (discountPct / 100);
+  const discountAmt = discountType === 'AMOUNT' ? discountValue : subtotal * (discountValue / 100);
   const taxable = subtotal - discountAmt;
   const taxAmt = taxable * (taxPct / 100);
   const grandTotal = taxable + taxAmt;
@@ -1205,7 +1205,7 @@ app.get('/api/quotations/:id', async (req, res) => {
 
 app.post('/api/quotations', async (req, res) => {
   try {
-    const { items = [], discount = 0, tax = 11, ...data } = req.body;
+    const { items = [], discount = 0, discountType = 'PERCENTAGE', tax = 11, ...data } = req.body;
     const number = await generateQuotationNumber();
     const parsedItems = items.map((it, idx) => ({
       no: idx + 1,
@@ -1218,11 +1218,12 @@ app.post('/api/quotations', async (req, res) => {
       skuId: it.skuId || null,
       costPrice: Number(it.costPrice) || 0
     }));
-    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, Number(discount), Number(tax));
+    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, discountType, Number(discount), Number(tax));
     const q = await prisma.quotation.create({
       data: {
         ...data,
         number,
+        discountType,
         discount: Number(discount),
         tax: Number(tax),
         subtotal, discountAmt, taxAmt, grandTotal,
@@ -1246,7 +1247,7 @@ app.post('/api/quotations', async (req, res) => {
 app.put('/api/quotations/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { items = [], discount = 0, tax = 11, id: _, createdAt, updatedAt, customer, ...data } = req.body;
+    const { items = [], discount = 0, discountType = 'PERCENTAGE', tax = 11, id: _, createdAt, updatedAt, customer, ...data } = req.body;
     const parsedItems = items.map((it, idx) => ({
       no: idx + 1,
       description: it.description,
@@ -1258,13 +1259,14 @@ app.put('/api/quotations/:id', async (req, res) => {
       skuId: it.skuId || null,
       costPrice: Number(it.costPrice) || 0
     }));
-    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, Number(discount), Number(tax));
+    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, discountType, Number(discount), Number(tax));
     const q = await prisma.$transaction(async (tx) => {
       await tx.quotationItem.deleteMany({ where: { quotationId: id } });
       const updated = await tx.quotation.update({
         where: { id },
         data: {
           ...data,
+          discountType,
           discount: Number(discount), tax: Number(tax),
           subtotal, discountAmt, taxAmt, grandTotal,
           date: data.date ? new Date(data.date) : undefined,
@@ -1414,7 +1416,7 @@ app.post('/api/orders', async (req, res) => {
       discount: Number(it.discount) || 0,
       amount: Number(it.amount) || 0
     }));
-    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, Number(discount), Number(tax));
+    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, 'PERCENTAGE', Number(discount), Number(tax));
     const o = await prisma.salesOrder.create({
       data: {
         ...data,
@@ -1448,7 +1450,7 @@ app.put('/api/orders/:id', async (req, res) => {
       discount: Number(it.discount) || 0,
       amount: Number(it.amount) || 0
     }));
-    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, Number(discount), Number(tax));
+    const { subtotal, discountAmt, taxAmt, grandTotal } = calcTotals(parsedItems, 'PERCENTAGE', Number(discount), Number(tax));
     const o = await prisma.$transaction(async (tx) => {
       await tx.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
       return tx.salesOrder.update({

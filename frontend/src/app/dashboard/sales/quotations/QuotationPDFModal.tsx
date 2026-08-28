@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 import { X, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-interface QuotationItem { id?: string; no: number; description: string; qty: number; unit: string; unitPrice: number; discount: number; amount: number; costPrice?: number }
+interface QuotationItem { id?: string; no: number; description: string; qty: number; unit: string; unitPrice: number; discount: number; amount: number; costPrice?: number; isChecklist?: boolean; checked?: boolean }
 interface Customer { id: string; name: string; code: string; address: string | null; taxId: string | null; phone: string | null; email: string | null }
 interface Quotation {
     id: string; number: string; date: string; validUntil: string; status: string
@@ -31,8 +31,10 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
     const [showProductImages, setShowProductImages] = useState(false)
     const [showTotals, setShowTotals] = useState(true)
     const [showBreakdown, setShowBreakdown] = useState(false)
+    const [showPOContract, setShowPOContract] = useState(false)
     const c = quotation.customer
     const sc = STATUS_CFG[quotation.status] || STATUS_CFG.DRAFT
+    const poItems = quotation.items?.some(i => i.isChecklist) ? quotation.items.filter(i => i.checked) : (quotation.items || [])
 
     const getProductImage = (it: QuotationItem) => {
         if (!products) return null
@@ -72,6 +74,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             const white = [255, 255, 255] as [number, number, number]
             const light = [241, 245, 249] as [number, number, number]
             let y = M
+            const isPOContract = showPOContract
 
             // Pre-load product images if requested
             const loadedImages: Record<string, HTMLImageElement> = {}
@@ -96,47 +99,64 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                 )
             }
 
-            // Logo
+            let cy = y
             let logoWidth = 0
-            if (company.logo) {
-                try {
-                    const img = new Image(); img.crossOrigin = 'anonymous'
-                    await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `${process.env.NEXT_PUBLIC_API_URL}${company.logo}` })
-                    if (img.complete && img.naturalWidth > 0) {
-                        const cv = document.createElement('canvas')
-                        cv.width = img.naturalWidth; cv.height = img.naturalHeight
-                        cv.getContext('2d')!.drawImage(img, 0, 0)
-                        const h = 12
-                        logoWidth = (img.naturalWidth / img.naturalHeight) * h
-                        doc.addImage(cv.toDataURL('image/png'), 'PNG', M, y, logoWidth, h)
-                    }
-                } catch { /* skip */ }
-            }
+            if (!isPOContract) {
+                // Logo
+                if (company.logo) {
+                    try {
+                        const img = new Image(); img.crossOrigin = 'anonymous'
+                        await new Promise<void>(r => { img.onload = () => r(); img.onerror = () => r(); img.src = `${process.env.NEXT_PUBLIC_API_URL}${company.logo}` })
+                        if (img.complete && img.naturalWidth > 0) {
+                            const cv = document.createElement('canvas')
+                            cv.width = img.naturalWidth; cv.height = img.naturalHeight
+                            cv.getContext('2d')!.drawImage(img, 0, 0)
+                            const h = 12
+                            logoWidth = (img.naturalWidth / img.naturalHeight) * h
+                            doc.addImage(cv.toDataURL('image/png'), 'PNG', M, y, logoWidth, h)
+                        }
+                    } catch { /* skip */ }
+                }
 
-            // Company info
-            const ix = logoWidth > 0 ? M + logoWidth + 5 : M
-            doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(...dark)
-            doc.text(company.name || 'PT. Axon Ecosystem', ix, y + 5)
-            doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...gray)
-            let cy = y + 11
-            // Only show legalName if it differs from name
-            if (company.legalName && company.legalName !== company.name) { doc.text(company.legalName, ix, cy); cy += 4 }
-            if (company.address) {
-                const addrParts = [company.address, [company.city, company.province].filter(Boolean).join(', '), company.postalCode].filter(Boolean).join(' — ')
-                const addrLines = doc.splitTextToSize(addrParts, 88)
-                doc.text(addrLines, ix, cy); cy += addrLines.length * 4
+                // Company info
+                const ix = logoWidth > 0 ? M + logoWidth + 5 : M
+                doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(...dark)
+                doc.text(company.name || 'PT. Axon Ecosystem', ix, y + 6)
+                doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...gray)
+                cy = y + 11
+                // Only show legalName if it differs from name
+                if (company.legalName && company.legalName !== company.name) { doc.text(company.legalName, ix, cy); cy += 4 }
+                if (company.address) {
+                    const addrParts = [company.address, [company.city, company.province].filter(Boolean).join(', '), company.postalCode].filter(Boolean).join(' — ')
+                    const addrLines = doc.splitTextToSize(addrParts, 88)
+                    doc.text(addrLines, ix, cy); cy += addrLines.length * 4
+                }
+                if (company.phone) { doc.text(`Tel: ${company.phone}`, ix, cy); cy += 4 }
+                if (company.email) { doc.text(`Email: ${company.email}`, ix, cy); cy += 4 }
+                if (company.taxId) { doc.text(`NPWP: ${company.taxId}`, ix, cy) }
+            } else {
+                // Customer info on top left
+                doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(...dark)
+                doc.text(c?.name || '', M, y + 6)
+                doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...gray)
+                cy = y + 11
+                if (c?.address) {
+                    const addrLines = doc.splitTextToSize(c.address, 88)
+                    doc.text(addrLines, M, cy); cy += addrLines.length * 4
+                }
+                if (c?.phone) { doc.text(`Tel: ${c.phone}`, M, cy); cy += 4 }
+                if (c?.email) { doc.text(`Email: ${c.email}`, M, cy); cy += 4 }
             }
-            if (company.phone) { doc.text(`Tel: ${company.phone}`, ix, cy); cy += 4 }
-            if (company.email) { doc.text(`Email: ${company.email}`, ix, cy); cy += 4 }
-            if (company.taxId) { doc.text(`NPWP: ${company.taxId}`, ix, cy) }
 
             // Quotation number/date block (right side of header)
             doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...gray)
-            const hdr = [['No.', quotation.number], ['Tanggal', fd(quotation.date)], ['Berlaku s/d', fd(quotation.validUntil)], ['Mata Uang', quotation.currency]]
+            const hdr = isPOContract
+                ? [['PO Date', fd(new Date().toISOString())], ['Ref. Quotation', quotation.number], ['Termin Bayar', quotation.paymentTerms], ['Mata Uang', quotation.currency]]
+                : [['No.', quotation.number], ['Tanggal', fd(quotation.date)], ['Berlaku s/d', fd(quotation.validUntil)], ['Mata Uang', quotation.currency]]
             let hy = y + 4
             hdr.forEach(([k, v]) => {
                 doc.setFont('helvetica', 'bold'); doc.text(`${k} :`, W - M - 28, hy, { align: 'right' })
-                doc.setFont('helvetica', 'normal').setTextColor(...dark); doc.text(v, W - M, hy, { align: 'right' })
+                doc.setFont('helvetica', 'normal').setTextColor(...dark); doc.text(v || '', W - M, hy, { align: 'right' })
                 doc.setTextColor(...gray); hy += 4.5
             })
 
@@ -145,30 +165,38 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             doc.setDrawColor(...indigo).setLineWidth(0.8).line(M, y, W - M, y)
             y += 7
 
-            // Title — centered below separator, smaller
+            // Title — centered below separator, smaller for PO Contract
+            const displayTitle = isPOContract ? 'PURCHASE ORDER' : (showBreakdown ? 'BREAKDOWN PROJECT' : 'PENAWARAN HARGA')
             doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(...indigo)
-            doc.text(showBreakdown ? 'BREAKDOWN PROJECT' : 'PENAWARAN HARGA', W / 2, y, { align: 'center' })
+            doc.text(displayTitle, W / 2, y, { align: 'center' })
             y += 8
 
-            // Recipient section
-            doc.setFont('helvetica', 'bold').setFontSize(7).setTextColor(...gray).text('KEPADA YTH.', M, y)
+            // Recipient section - simplified for PO Contract
+            doc.setFont('helvetica', 'bold').setFontSize(7).setTextColor(...gray).text(isPOContract ? 'VENDOR (PEMASOK)' : 'KEPADA YTH.', M, y)
             y += 4
-            doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(...dark).text(c?.name || '', M, y)
-            doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...gray)
-            let ry = y + 4
-            if (quotation.attn) { doc.text(`U/p: ${quotation.attn}`, M, ry); ry += 4 }
-            if (c?.address) { const ls = doc.splitTextToSize(c.address, 100); doc.text(ls, M, ry); ry += ls.length * 4 }
-            if (c?.phone) { doc.text(`Tel: ${c.phone}`, M, ry); ry += 4 }
+            if (isPOContract) {
+                doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(...dark).text(company.name || 'PT. Axon Ecosystem', M, y)
+                y += 6
+                if (company.address) { const ls = doc.splitTextToSize(company.address, 80); doc.text(ls, M, y); y += ls.length * 4 }
+                if (company.phone) { doc.text(`Tel: ${company.phone}`, M, y); y += 4 }
+            } else {
+                doc.setFont('helvetica', 'bold').setFontSize(9).setTextColor(...dark).text(c?.name || '', M, y)
+                y += 6
+                if (quotation.attn) { doc.text(`U/p: ${quotation.attn}`, M, y); y += 4 }
+                if (c?.address) { const ls = doc.splitTextToSize(c.address, 80); doc.text(ls, M, y); y += ls.length * 4 }
+                if (c?.phone) { doc.text(`Tel: ${c.phone}`, M, y); y += 4 }
+                if (c?.email) { doc.text(`Email: ${c.email}`, M, y); y += 4 }
+            }
 
-            y = ry + 4
-            // Detail Penawaran section - Full Width Rows
-            doc.setDrawColor(...light).setLineWidth(0.3).line(M, y, W - M, y); y += 6
-            doc.setFont('helvetica', 'bold').setFontSize(7).setTextColor(...gray).text('DETAIL PENAWARAN', M, y); y += 5
+            if (!isPOContract) {
+                // Detail Penawaran section - Full Width Rows
+                doc.setDrawColor(...light).setLineWidth(0.3).line(M, y, W - M, y); y += 6
+                doc.setFont('helvetica', 'bold').setFontSize(7).setTextColor(...gray).text('DETAIL PENAWARAN', M, y); y += 5
 
-            const detaLines = [
-                ['Perihal', quotation.subject],
-                ['Termin Bayar', quotation.paymentTerms],
-                ['Syarat Kirim', quotation.deliveryTerms]
+                const detaLines = [
+                    ['Perihal', quotation.subject],
+                    ['Termin Bayar', quotation.paymentTerms],
+                    ['Syarat Kirim', quotation.deliveryTerms]
             ].filter(([, v]) => v !== null && v !== undefined) as [string, string][]
 
             detaLines.forEach(([k, v]) => {
@@ -179,46 +207,66 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                 y += Math.max(ls.length * 4, 5)
             })
             y += 4
+            }
 
             // Items table
             const sortedItems = [...(quotation.items || [])].sort((a, b) => a.no - b.no)
 
             const fn = (n: number) => n.toLocaleString('id-ID');
-            const headRows = showBreakdown
-                ? [['No', 'Detail Item', 'Qty', 'Unit', 'Harga(Rp)', 'HPP(Rp)', 'Disc', 'Total(Rp)', 'Tot.HPP(Rp)', 'Profit(Rp)', '%']]
-                : [['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Disc%', 'Jumlah']]
+            const headRows = isPOContract
+                ? [['No', 'Deskripsi Barang', 'Qty', 'Satuan', 'Harga Satuan (Rp)', 'Total (Rp)']]
+                : showBreakdown
+                    ? [['No', 'Detail Item', 'Qty', 'Unit', 'Harga(Rp)', 'HPP(Rp)', 'Disc', 'Total(Rp)', 'Tot.HPP(Rp)', 'Profit(Rp)', '%']]
+                    : [['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Disc%', 'Jumlah']]
 
-            const bodyRows: any[] = showBreakdown
-                ? sortedItems.flatMap(it => {
-                    const totalJual = it.amount;
-                    const totalHPP = (it.costPrice || 0) * it.qty;
-                    const profit = totalJual - totalHPP;
-                    const profitPct = totalJual > 0 ? ((profit / totalJual) * 100).toFixed(1) : '0';
-                    return [
-                        [
-                            { content: it.no, styles: { halign: 'center', fontStyle: 'bold' } },
-                            { content: it.description, colSpan: 10, styles: { fontStyle: 'bold', textColor: indigo } }
-                        ],
-                        [
-                            '',
-                            '',
-                            { content: it.qty, styles: { halign: 'center' } },
-                            { content: it.unit, styles: { halign: 'center' } },
-                            { content: fn(it.unitPrice), styles: { halign: 'right' } },
-                            { content: fn(it.costPrice || 0), styles: { halign: 'right', textColor: [180, 83, 9] } },
-                            { content: it.discount > 0 ? `${it.discount}%` : '-', styles: { halign: 'center' } },
-                            { content: fn(totalJual), styles: { halign: 'right', fontStyle: 'bold' } },
-                            { content: fn(totalHPP), styles: { halign: 'right', fontStyle: 'bold', textColor: [180, 83, 9] } },
-                            { content: fn(profit), styles: { halign: 'right', fontStyle: 'bold', textColor: [22, 163, 74] } },
-                            { content: profitPct, styles: { halign: 'center', fontStyle: 'bold', textColor: [22, 163, 74] } }
+            const bodyRows: any[] = isPOContract
+                ? poItems.length > 0
+                    ? poItems.map((it, i) => [
+                        { content: i + 1, styles: { halign: 'center', fontStyle: 'bold' } },
+                        { content: it.description, styles: { fontStyle: 'bold', textColor: indigo } },
+                        { content: it.qty, styles: { halign: 'center' } },
+                        { content: it.unit || '-', styles: { halign: 'center' } },
+                        { content: fn(it.unitPrice), styles: { halign: 'right' } },
+                        { content: fn(it.amount), styles: { halign: 'right', fontStyle: 'bold' } }
+                    ])
+                    : [['', '', '', '', '', 'Item Detail Kosong']]
+                : showBreakdown
+                    ? sortedItems.flatMap(it => {
+                        const totalJual = it.amount;
+                        const totalHPP = (it.costPrice || 0) * it.qty;
+                        const profit = totalJual - totalHPP;
+                        const profitPct = totalJual > 0 ? ((profit / totalJual) * 100).toFixed(1) : '0';
+                        return [
+                            [
+                                { content: it.no, styles: { halign: 'center', fontStyle: 'bold' } },
+                                { content: it.description, colSpan: 10, styles: { fontStyle: 'bold', textColor: indigo } }
+                            ],
+                            [
+                                '',
+                                '',
+                                { content: it.qty, styles: { halign: 'center' } },
+                                { content: it.unit, styles: { halign: 'center' } },
+                                { content: fn(it.unitPrice), styles: { halign: 'right' } },
+                                { content: fn(it.costPrice || 0), styles: { halign: 'right', textColor: [180, 83, 9] } },
+                                { content: it.discount > 0 ? `${it.discount}%` : '-', styles: { halign: 'center' } },
+                                { content: fn(totalJual), styles: { halign: 'right', fontStyle: 'bold' } },
+                                { content: fn(totalHPP), styles: { halign: 'right', fontStyle: 'bold', textColor: [180, 83, 9] } },
+                                { content: fn(profit), styles: { halign: 'right', fontStyle: 'bold', textColor: [22, 163, 74] } },
+                                { content: profitPct, styles: { halign: 'center', fontStyle: 'bold', textColor: [22, 163, 74] } }
+                            ]
                         ]
-                    ]
-                })
-                : sortedItems.map(it => {
-                    return [it.no, it.description, it.qty, it.unit, fr(it.unitPrice), it.discount > 0 ? `${it.discount}%` : '-', fr(it.amount)]
-                })
+                    })
+                    : sortedItems.map(it => {
+                        return [it.no, it.description, it.qty, it.unit, fr(it.unitPrice), it.discount > 0 ? `${it.discount}%` : '-', fr(it.amount)]
+                    })
 
-            const colStyles: any = showBreakdown ? {
+            const colStyles: any = isPOContract ? {
+                0: { halign: 'center', cellWidth: 10 },
+                1: { halign: 'left' },
+                2: { halign: 'center', cellWidth: 14 },
+                3: { halign: 'right', cellWidth: 32 },
+                4: { halign: 'right', cellWidth: 32 }
+            } : showBreakdown ? {
                 0: { halign: 'center', cellWidth: 8 },
                 1: { halign: 'left' },
                 2: { halign: 'center', cellWidth: 10 },
@@ -282,17 +330,27 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
 
                 // Totals
                 const bx = W - M - 80
-                const tots: [string, string][] = [['Subtotal', fr(quotation.subtotal)]]
-                if (quotation.discount > 0) tots.push([`Diskon (${quotation.discount}%)`, `- ${fr(quotation.discountAmt)}`])
+                const tots: [string, string][] = isPOContract
+                    ? [['Subtotal', fr(poItems.reduce((s, it) => s + it.amount, 0))]]
+                    : [['Subtotal', fr(quotation.subtotal)]]
+                if ((quotation as any).discountType === 'AMOUNT') {
+                    if (quotation.discountAmt > 0) tots.push([`Diskon`, `- ${fr(quotation.discountAmt)}`])
+                } else {
+                    if (quotation.discount > 0) tots.push([`Diskon (${quotation.discount}%)`, `- ${fr(quotation.discountAmt)}`])
+                }
                 tots.push([`PPN (${quotation.tax}%)`, `+ ${fr(quotation.taxAmt)}`])
 
                 if (showBreakdown) {
                     const totalHPP = quotation.items.reduce((s, it) => s + (it.costPrice || 0) * it.qty, 0)
-                    const totalJual = quotation.subtotal
+                    const totalJualSblm = quotation.subtotal
+                    const totalJual = quotation.subtotal - (quotation.discountAmt || 0)
                     const profitTotal = totalJual - totalHPP
                     const profitTotalPct = totalJual > 0 ? ((profitTotal / totalJual) * 100).toFixed(1) + '%' : '0%'
                     
                     tots.push(['Total HPP', fr(totalHPP)])
+                    tots.push(['Total Sblm Diskon', fr(totalJualSblm)])
+                    if (quotation.discountAmt > 0) tots.push(['Total Diskon', `- ${fr(quotation.discountAmt)}`])
+                    tots.push(['Total Stlh Diskon', fr(totalJual)])
                     tots.push(['Total Profit', fr(profitTotal)])
                     tots.push(['% Profit', profitTotalPct])
                 }
@@ -304,14 +362,16 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                 })
                 doc.setDrawColor(...indigo).setLineWidth(0.5).line(bx, y, W - M, y); y += 5
                 doc.setFont('helvetica', 'bold').setFontSize(11).setTextColor(...indigo)
-                doc.text('TOTAL', bx, y).text(fr(quotation.grandTotal), W - M, y, { align: 'right' })
+                doc.text('TOTAL', bx, y).text(fr(isPOContract ? (poItems.reduce((s, it) => s + it.amount, 0) - (quotation.discountAmt || 0) + (quotation.taxAmt || 0)) : quotation.grandTotal), W - M, y, { align: 'right' })
                 y += 10
             }
 
+            const currentNotes = isPOContract ? "1. Harap memproses pesanan ini sesuai dengan rincian, harga, dan spesifikasi di atas.\n2. Mohon cantumkan Nomor PO ini pada setiap dokumen pengiriman dan invoice tagihan.\n3. Syarat dan ketentuan lain mengikuti kesepakatan yang telah disetujui bersama." : quotation.notes
+
             // Notes & Terms - Bottom Fixed
-            if (quotation.notes) {
+            if (currentNotes) {
                 doc.setFont('helvetica', 'normal').setFontSize(8)
-                const nl = doc.splitTextToSize(quotation.notes, W - M * 2)
+                const nl = doc.splitTextToSize(currentNotes, W - M * 2)
                 const nh = (nl.length * 4) + 15
                 if (y + nh > 275) { doc.addPage(); y = 20 }
 
@@ -328,9 +388,9 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             if (y > 230) { doc.addPage(); y = 20 }
             const sw = (W - M * 2 - 10) / 2
             doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...gray)
-            doc.text('Disetujui oleh,', M, y)
-            doc.text('Hormat kami,', M + sw + 10, y)
-            doc.text(`${company.city || 'Jakarta'}, ${fd(quotation.date)}`, M + sw + 10, y + 4)
+            doc.text(isPOContract ? 'Authorized by,' : 'Disetujui oleh,', M, y)
+            doc.text(isPOContract ? 'Accepted by,' : 'Hormat kami,', M + sw + 10, y)
+            doc.text(`${company.city || 'Jakarta'}, ${fd(isPOContract ? new Date().toISOString() : quotation.date)}`, M + sw + 10, y + 4)
 
             // TTD Image
             try {
@@ -381,7 +441,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${sc.color}`}>{quotation.number}</span>
                         <span className="text-slate-500 text-sm font-medium">{c?.name}</span>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="hidden md:block">
                         <div className="flex items-center gap-4 px-4 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Totals</span>
@@ -406,14 +466,30 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                                     <div className="w-8 h-4 bg-emerald-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-emerald-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
                                 </label>
                             </div>
+                            <div className="w-px h-4 bg-slate-300"></div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-tight">PO Contract</span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked={showPOContract} onChange={(e) => setShowPOContract(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-8 h-4 bg-indigo-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-indigo-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-400"></div>
+                                </label>
+                            </div>
                         </div>
+                    </div>
+                </div>
+                <div className="px-8 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                         <Button onClick={generatePDF} disabled={busy}
                             className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 px-5 text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20">
                             <Download size={13} className="mr-2" />
                             {busy ? 'Generating...' : 'Download PDF'}
                         </Button>
-                        <button onClick={onClose} className="w-9 h-9 rounded-xl hover:bg-slate-200 flex items-center justify-center text-slate-500"><X size={18} /></button>
+                        <Button onClick={() => setShowPOContract(!showPOContract)} disabled={busy} variant="outline" className="rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold h-9 px-5 text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20">
+                            <Download size={13} className="mr-2" />
+                            {showPOContract ? 'PO Contract' : 'PDF Quotation'}
+                        </Button>
                     </div>
+                    <button onClick={onClose} className="w-9 h-9 rounded-xl hover:bg-slate-200 flex items-center justify-center text-slate-500"><X size={18} /></button>
                 </div>
 
                 {/* A4 Preview */}
@@ -423,32 +499,46 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         {/* Header — company left | quotation details right */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #4f46e5', paddingBottom: 18, marginBottom: 0 }}>
                             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                                {company.logo && <img src={`${process.env.NEXT_PUBLIC_API_URL}${company.logo}`} alt="logo" style={{ height: 60, width: 'auto', objectFit: 'contain' }} />}
-                                <div>
-                                    <div style={{ fontWeight: 900, fontSize: 17, color: '#0f172a', marginBottom: 3, letterSpacing: 0.3 }}>{company.name || 'PT. Axon Ecosystem'}</div>
-                                    {company.legalName && company.legalName !== company.name && (
-                                        <div style={{ fontSize: 9, color: '#64748b', marginBottom: 2, fontStyle: 'italic' }}>{company.legalName}</div>
-                                    )}
-                                    {company.address && (
-                                        <div style={{ fontSize: 9, color: '#64748b', marginTop: 3, lineHeight: 1.5 }}>
-                                            {company.address}
-                                            {(company.city || company.province) && (
-                                                <span>, {[company.city, company.province].filter(Boolean).join(', ')}{company.postalCode ? ` ${company.postalCode}` : ''}</span>
-                                            )}
+                                {!showPOContract && company.logo && <img src={`${process.env.NEXT_PUBLIC_API_URL}${company.logo}`} alt="logo" style={{ height: 60, width: 'auto', objectFit: 'contain' }} />}
+                                {!showPOContract ? (
+                                    <div>
+                                        <div style={{ fontWeight: 900, fontSize: 17, color: '#0f172a', marginBottom: 3, letterSpacing: 0.3 }}>{company.name || 'PT. Axon Ecosystem'}</div>
+                                        {company.legalName && company.legalName !== company.name && (
+                                            <div style={{ fontSize: 9, color: '#64748b', marginBottom: 2, fontStyle: 'italic' }}>{company.legalName}</div>
+                                        )}
+                                        {company.address && (
+                                            <div style={{ fontSize: 9, color: '#64748b', marginTop: 3, lineHeight: 1.5 }}>
+                                                {company.address}
+                                                {(company.city || company.province) && (
+                                                    <span>, {[company.city, company.province].filter(Boolean).join(', ')}{company.postalCode ? ` ${company.postalCode}` : ''}</span>
+                                                )}
+                                            </div>
+                                        )}
+                                        <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            {company.phone && <div style={{ fontSize: 9, color: '#64748b' }}>Tel: {company.phone}</div>}
+                                            {company.email && <div style={{ fontSize: 9, color: '#64748b' }}>Email: {company.email}</div>}
+                                            {company.taxId && <div style={{ fontSize: 9, color: '#64748b' }}>NPWP: {company.taxId}</div>}
                                         </div>
-                                    )}
-                                    <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                        {company.phone && <div style={{ fontSize: 9, color: '#64748b' }}>Tel: {company.phone}</div>}
-                                        {company.email && <div style={{ fontSize: 9, color: '#64748b' }}>Email: {company.email}</div>}
-                                        {company.taxId && <div style={{ fontSize: 9, color: '#64748b' }}>NPWP: {company.taxId}</div>}
                                     </div>
-                                </div>
+                                ) : (
+                                    <div>
+                                        <div style={{ fontWeight: 900, fontSize: 17, color: '#0f172a', marginBottom: 3, letterSpacing: 0.3 }}>{c?.name}</div>
+                                        {c?.address && <div style={{ fontSize: 9, color: '#64748b', marginTop: 3, lineHeight: 1.5 }}>{c.address}</div>}
+                                        <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            {c?.phone && <div style={{ fontSize: 9, color: '#64748b' }}>Tel: {c.phone}</div>}
+                                            {c?.email && <div style={{ fontSize: 9, color: '#64748b' }}>Email: {c.email}</div>}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             {/* Quotation meta — right aligned */}
                             <div style={{ textAlign: 'right', minWidth: 180 }}>
                                 <table style={{ marginLeft: 'auto', fontSize: 9, borderCollapse: 'collapse' }}>
                                     <tbody>
-                                        {[['No.', quotation.number], ['Tanggal', fd(quotation.date)], ['Berlaku s/d', fd(quotation.validUntil)], ['Mata Uang', quotation.currency]].map(([k, v]) => (
+                                        {(showPOContract 
+                                            ? [['PO Date', fd(new Date().toISOString())], ['Ref. Quotation', quotation.number], ['Termin Bayar', quotation.paymentTerms], ['Mata Uang', quotation.currency]]
+                                            : [['No.', quotation.number], ['Tanggal', fd(quotation.date)], ['Berlaku s/d', fd(quotation.validUntil)], ['Mata Uang', quotation.currency]]
+                                        ).map(([k, v]) => (
                                             <tr key={k}>
                                                 <td style={{ textAlign: 'right', color: '#64748b', paddingRight: 8, fontWeight: 700, whiteSpace: 'nowrap', paddingBottom: 3 }}>{k}</td>
                                                 <td style={{ textAlign: 'right', color: '#0f172a', paddingBottom: 3, fontWeight: 600, whiteSpace: 'nowrap' }}>{v}</td>
@@ -461,94 +551,135 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
 
                         {/* Title — centered below the separator line */}
                         <div style={{ textAlign: 'center', padding: '10px 0 18px', borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
-                            <span style={{ fontWeight: 900, fontSize: 14, color: '#4f46e5', letterSpacing: 3, textTransform: 'uppercase' }}>{showBreakdown ? 'Breakdown Project' : 'Penawaran Harga'}</span>
+                            <span style={{ fontWeight: 900, fontSize: 14, color: '#4f46e5', letterSpacing: 3, textTransform: 'uppercase' }}>{showPOContract ? 'PURCHASE ORDER' : showBreakdown ? 'Breakdown Project' : 'Penawaran Harga'}</span>
                         </div>
 
                         {/* Recipient & Detail Info - Layout Full Width Rows */}
                         <div style={{ marginBottom: 24 }}>
                             <div style={{ paddingBottom: 16, borderBottom: '1px solid #f1f5f9', marginBottom: 16 }}>
-                                <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, color: '#94a3b8', marginBottom: 6 }}>Kepada Yth.</div>
-                                <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>{c?.name}</div>
-                                {quotation.attn && <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>U/p: {quotation.attn}</div>}
-                                {c?.address && <div style={{ fontSize: 9, color: '#64748b', marginTop: 4, lineHeight: 1.6 }}>{c.address}</div>}
-                                {c?.phone && <div style={{ fontSize: 9, color: '#64748b' }}>Tel: {c.phone}</div>}
+                                <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, color: '#94a3b8', marginBottom: 6 }}>{showPOContract ? 'VENDOR (PEMASOK)' : 'Kepada Yth.'}</div>
+                                {showPOContract ? (
+                                    <>
+                                        <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>{company.name || 'PT. Axon Ecosystem'}</div>
+                                        {company.address && <div style={{ fontSize: 9, color: '#64748b', marginTop: 4, lineHeight: 1.6 }}>{company.address}</div>}
+                                        {company.phone && <div style={{ fontSize: 9, color: '#64748b' }}>Tel: {company.phone}</div>}
+                                    </>
+                                ) : (
+                                    <>
+                                        <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>{c?.name}</div>
+                                        {quotation.attn && <div style={{ fontSize: 10, color: '#475569', marginTop: 2 }}>U/p: {quotation.attn}</div>}
+                                        {c?.address && <div style={{ fontSize: 9, color: '#64748b', marginTop: 4, lineHeight: 1.6 }}>{c.address}</div>}
+                                        {c?.phone && <div style={{ fontSize: 9, color: '#64748b' }}>Tel: {c.phone}</div>}
+                                    </>
+                                )}
                             </div>
 
-                            <div>
-                                <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, color: '#94a3b8', marginBottom: 10 }}>Detail Penawaran</div>
-                                <table style={{ fontSize: 10, width: '100%', borderCollapse: 'collapse' }}>
-                                    <tbody>
-                                        {[
-                                            ['Perihal', quotation.subject],
-                                            ['Termin Bayar', quotation.paymentTerms],
-                                            ['Syarat Kirim', quotation.deliveryTerms]
-                                        ].filter(([, v]) => v).map(([k, v]) => (
-                                            <tr key={k}>
-                                                <td style={{ fontWeight: 700, color: '#475569', paddingRight: 8, paddingBottom: 6, verticalAlign: 'top', whiteSpace: 'nowrap', width: 120 }}>{k}</td>
-                                                <td style={{ color: '#0f172a', paddingBottom: 6 }}>: {v}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                            {!showPOContract && (
+                                <div>
+                                    <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, color: '#94a3b8', marginBottom: 10 }}>Detail Penawaran</div>
+                                    <table style={{ fontSize: 10, width: '100%', borderCollapse: 'collapse' }}>
+                                        <tbody>
+                                            {[
+                                                ['Perihal', quotation.subject],
+                                                ['Termin Bayar', quotation.paymentTerms],
+                                                ['Syarat Kirim', quotation.deliveryTerms]
+                                            ].filter(([, v]) => v).map(([k, v]) => (
+                                                <tr key={k}>
+                                                    <td style={{ fontWeight: 700, color: '#475569', paddingRight: 8, paddingBottom: 6, verticalAlign: 'top', whiteSpace: 'nowrap', width: 120 }}>{k}</td>
+                                                    <td style={{ color: '#0f172a', paddingBottom: 6 }}>: {v}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
 
                         {/* Items */}
                         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 10 }}>
                             <thead>
                                 <tr style={{ background: '#4f46e5', color: '#fff' }}>
-                                    {(showBreakdown ? ['No', 'Detail Item', 'Qty', 'Unit', 'Harga(Rp)', 'HPP(Rp)', 'Disc', 'Total(Rp)', 'Tot.HPP(Rp)', 'Profit(Rp)', '%'] : ['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Disc%', 'Jumlah']).map((h, i) => (
-                                        <th key={h} style={{ padding: '8px 10px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, textAlign: i === 1 ? 'left' : (showBreakdown ? (i >= 4 && i !== 6 && i !== 10 ? 'right' : 'center') : (i >= 4 ? 'right' : 'center')), whiteSpace: 'nowrap' }}>{h}</th>
+                                    {(showPOContract ? ['No', 'Deskripsi Barang', 'Qty', 'Satuan', 'Harga Satuan (Rp)', 'Total (Rp)'] : showBreakdown ? ['No', 'Detail Item', 'Qty', 'Unit', 'Harga(Rp)', 'HPP(Rp)', 'Disc', 'Total(Rp)', 'Tot.HPP(Rp)', 'Profit(Rp)', '%'] : ['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Disc%', 'Jumlah']).map((h, i) => (
+                                        <th key={h} style={{ padding: '8px 10px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, textAlign: i === 1 ? 'left' : (showPOContract ? (i >= 4 ? 'right' : 'center') : showBreakdown ? (i >= 4 && i !== 6 && i !== 10 ? 'right' : 'center') : (i >= 4 ? 'right' : 'center')), whiteSpace: 'nowrap' }}>{h}</th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
-                                {[...(quotation.items || [])].sort((a, b) => a.no - b.no).map((it, i) => {
-                                    if (showBreakdown) {
-                                        return (
-                                            <Fragment key={i}>
-                                                <tr style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
-                                                    <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600, borderBottom: 'none' }}>{it.no}</td>
-                                                    <td colSpan={10} style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 700, color: '#4f46e5', borderBottom: 'none' }}>
-                                                        {it.description}
-                                                    </td>
-                                                </tr>
-                                                <tr style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
-                                                    <td style={{ borderTop: 'none' }}></td>
-                                                    <td style={{ borderTop: 'none' }}></td>
-                                                    <td style={{ padding: '7px 10px', textAlign: 'center' }}>{it.qty}</td>
-                                                    <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.unit}</td>
-                                                    <td style={{ padding: '7px 10px', textAlign: 'right' }}>{(it.unitPrice || 0).toLocaleString('id-ID')}</td>
-                                                    <td style={{ padding: '7px 10px', textAlign: 'right', color: '#b45309' }}>{(it.costPrice || 0).toLocaleString('id-ID')}</td>
-                                                    <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.discount > 0 ? `${it.discount}%` : '-'}</td>
-                                                    <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{(it.amount || 0).toLocaleString('id-ID')}</td>
-                                                    <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: '#b45309' }}>{((it.costPrice || 0) * it.qty).toLocaleString('id-ID')}</td>
-                                                    <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{(it.amount - ((it.costPrice || 0) * it.qty)).toLocaleString('id-ID')}</td>
-                                                    <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700, color: '#16a34a' }}>{it.amount > 0 ? ((it.amount - ((it.costPrice || 0) * it.qty)) / it.amount * 100).toFixed(1) : '0'}</td>
-                                                </tr>
-                                            </Fragment>
-                                        )
-                                    }
-                                    return (
-                                        <tr key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
-                                            <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{it.no}</td>
-                                            <td style={{ padding: '7px 10px', textAlign: 'left' }}>
-                                                {showProductImages && getProductImage(it) && (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                        <img src={`${process.env.NEXT_PUBLIC_API_URL}${getProductImage(it)}`} alt="" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4, background: '#fff', border: '1px solid #e2e8f0' }} />
-                                                        <span>{it.description}</span>
-                                                    </div>
-                                                )}
-                                                {!(showProductImages && getProductImage(it)) && <span>{it.description}</span>}
-                                            </td>
-                                            <td style={{ padding: '7px 10px', textAlign: 'center' }}>{it.qty}</td>
-                                            <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.unit}</td>
-                                            <td style={{ padding: '7px 10px', textAlign: 'right' }}>Rp {it.unitPrice?.toLocaleString('id-ID')}</td>
-                                            <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.discount > 0 ? `${it.discount}%` : '-'}</td>
-                                            <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>Rp {it.amount?.toLocaleString('id-ID')}</td>
+                                {showPOContract ? (
+                                    poItems.length > 0 ? (
+                                        poItems.sort((a, b) => a.no - b.no).map((it, i) => (
+                                            <tr key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
+                                                <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{i + 1}</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 700, color: '#4f46e5' }}>{it.description}</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'center' }}>{it.qty}</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.unit}</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'right' }}>{it.unitPrice?.toLocaleString('id-ID')}</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{it.amount?.toLocaleString('id-ID')}</td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr style={{ background: '#fff' }}>
+                                            <td colSpan={6} style={{ padding: '20px 10px', textAlign: 'center', fontWeight: 600, color: '#64748b' }}>Item Detail Kosong</td>
                                         </tr>
                                     )
-                                })}
+                                ) : (
+                                    [...(quotation.items || [])].sort((a, b) => a.no - b.no).map((it, i) => {
+                                        if (showBreakdown) {
+                                            return (
+                                                <Fragment key={i}>
+                                                    <tr style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
+                                                        <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600, borderBottom: 'none' }}>{it.no}</td>
+                                                        <td colSpan={10} style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 700, color: '#4f46e5', borderBottom: 'none' }}>
+                                                            {it.description}
+                                                        </td>
+                                                    </tr>
+                                                    <tr style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
+                                                        <td style={{ borderTop: 'none' }}></td>
+                                                        <td style={{ borderTop: 'none' }}></td>
+                                                        <td style={{ padding: '7px 10px', textAlign: 'center' }}>{it.qty}</td>
+                                                        <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.unit}</td>
+                                                        <td style={{ padding: '7px 10px', textAlign: 'right' }}>{(it.unitPrice || 0).toLocaleString('id-ID')}</td>
+                                                        <td style={{ padding: '7px 10px', textAlign: 'right', color: '#b45309' }}>{(it.costPrice || 0).toLocaleString('id-ID')}</td>
+                                                        <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.discount > 0 ? `${it.discount}%` : '-'}</td>
+                                                        <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>{(it.amount || 0).toLocaleString('id-ID')}</td>
+                                                        <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: '#b45309' }}>{((it.costPrice || 0) * it.qty).toLocaleString('id-ID')}</td>
+                                                        {(() => {
+                                                            const globalDiscRatio = quotation.subtotal > 0 ? ((quotation.discountAmt || 0) / quotation.subtotal) : 0;
+                                                            const netAmount = it.amount * (1 - globalDiscRatio);
+                                                            const margin = netAmount - ((it.costPrice || 0) * it.qty);
+                                                            const marginPct = netAmount > 0 ? (margin / netAmount * 100).toFixed(1) : '0';
+                                                            return (
+                                                                <>
+                                                                    <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>{margin.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                                                                    <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700, color: '#16a34a' }}>{marginPct}</td>
+                                                                </>
+                                                            )
+                                                        })()}
+                                                    </tr>
+                                                </Fragment>
+                                            )
+                                        }
+                                        return (
+                                            <tr key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
+                                                <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{it.no}</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'left' }}>
+                                                    {showProductImages && getProductImage(it) && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                            <img src={`${process.env.NEXT_PUBLIC_API_URL}${getProductImage(it)}`} alt="" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 4, background: '#fff', border: '1px solid #e2e8f0' }} />
+                                                            <span>{it.description}</span>
+                                                        </div>
+                                                    )}
+                                                    {!(showProductImages && getProductImage(it)) && <span>{it.description}</span>}
+                                                </td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'center' }}>{it.qty}</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.unit}</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'right' }}>Rp {it.unitPrice?.toLocaleString('id-ID')}</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.discount > 0 ? `${it.discount}%` : '-'}</td>
+                                                <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 700 }}>Rp {it.amount?.toLocaleString('id-ID')}</td>
+                                            </tr>
+                                        )
+                                    })
+                                )}
                             </tbody>
                         </table>
 
@@ -556,40 +687,58 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         {showTotals && (
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
                                 <div style={{ width: 300, fontSize: 10 }}>
-                                    {[['Subtotal', `Rp ${quotation.subtotal?.toLocaleString('id-ID')}`],
-                                    ...(quotation.discount > 0 ? [[`Diskon (${quotation.discount}%)`, `- Rp ${quotation.discountAmt?.toLocaleString('id-ID')}`]] : []),
-                                    [`PPN (${quotation.tax}%)`, `+ Rp ${quotation.taxAmt?.toLocaleString('id-ID')}`],
-                                    ...(showBreakdown ? [
-                                        ['Total HPP', `Rp ${quotation.items.reduce((s, it) => s + (it.costPrice || 0) * it.qty, 0).toLocaleString('id-ID')}`],
-                                        ['Total Profit', `Rp ${(quotation.subtotal - quotation.items.reduce((s, it) => s + (it.costPrice || 0) * it.qty, 0)).toLocaleString('id-ID')}`],
-                                        ['% Profit', quotation.subtotal > 0 ? (((quotation.subtotal - quotation.items.reduce((s, it) => s + (it.costPrice || 0) * it.qty, 0)) / quotation.subtotal) * 100).toFixed(1) + '%' : '0%']
-                                    ] : [])
-                                    ].map(([k, v]) => (
-                                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 5, marginBottom: 5 }}>
-                                            <span style={{ color: '#64748b' }}>{k}</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{v}</span>
-                                        </div>
-                                    ))}
+                                    {showPOContract ? (
+                                        [['Subtotal', `Rp ${poItems.reduce((s, it) => s + it.amount, 0).toLocaleString('id-ID')}`],
+                                        ...(((quotation as any).discountType === 'AMOUNT' && quotation.discountAmt! > 0) ? [['Diskon', `- Rp ${quotation.discountAmt?.toLocaleString('id-ID')}`]] : (quotation.discount > 0 ? [[`Diskon (${quotation.discount}%)`, `- Rp ${quotation.discountAmt?.toLocaleString('id-ID')}`]] : [])),
+                                        [`PPN (${quotation.tax}%)`, `+ Rp ${quotation.taxAmt?.toLocaleString('id-ID')}`]
+                                        ].map(([k, v]) => (
+                                            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 5, marginBottom: 5 }}>
+                                                <span style={{ color: '#64748b' }}>{k}</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{v}</span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        [['Subtotal', `Rp ${quotation.subtotal?.toLocaleString('id-ID')}`],
+                                        ...(((quotation as any).discountType === 'AMOUNT' && quotation.discountAmt! > 0) ? [['Diskon', `- Rp ${quotation.discountAmt?.toLocaleString('id-ID')}`]] : (quotation.discount > 0 ? [[`Diskon (${quotation.discount}%)`, `- Rp ${quotation.discountAmt?.toLocaleString('id-ID')}`]] : [])),
+                                        [`PPN (${quotation.tax}%)`, `+ Rp ${quotation.taxAmt?.toLocaleString('id-ID')}`],
+                                        ...(showBreakdown ? [
+                                            ['Total HPP', `Rp ${quotation.items.reduce((s, it) => s + (it.costPrice || 0) * it.qty, 0).toLocaleString('id-ID')}`],
+                                            ['Total Sblm Diskon', `Rp ${quotation.subtotal.toLocaleString('id-ID')}`],
+                                            ...((quotation.discountAmt || 0) > 0 ? [['Total Diskon', `- Rp ${quotation.discountAmt?.toLocaleString('id-ID')}`]] : []),
+                                            ['Total Stlh Diskon', `Rp ${(quotation.subtotal - (quotation.discountAmt || 0)).toLocaleString('id-ID')}`],
+                                            ['Total Profit', `Rp ${(quotation.subtotal - (quotation.discountAmt || 0) - quotation.items.reduce((s, it) => s + (it.costPrice || 0) * it.qty, 0)).toLocaleString('id-ID', { maximumFractionDigits: 0 })}`],
+                                            ['% Profit', (quotation.subtotal - (quotation.discountAmt || 0)) > 0 ? ((((quotation.subtotal - (quotation.discountAmt || 0)) - quotation.items.reduce((s, it) => s + (it.costPrice || 0) * it.qty, 0)) / (quotation.subtotal - (quotation.discountAmt || 0))) * 100).toFixed(1) + '%' : '0%']
+                                        ] : [])
+                                        ].map(([k, v]) => (
+                                            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 5, marginBottom: 5 }}>
+                                                <span style={{ color: '#64748b' }}>{k}</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{v}</span>
+                                            </div>
+                                        ))
+                                    )}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid #4f46e5' }}>
                                         <span style={{ fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: 1 }}>TOTAL</span>
-                                        <span style={{ fontWeight: 900, color: '#4f46e5', fontSize: 15 }}>Rp {quotation.grandTotal?.toLocaleString('id-ID')}</span>
+                                        <span style={{ fontWeight: 900, color: '#4f46e5', fontSize: 15 }}>Rp {showPOContract ? (poItems.reduce((s, it) => s + it.amount, 0) - (quotation.discountAmt || 0) + (quotation.taxAmt || 0)).toLocaleString('id-ID') : quotation.grandTotal?.toLocaleString('id-ID')}</span>
                                     </div>
                                 </div>
                             </div>
                         )}
 
                         {/* Notes - Bottom */}
-                        {quotation.notes && (
-                            <div style={{ borderTop: '2px solid #f1f5f9', paddingTop: 16, marginBottom: 24 }}>
-                                <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, color: '#94a3b8', marginBottom: 8 }}>Catatan & Syarat Ketentuan</div>
-                                <div style={{ fontSize: 9, color: '#475569', lineHeight: 1.8, whiteSpace: 'pre-line' }}>{quotation.notes}</div>
-                            </div>
-                        )}
+                        {(() => {
+                            const currentNotesPreview = showPOContract ? "1. Harap memproses pesanan ini sesuai dengan rincian, harga, dan spesifikasi di atas.\n2. Mohon cantumkan Nomor PO ini pada setiap dokumen pengiriman dan invoice tagihan.\n3. Syarat dan ketentuan lain mengikuti kesepakatan yang telah disetujui bersama." : quotation.notes
+                            if (!currentNotesPreview) return null
+                            return (
+                                <div style={{ borderTop: '2px solid #f1f5f9', paddingTop: 16, marginBottom: 24 }}>
+                                    <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, color: '#94a3b8', marginBottom: 8 }}>Catatan & Syarat Ketentuan</div>
+                                    <div style={{ fontSize: 9, color: '#475569', lineHeight: 1.8, whiteSpace: 'pre-line' }}>{currentNotesPreview}</div>
+                                </div>
+                            )
+                        })()}
 
                         {/* Signatures */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginTop: 16 }}>
                             {[
-                                { label: 'Disetujui oleh,', sub: '', name: c?.name || '' },
-                                { label: 'Hormat kami,', sub: `${company.city || 'Jakarta'}, ${fd(quotation.date)}`, name: company.name || 'PT. Axon Ecosystem' },
+                                { label: showPOContract ? 'Authorized by,' : 'Disetujui oleh,', sub: '', name: c?.name || '' },
+                                { label: showPOContract ? 'Accepted by,' : 'Hormat kami,', sub: `${company.city || 'Jakarta'}, ${fd(showPOContract ? new Date().toISOString() : quotation.date)}`, name: company.name || 'PT. Axon Ecosystem' },
                             ].map((s, i) => (
                                 <div key={i} style={{ textAlign: 'center' }}>
                                     <div style={{ fontSize: 9, color: '#64748b' }}>{s.label}</div>

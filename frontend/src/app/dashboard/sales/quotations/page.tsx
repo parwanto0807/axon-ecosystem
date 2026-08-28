@@ -24,7 +24,7 @@ export interface Quotation {
     id: string; number: string; date: string; validUntil: string; status: string
     customerId: string; customer: Customer; attn: string | null; subject: string
     notes: string | null; paymentTerms: string | null; deliveryTerms: string | null
-    currency: string; discount: number; tax: number
+    currency: string; discountType: string; discount: number; tax: number
     subtotal: number; discountAmt: number; taxAmt: number; grandTotal: number
     createdAt: string; items: QuotationItem[]; projectId?: string; project?: { number: string; name: string }
 }
@@ -278,16 +278,24 @@ export default function QuotationsPage() {
                                                 <td className="px-6 py-4 text-[11px] text-slate-500 font-medium">{fmtDate(q.date)}</td>
                                                 <td className="px-6 py-4 text-[11px] text-slate-500 font-medium">{fmtDate(q.validUntil)}</td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <p className="font-bold text-slate-900 text-sm">{fmt(q.grandTotal)}</p>
+                                                    <p className="text-[10px] text-slate-500">Sblm Disc: {fmt(q.subtotal)}</p>
+                                                    {q.discountAmt > 0 && <p className="text-[10px] text-rose-500">Disc: -{fmt(q.discountAmt)}</p>}
+                                                    <p className="font-bold text-slate-900 text-sm mt-0.5">{fmt(q.grandTotal)}</p>
                                                     <p className="text-[9px] text-slate-400">{q.items?.length || 0} items</p>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
                                                     <p className="font-semibold text-amber-700 text-sm">{fmt(q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0)}</p>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <p className={`font-bold text-sm ${q.subtotal - (q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0) >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                                                        {fmt(q.subtotal - (q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0))}
-                                                    </p>
+                                                    {(() => {
+                                                        const totalCost = q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0;
+                                                        const margin = q.subtotal - (q.discountAmt || 0) - totalCost;
+                                                        return (
+                                                            <p className={`font-bold text-sm ${margin >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                                {fmt(margin)}
+                                                            </p>
+                                                        )
+                                                    })()}
                                                 </td>
                                                 <td className="px-6 py-4 text-center">
                                                     <div className="relative status-dropdown inline-block">
@@ -420,6 +428,7 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
         deliveryTerms: quotation?.deliveryTerms || 'FOB Jakarta',
         notes: quotation?.notes || 'Penawaran ini berlaku sesuai tanggal validitas di atas.\nHarga belum termasuk biaya pengiriman kecuali disebutkan.\nApabila ada pertanyaan, silakan hubungi kami.',
         currency: quotation?.currency || 'IDR',
+        discountType: quotation?.discountType || 'PERCENTAGE',
         discount: quotation?.discount ?? 0,
         tax: quotation?.tax ?? 11,
         projectId: quotation?.projectId || '',
@@ -446,9 +455,9 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
 
     const subtotal = items.reduce((s, i) => s + i.amount, 0)
     const totalCost = items.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0)
-    const totalMargin = subtotal - totalCost
-    const discountAmt = subtotal * (Number(form.discount) / 100)
+    const discountAmt = (form as any).discountType === 'AMOUNT' ? Number(form.discount) : subtotal * (Number(form.discount) / 100)
     const taxable = subtotal - discountAmt
+    const totalMargin = taxable - totalCost
     const taxAmt = taxable * (Number(form.tax) / 100)
     const grandTotal = taxable + taxAmt
 
@@ -597,7 +606,16 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                                                 <p className="text-sm font-bold text-slate-800">Rp {it.amount.toLocaleString('id-ID')}</p>
                                             </td>
                                             <td className="px-3 py-2 text-right">
-                                                <p className={`text-sm font-bold ${it.amount - (it.costPrice || 0) * it.qty >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>Rp {(it.amount - (it.costPrice || 0) * it.qty).toLocaleString('id-ID')}</p>
+                                                {(() => {
+                                                    const globalDiscRatio = subtotal > 0 ? (discountAmt / subtotal) : 0;
+                                                    const netAmount = it.amount * (1 - globalDiscRatio);
+                                                    const margin = netAmount - (it.costPrice || 0) * it.qty;
+                                                    return (
+                                                        <p className={`text-sm font-bold ${margin >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+                                                            Rp {margin.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                                                        </p>
+                                                    )
+                                                })()}
                                             </td>
                                             <td className="px-2 py-2 text-center">
                                                 {items.length > 1 && (
@@ -634,11 +652,17 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                                 <span className={`font-bold ${totalMargin >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>Rp {totalMargin.toLocaleString('id-ID')}</span>
                             </div>
                             <div className="flex items-center justify-between gap-3">
-                                <span className="text-slate-500 font-medium text-sm">Discount (%)</span>
                                 <div className="flex items-center gap-2">
-                                    <input type="number" min="0" max="100" step="0.1" value={form.discount} onChange={e => setForm({ ...form, discount: +e.target.value })}
-                                        className="w-20 text-sm bg-white border border-slate-200 rounded-lg px-2 py-1 text-center focus:outline-none" />
-                                    <span className="font-semibold text-rose-600 text-sm">- Rp {discountAmt.toLocaleString('id-ID')}</span>
+                                    <span className="text-slate-500 font-medium text-sm">Discount</span>
+                                    <select value={(form as any).discountType} onChange={e => setForm({ ...form, discountType: e.target.value })} className="text-xs bg-slate-100 border border-slate-200 rounded px-1 py-0.5 outline-none text-slate-600">
+                                        <option value="PERCENTAGE">%</option>
+                                        <option value="AMOUNT">Rp</option>
+                                    </select>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input type="number" min="0" step="0.1" value={form.discount} onChange={e => setForm({ ...form, discount: +e.target.value })}
+                                        className="w-24 text-sm bg-white border border-slate-200 rounded-lg px-2 py-1 text-right focus:outline-none focus:border-indigo-500" />
+                                    <span className="font-semibold text-rose-600 text-sm w-28 text-right">- Rp {discountAmt.toLocaleString('id-ID')}</span>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between gap-3">
