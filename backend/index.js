@@ -8710,7 +8710,7 @@ app.post('/api/investor-loans/:id/disburse', checkRole(INVESTOR_LOAN_ROLES), asy
       }
 
       return { disbursement, journal };
-    });
+    }, { maxWait: 5000, timeout: 20000 });
 
     res.status(201).json(result);
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -8817,7 +8817,7 @@ app.post('/api/investor-loans/:id/repay', checkRole(INVESTOR_LOAN_ROLES), async 
       }
 
       return { repayment, journal };
-    });
+    }, { maxWait: 5000, timeout: 20000 });
 
     res.status(201).json(result);
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -8898,7 +8898,7 @@ app.post('/api/investor-loans/:id/distribute-profit', checkRole(INVESTOR_LOAN_RO
       });
 
       return { distribution, journal };
-    });
+    }, { maxWait: 5000, timeout: 20000 });
 
     res.status(201).json(result);
   } catch (e) { res.status(500).json({ message: e.message }); }

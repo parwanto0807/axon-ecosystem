@@ -374,6 +374,7 @@ export default function InvestorLoansPage() {
                                     <th className="text-left px-4 py-3 font-medium text-gray-600">No</th>
                                     <th className="text-left px-4 py-3 font-medium text-gray-600">{T.investorName}</th>
                                     <th className="text-left px-4 py-3 font-medium text-gray-600">{T.principal}</th>
+                                    <th className="text-left px-4 py-3 font-medium text-gray-600">Pencairan Dana</th>
                                     <th className="text-left px-4 py-3 font-medium text-gray-600">{T.profitShare}</th>
                                     <th className="text-left px-4 py-3 font-medium text-gray-600">{T.repaymentType}</th>
                                     <th className="text-left px-4 py-3 font-medium text-gray-600">{T.dueDate}</th>
@@ -395,6 +396,22 @@ export default function InvestorLoansPage() {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 font-medium text-gray-900">{formatRp(loan.principalAmount)}</td>
+                                        <td className="px-4 py-3">
+                                            {loan.disbursements && loan.disbursements.length > 0 ? (
+                                                <div className="space-y-1">
+                                                    {loan.disbursements.map((d: any, i: number) => (
+                                                        <div key={i} className="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
+                                                            {new Date(d.date).toLocaleDateString('id-ID')} : <span className="font-bold">{formatRp(d.amount)}</span>
+                                                        </div>
+                                                    ))}
+                                                    <div className="text-xs font-bold text-gray-600 mt-1 pt-1 border-t border-gray-200">
+                                                        Total: {formatRp(loan.disbursements.reduce((sum: number, d: any) => sum + d.amount, 0))}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-gray-400 italic">Belum ada pencairan</span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3">
                                             <span className="inline-flex items-center gap-1 text-sm">
                                                 <Percent className="w-3 h-3" />
