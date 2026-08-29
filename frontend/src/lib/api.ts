@@ -46,6 +46,30 @@ export const getSalesData = async (): Promise<{ monthlySales: number[], months: 
   }
 };
 
+export const getSalesOrderData = async (): Promise<{ monthlyOrders: number[], rawData: any[] }> => {
+  try {
+    const response = await api.get('/api/orders');
+    const orders = response.data;
+
+    const monthlyOrders = Array(12).fill(0);
+    const today = new Date();
+
+    orders.forEach((order: any) => {
+      if (['DRAFT', 'CANCELLED'].includes(order.status)) return;
+      const orderDate = new Date(order.date || order.createdAt);
+      const monthDiff = (today.getFullYear() - orderDate.getFullYear()) * 12 + (today.getMonth() - orderDate.getMonth());
+      if (monthDiff >= 0 && monthDiff < 12) {
+        monthlyOrders[11 - monthDiff] += order.grandTotal;
+      }
+    });
+
+    return { monthlyOrders, rawData: orders };
+  } catch (error) {
+    console.error('Error fetching sales order data:', error);
+    throw error;
+  }
+};
+
 export const getExpensesData = async (): Promise<{ categories: string[], amounts: number[], rawData: any[] }> => {
   try {
     // Now fetches combined operational expenses + payroll (salary)
@@ -133,11 +157,12 @@ export const getSalesByCategory = async (startDate: string, endDate: string): Pr
 // Example: Fetch Recent Activity (Unifies multiple sources)
 export const getRecentActivity = async () => {
   try {
-    const [invoices, quotations, workOrders, proposals] = await Promise.all([
+    const [invoices, quotations, workOrders, proposals, salesOrders] = await Promise.all([
       api.get('/api/invoices').then(res => res.data.slice(0, 5)),
       api.get('/api/quotations').then(res => res.data.slice(0, 5)),
       api.get('/api/work-orders').then(res => res.data.slice(0, 5)),
       api.get('/api/proposals').then(res => res.data.slice(0, 5)),
+      api.get('/api/orders').then(res => res.data.slice(0, 5)),
     ]);
 
     const unified = [
@@ -174,6 +199,15 @@ export const getRecentActivity = async () => {
         subtitle: prop.subject,
         date: prop.createdAt ? new Date(prop.createdAt) : new Date(),
         status: prop.status,
+      })),
+      ...salesOrders.map((so: any) => ({
+        id: so.id,
+        type: 'SALES_ORDER',
+        title: `Sales Order ${so.number}`,
+        subtitle: so.customer?.name || 'Customer',
+        amount: so.grandTotal,
+        date: so.createdAt ? new Date(so.createdAt) : new Date(),
+        status: so.status,
       })),
     ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 10);
 

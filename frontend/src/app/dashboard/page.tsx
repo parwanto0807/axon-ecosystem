@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { 
   getSalesData, 
+  getSalesOrderData,
   getExpensesData, 
   getInventoryStock, 
   getLowStockItems, 
@@ -200,7 +201,7 @@ const endDate = format(today, DATE_FORMAT);
 
 interface ActivityItem {
   id: string;
-  type: 'INVOICE' | 'QUOTATION' | 'WORK_ORDER' | 'PROPOSAL';
+  type: 'INVOICE' | 'QUOTATION' | 'WORK_ORDER' | 'PROPOSAL' | 'SALES_ORDER';
   title: string;
   subtitle: string;
   amount?: number;
@@ -367,6 +368,7 @@ export default function DashboardPage() {
 
   // Fetch data for the dashboard
   const { data: salesData, isLoading: isLoadingSales, refetch: refetchSales } = useQuery<SalesData>({ queryKey: ['salesData'], queryFn: getSalesData });
+  const { data: salesOrderData, isLoading: isLoadingSalesOrder, refetch: refetchSalesOrder } = useQuery({ queryKey: ['salesOrderData'], queryFn: getSalesOrderData });
   const { data: expensesData, isLoading: isLoadingExpenses, refetch: refetchExpenses } = useQuery<ExpensesData>({ queryKey: ['expensesData'], queryFn: getExpensesData });
   const { data: inventoryStock, isLoading: isLoadingInventory, refetch: refetchInventory } = useQuery({ queryKey: ['inventoryStock'], queryFn: getInventoryStock });
   const { data: lowStockItems, isLoading: isLoadingLowStock, refetch: refetchLowStock } = useQuery({ queryKey: ['lowStockItems'], queryFn: getLowStockItems });
@@ -388,6 +390,7 @@ export default function DashboardPage() {
 
   const handleRefresh = () => {
     refetchSales();
+    refetchSalesOrder();
     refetchExpenses();
     refetchInventory();
     refetchLowStock();
@@ -398,7 +401,7 @@ export default function DashboardPage() {
     refetchSurveys();
   };
 
-  const isLoading = isLoadingSales || isLoadingExpenses || isLoadingInventory || isLoadingLowStock || isLoadingProfitLoss || isLoadingCashFlow || isLoadingActivity || isLoadingSurveys;
+  const isLoading = isLoadingSales || isLoadingSalesOrder || isLoadingExpenses || isLoadingInventory || isLoadingLowStock || isLoadingProfitLoss || isLoadingCashFlow || isLoadingActivity || isLoadingSurveys;
 
   const safeTotalRevenue = profitLossReport?.totalRevenue || 0;
   const safeTotalCOGS = profitLossReport?.totalCOGS || 0;
@@ -437,6 +440,22 @@ export default function DashboardPage() {
         borderDash: [6, 4],
         fill: false,
         order: 0,
+      },
+      {
+        type: 'line' as const,
+        label: 'Sales Order (Pipeline)',
+        data: salesOrderData?.monthlyOrders || [],
+        borderColor: '#a855f7', // Purple
+        borderWidth: 2.5,
+        pointRadius: 4,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#fff',
+        pointBorderColor: '#a855f7',
+        pointBorderWidth: 2,
+        tension: 0.4,
+        borderDash: [4, 4],
+        fill: false,
+        order: 1,
       },
       {
         type: 'line' as const,
@@ -1011,12 +1030,14 @@ export default function DashboardPage() {
                       <div className={`p-3 rounded-2xl flex-shrink-0 ${activity.type === 'INVOICE' ? 'bg-indigo-50 text-indigo-600' :
                         activity.type === 'QUOTATION' ? 'bg-emerald-50 text-emerald-600' :
                           activity.type === 'WORK_ORDER' ? 'bg-amber-50 text-amber-600' :
-                            'bg-slate-50 text-slate-600'
+                            activity.type === 'SALES_ORDER' ? 'bg-blue-50 text-blue-600' :
+                              'bg-slate-50 text-slate-600'
                         }`}>
                         {activity.type === 'INVOICE' && <DollarSign size={18} />}
                         {activity.type === 'QUOTATION' && <ArrowUpRight size={18} />}
                         {activity.type === 'WORK_ORDER' && <Activity size={18} />}
                         {activity.type === 'PROPOSAL' && <Layers size={18} />}
+                        {activity.type === 'SALES_ORDER' && <ShoppingCart size={18} />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-0.5">

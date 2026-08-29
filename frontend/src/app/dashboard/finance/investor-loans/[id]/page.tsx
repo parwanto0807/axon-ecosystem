@@ -164,7 +164,19 @@ export default function InvestorLoanDetailPage() {
     const [showRepayModal, setShowRepayModal] = useState(false)
     const [showProfitModal, setShowProfitModal] = useState(false)
 
-    const [editForm, setEditForm] = useState({
+    const [editForm, setEditForm] = useState<{
+        investorName: string,
+        investorContact: string,
+        principalAmount: number,
+        profitSharingPercent: number,
+        interestRate: number,
+        repaymentType: string,
+        tenorMonths: number,
+        dueDate: string,
+        projectId: string,
+        salesOrderIds: string[],
+        notes: string
+    }>({
         investorName: '',
         investorContact: '',
         principalAmount: 0,
@@ -174,6 +186,7 @@ export default function InvestorLoanDetailPage() {
         tenorMonths: 12,
         dueDate: '',
         projectId: '',
+        salesOrderIds: [],
         notes: ''
     })
 
@@ -284,6 +297,7 @@ export default function InvestorLoanDetailPage() {
             tenorMonths: loan.tenorMonths || 12,
             dueDate: loan.dueDate ? new Date(loan.dueDate).toISOString().split('T')[0] : '',
             projectId: loan.projectId || '',
+            salesOrderIds: loan.salesOrders ? loan.salesOrders.map((so: any) => so.id) : [],
             notes: loan.notes || ''
         })
         setShowEditModal(true)
@@ -545,6 +559,69 @@ export default function InvestorLoanDetailPage() {
                                 <p className="font-medium">{loan.notes}</p>
                             </div>
                         )}
+
+                        {/* Project Reference & PO */}
+                        {loan.project && (
+                            <div className="col-span-2 md:col-span-3 mt-4 pt-4 border-t border-gray-100">
+                                <p className="text-gray-900 font-medium mb-2 flex items-center gap-2">
+                                    <FileText className="w-4 h-4 text-blue-600" />
+                                    Acuan Perjanjian (Project & PO)
+                                </p>
+                                <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                                    <p className="mb-2"><span className="text-gray-500">Project:</span> <span className="font-medium">{loan.project.number} - {loan.project.name}</span></p>
+                                    
+                                    {loan.salesOrders && loan.salesOrders.length > 0 ? (
+                                        <div className="mt-2">
+                                            <p className="text-gray-500 mb-2">Daftar Sales Order / PO (Didanai):</p>
+                                            <ul className="space-y-1.5">
+                                                {loan.salesOrders.map((so: any) => (
+                                                    <li key={so.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white px-3 py-2 border border-gray-200 rounded shadow-sm">
+                                                        <span className="font-medium text-gray-800">
+                                                            {so.number} {so.poNumber ? <span className="text-blue-600 font-normal">(PO: {so.poNumber})</span> : ''}
+                                                        </span>
+                                                        <span className="font-bold text-emerald-600 mt-1 sm:mt-0">{formatRp(so.grandTotal)}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            <div className="mt-3 flex justify-between items-center border-t border-gray-200 pt-3">
+                                                <span className="text-gray-600 font-medium">Total Nilai Project (Revenue dari PO):</span>
+                                                <span className="font-bold text-emerald-700 text-lg">
+                                                    {formatRp(loan.salesOrders.reduce((sum: number, so: any) => sum + so.grandTotal, 0))}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-white p-3 rounded border border-gray-200 text-center">
+                                            <p className="text-gray-400">Belum ada Sales Order / PO yang terbit untuk project ini.</p>
+                                        </div>
+                                    )}
+
+                                    {/* Estimasi Profit Investor */}
+                                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                                            <p className="text-xs text-indigo-600 mb-1 font-medium">Estimasi Profit Investor</p>
+                                            <p className="font-bold text-indigo-800 text-lg">
+                                                {loan.profitSharingPercent > 0 
+                                                    ? `${loan.profitSharingPercent}% dari Profit Project`
+                                                    : loan.interestRate > 0 
+                                                        ? formatRp(loan.principalAmount * (loan.interestRate / 100))
+                                                        : '-'}
+                                            </p>
+                                        </div>
+                                        <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                                            <p className="text-xs text-emerald-600 mb-1 font-medium">Total Pengembalian (Estimasi)</p>
+                                            <p className="font-bold text-emerald-800 text-lg">
+                                                {loan.profitSharingPercent > 0 
+                                                    ? `Modal + ${loan.profitSharingPercent}% Profit`
+                                                    : loan.interestRate > 0 
+                                                        ? formatRp(loan.principalAmount + (loan.principalAmount * (loan.interestRate / 100)))
+                                                        : formatRp(loan.principalAmount)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -552,15 +629,17 @@ export default function InvestorLoanDetailPage() {
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
                     <h3 className="font-bold text-gray-900 mb-4">Aksi</h3>
                     <div className="space-y-3">
+                        {loan.status !== 'PAID' && (
+                            <button
+                                onClick={openEditModal}
+                                className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition"
+                            >
+                                <Pencil className="w-4 h-4" />
+                                {lang === 'EN' ? 'Edit Loan' : 'Edit Pinjaman'}
+                            </button>
+                        )}
                         {loan.status === 'DRAFT' && (
                             <>
-                                <button
-                                    onClick={openEditModal}
-                                    className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition"
-                                >
-                                    <Pencil className="w-4 h-4" />
-                                    {lang === 'EN' ? 'Edit Loan' : 'Edit Pinjaman'}
-                                </button>
                                 <button
                                     onClick={handleActivate}
                                     disabled={activating}
@@ -1171,7 +1250,7 @@ export default function InvestorLoanDetailPage() {
                                     <label className="block text-sm font-medium text-gray-700 mb-1">{T.project}</label>
                                     <select
                                         value={editForm.projectId}
-                                        onChange={e => setEditForm({ ...editForm, projectId: e.target.value })}
+                                        onChange={e => setEditForm({ ...editForm, projectId: e.target.value, salesOrderIds: [] })}
                                         className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="">{lang === 'EN' ? 'No Project' : 'Tanpa Project'}</option>
@@ -1180,6 +1259,40 @@ export default function InvestorLoanDetailPage() {
                                         ))}
                                     </select>
                                 </div>
+
+                                {editForm.projectId && (
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Sales Order / PO yang didanai:</label>
+                                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            {(() => {
+                                                const selectedProject = projects.find(p => p.id === editForm.projectId);
+                                                if (!selectedProject || !selectedProject.salesOrders || selectedProject.salesOrders.length === 0) {
+                                                    return <p className="text-sm text-gray-500">Tidak ada PO di project ini.</p>;
+                                                }
+                                                return selectedProject.salesOrders.map((so: any) => (
+                                                    <label key={so.id} className="flex items-center gap-2 text-sm bg-white p-2 rounded border border-gray-100 cursor-pointer hover:bg-gray-50">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="rounded text-blue-600 focus:ring-blue-500"
+                                                            checked={editForm.salesOrderIds.includes(so.id)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setEditForm(prev => ({ ...prev, salesOrderIds: [...prev.salesOrderIds, so.id] }));
+                                                                } else {
+                                                                    setEditForm(prev => ({ ...prev, salesOrderIds: prev.salesOrderIds.filter(id => id !== so.id) }));
+                                                                }
+                                                            }}
+                                                        />
+                                                        <div className="flex flex-col">
+                                                            <span className="font-medium">{so.number} {so.poNumber ? `(PO: ${so.poNumber})` : ''}</span>
+                                                            <span className="text-xs text-gray-500">{formatRp(so.grandTotal)}</span>
+                                                        </div>
+                                                    </label>
+                                                ));
+                                            })()}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">{T.notes}</label>

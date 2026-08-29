@@ -27,7 +27,7 @@ interface Invoice {
     currency: string; subtotal: number; tax: number; discount: number;
     discountAmt: number; taxAmt: number; grandTotal: number;
     payments?: { id: string; amount: number; date: string; status: string; notes?: string }[];
-    notes?: string; paymentTerms?: string;
+    notes?: string; paymentTerms?: string; invoiceType?: string; terminPercent?: number;
     items: InvoiceItem[];
     createdAt: string;
 }
@@ -109,7 +109,7 @@ export default function InvoicesPage() {
         customerId: '', projectId: '', contractId: '', salesOrderId: '', deliveryOrderId: '',
         bankAccountId: '', signerName: '', signerPosition: '',
         date: new Date().toISOString().split('T')[0],
-        dueDate: '', notes: '', paymentTerms: '',
+        dueDate: '', notes: '', paymentTerms: '', invoiceType: 'STANDARD', terminType: 'PERCENT', terminPercent: 30, terminNominal: 0,
         subtotal: 0, tax: 11, discount: 0, discountAmt: 0, taxAmt: 0, grandTotal: 0,
         items: [] as InvoiceItem[]
     })
@@ -156,8 +156,9 @@ export default function InvoicesPage() {
         if (!form.customerId || form.items.length === 0) return showToast('error', 'Customer dan Item wajib diisi')
         setSaving(true)
         try {
+            const { terminType, terminPercent, terminNominal, ...cleanForm } = form;
             const payload = {
-                ...form,
+                ...cleanForm,
                 projectId: form.projectId || null,
                 contractId: form.contractId || null,
                 salesOrderId: form.salesOrderId || null,
@@ -248,20 +249,47 @@ export default function InvoicesPage() {
         setForm(prev => ({ ...prev, items: newItems, ...totals }))
     }
 
-    const copyFromSalesOrder = (soId: string) => {
+    const copyFromSalesOrder = (soId: string, currentInvoiceType: string = form.invoiceType, currentTerminPercent: number = form.terminPercent, currentTerminType: string = form.terminType, currentTerminNominal: number = form.terminNominal) => {
         const so = salesOrders.find(s => s.id === soId);
         if (so) {
-            const items = so.items.map((it: any, i: number) => ({
-                no: i + 1,
-                description: it.description,
-                qty: it.qty,
-                unit: it.unit,
-                unitPrice: it.unitPrice,
-                discount: it.discount,
-                amount: it.amount
-            }))
-            const totals = calculateTotals(items, 11, 0)
-            const linkedDo = deliveryOrders.find(d => d.salesOrderId === soId)
+            let items = [];
+            
+            if (currentInvoiceType !== 'STANDARD') {
+                const soTotal = so.grandTotal || 0;
+                let terminLabel = "Tagihan";
+                if (currentInvoiceType === 'DOWN_PAYMENT') terminLabel = "Down Payment (Uang Muka)";
+                else if (currentInvoiceType === 'PROGRESS') terminLabel = "Termin Progress";
+                else if (currentInvoiceType === 'FINAL') terminLabel = "Pelunasan (Final)";
+                else if (currentInvoiceType === 'RETENTION') terminLabel = "Retensi";
+
+                const terminAmount = currentTerminType === 'PERCENT' ? soTotal * (currentTerminPercent / 100) : currentTerminNominal;
+                const subtotalBeforeTax = terminAmount;
+                
+                const descSuffix = currentTerminType === 'PERCENT' ? `${currentTerminPercent}%` : `(Nominal)`;
+
+                items = [{
+                    no: 1,
+                    description: `${terminLabel} ${descSuffix} - SO ${so.number}`,
+                    qty: 1,
+                    unit: 'lot',
+                    unitPrice: subtotalBeforeTax,
+                    discount: 0,
+                    amount: subtotalBeforeTax
+                }];
+            } else {
+                items = so.items.map((it: any, i: number) => ({
+                    no: i + 1,
+                    description: it.description,
+                    qty: it.qty,
+                    unit: it.unit,
+                    unitPrice: it.unitPrice,
+                    discount: it.discount,
+                    amount: it.amount
+                }));
+            }
+
+            const totals = calculateTotals(items, form.tax, 0);
+            const linkedDo = deliveryOrders.find(d => d.salesOrderId === soId);
             setForm(prev => ({
                 ...prev,
                 customerId: (so as any).customerId || '',
@@ -270,7 +298,7 @@ export default function InvoicesPage() {
                 deliveryOrderId: linkedDo?.id || prev.deliveryOrderId,
                 items,
                 ...totals
-            }))
+            }));
         }
     }
 
@@ -579,6 +607,8 @@ export default function InvoicesPage() {
                                                 dueDate: inv.dueDate ? inv.dueDate.split('T')[0] : '',
                                                 notes: inv.notes || '',
                                                 paymentTerms: inv.paymentTerms || '',
+                                                invoiceType: inv.invoiceType || 'STANDARD',
+                                                terminPercent: inv.terminPercent || 30,
                                                 subtotal: inv.subtotal,
                                                 tax: inv.tax,
                                                 discount: inv.discount,
@@ -660,24 +690,89 @@ export default function InvoicesPage() {
                             </div>
 
                             <div className="p-4 md:p-8 overflow-y-auto custom-scrollbar space-y-6 md:space-y-8 pb-24 md:pb-8">
-                                {/* Auto-Pull Row */}
                                 <div className="p-4 bg-emerald-600/5 rounded-2xl border border-emerald-600/10 flex flex-col md:flex-row md:items-center gap-4">
                                     <div className="flex-1 flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shrink-0">
                                             <Tag size={20} />
                                         </div>
                                         <div>
-                                            <p className="text-xs font-black uppercase text-emerald-700 tracking-wider">Tarik Data dari SO</p>
-                                            <p className="text-[10px] font-medium text-emerald-600/80">Otomatis isi item dan nominal dari Pesanan Penjualan</p>
+                                            <p className="text-xs font-black uppercase text-emerald-700 tracking-wider">Tarik Data dari SO / Penagihan Termin</p>
+                                            <p className="text-[10px] font-medium text-emerald-600/80">Otomatis isi item dan nominal berdasarkan jenis tagihan</p>
                                         </div>
                                     </div>
-                                    <select
-                                        className="h-11 px-4 rounded-xl bg-white border-2 border-emerald-600/20 font-bold text-sm focus:outline-none min-w-[300px]"
-                                        onChange={e => copyFromSalesOrder(e.target.value)}
-                                    >
-                                        <option value="">Pilih Pesanan Penjualan (SO)...</option>
-                                        {salesOrders.map(so => <option key={so.id} value={so.id}>{so.number} - {so.customer?.name} ({fmt(so.grandTotal || 0)})</option>)}
-                                    </select>
+                                    <div className="flex gap-2">
+                                        <select
+                                            className="h-11 px-4 rounded-xl bg-white border-2 border-emerald-600/20 font-bold text-sm focus:outline-none w-40"
+                                            value={form.invoiceType}
+                                            onChange={e => {
+                                                setForm({ ...form, invoiceType: e.target.value });
+                                                if (form.salesOrderId) copyFromSalesOrder(form.salesOrderId, e.target.value, form.terminPercent);
+                                            }}
+                                        >
+                                            <option value="STANDARD">Tagihan Penuh</option>
+                                            <option value="DOWN_PAYMENT">Down Payment (DP)</option>
+                                            <option value="PROGRESS">Termin Progress</option>
+                                            <option value="FINAL">Pelunasan</option>
+                                            <option value="RETENTION">Retensi</option>
+                                        </select>
+                                        
+                                        {form.invoiceType !== 'STANDARD' && (
+                                            <div className="flex items-center bg-white border-2 border-emerald-600/20 rounded-xl overflow-hidden h-11">
+                                                <select 
+                                                    className="h-full px-2 bg-emerald-50 text-emerald-700 font-bold text-xs border-r border-emerald-600/20 focus:outline-none"
+                                                    value={form.terminType}
+                                                    onChange={e => {
+                                                        const tType = e.target.value;
+                                                        setForm({ ...form, terminType: tType });
+                                                        if (form.salesOrderId) copyFromSalesOrder(form.salesOrderId, form.invoiceType, form.terminPercent, tType, form.terminNominal);
+                                                    }}
+                                                >
+                                                    <option value="PERCENT">%</option>
+                                                    <option value="NOMINAL">Rp</option>
+                                                </select>
+                                                <div className="relative">
+                                                    {form.terminType === 'PERCENT' ? (
+                                                        <input 
+                                                            type="number" 
+                                                            className="h-full px-3 pl-8 bg-transparent font-bold text-sm focus:outline-none w-24"
+                                                            value={form.terminPercent}
+                                                            onChange={e => {
+                                                                const pct = Number(e.target.value);
+                                                                setForm({ ...form, terminPercent: pct });
+                                                                if (form.salesOrderId) copyFromSalesOrder(form.salesOrderId, form.invoiceType, pct, form.terminType, form.terminNominal);
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <input 
+                                                            type="number" 
+                                                            className="h-full px-3 pl-8 bg-transparent font-bold text-sm focus:outline-none w-36"
+                                                            value={form.terminNominal || ''}
+                                                            placeholder="Nominal..."
+                                                            onChange={e => {
+                                                                const nom = Number(e.target.value);
+                                                                setForm({ ...form, terminNominal: nom });
+                                                                if (form.salesOrderId) copyFromSalesOrder(form.salesOrderId, form.invoiceType, form.terminPercent, form.terminType, nom);
+                                                            }}
+                                                        />
+                                                    )}
+                                                    {form.terminType === 'PERCENT' ? (
+                                                        <Percent size={14} className="absolute left-3 top-3.5 text-slate-400" />
+                                                    ) : (
+                                                        <span className="absolute left-3 top-3 text-xs font-black text-slate-400">Rp</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <select
+                                            className="h-11 px-4 rounded-xl bg-white border-2 border-emerald-600/20 font-bold text-sm focus:outline-none min-w-[200px]"
+                                            value={form.salesOrderId}
+                                            onChange={e => copyFromSalesOrder(e.target.value)}
+                                        >
+                                            <option value="">Pilih SO...</option>
+                                            {salesOrders.map(so => <option key={so.id} value={so.id}>{so.number} ({fmt(so.grandTotal || 0)})</option>)}
+                                        </select>
+                                    </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

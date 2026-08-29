@@ -8436,6 +8436,7 @@ app.get('/api/investor-loans', async (req, res) => {
       where,
       include: {
         project: { select: { id: true, number: true, name: true } },
+        salesOrders: true,
         disbursements: { select: { amount: true, date: true } },
         repayments: { select: { amount: true, date: true, type: true } },
         profitDistributions: { select: { distributedAmount: true, status: true } }
@@ -8492,7 +8493,12 @@ app.post('/api/investor-loans', checkRole(INVESTOR_LOAN_ROLES), async (req, res)
           dueDate: dueDate ? new Date(dueDate) : null,
           status: 'DRAFT',
           notes: notes || null,
-          createdBy: req.userName || null
+          createdBy: req.userName || null,
+          ...(req.body.salesOrderIds && req.body.salesOrderIds.length > 0 ? {
+            salesOrders: {
+              connect: req.body.salesOrderIds.map(id => ({ id }))
+            }
+          } : {})
         },
         include: {
           project: { select: { id: true, number: true, name: true } }
@@ -8510,7 +8516,22 @@ app.get('/api/investor-loans/:id', async (req, res) => {
     const loan = await prisma.investorLoan.findUnique({
       where: { id: req.params.id },
       include: {
-        project: { select: { id: true, number: true, name: true } },
+        project: { 
+          select: { 
+            id: true, 
+            number: true, 
+            name: true
+          } 
+        },
+        salesOrders: {
+          select: {
+            id: true,
+            number: true,
+            poNumber: true,
+            grandTotal: true,
+            status: true
+          }
+        },
         disbursements: { include: { bankAccount: true }, orderBy: { date: 'asc' } },
         repayments: { include: { bankAccount: true }, orderBy: { date: 'asc' } },
         profitDistributions: { include: { bankAccount: true }, orderBy: { date: 'asc' } }
@@ -8561,7 +8582,12 @@ app.patch('/api/investor-loans/:id', checkRole(INVESTOR_LOAN_ROLES), async (req,
         tenorMonths: tenorMonths !== undefined ? (tenorMonths ? Number(tenorMonths) : null) : existing.tenorMonths,
         dueDate: dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : existing.dueDate,
         notes: notes !== undefined ? notes : existing.notes,
-        status: status || existing.status
+        status: status || existing.status,
+        ...(req.body.salesOrderIds !== undefined ? {
+          salesOrders: {
+            set: req.body.salesOrderIds.map(id => ({ id }))
+          }
+        } : {})
       },
       include: {
         project: { select: { id: true, number: true, name: true } }

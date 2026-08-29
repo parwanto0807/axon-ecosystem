@@ -33,7 +33,15 @@ interface Loan {
     dueDate?: string
     status: string
     notes?: string
-    project?: { number: string; name: string }
+    disbursements?: {
+        date: string
+        amount: number
+        method?: string
+        bankAccount?: { bankName: string; accountName: string; accountNumber: string }
+        notes?: string
+    }[]
+    project?: { number: string; name: string; salesOrders?: any[] }
+    salesOrders?: any[]
     createdAt: string
 }
 
@@ -98,6 +106,10 @@ export default function InvestorLoanPDFModal({
     const effectiveInvestorTitle = investorSignerTitle.trim() || 'Investor / Pemodal'
     const effectiveDirectorName = directorName.trim() || 'Parwanto'
     const effectiveDirectorTitle = directorTitle.trim() || 'Direktur'
+
+    const projectRevenue = (loan.salesOrders && loan.salesOrders.length > 0) 
+        ? loan.salesOrders.reduce((sum: number, so: any) => sum + (so.grandTotal || 0), 0) 
+        : (loan.project?.salesOrders?.reduce((sum: number, so: any) => sum + (so.grandTotal || 0), 0) || 0);
 
     const [busy, setBusy] = useState(false)
     const monthlyPayment = loan.tenorMonths && loan.tenorMonths > 0
@@ -409,8 +421,8 @@ export default function InvestorLoanPDFModal({
                         akadType === 'MURABAHAH'
                             ? `PIHAK KEDUA menyetujui pembelian kebutuhan ${loan.project ? `proyek ${loan.project.name}` : 'operasional perusahaan'} dari PIHAK PERTAMA dengan total harga jual sebesar ${fr(loan.principalAmount)} (${terbilang(loan.principalAmount)} Rupiah), yang mencakup harga pokok barang ditambah margin keuntungan bagi PIHAK PERTAMA.`
                             : `PIHAK PERTAMA setuju untuk menempatkan dana pinjaman modal kepada PIHAK KEDUA sebesar ${fr(loan.principalAmount)} (${terbilang(loan.principalAmount)} Rupiah).`,
-                        `PIHAK KEDUA wajib mempergunakan seluruh dana pinjaman semata-mata untuk keperluan permodalan usaha, pelaksanaan proyek ${loan.project ? `(${loan.project.name})` : 'operasional perusahaan'}, dan pengembangan bisnis yang sah.`,
-                        `Pencairan modal dilakukan secara transfer bank ke rekening operasional resmi PIHAK KEDUA dan dibuktikan dengan bukti transfer yang sah.`
+                        `PIHAK KEDUA wajib mempergunakan seluruh dana pinjaman semata-mata untuk keperluan permodalan usaha, pelaksanaan proyek ${loan.project ? `(${loan.project.name})${loan.salesOrders && loan.salesOrders.length > 0 ? ` khususnya mendanai Purchase Order (PO): ${loan.salesOrders.map((so: any) => so.poNumber || so.number).join(', ')}` : ''} dengan estimasi Nilai Project sebesar ${fr(projectRevenue)}` : 'operasional perusahaan'}, dan pengembangan bisnis yang sah.`,
+                        `Pencairan modal dilakukan secara transfer bank ke rekening operasional resmi PIHAK KEDUA. Apabila disepakati, pencairan dana investasi dapat dilakukan secara bertahap (termin/cicil) sesuai dengan progres dan kebutuhan aktual di lapangan.`
                     ]
                 },
                 {
@@ -458,7 +470,6 @@ export default function InvestorLoanPDFModal({
                     title: 'KETERLAMBATAN & KELALAIAN (WANPRESTASI)',
                     items: [
                         `Apabila PIHAK KEDUA mengalami keterlambatan pembayaran cicilan lebih dari 14 (empat belas) hari kalender tanpa pemberitahuan tertulis, PIHAK PERTAMA berhak memberikan Surat Peringatan.`,
-                        `Denda keterlambatan disepakati sebesar 1.5% per bulan terhadap nominal angsuran yang tertunggak, kecuali keterlambatan diakibatkan keadaan kahar (Force Majeure).`,
                         `Apabila kelalaian berlanjut hingga 60 hari kalender, PARA PIHAK sepakat untuk melakukan musyawarah restrukturisasi jadwal pembayaran.`
                     ]
                 },
@@ -475,13 +486,11 @@ export default function InvestorLoanPDFModal({
 
             // Render Articles
             clauses.forEach((cl) => {
-                // Check remaining page space (banner + at least first item)
                 if (y > pageHeight - 50) {
                     doc.addPage()
                     y = margin + 12
                 }
 
-                // Article Header Banner
                 const bannerH = 6.5
                 doc.setFillColor(241, 245, 249)
                 doc.setDrawColor(...accentColor)
@@ -493,16 +502,13 @@ export default function InvestorLoanPDFModal({
                 doc.setTextColor(...primaryColor)
                 doc.text(`${cl.pasal} : ${cl.title}`, margin + 3.5, y + 4.5)
 
-                // Advance y safely below the banner box bottom with proper breathing space
                 y += bannerH + 4.5
 
-                // Items
                 cl.items.forEach((item, itemIdx) => {
                     const itemNum = `(${itemIdx + 1})`
                     const itemLines = doc.splitTextToSize(item, contentWidth - 11)
                     const itemBlockHeight = (itemLines.length * 3.8) + 2.2
 
-                    // Prevent splitting an item across page boundary awkwardly
                     if (y + itemBlockHeight > pageHeight - 25) {
                         doc.addPage()
                         y = margin + 12
@@ -518,9 +524,51 @@ export default function InvestorLoanPDFModal({
                     y += itemBlockHeight
                 })
 
-                // Space after each article before the next article
                 y += 3.5
             })
+
+            // ═══════════════════════════════════════════════════════════
+            // RIWAYAT PENCAIRAN DANA
+            // ═══════════════════════════════════════════════════════════
+            if (loan.disbursements && loan.disbursements.length > 0) {
+                if (y + 30 > pageHeight - margin) {
+                    doc.addPage()
+                    y = margin
+                }
+
+                doc.setFont('helvetica', 'bold')
+                doc.setFontSize(10)
+                doc.setTextColor(...primaryColor)
+                doc.text('RIWAYAT PENCAIRAN DANA', margin, y)
+                y += 6
+
+                const disbBody = loan.disbursements.map(d => [
+                    fd(d.date),
+                    fr(d.amount),
+                    d.method || '-',
+                    d.bankAccount ? `${d.bankAccount.bankName} - ${d.bankAccount.accountNumber}` : '-',
+                    d.notes || '-'
+                ])
+
+                autoTable(doc, {
+                    startY: y,
+                    head: [['Tanggal', 'Jumlah', 'Metode', 'Rekening Bank', 'Catatan']],
+                    body: disbBody,
+                    theme: 'grid',
+                    headStyles: { fillColor: primaryColor, textColor: 255, fontSize: 8, fontStyle: 'bold' },
+                    bodyStyles: { fontSize: 8, textColor: darkText },
+                    alternateRowStyles: { fillColor: lightBg },
+                    columnStyles: {
+                        0: { cellWidth: 25 },
+                        1: { cellWidth: 30, halign: 'right' },
+                        2: { cellWidth: 25 },
+                        3: { cellWidth: 40 },
+                        4: { cellWidth: 'auto' }
+                    }
+                })
+                
+                y = (doc as any).lastAutoTable.finalY + 8
+            }
 
             // ═══════════════════════════════════════════════════════════
             // 7. SIGNATURE BLOCK (PENGESAHAN)
@@ -957,7 +1005,8 @@ export default function InvestorLoanPDFModal({
                                         ? `PIHAK KEDUA menyetujui pembelian kebutuhan ${loan.project ? `proyek ${loan.project.name}` : 'operasional perusahaan'} dari PIHAK PERTAMA dengan total harga jual sebesar ${fr(loan.principalAmount)}.`
                                         : `PIHAK PERTAMA setuju menyalurkan dana investasi sebesar ${fr(loan.principalAmount)} (${terbilang(loan.principalAmount)} Rupiah) kepada PIHAK KEDUA.`
                                     }<br />
-                                    (2) PIHAK KEDUA wajib mengalokasikan dana tersebut secara penuh untuk kebutuhan modal usaha {loan.project ? `pada proyek ${loan.project.name}` : 'operasional perusahaan'}.
+                                    (2) PIHAK KEDUA wajib mengalokasikan dana tersebut secara penuh untuk kebutuhan modal usaha {loan.project ? `pada proyek ${loan.project.name}${loan.salesOrders && loan.salesOrders.length > 0 ? ` (PO: ${loan.salesOrders.map((so: any) => so.poNumber || so.number).join(', ')})` : ''} dengan estimasi Nilai Project sebesar ${fr(projectRevenue)}` : 'operasional perusahaan'}.<br />
+                                    (3) Pencairan dana dapat dilakukan secara bertahap (termin) sesuai kesepakatan dan kebutuhan aktual proyek.
                                 </p>
                             </div>
 
@@ -1004,6 +1053,41 @@ export default function InvestorLoanPDFModal({
                                 </p>
                             </div>
                         </div>
+
+                        {/* Disbursements History Table */}
+                        {loan.disbursements && loan.disbursements.length > 0 && (
+                            <div className="mb-8 border-t border-dashed border-slate-300 pt-6">
+                                <h4 className="font-bold text-slate-900 uppercase mb-4 text-sm">Riwayat Pencairan Dana</h4>
+                                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                                    <table className="w-full text-xs text-left">
+                                        <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                                            <tr>
+                                                <th className="py-2 px-3 font-semibold">Tanggal</th>
+                                                <th className="py-2 px-3 font-semibold text-right">Jumlah</th>
+                                                <th className="py-2 px-3 font-semibold">Metode</th>
+                                                <th className="py-2 px-3 font-semibold">Rekening Bank</th>
+                                                <th className="py-2 px-3 font-semibold">Catatan</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {loan.disbursements.map((d, i) => (
+                                                <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                                                    <td className="py-2 px-3 whitespace-nowrap">{fd(d.date)}</td>
+                                                    <td className="py-2 px-3 text-right font-medium whitespace-nowrap">{fr(d.amount)}</td>
+                                                    <td className="py-2 px-3 whitespace-nowrap">{d.method || '-'}</td>
+                                                    <td className="py-2 px-3">
+                                                        {d.bankAccount ? `${d.bankAccount.bankName} - ${d.bankAccount.accountNumber}` : '-'}
+                                                    </td>
+                                                    <td className="py-2 px-3 text-slate-500 italic max-w-xs truncate" title={d.notes || ''}>
+                                                        {d.notes || '-'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Signatures */}
                         <div className="pt-6 border-t border-slate-200">

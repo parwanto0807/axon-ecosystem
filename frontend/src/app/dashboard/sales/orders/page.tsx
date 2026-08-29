@@ -145,7 +145,11 @@ export default function SalesOrdersPage() {
             (filterStatus === 'ALL' || o.status === filterStatus) &&
             (filterProject === 'ALL' || o.projectId === filterProject) &&
             (filterBusinessCategory === 'ALL' || o.businessCategoryId === filterBusinessCategory)
-    }).sort((a, b) => (b.project?.number || '').localeCompare(a.project?.number || ''))
+    }).sort((a, b) => {
+        const dateA = new Date(a.date).getTime()
+        const dateB = new Date(b.date).getTime()
+        return dateB - dateA
+    })
 
     useEffect(() => { setPage(1) }, [search, filterStatus, filterProject, filterBusinessCategory])
 
@@ -323,6 +327,7 @@ export default function SalesOrdersPage() {
                                 <th className="px-5 py-3.5">SO Number</th>
                                 <th className="px-5 py-3.5">Customer</th>
                                 <th className="px-5 py-3.5">Date</th>
+                                <th className="px-5 py-3.5">Perihal</th>
                                 <th className="px-5 py-3.5 text-right">Grand Total</th>
                                 <th className="px-5 py-3.5 text-center">Status</th>
                                 <th className="px-5 py-3.5 text-right">Actions</th>
@@ -370,6 +375,7 @@ export default function SalesOrdersPage() {
                                             </div>
                                         </td>
                                         <td className="px-5 py-4 text-[11px] text-slate-500 font-medium">{fmtDate(o.date)}</td>
+                                        <td className="px-5 py-4">{o.subject || '-'}</td>
                                         <td className="px-5 py-4 text-right">
                                             <p className="text-[10px] text-slate-500">Sblm Disc: {fmt(o.subtotal)}</p>
                                             {o.discountAmt > 0 && <p className="text-[10px] text-rose-500">Disc: -{fmt(o.discountAmt)}</p>}

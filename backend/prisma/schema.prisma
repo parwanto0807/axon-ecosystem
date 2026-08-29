@@ -373,6 +373,7 @@ model SalesOrder {
   businessCategoryId String?
   businessCategory   BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
   plannings      ProjectPlanning[]
+  investorLoans  InvestorLoan[]   @relation("InvestorLoanToSalesOrder")
 }
 
 model SalesOrderItem {
@@ -586,6 +587,7 @@ model Invoice {
   date            DateTime         @default(now())
   dueDate         DateTime?
   status          InvoiceStatus    @default(DRAFT)
+  invoiceType     String           @default("STANDARD")
   customerId      String
   projectId       String?
   salesOrderId    String?
@@ -1665,6 +1667,7 @@ model InvestorLoan {
   disbursements        InvestorLoanDisbursement[]
   repayments           InvestorLoanRepayment[]
   profitDistributions  ProfitDistribution[]
+  salesOrders          SalesOrder[]              @relation("InvestorLoanToSalesOrder")
 }
 
 model InvestorLoanDisbursement {

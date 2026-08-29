@@ -124,7 +124,19 @@ export default function InvestorLoansPage() {
     const [filterStatus, setFilterStatus] = useState('ALL')
     const [deleting, setDeleting] = useState<string | null>(null)
 
-    const [form, setForm] = useState({
+    const [form, setForm] = useState<{
+        investorName: string,
+        investorContact: string,
+        principalAmount: number,
+        profitSharingPercent: number,
+        interestRate: number,
+        repaymentType: string,
+        tenorMonths: number,
+        dueDate: string,
+        projectId: string,
+        salesOrderIds: string[],
+        notes: string
+    }>({
         investorName: '',
         investorContact: '',
         principalAmount: 0,
@@ -134,6 +146,7 @@ export default function InvestorLoansPage() {
         tenorMonths: 12,
         dueDate: '',
         projectId: '',
+        salesOrderIds: [],
         notes: ''
     })
 
@@ -195,7 +208,7 @@ export default function InvestorLoansPage() {
             setForm({
                 investorName: '', investorContact: '', principalAmount: 0,
                 profitSharingPercent: 0, interestRate: 0, repaymentType: 'INSTALLMENT',
-                tenorMonths: 12, dueDate: '', projectId: '', notes: ''
+                tenorMonths: 12, dueDate: '', projectId: '', salesOrderIds: [], notes: ''
             })
             fetchLoans()
         } catch (e: any) {
@@ -557,7 +570,7 @@ export default function InvestorLoansPage() {
                                     <label className="block text-sm font-medium text-gray-700 mb-1">{T.project}</label>
                                     <select
                                         value={form.projectId}
-                                        onChange={e => setForm({ ...form, projectId: e.target.value })}
+                                        onChange={e => setForm({ ...form, projectId: e.target.value, salesOrderIds: [] })}
                                         className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                                     >
                                         <option value="">{T.noProject}</option>
@@ -566,6 +579,40 @@ export default function InvestorLoansPage() {
                                         ))}
                                     </select>
                                 </div>
+
+                                {form.projectId && (
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">Pilih Sales Order / PO yang didanai:</label>
+                                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            {(() => {
+                                                const selectedProject = projects.find(p => p.id === form.projectId);
+                                                if (!selectedProject || !selectedProject.salesOrders || selectedProject.salesOrders.length === 0) {
+                                                    return <p className="text-sm text-gray-500">Tidak ada PO di project ini.</p>;
+                                                }
+                                                return selectedProject.salesOrders.map((so: any) => (
+                                                    <label key={so.id} className="flex items-center gap-2 text-sm bg-white p-2 rounded border border-gray-100 cursor-pointer hover:bg-gray-50">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="rounded text-blue-600 focus:ring-blue-500"
+                                                            checked={form.salesOrderIds.includes(so.id)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setForm(prev => ({ ...prev, salesOrderIds: [...prev.salesOrderIds, so.id] }));
+                                                                } else {
+                                                                    setForm(prev => ({ ...prev, salesOrderIds: prev.salesOrderIds.filter(id => id !== so.id) }));
+                                                                }
+                                                            }}
+                                                        />
+                                                        <div className="flex flex-col">
+                                                            <span className="font-medium">{so.number} {so.poNumber ? `(PO: ${so.poNumber})` : ''}</span>
+                                                            <span className="text-xs text-gray-500">{formatRp(so.grandTotal)}</span>
+                                                        </div>
+                                                    </label>
+                                                ));
+                                            })()}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">{T.notes}</label>

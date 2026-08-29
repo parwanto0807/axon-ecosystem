@@ -16,7 +16,7 @@ interface Invoice {
     signerName?: string; signerPosition?: string;
     currency: string; subtotal: number; tax: number; discount: number;
     discountAmt: number; taxAmt: number; grandTotal: number;
-    notes?: string; paymentTerms?: string;
+    notes?: string; paymentTerms?: string; invoiceType?: string; terminPercent?: number;
     items: InvoiceItem[];
 }
 
@@ -106,8 +106,14 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
             y += 7
 
             // Header title
+            let pdfTitle = 'FAKTUR / INVOICE';
+            if (invoice.invoiceType === 'DOWN_PAYMENT') pdfTitle = 'INVOICE - UANG MUKA (DP)';
+            else if (invoice.invoiceType === 'PROGRESS') pdfTitle = 'INVOICE - TERMIN PROGRESS';
+            else if (invoice.invoiceType === 'FINAL') pdfTitle = 'INVOICE - PELUNASAN';
+            else if (invoice.invoiceType === 'RETENTION') pdfTitle = 'INVOICE - RETENSI';
+
             doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(...indigo)
-            doc.text('FAKTUR / INVOICE', W / 2, y, { align: 'center' })
+            doc.text(pdfTitle, W / 2, y, { align: 'center' })
             y += 8
 
             // Recipient & Details
@@ -285,7 +291,13 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                                 </div>
                             </div>
                             <div className="text-right">
-                                <h1 className={`text-2xl font-black ${isPrintMode ? 'text-black' : 'text-indigo-600'} uppercase tracking-tighter mb-2`}>Invoice</h1>
+                                <h1 className={`text-2xl font-black ${isPrintMode ? 'text-black' : 'text-indigo-600'} uppercase tracking-tighter mb-2`}>
+                                    {invoice.invoiceType === 'DOWN_PAYMENT' ? 'Invoice - Uang Muka (DP)' :
+                                     invoice.invoiceType === 'PROGRESS' ? 'Invoice - Termin Progress' :
+                                     invoice.invoiceType === 'FINAL' ? 'Invoice - Pelunasan' :
+                                     invoice.invoiceType === 'RETENTION' ? 'Invoice - Retensi' :
+                                     'Invoice'}
+                                </h1>
                                 <table className="text-[10px] ml-auto">
                                     <tbody>
                                         {[
