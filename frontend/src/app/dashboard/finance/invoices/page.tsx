@@ -27,7 +27,7 @@ interface Invoice {
     currency: string; subtotal: number; tax: number; discount: number;
     discountAmt: number; taxAmt: number; grandTotal: number;
     payments?: { id: string; amount: number; date: string; status: string; notes?: string }[];
-    notes?: string; paymentTerms?: string; invoiceType?: string; terminPercent?: number;
+    notes?: string; paymentTerms?: string; invoiceType?: string; terminType?: string; terminPercent?: number; terminNominal?: number;
     items: InvoiceItem[];
     createdAt: string;
 }
