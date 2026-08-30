@@ -1658,7 +1658,9 @@ app.get('/api/projects/:id', checkRole(['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAF
         },
         basts: { include: { items: true } },
         deliveryOrders: { include: { items: true } },
-        invoices: { include: { items: true } }
+        invoices: { include: { items: true } },
+        surveyExpenses: true,
+        operationalExpenses: true
       }
     });
     res.json(project);
@@ -6861,6 +6863,49 @@ app.post('/api/hr/payroll/:id/post', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+app.post('/api/hr/payroll/:id/unpost', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const run = await prisma.payrollRun.findUnique({
+      where: { id },
+      include: { items: true }
+    });
+
+    if (!run) return res.status(404).json({ message: 'Payroll not found' });
+    if (run.status !== 'POSTED') return res.status(400).json({ message: 'Only POSTED payroll can be unposted' });
+
+    await prisma.$transaction(async (tx) => {
+      // Void the journal entry
+      if (run.journalId) {
+        await tx.journalEntry.update({
+          where: { id: run.journalId },
+          data: {
+            status: 'VOID',
+            voidedAt: new Date(),
+            voidedBy: 'System - Unpost Payroll'
+          }
+        });
+        await tx.journalItem.updateMany({
+          where: { journalEntryId: run.journalId },
+          data: { debit: 0, credit: 0, description: 'VOIDED' }
+        });
+      }
+
+      // Reset payroll run back to DRAFT
+      await tx.payrollRun.update({
+        where: { id },
+        data: {
+          status: 'DRAFT',
+          postedAt: null,
+          journalId: null
+        }
+      });
+    });
+
+    res.json({ success: true, message: 'Payroll unposted successfully' });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 app.post('/api/hr/payroll/:id/pay', async (req, res) => {
   try {
     const { id } = req.params;
@@ -7584,7 +7629,7 @@ app.put('/api/journals/:id/void', async (req, res) => {
     const journal = await prisma.journalEntry.findUnique({ where: { id } });
     if (!journal) return res.status(404).json({ message: 'Jurnal tidak ditemukan' });
     if (journal.status === 'VOID') return res.status(400).json({ message: 'Jurnal sudah dibatalkan' });
-    if (journal.type !== 'GENERAL') return res.status(400).json({ message: 'Hanya jurnal manual yang bisa dibatalkan dari sini' });
+    if (journal.type !== 'GENERAL' && journal.type !== 'PAYROLL') return res.status(400).json({ message: 'Hanya jurnal manual atau payroll yang bisa dibatalkan dari sini' });
 
     // Mark as void and zero out the items so it doesn't affect ledger
     const result = await prisma.$transaction(async (tx) => {
@@ -7602,6 +7647,18 @@ app.put('/api/journals/:id/void', async (req, res) => {
         where: { journalEntryId: id },
         data: { debit: 0, credit: 0, description: 'VOIDED' }
       });
+
+      // 3. If PAYROLL type, reset the payroll run back to DRAFT
+      if (journal.type === 'PAYROLL') {
+        await tx.payrollRun.updateMany({
+          where: { journalId: id },
+          data: {
+            status: 'DRAFT',
+            postedAt: null,
+            journalId: null
+          }
+        });
+      }
       
       return voided;
     });

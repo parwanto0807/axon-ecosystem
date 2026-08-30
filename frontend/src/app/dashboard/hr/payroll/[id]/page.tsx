@@ -34,8 +34,10 @@ export default function PayrollDetailPage() {
     const [run, setRun] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const [posting, setPosting] = useState(false)
+    const [unposting, setUnposting] = useState(false)
     const [paying, setPaying] = useState(false)
     const [showPayModal, setShowPayModal] = useState(false)
+    const [showPostModal, setShowPostModal] = useState(false)
     const [accounts, setAccounts] = useState<any[]>([])
     const [paymentData, setPaymentData] = useState({
         coaId: "",
@@ -79,7 +81,11 @@ export default function PayrollDetailPage() {
     }
 
     const handlePost = async () => {
-        if (!confirm("Posting ke Ledger? Tindakan ini akan membuat Jurnal Umum dan status menjadi POSTED.")) return
+        setShowPostModal(true)
+    }
+
+    const confirmPost = async () => {
+        setShowPostModal(false)
         setPosting(true)
         try {
             const res = await fetch(`${API_BASE}/hr/payroll/${id}/post`, { method: 'POST' })
@@ -95,6 +101,26 @@ export default function PayrollDetailPage() {
             alert("Failed to post payroll.")
         } finally {
             setPosting(false)
+        }
+    }
+
+    const handleUnpost = async () => {
+        if (!confirm("Batalkan posting? Jurnal akan diVOID dan status kembali ke DRAFT.")) return
+        setUnposting(true)
+        try {
+            const res = await fetch(`${API_BASE}/hr/payroll/${id}/unpost`, { method: 'POST' })
+            if (res.ok) {
+                alert("Posting dibatalkan! Status kembali ke DRAFT.")
+                fetchRun()
+            } else {
+                const err = await res.json()
+                alert(`Error: ${err.message}`)
+            }
+        } catch (e) {
+            console.error(e)
+            alert("Failed to unpost payroll.")
+        } finally {
+            setUnposting(false)
         }
     }
 
@@ -168,16 +194,26 @@ export default function PayrollDetailPage() {
                     )}
 
                     {isPosted && (
-                        <button 
-                            onClick={() => {
-                                fetchAccounts()
-                                setShowPayModal(true)
-                            }}
-                            className="flex-1 md:flex-none px-6 md:px-8 py-3 bg-indigo-600 text-white rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black hover:bg-indigo-700 active:scale-[0.95] transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
-                        >
-                            <CreditCard size={16} />
-                            {isMobile ? 'PELUNASAN' : 'PELUNASAN GAJI (PAYMENT)'}
-                        </button>
+                        <>
+                            <button 
+                                disabled={unposting}
+                                onClick={handleUnpost}
+                                className="flex-1 md:flex-none px-4 md:px-6 py-3 bg-red-600 text-white rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black hover:bg-red-700 active:scale-[0.95] transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 disabled:opacity-50"
+                            >
+                                <X size={16} />
+                                {unposting ? 'MEMBATALKAN...' : 'BATALKAN POSTING'}
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    fetchAccounts()
+                                    setShowPayModal(true)
+                                }}
+                                className="flex-1 md:flex-none px-6 md:px-8 py-3 bg-indigo-600 text-white rounded-xl md:rounded-2xl text-[10px] md:text-xs font-black hover:bg-indigo-700 active:scale-[0.95] transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                            >
+                                <CreditCard size={16} />
+                                {isMobile ? 'PELUNASAN' : 'PELUNASAN GAJI (PAYMENT)'}
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -361,6 +397,88 @@ export default function PayrollDetailPage() {
                     )}
                 </div>
             </div>
+
+            {/* Post Confirmation Modal */}
+            <AnimatePresence>
+                {showPostModal && (
+                    <div className={`fixed inset-0 z-[100] flex ${isMobile ? 'items-end' : 'items-center justify-center p-4'} bg-slate-900/40 backdrop-blur-sm`}>
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowPostModal(false)}
+                            className="absolute inset-0"
+                        />
+                        <motion.div 
+                            initial={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 20 }}
+                            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0 }}
+                            exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 20 }}
+                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                            className={`relative bg-white w-full max-w-md overflow-hidden flex flex-col ${isMobile ? 'rounded-t-[2.5rem] max-h-[90vh]' : 'rounded-[2.5rem] shadow-2xl'}`}
+                        >
+                            {isMobile && (
+                                <div className="w-full h-8 flex items-center justify-center shrink-0">
+                                    <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
+                                </div>
+                            )}
+                            <div className="p-8 space-y-6 overflow-y-auto">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner shrink-0">
+                                            <Send size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-black text-slate-800 tracking-tight lowercase first-letter:uppercase">POST KE LEDGER</h3>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Konfirmasi Posting Jurnal</p>
+                                        </div>
+                                    </div>
+                                    {!isMobile && (
+                                        <button onClick={() => setShowPostModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
+                                            <X size={20} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Periode</span>
+                                        <span className="text-xs font-black text-slate-700">{MONTHS[(run?.month || 1) - 1]} {run?.year}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total</span>
+                                        <span className="text-lg font-black text-emerald-600">Rp {run.totalAmount?.toLocaleString()}</span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+                                    <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-wide leading-relaxed">
+                                        Tindakan ini akan membuat Jurnal Umum dan mengubah status menjadi POSTED. Apakah Anda yakin?
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center gap-3 pt-2">
+                                    {!isMobile && (
+                                        <button 
+                                            onClick={() => setShowPostModal(false)}
+                                            className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                        >
+                                            BATAL
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={confirmPost}
+                                        disabled={posting}
+                                        className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 active:scale-[0.98] transition-all shadow-xl shadow-emerald-600/20 disabled:opacity-50"
+                                    >
+                                        {posting ? 'POSTING...' : 'YA, POST SEKARANG'}
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Payment Modal */}
             <AnimatePresence>

@@ -143,8 +143,10 @@ const calcProjectStats = (p: PreSalesProject) => {
     let quotationRevenue = 0
     let quotationHpp = 0
     p.quotations?.forEach((q: any) => {
-        quotationRevenue += (q.subtotal || 0)
-        q.items?.forEach((i: any) => { quotationHpp += (i.costPrice || 0) * (i.qty || 1) })
+        if (q.status === 'ACCEPTED' || q.status === 'SENT') {
+            quotationRevenue += (q.subtotal || 0)
+            q.items?.forEach((i: any) => { quotationHpp += (i.costPrice || 0) * (i.qty || 1) })
+        }
     })
     const quotationProfit = quotationRevenue - quotationHpp
     const quotationMargin = quotationRevenue > 0 ? (quotationProfit / quotationRevenue) * 100 : 0
@@ -818,6 +820,9 @@ export default function ProjectsPage() {
                                                 <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} className="flex-1 flex items-center justify-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 py-2 rounded-lg text-[9px] font-semibold transition-all">
                                                     <Eye size={11} /> View
                                                 </button>
+                                                <button onClick={() => window.location.href = `/dashboard/sales/projects/${p.id}/resume`} aria-label={`Resume ${p.name}`} className="flex-1 flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-600 py-2 rounded-lg text-[9px] font-semibold transition-all">
+                                                    <BarChart3 size={11} /> Resume
+                                                </button>
                                                 <button onClick={() => { setEditing(p); setModalOpen(true) }} aria-label={`Edit ${p.name}`} className="w-9 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg transition-all">
                                                     <Edit size={12} />
                                                 </button>
@@ -903,6 +908,9 @@ export default function ProjectsPage() {
                                         <div className="flex items-center gap-1">
                                             <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="View">
                                                 <Eye size={13} className="text-slate-400" />
+                                            </button>
+                                            <button onClick={() => window.location.href = `/dashboard/sales/projects/${p.id}/resume`} aria-label={`Resume ${p.name}`} className="p-1.5 hover:bg-amber-50 rounded-lg transition-colors" title="Resume">
+                                                <BarChart3 size={13} className="text-amber-500" />
                                             </button>
                                             <button onClick={() => { setEditing(p); setModalOpen(true); }} aria-label={`Edit ${p.name}`} className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors" title="Edit">
                                                 <Edit size={13} className="text-indigo-400" />
@@ -1045,6 +1053,9 @@ export default function ProjectsPage() {
                                                     <div className="flex items-center justify-end gap-1">
                                                         <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} className="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all" title="Details">
                                                             <Eye size={12} />
+                                                        </button>
+                                                        <button onClick={() => window.location.href = `/dashboard/sales/projects/${p.id}/resume`} aria-label={`Resume ${p.name}`} className="w-7 h-7 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-600 hover:text-white transition-all" title="Resume">
+                                                            <BarChart3 size={12} />
                                                         </button>
                                                         <button onClick={() => { setEditing(p); setModalOpen(true) }} aria-label={`Edit ${p.name}`} className="w-7 h-7 flex items-center justify-center bg-slate-100 text-slate-500 rounded-lg hover:bg-indigo-600 hover:text-white transition-all" title="Edit">
                                                             <Edit size={12} />
