@@ -32,6 +32,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
     const [showTotals, setShowTotals] = useState(true)
     const [showBreakdown, setShowBreakdown] = useState(false)
     const [showPOContract, setShowPOContract] = useState(false)
+    const [showSimpleList, setShowSimpleList] = useState(false)
     const c = quotation.customer
     const sc = STATUS_CFG[quotation.status] || STATUS_CFG.DRAFT
     const poItems = quotation.items?.some(i => i.isChecklist) ? quotation.items.filter(i => i.checked) : (quotation.items || [])
@@ -166,12 +167,13 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             y += 7
 
             // Title — centered below separator, smaller for PO Contract
-            const displayTitle = isPOContract ? 'PURCHASE ORDER' : (showBreakdown ? 'BREAKDOWN PROJECT' : 'PENAWARAN HARGA')
+            const displayTitle = showSimpleList ? 'LIST PEMBELIAN BARANG' : isPOContract ? 'PURCHASE ORDER' : (showBreakdown ? 'BREAKDOWN PROJECT' : 'PENAWARAN HARGA')
             doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(...indigo)
             doc.text(displayTitle, W / 2, y, { align: 'center' })
             y += 8
 
             // Recipient section - simplified for PO Contract
+            if (!showSimpleList) {
             doc.setFont('helvetica', 'bold').setFontSize(7).setTextColor(...gray).text(isPOContract ? 'VENDOR (PEMASOK)' : 'KEPADA YTH.', M, y)
             y += 4
             if (isPOContract) {
@@ -187,8 +189,9 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                 if (c?.phone) { doc.text(`Tel: ${c.phone}`, M, y); y += 4 }
                 if (c?.email) { doc.text(`Email: ${c.email}`, M, y); y += 4 }
             }
+            }
 
-            if (!isPOContract) {
+            if (!isPOContract && !showSimpleList) {
                 // Detail Penawaran section - Full Width Rows
                 doc.setDrawColor(...light).setLineWidth(0.3).line(M, y, W - M, y); y += 6
                 doc.setFont('helvetica', 'bold').setFontSize(7).setTextColor(...gray).text('DETAIL PENAWARAN', M, y); y += 5
@@ -213,13 +216,23 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             const sortedItems = [...(quotation.items || [])].sort((a, b) => a.no - b.no)
 
             const fn = (n: number) => n.toLocaleString('id-ID');
-            const headRows = isPOContract
-                ? [['No', 'Deskripsi Barang', 'Qty', 'Satuan', 'Harga Satuan (Rp)', 'Total (Rp)']]
-                : showBreakdown
-                    ? [['No', 'Detail Item', 'Qty', 'Unit', 'Harga(Rp)', 'HPP(Rp)', 'Disc', 'Total(Rp)', 'Tot.HPP(Rp)', 'Profit(Rp)', '%']]
-                    : [['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Disc%', 'Jumlah']]
+            const headRows = showSimpleList
+                ? [['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Actual']]
+                : isPOContract
+                    ? [['No', 'Deskripsi Barang', 'Qty', 'Satuan', 'Harga Satuan (Rp)', 'Total (Rp)']]
+                    : showBreakdown
+                        ? [['No', 'Detail Item', 'Qty', 'Unit', 'Harga(Rp)', 'HPP(Rp)', 'Disc', 'Total(Rp)', 'Tot.HPP(Rp)', 'Profit(Rp)', '%']]
+                        : [['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Disc%', 'Jumlah']]
 
-            const bodyRows: any[] = isPOContract
+            const bodyRows: any[] = showSimpleList
+                ? sortedItems.map(it => [
+                    { content: it.no, styles: { halign: 'center', fontStyle: 'bold' } },
+                    { content: it.description, styles: { fontStyle: 'bold', textColor: indigo } },
+                    { content: it.qty, styles: { halign: 'center' } },
+                    { content: it.unit || '-', styles: { halign: 'center' } },
+                    { content: '', styles: { halign: 'right' } }
+                ])
+                : isPOContract
                 ? poItems.length > 0
                     ? poItems.map((it, i) => [
                         { content: i + 1, styles: { halign: 'center', fontStyle: 'bold' } },
@@ -260,7 +273,13 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         return [it.no, it.description, it.qty, it.unit, fr(it.unitPrice), it.discount > 0 ? `${it.discount}%` : '-', fr(it.amount)]
                     })
 
-            const colStyles: any = isPOContract ? {
+            const colStyles: any = showSimpleList ? {
+                0: { halign: 'center', cellWidth: 10 },
+                1: { halign: 'left' },
+                2: { halign: 'center', cellWidth: 14 },
+                3: { halign: 'center', cellWidth: 16 },
+                4: { halign: 'right', cellWidth: 32 }
+            } : isPOContract ? {
                 0: { halign: 'center', cellWidth: 10 },
                 1: { halign: 'left' },
                 2: { halign: 'center', cellWidth: 14 },
@@ -325,7 +344,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             y = (doc as any).lastAutoTable.finalY + 8
 
             // Check page break for Totals
-            if (showTotals) {
+            if (showTotals && !showSimpleList) {
                 if (y > 250) { doc.addPage(); y = 20 }
 
                 // Totals
@@ -366,7 +385,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                 y += 10
             }
 
-            const currentNotes = isPOContract ? "1. Harap memproses pesanan ini sesuai dengan rincian, harga, dan spesifikasi di atas.\n2. Mohon cantumkan Nomor PO ini pada setiap dokumen pengiriman dan invoice tagihan.\n3. Syarat dan ketentuan lain mengikuti kesepakatan yang telah disetujui bersama." : quotation.notes
+            const currentNotes = showSimpleList ? null : (isPOContract ? "1. Harap memproses pesanan ini sesuai dengan rincian, harga, dan spesifikasi di atas.\n2. Mohon cantumkan Nomor PO ini pada setiap dokumen pengiriman dan invoice tagihan.\n3. Syarat dan ketentuan lain mengikuti kesepakatan yang telah disetujui bersama." : quotation.notes)
 
             // Notes & Terms - Bottom Fixed
             if (currentNotes) {
@@ -385,6 +404,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             }
 
             // Signatures
+            if (!showSimpleList) {
             if (y > 230) { doc.addPage(); y = 20 }
             const sw = (W - M * 2 - 10) / 2
             doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...gray)
@@ -417,6 +437,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             doc.text('Nama / Jabatan', M, y); doc.text('Nama / Jabatan', M + sw + 10, y); y += 4
             doc.setFont('helvetica', 'bold').setTextColor(...dark)
             doc.text(c?.name || '', M, y); doc.text(company.name || '', M + sw + 10, y)
+            }
 
             // Footer
             const pc = doc.getNumberOfPages()
@@ -472,6 +493,14 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" checked={showPOContract} onChange={(e) => setShowPOContract(e.target.checked)} className="sr-only peer" />
                                     <div className="w-8 h-4 bg-indigo-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-indigo-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-400"></div>
+                                </label>
+                            </div>
+                            <div className="w-px h-4 bg-slate-300"></div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">List Pembelian</span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked={showSimpleList} onChange={(e) => setShowSimpleList(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-8 h-4 bg-amber-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-amber-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-500"></div>
                                 </label>
                             </div>
                         </div>
@@ -551,10 +580,11 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
 
                         {/* Title — centered below the separator line */}
                         <div style={{ textAlign: 'center', padding: '10px 0 18px', borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
-                            <span style={{ fontWeight: 900, fontSize: 14, color: '#4f46e5', letterSpacing: 3, textTransform: 'uppercase' }}>{showPOContract ? 'PURCHASE ORDER' : showBreakdown ? 'Breakdown Project' : 'Penawaran Harga'}</span>
+                            <span style={{ fontWeight: 900, fontSize: 14, color: '#4f46e5', letterSpacing: 3, textTransform: 'uppercase' }}>{showSimpleList ? 'List Pembelian Barang' : showPOContract ? 'Purchase Order' : showBreakdown ? 'Breakdown Project' : 'Penawaran Harga'}</span>
                         </div>
 
                         {/* Recipient & Detail Info - Layout Full Width Rows */}
+                        {!showSimpleList && (
                         <div style={{ marginBottom: 24 }}>
                             <div style={{ paddingBottom: 16, borderBottom: '1px solid #f1f5f9', marginBottom: 16 }}>
                                 <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, color: '#94a3b8', marginBottom: 6 }}>{showPOContract ? 'VENDOR (PEMASOK)' : 'Kepada Yth.'}</div>
@@ -574,7 +604,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                                 )}
                             </div>
 
-                            {!showPOContract && (
+                            {!showPOContract && !showSimpleList && (
                                 <div>
                                     <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 2, color: '#94a3b8', marginBottom: 10 }}>Detail Penawaran</div>
                                     <table style={{ fontSize: 10, width: '100%', borderCollapse: 'collapse' }}>
@@ -594,18 +624,29 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                                 </div>
                             )}
                         </div>
+                        )}
 
                         {/* Items */}
                         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 10 }}>
                             <thead>
                                 <tr style={{ background: '#4f46e5', color: '#fff' }}>
-                                    {(showPOContract ? ['No', 'Deskripsi Barang', 'Qty', 'Satuan', 'Harga Satuan (Rp)', 'Total (Rp)'] : showBreakdown ? ['No', 'Detail Item', 'Qty', 'Unit', 'Harga(Rp)', 'HPP(Rp)', 'Disc', 'Total(Rp)', 'Tot.HPP(Rp)', 'Profit(Rp)', '%'] : ['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Disc%', 'Jumlah']).map((h, i) => (
-                                        <th key={h} style={{ padding: '8px 10px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, textAlign: i === 1 ? 'left' : (showPOContract ? (i >= 4 ? 'right' : 'center') : showBreakdown ? (i >= 4 && i !== 6 && i !== 10 ? 'right' : 'center') : (i >= 4 ? 'right' : 'center')), whiteSpace: 'nowrap' }}>{h}</th>
+                                    {(showSimpleList ? ['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Actual'] : showPOContract ? ['No', 'Deskripsi Barang', 'Qty', 'Satuan', 'Harga Satuan (Rp)', 'Total (Rp)'] : showBreakdown ? ['No', 'Detail Item', 'Qty', 'Unit', 'Harga(Rp)', 'HPP(Rp)', 'Disc', 'Total(Rp)', 'Tot.HPP(Rp)', 'Profit(Rp)', '%'] : ['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Disc%', 'Jumlah']).map((h, i) => (
+                                        <th key={h} style={{ padding: '8px 10px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, textAlign: i === 1 ? 'left' : (showSimpleList ? (i === 4 ? 'right' : 'center') : (showPOContract ? (i >= 4 ? 'right' : 'center') : showBreakdown ? (i >= 4 && i !== 6 && i !== 10 ? 'right' : 'center') : (i >= 4 ? 'right' : 'center'))), whiteSpace: 'nowrap' }}>{h}</th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody>
-                                {showPOContract ? (
+                                {showSimpleList ? (
+                                    [...(quotation.items || [])].sort((a, b) => a.no - b.no).map((it, i) => (
+                                        <tr key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
+                                            <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{it.no}</td>
+                                            <td style={{ padding: '7px 10px', textAlign: 'left' }}>{it.description}</td>
+                                            <td style={{ padding: '7px 10px', textAlign: 'center' }}>{it.qty}</td>
+                                            <td style={{ padding: '7px 10px', textAlign: 'center', color: '#64748b' }}>{it.unit}</td>
+                                            <td style={{ padding: '7px 10px', textAlign: 'right', border: '1px dashed #cbd5e1' }}></td>
+                                        </tr>
+                                    ))
+                                ) : showPOContract ? (
                                     poItems.length > 0 ? (
                                         poItems.sort((a, b) => a.no - b.no).map((it, i) => (
                                             <tr key={i} style={{ background: i % 2 === 0 ? '#f8fafc' : '#fff' }}>
@@ -684,7 +725,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         </table>
 
                         {/* Totals */}
-                        {showTotals && (
+                        {showTotals && !showSimpleList && (
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
                                 <div style={{ width: 300, fontSize: 10 }}>
                                     {showPOContract ? (
@@ -723,7 +764,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         )}
 
                         {/* Notes - Bottom */}
-                        {(() => {
+                        {!showSimpleList && (() => {
                             const currentNotesPreview = showPOContract ? "1. Harap memproses pesanan ini sesuai dengan rincian, harga, dan spesifikasi di atas.\n2. Mohon cantumkan Nomor PO ini pada setiap dokumen pengiriman dan invoice tagihan.\n3. Syarat dan ketentuan lain mengikuti kesepakatan yang telah disetujui bersama." : quotation.notes
                             if (!currentNotesPreview) return null
                             return (
@@ -735,6 +776,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         })()}
 
                         {/* Signatures */}
+                        {!showSimpleList && (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginTop: 16 }}>
                             {[
                                 { label: showPOContract ? 'Authorized by,' : 'Disetujui oleh,', sub: '', name: c?.name || '' },
@@ -760,6 +802,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                                 </div>
                             ))}
                         </div>
+                        )}
 
                     </div>
                 </div>
