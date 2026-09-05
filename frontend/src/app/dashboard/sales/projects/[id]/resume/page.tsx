@@ -111,7 +111,6 @@ export default function ProjectResumePage() {
     const revenue = project.salesOrders?.reduce((acc, so) => acc + (so.grandTotal || 0), 0) || 0
 
     let materialUsageCosts = 0
-    let directPurchaseCosts = 0
     let operationalExpenses = 0
     const processedExpenseIds = new Set<string>()
 
@@ -144,14 +143,10 @@ export default function ProjectResumePage() {
     })
 
     const validPOStatuses = ['APPROVED', 'SENT', 'PARTIALLY_RECEIVED', 'COMPLETED', 'POSTED']
+    let totalPOGrandTotal = 0
     project.purchaseOrders?.forEach(po => {
         if (validPOStatuses.includes(po.status)) {
-            po.items?.forEach((item: any) => {
-                const desc = (item.description || '').toLowerCase()
-                const isInventoryItem = desc.includes('sku-') || desc.includes('prod-')
-                const isService = desc.includes('jasa') || desc.includes('service') || desc.includes('fee') || desc.includes('ongkos')
-                if (isService || !isInventoryItem) directPurchaseCosts += (item.qty || 0) * (item.unitPrice || 0)
-            })
+            totalPOGrandTotal += po.grandTotal || 0
         }
     })
 
@@ -160,7 +155,7 @@ export default function ProjectResumePage() {
     project.surveyExpenses?.forEach((e: any) => processExpense(e, 'project_survey'))
     project.operationalExpenses?.forEach((e: any) => processExpense(e, 'opex'))
 
-    const totalCOGS = materialUsageCosts + directPurchaseCosts
+    const totalCOGS = materialUsageCosts + totalPOGrandTotal
     const totalExpenses = totalCOGS + operationalExpenses
     const profit = revenue - totalExpenses
     const margin = revenue > 0 ? (profit / revenue) * 100 : 0
@@ -495,7 +490,7 @@ export default function ProjectResumePage() {
                             </div>
                             <div className="text-right">
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Biaya</p>
-                                <p className="text-sm font-extrabold text-orange-600">{fmt(directPurchaseCosts)}</p>
+                                <p className="text-sm font-extrabold text-orange-600">{fmt(totalPOGrandTotal)}</p>
                             </div>
                         </div>
                         {project.purchaseOrders && project.purchaseOrders.length > 0 ? (
@@ -658,7 +653,7 @@ export default function ProjectResumePage() {
                             </div>
                             <div className="flex items-center justify-between py-1">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Biaya Pembelian (PO)</span>
-                                <span className="text-xs font-bold text-rose-500">({fmt(directPurchaseCosts)})</span>
+                                <span className="text-xs font-bold text-rose-500">({fmt(totalPOGrandTotal)})</span>
                             </div>
                             <div className="flex items-center justify-between py-1">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Biaya Operasional</span>

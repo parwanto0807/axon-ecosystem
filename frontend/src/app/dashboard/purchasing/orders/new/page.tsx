@@ -149,8 +149,8 @@ export default function NewPurchaseOrderPage() {
     }
 
     return (
-        <div className="p-8 space-y-6 w-full font-inter max-w-7xl mx-auto">
-            <header className="flex items-center justify-between">
+        <div className="p-6 lg:p-8 space-y-6 w-full font-inter">
+            <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     <Link
                         href="/dashboard/purchasing/orders"
@@ -190,8 +190,9 @@ export default function NewPurchaseOrderPage() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                {/* Left Column: Order Items + Notes */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="xl:col-span-9 space-y-6">
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
                         <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
                             <FileText size={18} className="text-indigo-600" />
@@ -200,72 +201,86 @@ export default function NewPurchaseOrderPage() {
 
                         <div className="space-y-4">
                             {items.map((item, index) => (
-                                <div key={item.id} className="grid grid-cols-12 gap-3 items-start bg-slate-50 p-4 rounded-2xl relative group">
-                                    <div className="col-span-1 flex items-center justify-center p-3 text-sm font-bold text-slate-400">
-                                        {index + 1}.
-                                    </div>
-                                    <div className="col-span-5 space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Product Description</label>
-                                        <SkuSelect
-                                            value={item.description}
-                                            skus={availableSkus}
-                                            onChange={code => {
-                                                const selectedSku = availableSkus.find(s => s.code === code);
+                                <div key={item.id} className="bg-slate-50 p-5 rounded-2xl relative group border border-slate-100 hover:border-indigo-200 transition-colors">
+                                    <div className="flex items-center gap-4 mb-4">
+                                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-sm font-black flex-shrink-0">
+                                            {index + 1}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Product Description</label>
+                                            <SkuSelect
+                                                value={item.description}
+                                                skus={availableSkus}
+                                                onChange={code => {
+                                                    const selectedSku = availableSkus.find(s => s.code === code);
 
-                                                setItems(items.map(i => {
-                                                    if (i.id === item.id) {
-                                                        const updated = { ...i, description: code };
-                                                        if (selectedSku) {
-                                                            updated.unitPrice = selectedSku.purchasePrice || selectedSku.salePrice || 0;
-                                                            if (selectedSku.unit?.name) {
-                                                                updated.unit = selectedSku.unit.name;
-                                                            } else if (selectedSku.purchaseUnit?.name) {
-                                                                updated.unit = selectedSku.purchaseUnit.name;
+                                                    setItems(items.map(i => {
+                                                        if (i.id === item.id) {
+                                                            const updated = { ...i, description: code };
+                                                            if (selectedSku) {
+                                                                updated.unitPrice = selectedSku.purchasePrice || selectedSku.salePrice || 0;
+                                                                if (selectedSku.unit?.name) {
+                                                                    updated.unit = selectedSku.unit.name;
+                                                                } else if (selectedSku.purchaseUnit?.name) {
+                                                                    updated.unit = selectedSku.purchaseUnit.name;
+                                                                }
+                                                                const sub = updated.qty * updated.unitPrice;
+                                                                const disc = (sub * (updated.discount / 100));
+                                                                updated.amount = sub - disc;
                                                             }
-                                                            const sub = updated.qty * updated.unitPrice;
-                                                            const disc = (sub * (updated.discount / 100));
-                                                            updated.amount = sub - disc;
+                                                            return updated;
                                                         }
-                                                        return updated;
-                                                    }
-                                                    return i;
-                                                }));
-                                            }}
-                                        />
+                                                        return i;
+                                                    }));
+                                                }}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="col-span-2 space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Qty & Unit</label>
-                                        <div className="flex">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Qty</label>
                                             <input
                                                 type="number"
                                                 min="1"
                                                 step="0.01"
                                                 value={item.qty}
                                                 onChange={e => handleItemChange(item.id, 'qty', parseFloat(e.target.value) || 0)}
-                                                className="w-1/2 px-3 py-2 bg-white border border-slate-200 border-r-0 rounded-l-lg text-sm text-center"
+                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-center font-bold"
                                             />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Unit</label>
                                             <input
                                                 type="text"
                                                 value={item.unit}
                                                 onChange={e => handleItemChange(item.id, 'unit', e.target.value)}
-                                                className="w-1/2 px-2 py-2 bg-white border border-slate-200 rounded-r-lg text-xs text-center"
+                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-center"
                                                 placeholder="pcs"
                                             />
                                         </div>
-                                    </div>
-                                    <div className="col-span-3 space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Unit Price</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2 text-xs text-slate-400">Rp</span>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Unit Price (Rp)</label>
                                             <input
                                                 type="number"
                                                 value={item.unitPrice}
                                                 onChange={e => handleItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                                className="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-mono"
+                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-mono text-right"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Discount (%)</label>
+                                            <input
+                                                type="number"
+                                                value={item.discount}
+                                                onChange={e => handleItemChange(item.id, 'discount', parseFloat(e.target.value) || 0)}
+                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-center"
                                             />
                                         </div>
                                     </div>
-                                    <div className="col-span-1 pt-6 text-right">
+                                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-200/60">
+                                        <div className="font-mono font-bold text-indigo-700 bg-indigo-50 px-4 py-1.5 rounded-lg text-sm">
+                                            Rp {item.amount.toLocaleString('id-ID')}
+                                        </div>
                                         <button
                                             onClick={() => removeItem(item.id)}
                                             className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
@@ -273,20 +288,6 @@ export default function NewPurchaseOrderPage() {
                                         >
                                             <Trash2 size={16} />
                                         </button>
-                                    </div>
-                                    <div className="col-span-12 flex justify-between items-center text-xs mt-2 pt-2 border-t border-slate-200/50">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-slate-500 font-medium">Discount (%):</span>
-                                            <input
-                                                type="number"
-                                                value={item.discount}
-                                                onChange={e => handleItemChange(item.id, 'discount', parseFloat(e.target.value) || 0)}
-                                                className="w-16 px-2 py-1 bg-white border border-slate-200 rounded text-center"
-                                            />
-                                        </div>
-                                        <div className="font-mono font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-lg">
-                                            Rp {item.amount.toLocaleString('id-ID')}
-                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -300,7 +301,7 @@ export default function NewPurchaseOrderPage() {
                     </div>
 
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                                 <label className="text-xs font-bold text-slate-500 uppercase">Terms & Conditions</label>
                                 <textarea
@@ -325,7 +326,8 @@ export default function NewPurchaseOrderPage() {
                     </div>
                 </motion.div>
 
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="space-y-6">
+                {/* Right Column: Details + Summary */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="xl:col-span-3 space-y-6">
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-4">
                         <h2 className="font-bold text-slate-800 mb-4">Initial Details</h2>
 
@@ -335,7 +337,7 @@ export default function NewPurchaseOrderPage() {
                                 <button
                                     type="button"
                                     onClick={() => setPoData({ ...poData, paymentType: 'CREDIT' })}
-                                    className={`py-2 text-xs font-bold rounded-xl border-2 transition-all ${poData.paymentType === 'CREDIT'
+                                    className={`py-2.5 text-xs font-bold rounded-xl border-2 transition-all ${poData.paymentType === 'CREDIT'
                                         ? 'bg-indigo-50 border-indigo-600 text-indigo-700'
                                         : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'
                                         }`}
@@ -345,7 +347,7 @@ export default function NewPurchaseOrderPage() {
                                 <button
                                     type="button"
                                     onClick={() => setPoData({ ...poData, paymentType: 'CASH' })}
-                                    className={`py-2 text-xs font-bold rounded-xl border-2 transition-all ${poData.paymentType === 'CASH'
+                                    className={`py-2.5 text-xs font-bold rounded-xl border-2 transition-all ${poData.paymentType === 'CASH'
                                         ? 'bg-emerald-50 border-emerald-600 text-emerald-700'
                                         : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'
                                         }`}
@@ -364,7 +366,7 @@ export default function NewPurchaseOrderPage() {
                             >
                                 <option value="">-- Choose Vendor --</option>
                                 {vendors.map(v => (
-                                        <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
+                                    <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
                                 ))}
                             </select>
                         </div>
@@ -547,9 +549,9 @@ function SkuSelect({ value, skus, onChange }: { value: string; skus: any[]; onCh
             </button>
 
             {open && (
-                <div className="absolute z-30 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden">
-                    <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 bg-slate-50">
-                        <Search size={14} className="text-slate-400 flex-shrink-0" />
+                <div className="absolute z-30 mt-1 w-full min-w-[400px] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
+                    <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 bg-slate-50">
+                        <Search size={16} className="text-slate-400 flex-shrink-0" />
                         <input
                             autoFocus
                             value={query}
@@ -558,16 +560,16 @@ function SkuSelect({ value, skus, onChange }: { value: string; skus: any[]; onCh
                             className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
                         />
                     </div>
-                    <div className="max-h-56 overflow-y-auto">
+                    <div className="max-h-64 overflow-y-auto">
                         {filtered.length === 0 && (
-                            <div className="px-3 py-3 text-sm text-slate-400">No product found</div>
+                            <div className="px-4 py-4 text-sm text-slate-400 text-center">No product found</div>
                         )}
                         {filtered.map(sku => (
                             <button
                                 key={sku.id}
                                 type="button"
                                 onClick={() => { onChange(sku.code); setOpen(false); setQuery('') }}
-                                className={`w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 ${sku.code === value ? 'bg-indigo-50 font-semibold' : ''}`}
+                                className={`w-full text-left px-4 py-3 text-sm hover:bg-indigo-50 transition-colors border-b border-slate-50 last:border-0 ${sku.code === value ? 'bg-indigo-50 font-semibold' : ''}`}
                             >
                                 {sku.displayLabel}
                             </button>
