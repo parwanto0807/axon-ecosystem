@@ -115,7 +115,7 @@ export default function SalesOrderPDFModal({ order, company, onClose }:
             if (c?.email) { doc.text(`Email: ${c.email}`, M, ry) }
 
             let dy = y
-                ;[['Perihal', order.subject], ['Termin Bayar', order.paymentTerms || ''], ['Syarat Kirim', order.deliveryTerms || '']].filter(([, v]) => v).forEach(([k, v]) => {
+                ;[['Perihal', order.subject], ['Termin Pembayaran', order.paymentTerms || ''], ['Syarat Pengiriman', order.deliveryTerms || '']].filter(([, v]) => v).forEach(([k, v]) => {
                     doc.setFont('helvetica', 'bold').setTextColor(...gray); doc.text(`${k}`, col2, dy)
                     doc.setFont('helvetica', 'normal').setTextColor(...dark)
                     const ls = doc.splitTextToSize(`: ${v}`, 70); doc.text(ls, col2 + 22, dy)
@@ -268,8 +268,8 @@ export default function SalesOrderPDFModal({ order, company, onClose }:
                                     <tbody>
                                         {[
                                             ['Perihal', order.subject],
-                                            ['Termin Bayar', order.paymentTerms],
-                                            ['Syarat Kirim', order.deliveryTerms]
+                                            ['Termin Pembayaran', order.paymentTerms],
+                                            ['Syarat Pengiriman', order.deliveryTerms]
                                         ].filter(([, v]) => v).map(([k, v]) => (
                                             <tr key={k}>
                                                 <td style={{ fontWeight: 700, color: '#475569', paddingRight: 8, paddingBottom: 4, verticalAlign: 'top' }}>{k}</td>

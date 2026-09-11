@@ -741,15 +741,46 @@ function OrderFormModal({ order, customers, products, quotations, projects, busi
                         </div>
                         <div>
                             <label className={lc}>Termin Pembayaran</label>
-                            <select value={form.paymentTerms} onChange={e => setForm({ ...form, paymentTerms: e.target.value })} className={ic}>
-                                <option>Cash/Tunai</option><option>NET 7</option><option>NET 14</option><option>NET 30</option><option>NET 45</option><option>NET 60</option><option>50% DP, 50% Lunas</option><option>30% DP, 70% Lunas</option>
-                            </select>
+                            <input
+                                type="text"
+                                list="order-payment-terms"
+                                value={form.paymentTerms || ''}
+                                onChange={e => setForm({ ...form, paymentTerms: e.target.value })}
+                                placeholder="Pilih atau ketik termin pembayaran..."
+                                className={ic}
+                            />
+                            <datalist id="order-payment-terms">
+                                <option value="Cash / Tunai" />
+                                <option value="NET 7 Hari" />
+                                <option value="NET 14 Hari" />
+                                <option value="NET 30 Hari" />
+                                <option value="NET 45 Hari" />
+                                <option value="NET 60 Hari" />
+                                <option value="DP 50%, Pelunasan 50%" />
+                                <option value="DP 30%, Pelunasan 70%" />
+                                <option value="DP 50%, 30% 1 Bulan, 20% 2 Bulan" />
+                                <option value="DP 30%, 40% Progres, 30% Retensi" />
+                                <option value="Sesuai Kesepakatan / Kontrak" />
+                            </datalist>
                         </div>
                         <div>
                             <label className={lc}>Syarat Pengiriman</label>
-                            <select value={form.deliveryTerms} onChange={e => setForm({ ...form, deliveryTerms: e.target.value })} className={ic}>
-                                <option>FOB Jakarta</option><option>CIF Tujuan</option><option>Ex-Works</option><option>Franco Gudang Pembeli</option><option>Sesuai Kesepakatan</option>
-                            </select>
+                            <input
+                                type="text"
+                                list="order-delivery-terms"
+                                value={form.deliveryTerms || ''}
+                                onChange={e => setForm({ ...form, deliveryTerms: e.target.value })}
+                                placeholder="Pilih atau ketik syarat pengiriman..."
+                                className={ic}
+                            />
+                            <datalist id="order-delivery-terms">
+                                <option value="FOB Jakarta" />
+                                <option value="CIF Tujuan" />
+                                <option value="Ex-Works" />
+                                <option value="Franco Gudang Pembeli" />
+                                <option value="Loco Gudang Penjual" />
+                                <option value="Sesuai Kesepakatan" />
+                            </datalist>
                         </div>
                     </div>
 

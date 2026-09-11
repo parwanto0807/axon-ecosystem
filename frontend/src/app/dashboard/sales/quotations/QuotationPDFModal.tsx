@@ -152,7 +152,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             // Quotation number/date block (right side of header)
             doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...gray)
             const hdr = isPOContract
-                ? [['PO Date', fd(new Date().toISOString())], ['Ref. Quotation', quotation.number], ['Termin Bayar', quotation.paymentTerms], ['Mata Uang', quotation.currency]]
+                ? [['PO Date', fd(new Date().toISOString())], ['Ref. Quotation', quotation.number], ['Termin Pembayaran', quotation.paymentTerms], ['Mata Uang', quotation.currency]]
                 : [['No.', quotation.number], ['Tanggal', fd(quotation.date)], ['Berlaku s/d', fd(quotation.validUntil)], ['Mata Uang', quotation.currency]]
             let hy = y + 4
             hdr.forEach(([k, v]) => {
@@ -198,8 +198,8 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
 
                 const detaLines = [
                     ['Perihal', quotation.subject],
-                    ['Termin Bayar', quotation.paymentTerms],
-                    ['Syarat Kirim', quotation.deliveryTerms]
+                    ['Termin Pembayaran', quotation.paymentTerms],
+                    ['Syarat Pengiriman', quotation.deliveryTerms]
             ].filter(([, v]) => v !== null && v !== undefined) as [string, string][]
 
             detaLines.forEach(([k, v]) => {
@@ -565,7 +565,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                                 <table style={{ marginLeft: 'auto', fontSize: 9, borderCollapse: 'collapse' }}>
                                     <tbody>
                                         {(showPOContract 
-                                            ? [['PO Date', fd(new Date().toISOString())], ['Ref. Quotation', quotation.number], ['Termin Bayar', quotation.paymentTerms], ['Mata Uang', quotation.currency]]
+                                            ? [['PO Date', fd(new Date().toISOString())], ['Ref. Quotation', quotation.number], ['Termin Pembayaran', quotation.paymentTerms], ['Mata Uang', quotation.currency]]
                                             : [['No.', quotation.number], ['Tanggal', fd(quotation.date)], ['Berlaku s/d', fd(quotation.validUntil)], ['Mata Uang', quotation.currency]]
                                         ).map(([k, v]) => (
                                             <tr key={k}>
@@ -611,8 +611,8 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                                         <tbody>
                                             {[
                                                 ['Perihal', quotation.subject],
-                                                ['Termin Bayar', quotation.paymentTerms],
-                                                ['Syarat Kirim', quotation.deliveryTerms]
+                                                ['Termin Pembayaran', quotation.paymentTerms],
+                                                ['Syarat Pengiriman', quotation.deliveryTerms]
                                             ].filter(([, v]) => v).map(([k, v]) => (
                                                 <tr key={k}>
                                                     <td style={{ fontWeight: 700, color: '#475569', paddingRight: 8, paddingBottom: 6, verticalAlign: 'top', whiteSpace: 'nowrap', width: 120 }}>{k}</td>
