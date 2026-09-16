@@ -2383,7 +2383,7 @@ app.put('/api/stock-movements/:id', async (req, res) => {
         where: { id: req.params.id },
         include: { warehouse: true, toWarehouse: true, workOrder: true, items: { include: { sku: { include: { product: true } } } } }
       });
-    });
+    }, { maxWait: 20000, timeout: 60000 });
     res.json(movement);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
@@ -2431,8 +2431,9 @@ app.post('/api/stock-movements/:id/confirm', async (req, res) => {
       });
 
       // Automated Journaling and Price Sync
+      let totalAmount = 0;
       for (const item of result.items) {
-        const amount = (Number(item.unitCost) || 0) * item.qty;
+        const itemAmount = (Number(item.unitCost) || 0) * item.qty;
         
         // 1. Update Product SKU Purchase Price (Refinement)
         if (result.type === 'IN' || result.type === 'BEGINNING') {
@@ -2442,15 +2443,19 @@ app.post('/api/stock-movements/:id/confirm', async (req, res) => {
           });
         }
 
-        if (amount <= 0) continue;
+        if (itemAmount > 0) {
+          totalAmount += itemAmount;
+        }
+      }
 
-        // 2. Journaling
+      // 2. Journaling (Single consolidated entry per Stock Movement)
+      if (totalAmount > 0) {
         if (result.type === 'IN' || result.type === 'BEGINNING') {
            await postJournalFromSystemKey({
              systemKey: 'INVENTORY_PUSAT',
              counterSystemKey: 'UNBILLED_RECEIPT',
-             amount,
-             description: `Stock IN: ${result.number} - ${item.sku.name}`,
+             amount: totalAmount,
+             description: `Stock IN: ${result.number} (${result.items.length} items)`,
              reference: result.number,
              type: 'STOCK_MOVEMENT',
              prismaTx: tx
@@ -2460,8 +2465,8 @@ app.post('/api/stock-movements/:id/confirm', async (req, res) => {
            await postJournalFromSystemKey({
              systemKey: 'COGS', // Ensure COGS key exists or handle fallback
              counterSystemKey: 'INVENTORY_PUSAT',
-             amount,
-             description: `Stock OUT: ${result.number} - ${item.sku.name}`,
+             amount: totalAmount,
+             description: `Stock OUT: ${result.number} (${result.items.length} items)`,
              reference: result.number,
              type: 'INVENTORY',
              prismaTx: tx
@@ -2470,6 +2475,9 @@ app.post('/api/stock-movements/:id/confirm', async (req, res) => {
       }
 
       return result;
+    }, {
+      maxWait: 20000,
+      timeout: 60000
     });
     res.json(result);
   } catch (e) { res.status(400).json({ message: e.message }); }
@@ -2526,6 +2534,9 @@ app.patch('/api/stock-movements/:id/revert', async (req, res) => {
         where: { id: req.params.id },
         data: { status: 'DRAFT', confirmedAt: null, confirmedBy: null }
       });
+    }, {
+      maxWait: 20000,
+      timeout: 60000
     });
     res.json(result);
   } catch (e) { res.status(400).json({ message: e.message }); }

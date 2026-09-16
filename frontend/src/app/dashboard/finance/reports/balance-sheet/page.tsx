@@ -197,7 +197,8 @@ export default function BalanceSheetPage() {
                             <tbody className="divide-y divide-slate-50">
                                 {data.equity.map(acc => {
                                     // Net Profit (Laba Tahun Berjalan) bisa negatif jika rugi - bukan anomali
-                                    const isAbnormal = acc.balance < 0 && acc.id !== 'NET_PROFIT';
+                                    // Prive Pemilik (Owner's Draw) juga normalnya negatif (contra-equity)
+                                    const isAbnormal = acc.balance < 0 && acc.id !== 'NET_PROFIT' && !acc.name.toLowerCase().includes('prive');
                                     return (
                                     <tr key={acc.id} className={`hover:bg-slate-50/50 transition-colors ${isAbnormal ? 'bg-amber-50/50' : ''}`}>
                                         <td className="px-5 md:px-8 py-3 md:py-4">

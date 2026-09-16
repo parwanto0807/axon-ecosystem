@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(curl -s \"http://localhost:5003/api/reports/cash-flow?startDate=2026-01-01&endDate=2026-12-31\" -o \"C:\\Users\\parwa\\AppData\\Local\\Temp\\commandcode\\D--Project-WebApp-axon-ecosystem\\8e09f1ba-2c09-440a-849f-dc9601950b42\\scratchpad\\cf2026.json\" 2>nul && powershell -Command \"$data = Get-Content 'C:\\Users\\parwa\\AppData\\Local\\Temp\\commandcode\\D--Project-WebApp-axon-ecosystem\\8e09f1ba-2c09-440a-849f-dc9601950b42\\scratchpad\\cf2026.json' | ConvertFrom-Json -ErrorAction SilentlyContinue; if ($data) { Write-Host 'Operating: ' $data.operating.total 'items(' $data.operating.items.Count ')'; Write-Host 'Investing: ' $data.investing.total 'items(' $data.investing.items.Count ')'; Write-Host 'Financing: ' $data.financing.total 'items(' $data.financing.items.Count ')'; $net = $data.operating.total + $data.investing.total + $data.financing.total; Write-Host 'Net Cash Flow: ' $net } else { Write-Host 'Error'; Get-Content 'C:\\Users\\parwa\\AppData\\Local\\Temp\\commandcode\\D--Project-WebApp-axon-ecosystem\\8e09f1ba-2c09-440a-849f-dc9601950b42\\scratchpad\\cf2026.json' }\")",
+      "Shell(curl -s \"http://localhost:5003/api/journals?limit=50\" -o \"C:\\Users\\parwa\\AppData\\Local\\Temp\\commandcode\\D--Project-WebApp-axon-ecosystem\\8e09f1ba-2c09-440a-849f-dc9601950b42\\scratchpad\\journals_all.json\" 2>nul && powershell -Command \"$data = Get-Content 'C:\\Users\\parwa\\AppData\\Local\\Temp\\commandcode\\D--Project-WebApp-axon-ecosystem\\8e09f1ba-2c09-440a-849f-dc9601950b42\\scratchpad\\journals_all.json' | ConvertFrom-Json; $types = $data | Group-Object type | Select-Object Name, Count; Write-Host 'Journal Entry Types:'; $types | ForEach-Object { Write-Host (' ' + $_.Name + ': ' + $_.Count) }\")",
+      "Shell(powershell -Command \"$data = Get-Content 'C:\\Users\\parwa\\AppData\\Local\\Temp\\commandcode\\D--Project-WebApp-axon-ecosystem\\8e09f1ba-2c09-440a-849f-dc9601950b42\\scratchpad\\journals_all.json' | ConvertFrom-Json; $statuses = $data | Group-Object status | Select-Object Name, Count; Write-Host 'Journal Entry Statuses:'; $statuses | ForEach-Object { Write-Host (' ' + $_.Name + ': ' + $_.Count) }\")",
+      "Shell(agent-browser:*)",
+      "Shell(npm:*)",
+      "Shell(psql:*)",
+      "Shell(findstr:*)",
+      "Shell(git:*)",
+      "Shell(for pw in \"admin\" \"password\" \"admin123\" \"Password1\" \"Amigos2010\" \"amigos2010\" \"admin1234\" \"123456\" \"password123\" \"admin@axon\" \"secret\" \"qwerty\"; do result=$(curl -s -o /dev/null -w \"%{http_code}\" -X POST http://localhost:5003/api/login -H \"Content-Type: application/json\" -d \"{\\\"email\\\":\\\"admin@axon.com\\\",\\\"password\\\":\\\"$pw\\\"}\") echo \"password=$pw -> HTTP $result\" if [ \"$result\" = \"200\" ]; then echo \"FOUND: $pw\"; break; fi done 2>&1)",
+      "Shell(powershell -Command \"& { $passwords = @('admin','password','admin123','Password1','Amigos2010','amigos2010','admin1234','123456','password123','admin@axon','secret','qwerty','admin12345','test','demo') foreach ($pw in $passwords) { $body = '{\\\"email\\\":\\\"admin@axon.com\\\",\\\"password\\\":\\\"' + $pw + '\\\"}' $status = (Invoke-WebRequest -Uri 'http://localhost:5003/api/login' -Method POST -Body $body -ContentType 'application/json' -ErrorAction SilentlyContinue).StatusCode Write-Output \\\"password=$pw -> HTTP $status\\\" if ($status -eq 200) { Write-Output 'FOUND: ' + $pw; break } } }\" 2>&1)",
+      "Shell(curl -s -X POST http://localhost:5003/api/login -H Content-Type: application/json -d @- 2 >& 1)",
+      "Shell(curl -s -X POST http://localhost:5003/api/login -H \"Content-Type: application/json\" -d \"{\\\"email\\\":\\\"admin@axon.com\\\",\\\"password\\\":\\\"admin\\\"}\" 2>&1)",
+      "Shell(curl -s \"http://localhost:5003/api/reports/balance-sheet?date=2026-09-17\" 2>&1)",
+      "Shell(curl -s http://localhost:5003/api/reports/balance-sheet?date=2026-09-17)",
+      "Shell(python -c import json,sys; d=json.load(sys.stdin); print('LIABILITIES:'); [print(f' {x[\"code\"]} {x[\"name\"]}: {x[\"balance\"]}') for x in d['liabilities']]; print('EQUITY:'); [print(f' {x[\"code\"]} {x[\"name\"]}: {x[\"balance\"]}') for x in d['equity']] 2 >& 1)",
+      "Shell(npx tsc --noEmit --skipLibCheck 2 >& 1)",
+      "Shell(Select-String:*)",
+      "Shell(npx tsc --noEmit 2 >& 1)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}

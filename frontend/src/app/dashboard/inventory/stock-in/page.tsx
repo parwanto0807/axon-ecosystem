@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
     PackagePlus, Plus, Search, Trash2, X, CheckCircle2,
     AlertCircle, RefreshCw, Check, Ban, DollarSign, Eye,
-    Clock, Tag, MapPin, Briefcase
+    Clock, Tag, MapPin, Briefcase, FileText, ChevronDown
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -13,7 +13,7 @@ const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
 
 interface Warehouse { id: string; code: string; name: string }
-interface SKU { id: string; code: string; name: string; purchasePrice: number; product: { name: string } }
+interface SKU { id: string; code: string; name: string; barcode?: string; purchasePrice: number; product: { name: string } }
 interface Movement {
     id: string; number: string; type: string; status: string; date: string;
     warehouse: Warehouse; notes?: string; confirmedAt?: string; referenceNumber?: string;
@@ -25,7 +25,11 @@ interface Movement {
     };
     items: { id: string; qty: number; unitCost: number; sku: { code: string; name: string; product: { name: string } } }[]
 }
-
+interface PurchaseOrder {
+    id: string; number: string; date: string; status: string; grandTotal: number;
+    vendor: { code: string; name: string };
+    items: any[];
+}
 interface FormItem { skuId: string; qty: number; unitCost: number; notes?: string; _sku?: SKU }
 
 const STATUS_CFG: Record<string, { label: string; color: string; icon: any }> = {
@@ -46,6 +50,8 @@ export default function StockInPage() {
     const [form, setForm] = useState({ warehouseId: '', date: new Date().toISOString().split('T')[0], notes: '', referenceNumber: '' })
     const [items, setItems] = useState<FormItem[]>([])
     const [saving, setSaving] = useState(false)
+    const [poList, setPoList] = useState<PurchaseOrder[]>([])
+    const [selectedPO, setSelectedPO] = useState<string>('')
 
     const [search, setSearch] = useState("")
     const [filterStatus, setFilterStatus] = useState("ALL")
@@ -57,14 +63,16 @@ export default function StockInPage() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const [mRes, wRes, sRes] = await Promise.all([
+            const [mRes, wRes, sRes, poRes] = await Promise.all([
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements?type=IN`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock`)
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders`)
             ])
             setMovements(await mRes.json())
             setWarehouses((await wRes.json()).filter((w: Warehouse & { isActive: boolean }) => w.isActive))
             setSkus(await sRes.json())
+            setPoList(await poRes.json())
         } catch { showToast('error', 'Gagal memuat data') }
         finally { setLoading(false) }
     }, [])
@@ -85,17 +93,150 @@ export default function StockInPage() {
 
     const totalValue = items.reduce((s, i) => s + i.qty * i.unitCost, 0)
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault(); setSaving(true)
+    // Smart SKU matching helper for PO items
+    const findMatchingSku = (desc: string) => {
+        if (!desc) return undefined
+        const clean = desc.trim().toLowerCase()
+        // 1. Exact code match
+        let match = skus.find(s => s.code.toLowerCase() === clean)
+        if (match) return match
+
+        // 2. Barcode match
+        match = skus.find(s => s.barcode && s.barcode.toLowerCase() === clean)
+        if (match) return match
+
+        // 3. Name or Product name match
+        match = skus.find(s => (s.name && s.name.toLowerCase() === clean) || (s.product?.name && s.product.name.toLowerCase() === clean))
+        if (match) return match
+
+        // 4. Description contains code
+        match = skus.find(s => clean.includes(s.code.toLowerCase()))
+        if (match) return match
+
+        // 5. Product name containment
+        match = skus.find(s => {
+            const pName = s.product?.name?.toLowerCase()
+            return pName && (clean.includes(pName) || pName.includes(clean))
+        })
+        if (match) return match
+
+        // 6. SKU name containment
+        match = skus.find(s => {
+            const sName = s.name?.toLowerCase()
+            return sName && (clean.includes(sName) || sName.includes(clean))
+        })
+        return match
+    }
+
+    // Load PO items into the form
+    const loadPOItems = (poId: string) => {
+        const po = poList.find(p => p.id === poId)
+        if (!po) return
+
+        if (!po.items || po.items.length === 0) {
+            showToast('error', `PO ${po.number} tidak memiliki daftar item barang`)
+            return
+        }
+
+        const newItems: FormItem[] = po.items.map((item: any) => {
+            const matchedSku = findMatchingSku(item.description) || findMatchingSku(item.productName)
+            return {
+                skuId: matchedSku?.id || '',
+                qty: Number(item.qty) || 1,
+                unitCost: Number(item.unitPrice) || matchedSku?.purchasePrice || 0,
+                notes: item.productName || item.description || '',
+                _sku: matchedSku || undefined
+            }
+        })
+
+        setItems(newItems)
+        setSelectedPO(poId)
+
+        // Auto pre-fill reference number & notes & warehouse
+        setForm(prev => ({
+            ...prev,
+            referenceNumber: po.number,
+            notes: prev.notes ? prev.notes : `Penerimaan PO ${po.number} dari ${po.vendor?.name || 'Vendor'}`,
+            warehouseId: prev.warehouseId ? prev.warehouseId : (warehouses[0]?.id || '')
+        }))
+
+        const unmappedCount = newItems.filter(i => !i.skuId).length
+        if (unmappedCount > 0) {
+            showToast('error', `${newItems.length} item dimuat (${unmappedCount} item perlu dipilih SKU manual)`)
+        } else {
+            showToast('success', `${newItems.length} item berhasil dimuat dari PO ${po.number}`)
+        }
+    }
+
+    // Clear PO reference
+    const clearPO = () => {
+        setSelectedPO('')
+        setItems([])
+        setForm(prev => ({ ...prev, referenceNumber: '', notes: '' }))
+    }
+
+    const handleSubmit = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault()
+
+        if (!form.warehouseId) {
+            showToast('error', 'Silakan pilih Gudang Tujuan terlebih dahulu')
+            return
+        }
+        if (items.length === 0) {
+            showToast('error', 'Daftar barang penerimaan tidak boleh kosong')
+            return
+        }
+        const unassigned = items.find(i => !i.skuId)
+        if (unassigned) {
+            showToast('error', 'Pastikan semua baris barang telah dipilih SKU-nya')
+            return
+        }
+        const invalidQty = items.find(i => !i.qty || Number(i.qty) <= 0)
+        if (invalidQty) {
+            showToast('error', 'Jumlah (Qty) setiap barang harus lebih dari 0')
+            return
+        }
+
+        setSaving(true)
         try {
+            const po = selectedPO ? poList.find(p => p.id === selectedPO) : null
+            const payload = {
+                warehouseId: form.warehouseId,
+                date: form.date,
+                notes: form.notes,
+                type: 'IN',
+                referenceType: po ? 'PURCHASE_ORDER' : 'MANUAL',
+                referenceNumber: po ? po.number : form.referenceNumber,
+                items: items.map(i => ({
+                    skuId: i.skuId,
+                    qty: Number(i.qty) || 0,
+                    unitCost: Number(i.unitCost) || 0,
+                    notes: i.notes || ''
+                }))
+            }
+
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/stock-movements`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...form, type: 'IN', referenceType: 'MANUAL', items: items.map(i => ({ skuId: i.skuId, qty: i.qty, unitCost: i.unitCost, notes: i.notes })) })
+                body: JSON.stringify(payload)
             })
-            if (res.ok) { setModalOpen(false); setItems([]); setForm({ warehouseId: '', date: new Date().toISOString().split('T')[0], notes: '', referenceNumber: '' }); showToast('success', 'Penerimaan barang dibuat'); load() }
-            else { const d = await res.json(); showToast('error', d.message) }
-        } finally { setSaving(false) }
+
+            if (res.ok) {
+                setModalOpen(false)
+                setItems([])
+                setSelectedPO('')
+                setForm({ warehouseId: '', date: new Date().toISOString().split('T')[0], notes: '', referenceNumber: '' })
+                showToast('success', 'Penerimaan barang berhasil dibuat (Draft)')
+                load()
+            } else {
+                const d = await res.json()
+                showToast('error', d.message || 'Gagal menyimpan penerimaan barang')
+            }
+        } catch (err: any) {
+            showToast('error', 'Terjadi kesalahan koneksi server')
+        } finally {
+            setSaving(false)
+        }
     }
 
     const handleConfirm = async (id: string) => {
@@ -237,20 +378,6 @@ export default function StockInPage() {
                                             <div className="flex flex-col">
                                                 <span className="font-black text-xs text-emerald-600 tabular-nums tracking-tight">{m.number}</span>
                                                 <span className="text-[10px] font-bold text-slate-400 mt-0.5">{fmtDate(m.date)}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex items-center gap-1.5 group/wh">
-                                                    <MapPin size={10} className="text-slate-300 group-hover/wh:text-emerald-500 transition-colors" />
-                                                    <span className="font-bold text-slate-700 text-xs">{m.warehouse?.name}</span>
-                                                </div>
-                                                {m.referenceNumber && (
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Tag size={10} className="text-slate-300" />
-                                                        <span className="text-[10px] font-medium text-slate-400 italic">Ref: {m.referenceNumber}</span>
-                                                    </div>
-                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -439,21 +566,62 @@ export default function StockInPage() {
                                             </div>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className={lc}>Nomor Referensi</label>
+                                            <label className={lc}>Referensi PO (Opsional)</label>
                                             <div className="relative group">
-                                                <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                                                <input value={form.referenceNumber} onChange={e => setForm({ ...form, referenceNumber: e.target.value })} placeholder="No. DO Vendor, PO, dsb." className={`${ic} pl-10`} />
+                                                <FileText size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                                                <select
+                                                    value={selectedPO}
+                                                    onChange={e => {
+                                                        if (e.target.value) { loadPOItems(e.target.value) }
+                                                        else { clearPO() }
+                                                    }}
+                                                    className={`${ic} pl-10 pr-8 appearance-none cursor-pointer`}
+                                                >
+                                                    <option value="">-- Pilih PO --</option>
+                                                    {poList.filter(po => po.status !== 'CANCELLED').map(po => (
+                                                        <option key={po.id} value={po.id}>[{po.number}] {po.vendor?.name} - Rp {po.grandTotal?.toLocaleString('id-ID')}</option>
+                                                    ))}
+                                                </select>
                                             </div>
                                         </div>
-                                        <div className="space-y-1.5 text-xs text-slate-400">
-                                            <label className={lc}>Catatan Tambahan</label>
-                                            <input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Opsional..." className={ic} />
+                                        <div className="space-y-1.5">
+                                            <label className={lc}>Nomor Referensi (Manual)</label>
+                                            <div className="relative group">
+                                                <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                                                <input value={form.referenceNumber} onChange={e => setForm({ ...form, referenceNumber: e.target.value })} placeholder="DO Number, dll." className={`${ic} pl-10`} disabled={!!selectedPO} />
+                                            </div>
                                         </div>
+
+                                        {selectedPO && (() => {
+                                            const p = poList.find(x => x.id === selectedPO)
+                                            if (!p) return null
+                                            return (
+                                                <div className="md:col-span-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-bold text-emerald-800 flex items-center gap-1">
+                                                            <CheckCircle2 size={13} className="text-emerald-600" /> Referensi PO: {p.number}
+                                                        </span>
+                                                        <span className="text-slate-500">• {p.vendor?.name}</span>
+                                                        <span className="text-emerald-700 font-mono font-bold">• {fmt(p.grandTotal)}</span>
+                                                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-semibold">{items.length} item</span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={clearPO}
+                                                        className="text-[11px] font-bold text-rose-600 hover:text-rose-800 bg-white hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 transition-colors shrink-0"
+                                                    >
+                                                        ✕ Batalkan PO
+                                                    </button>
+                                                </div>
+                                            )
+                                        })()}
                                     </div>
 
                                     <div className="space-y-4 pt-4 border-t border-slate-50">
                                         <div className="flex items-center justify-between">
-                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-900 flex items-center gap-2"><PackagePlus size={16} className="text-emerald-500" /> Daftar Barang</h3>
+                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
+                                                <PackagePlus size={16} className="text-emerald-500" /> Daftar Barang
+                                            </h3>
                                             <button type="button" onClick={addItem} className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-4 py-2 rounded-xl transition-all active:scale-95 shadow-sm border border-emerald-100">+ Tambah Baris</button>
                                         </div>
                                         <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2 custom-scrollbar">
@@ -466,10 +634,21 @@ export default function StockInPage() {
                                                 items.map((item, idx) => (
                                                     <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} key={idx} className="grid grid-cols-12 gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm items-center hover:shadow-md transition-shadow group/item">
                                                         <div className="col-span-5">
-                                                            <select value={item.skuId} onChange={e => updateItem(idx, 'skuId', e.target.value)} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white transition-all">
-                                                                <option value="">-- Pilih Barang --</option>
+                                                            <select
+                                                                value={item.skuId}
+                                                                onChange={e => updateItem(idx, 'skuId', e.target.value)}
+                                                                className={`w-full border rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all ${
+                                                                    !item.skuId ? 'border-amber-400 bg-amber-50/60 text-amber-900' : 'bg-slate-50 border-slate-100 text-slate-800 focus:bg-white'
+                                                                }`}
+                                                            >
+                                                                <option value="">-- {!item.skuId ? '⚠️ Wajib Pilih SKU Barang' : 'Pilih Barang'} --</option>
                                                                 {skus.map(s => <option key={s.id} value={s.id}>{s.code} - {s.product?.name}</option>)}
                                                             </select>
+                                                            {item.notes && (
+                                                                <p className="text-[10px] text-slate-400 font-medium mt-1 truncate pl-1" title={item.notes}>
+                                                                    Item PO: <span className="text-slate-600 font-semibold">{item.notes}</span>
+                                                                </p>
+                                                            )}
                                                         </div>
                                                         <div className="col-span-2">
                                                             <div className="relative shadow-sm">
@@ -505,7 +684,12 @@ export default function StockInPage() {
                                     </div>
                                     <div className="flex gap-2 w-full md:w-auto">
                                         <Button type="button" variant="outline" onClick={() => setModalOpen(false)} className="flex-1 md:flex-none rounded-xl bg-white h-12 md:h-14 md:px-8 font-black uppercase tracking-widest text-[10px] border-slate-200 hover:bg-slate-50 transition-all">Batal</Button>
-                                        <Button type="submit" disabled={saving || items.length === 0} className="flex-[2] md:flex-none rounded-xl h-12 md:h-14 md:px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-emerald-600/30 transition-all disabled:opacity-50 active:scale-95">
+                                        <Button
+                                            type="button"
+                                            onClick={() => handleSubmit()}
+                                            disabled={saving || items.length === 0}
+                                            className="flex-[2] md:flex-none rounded-xl h-12 md:h-14 md:px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-emerald-600/30 transition-all disabled:opacity-50 active:scale-95 cursor-pointer"
+                                        >
                                             {saving ? 'Menyimpan...' : 'Simpan Draft'}
                                         </Button>
                                     </div>

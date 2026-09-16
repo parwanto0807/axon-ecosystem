@@ -1,0 +1,3 @@
+- Prefers Indonesian/Bahasa Indonesia in communication. Confidence: 0.85
+- Wants UI labels, messages, and report text in Indonesian (Bahasa Indonesia), not English. Examples: "Catatan Keuangan", "Tidak ada pendapatan di periode ini", "Memuat data laporan..." Confidence: 0.8
+- Prefers clean, readable financial report layouts with consistent formatting (monospace numbers, clear section hierarchy, proper currency formatting). Confidence: 0.7
