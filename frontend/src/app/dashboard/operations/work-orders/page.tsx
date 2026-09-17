@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect, useCallback, Fragment } from "react"
+import { useState, useEffect, useCallback, Fragment, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Wrench, Plus, Search, Edit, Trash2, X, Save, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, Clock, MapPin, User, Calendar, DollarSign, Package, ClipboardList, Play, Pause, Check, Ban, XCircle, HardHat, AlertTriangle, ChevronRight, SquareCheckBig, Circle, Printer, Box, Wind, Monitor } from "lucide-react"
+import { Wrench, Plus, Search, Edit, Trash2, X, Save, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, Clock, MapPin, User, Calendar, DollarSign, Package, ClipboardList, Play, Pause, Check, Ban, XCircle, HardHat, AlertTriangle, ChevronRight, SquareCheckBig, Circle, Printer, Box, Wind, Monitor, ShoppingBag, CheckSquare, Layers, ExternalLink, ArrowDownToLine } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import WorkOrderPDFModal from "./WorkOrderPDFModal"
 import { useSession } from "next-auth/react"
@@ -25,6 +26,7 @@ interface WO {
     stockMovements: any[]
     expenses: any[]
     reports: WorkOrderReport[]
+    purchaseOrders?: PurchaseOrder[]
     _count?: { items: number; tasks: number; reports: number }
     businessCategoryId?: string
     businessCategory?: { id: string; name: string }
@@ -56,7 +58,33 @@ interface WOItem {
 }
 interface WOTask { id?: string; title: string; description?: string; isDone: boolean; doneAt?: string; sortOrder?: number }
 interface Ref { id: string; number: string; name?: string; customer?: { name: string } }
-interface SKU { id: string; code: string; name: string; purchasePrice: number; product: { name: string } }
+interface SKU { id: string; code: string; name: string; purchasePrice: number; product: { name: string; type?: string } }
+
+interface PurchaseOrderItem {
+    id: string
+    purchaseOrderId: string
+    no: number
+    description: string
+    qty: number
+    unit: string
+    unitPrice: number
+    discount: number
+    amount: number
+}
+
+interface PurchaseOrder {
+    id: string
+    number: string
+    date: string
+    status: string
+    vendorId: string
+    vendor?: { name: string; code: string }
+    projectId?: string | null
+    salesOrderId?: string | null
+    workOrderId?: string | null
+    grandTotal: number
+    items: PurchaseOrderItem[]
+}
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -122,6 +150,16 @@ const defaultForm = { title: '', description: '', type: 'SERVICE', priority: 'NO
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function WorkOrdersPage() {
+    return (
+        <Suspense fallback={<div className="p-8 text-center text-slate-400 font-inter">Memuat Work Orders...</div>}>
+            <WorkOrdersContent />
+        </Suspense>
+    )
+}
+
+function WorkOrdersContent() {
+    const searchParams = useSearchParams()
+    const targetId = searchParams.get('id')
     const { data: session } = useSession()
     const userRole = (session?.user as any)?.role
 
@@ -132,6 +170,7 @@ export default function WorkOrdersPage() {
     const [assets, setAssets] = useState<{ id: string; name: string; customerId: string; category: string; brand?: string; model?: string; serialNumber?: string }[]>([])
     const [skus, setSkus] = useState<SKU[]>([])
     const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([])
+    const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
     const [companyInfo, setCompanyInfo] = useState<Record<string, string>>({})
     const [loading, setLoading] = useState(true)
     const [modalOpen, setModalOpen] = useState(false)
@@ -153,6 +192,13 @@ export default function WorkOrdersPage() {
     const [tasks, setTasks] = useState<Omit<WOTask, 'id'>[]>([])
     const [releasing, setReleasing] = useState(false)
     const [releaseWarehouse, setReleaseWarehouse] = useState('')
+    const [releaseModalOpen, setReleaseModalOpen] = useState(false)
+
+    // PO Import state
+    const [poImportModalOpen, setPoImportModalOpen] = useState(false)
+    const [selectedPoId, setSelectedPoId] = useState('')
+    const [selectedPoItems, setSelectedPoItems] = useState<Record<string, boolean>>({})
+    const [selectedPoSource, setSelectedPoSource] = useState('STOCK')
 
     // Expense Form State
     const [expenseModalOpen, setExpenseModalOpen] = useState(false)
@@ -195,7 +241,8 @@ export default function WorkOrdersPage() {
                 { name: 'stock', url: `${process.env.NEXT_PUBLIC_API_URL}/api/inventory/stock` },
                 { name: 'warehouses', url: `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses` },
                 { name: 'company', url: `${process.env.NEXT_PUBLIC_API_URL}/api/settings/company` },
-                { name: 'business-categories', url: `${process.env.NEXT_PUBLIC_API_URL}/api/business-categories` }
+                { name: 'business-categories', url: `${process.env.NEXT_PUBLIC_API_URL}/api/business-categories` },
+                { name: 'purchase-orders', url: `${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders` }
             ]
 
             const results = await Promise.all(
@@ -226,6 +273,7 @@ export default function WorkOrdersPage() {
             setWarehouses(results[6])
             setCompanyInfo(results[7] || {})
             setBusinessCategories(results[8] || [])
+            setPurchaseOrders(results[9] || [])
         } catch (e: any) {
             console.error('Work Order load error:', e)
             showToast('error', e.message || 'Gagal memuat data')
@@ -296,6 +344,103 @@ export default function WorkOrdersPage() {
         } finally {
             setLoading(false)
         }
+    }
+
+    // Auto-open if query param ?id=... is present
+    useEffect(() => {
+        if (targetId && wos.length > 0 && !viewing && !detailOpen) {
+            const found = wos.find(w => w.id === targetId)
+            if (found) {
+                openDetail(found)
+            }
+        }
+    }, [targetId, wos, viewing, detailOpen])
+
+    // PO Import Helpers
+    const openPoImportModal = () => {
+        // Find candidate POs:
+        const linkedPo = purchaseOrders.find(p => 
+            (editing && p.workOrderId === editing.id) ||
+            (form.projectId && p.projectId === form.projectId) ||
+            (form.salesOrderId && p.salesOrderId === form.salesOrderId)
+        )
+        const initialPoId = linkedPo ? linkedPo.id : (purchaseOrders[0]?.id || '')
+        setSelectedPoId(initialPoId)
+
+        const poObj = purchaseOrders.find(p => p.id === initialPoId)
+        const initialSelection: Record<string, boolean> = {}
+        if (poObj?.items) {
+            poObj.items.forEach(it => { initialSelection[it.id] = true })
+        }
+        setSelectedPoItems(initialSelection)
+        setSelectedPoSource('STOCK')
+        setPoImportModalOpen(true)
+    }
+
+    const handlePoSelectChange = (poId: string) => {
+        setSelectedPoId(poId)
+        const poObj = purchaseOrders.find(p => p.id === poId)
+        const newSelection: Record<string, boolean> = {}
+        if (poObj?.items) {
+            poObj.items.forEach(it => { newSelection[it.id] = true })
+        }
+        setSelectedPoItems(newSelection)
+    }
+
+    const handleTogglePoItem = (itemId: string) => {
+        setSelectedPoItems(prev => ({ ...prev, [itemId]: !prev[itemId] }))
+    }
+
+    const handleToggleAllPoItems = (selectAll: boolean) => {
+        const poObj = purchaseOrders.find(p => p.id === selectedPoId)
+        const newSelection: Record<string, boolean> = {}
+        if (poObj?.items) {
+            poObj.items.forEach(it => { newSelection[it.id] = selectAll })
+        }
+        setSelectedPoItems(newSelection)
+    }
+
+    const handleApplyPoItemsToBom = () => {
+        const poObj = purchaseOrders.find(p => p.id === selectedPoId)
+        if (!poObj || !poObj.items) return
+
+        const itemsToAdd: Omit<WOItem, 'id'>[] = []
+        poObj.items.forEach(it => {
+            if (selectedPoItems[it.id]) {
+                const matchedSku = skus.find(s => 
+                    s.code === it.description ||
+                    s.name?.toLowerCase() === it.description.toLowerCase() ||
+                    s.product?.name?.toLowerCase() === it.description.toLowerCase()
+                )
+
+                const itemType = (matchedSku as any)?.product?.type === 'SERVICE' ? 'LABOR' : 'MATERIAL'
+                const itemDescription = matchedSku ? `[${matchedSku.code}] ${matchedSku.product?.name || matchedSku.name}` : (it.description || 'Material')
+                const qty = Number(it.qty) || 1
+                const unitCost = Number(it.unitPrice) || 0
+
+                itemsToAdd.push({
+                    type: itemType,
+                    source: selectedPoSource,
+                    skuId: matchedSku?.id,
+                    description: itemDescription,
+                    qty: qty,
+                    unit: it.unit || 'pcs',
+                    unitCost: unitCost,
+                    totalCost: qty * unitCost,
+                    isReleased: false,
+                    notes: `Ref PO: ${poObj.number}`
+                })
+            }
+        })
+
+        if (itemsToAdd.length === 0) {
+            showToast('error', 'Pilih minimal satu item dari PO')
+            return
+        }
+
+        setItems(prev => [...prev, ...itemsToAdd])
+        setPoImportModalOpen(false)
+        showToast('success', `${itemsToAdd.length} item dari PO berhasil dimasukkan ke Bill of Materials`)
     }
 
     // Form Submission
@@ -841,6 +986,26 @@ export default function WorkOrdersPage() {
                                             <InfoBlock label="Business Unit" value={viewing.businessCategory?.name} icon={<Wind size={11} className="text-rose-600" />} />
                                         </div>
 
+                                        {viewing.purchaseOrders && viewing.purchaseOrders.length > 0 && (
+                                            <div>
+                                                <p className={lc + ' flex items-center gap-1.5 text-amber-600'}><ShoppingBag size={12} /> PO Pembelian Terkait ({viewing.purchaseOrders.length})</p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                    {viewing.purchaseOrders.map((po: any) => (
+                                                        <div key={po.id} className="p-3.5 bg-amber-50/40 border border-amber-200/60 rounded-2xl flex items-center justify-between gap-3 shadow-sm hover:border-amber-300 transition-all">
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[11px] font-black text-amber-700 tracking-tight">{po.number}</span>
+                                                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-white text-slate-600 border border-slate-200 uppercase">{po.status}</span>
+                                                                </div>
+                                                                <p className="text-[11px] font-bold text-slate-800 truncate mt-0.5">{po.vendor?.name || 'Vendor'}</p>
+                                                                <p className="text-[9px] text-slate-500 font-semibold">{po.items?.length || 0} item · {fmt(po.grandTotal || 0)}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {viewing.description && (
                                             <div><p className={lc}>Deskripsi</p><p className="text-sm text-slate-600 bg-slate-50 rounded-2xl p-4">{viewing.description}</p></div>
                                         )}
@@ -862,9 +1027,36 @@ export default function WorkOrdersPage() {
                                         )}
 
                                         {viewing.items.length > 0 && (
-                                            <div>
-                                                <p className={lc + ' flex items-center gap-2'}><Package size={12} /> Bill of Materials ({viewing.items.length} item)</p>
-                                                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <p className={lc + ' flex items-center gap-2'}><Package size={12} /> Bill of Materials ({viewing.items.length} item)</p>
+                                                </div>
+
+                                                {viewing.items.some((i: any) => i.type === 'MATERIAL' && (i.source === 'STOCK' || !i.source) && !i.isReleased && i.skuId) && (
+                                                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-amber-600/20">
+                                                                <Package size={18} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs font-black text-amber-950 leading-tight">Pengambilan Stock dari Gudang</p>
+                                                                <p className="text-[10px] text-amber-800 font-medium mt-0.5">Terdapat material tipe Pengambilan Stock yang belum dirilis ke Gudang.</p>
+                                                            </div>
+                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setReleaseWarehouse(warehouses[0]?.id || '')
+                                                                setReleaseModalOpen(true)
+                                                            }}
+                                                            className="w-full sm:w-auto rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wider h-9 px-4 shadow-sm active:scale-95"
+                                                        >
+                                                            Rilis ke Gudang
+                                                        </Button>
+                                                    </div>
+                                                )}
+
+                                                <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
                                                     <table className="w-full text-xs">
                                                         <thead><tr className="bg-slate-50 border-b border-slate-100"><th className="px-4 py-2 text-left text-[8px] font-black text-slate-400 uppercase">Deskripsi</th><th className="px-4 py-2 text-center text-[8px] font-black text-slate-400 uppercase">Qty</th><th className="px-4 py-2 text-center text-[8px] font-black text-slate-400 uppercase">Sumber</th><th className="px-4 py-2 text-right text-[8px] font-black text-slate-400 uppercase text-nowrap">Rilis?</th><th className="px-4 py-2 text-right text-[8px] font-black text-slate-400 uppercase">Total</th></tr></thead>
                                                         <tbody className="divide-y divide-slate-50">
@@ -874,7 +1066,13 @@ export default function WorkOrdersPage() {
                                                                     <td className="px-4 py-2.5 text-center">{item.qty} {item.unit}</td>
                                                                     <td className="px-4 py-2.5 text-center"><span className="px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-slate-100 text-slate-600">{ITEM_SOURCE[(item as any).source] || (item as any).source || 'STOCK'}</span></td>
                                                                     <td className="px-4 py-2.5 text-right">
-                                                                        {item.type === 'MATERIAL' ? (item.isReleased ? 'Released' : 'Draft') : '—'}
+                                                                        {item.type === 'MATERIAL' ? (
+                                                                            item.isReleased ? (
+                                                                                <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">Released</span>
+                                                                            ) : (
+                                                                                <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">Draft</span>
+                                                                            )
+                                                                        ) : '—'}
                                                                     </td>
                                                                     <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{fmt(item.totalCost)}</td>
                                                                 </tr>
@@ -1080,7 +1278,20 @@ export default function WorkOrdersPage() {
                                         <button type="button" onClick={addTask} className="w-full py-3 border border-dashed border-slate-200 rounded-xl text-[10px] font-bold text-slate-400"> + Tambah Langkah</button>
                                     </div>
                                 </Section>
-                                <Section title={`Bill of Materials (${items.length} item)`} icon={<Package size={14} className="text-emerald-500" />}>
+                                <Section 
+                                    title={`Bill of Materials (${items.length} item)`} 
+                                    icon={<Package size={14} className="text-emerald-500" />}
+                                    extra={
+                                        <button
+                                            type="button"
+                                            onClick={openPoImportModal}
+                                            className="h-8 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 transition-all"
+                                        >
+                                            <ShoppingBag size={13} />
+                                            Tarik dari PO Pembelian
+                                        </button>
+                                    }
+                                >
                                     <div className="space-y-3">
                                         {items.map((item, idx) => (
                                             <div key={idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3 relative group">
@@ -1294,6 +1505,267 @@ export default function WorkOrdersPage() {
                 )}
             </AnimatePresence>
 
+            {/* PO Import Modal */}
+            <AnimatePresence>
+                {poImportModalOpen && (
+                    <div className="fixed inset-0 z-[250] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm text-slate-900">
+                        <motion.div
+                            initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }}
+                            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }}
+                            exit={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-t-[2.5rem] md:rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                            
+                            {/* Mobile Drag Handle */}
+                            <div className="md:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-1 shrink-0" />
+
+                            <div className="flex items-center justify-between px-6 md:px-8 py-5 border-b border-amber-100 bg-amber-50/60 sticky top-0 z-10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-600/20">
+                                        <ShoppingBag size={18} />
+                                    </div>
+                                    <div>
+                                        <h2 className="font-extrabold text-slate-900 text-sm md:text-base uppercase tracking-wider">Tarik Item dari PO Pembelian</h2>
+                                        <p className="text-[10px] text-amber-700 font-bold tracking-tight">Otomatis lengkapi data Material & Pengambilan Stock ke BOM</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setPoImportModalOpen(false)} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100"><X size={20} /></button>
+                            </div>
+
+                            <div className="p-6 md:p-8 space-y-5 overflow-y-auto flex-1">
+                                <div>
+                                    <label className={lc}>Pilih PO Pembelian (Purchase Order) <span className="text-rose-500">*</span></label>
+                                    <select
+                                        value={selectedPoId}
+                                        onChange={e => handlePoSelectChange(e.target.value)}
+                                        className={ic + " font-bold text-slate-800 bg-amber-50/20 border-amber-200"}
+                                    >
+                                        <option value="">— Pilih PO Pembelian —</option>
+                                        {(() => {
+                                            const linkedPos = purchaseOrders.filter(p => 
+                                                (editing && p.workOrderId === editing.id) ||
+                                                (form.projectId && p.projectId === form.projectId) ||
+                                                (form.salesOrderId && p.salesOrderId === form.salesOrderId)
+                                            )
+                                            const otherPos = purchaseOrders.filter(p => !linkedPos.some(lp => lp.id === p.id))
+                                            return (
+                                                <>
+                                                    {linkedPos.length > 0 && (
+                                                        <optgroup label="⭐ PO Terkait Work Order / Project Ini">
+                                                            {linkedPos.map(p => (
+                                                                <option key={p.id} value={p.id}>
+                                                                    [{p.number}] {p.vendor?.name || 'Vendor'} — Rp {p.grandTotal?.toLocaleString('id-ID')} ({p.items?.length || 0} item)
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    )}
+                                                    <optgroup label="📋 Semua PO Pembelian Lainnya">
+                                                        {otherPos.map(p => (
+                                                            <option key={p.id} value={p.id}>
+                                                                [{p.number}] {p.vendor?.name || 'Vendor'} — Rp {p.grandTotal?.toLocaleString('id-ID')} ({p.items?.length || 0} item)
+                                                            </option>
+                                                        ))}
+                                                    </optgroup>
+                                                </>
+                                            )
+                                        })()}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className={lc}>Set Sumber Material (Source)</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedPoSource('STOCK')}
+                                            className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-left flex items-center justify-between ${selectedPoSource === 'STOCK' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+                                        >
+                                            <span>📦 Pengambilan Stock</span>
+                                            {selectedPoSource === 'STOCK' && <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedPoSource('PO')}
+                                            className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-left flex items-center justify-between ${selectedPoSource === 'PO' ? 'bg-indigo-50 border-indigo-500 text-indigo-800 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+                                        >
+                                            <span>📑 Pembelian PO Langsung</span>
+                                            {selectedPoSource === 'PO' && <CheckCircle2 size={14} className="text-indigo-600 shrink-0" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {selectedPoId && (
+                                    <div className="space-y-3">
+                                        {(() => {
+                                            const poObj = purchaseOrders.find(p => p.id === selectedPoId)
+                                            if (!poObj) return null
+                                            const poItems = poObj.items || []
+                                            const selectedCount = Object.values(selectedPoItems).filter(Boolean).length
+
+                                            return (
+                                                <>
+                                                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                                                        <div>
+                                                            <p className="text-xs font-extrabold text-slate-800">Daftar Item ({poItems.length})</p>
+                                                            <p className="text-[10px] text-slate-400 font-semibold">{selectedCount} item dipilih</p>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleToggleAllPoItems(true)}
+                                                                className="text-[10px] font-bold text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition-colors"
+                                                            >
+                                                                Pilih Semua
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleToggleAllPoItems(false)}
+                                                                className="text-[10px] font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition-colors"
+                                                            >
+                                                                Batal Pilih
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-72 overflow-y-auto bg-white shadow-sm">
+                                                        {poItems.length === 0 ? (
+                                                            <p className="p-6 text-center text-xs text-slate-400 font-medium">Tidak ada item di PO ini</p>
+                                                        ) : (
+                                                            poItems.map((item, idx) => {
+                                                                const isChecked = !!selectedPoItems[item.id]
+                                                                const matchedSku = skus.find(s => 
+                                                                    s.code === item.description ||
+                                                                    s.name?.toLowerCase() === item.description.toLowerCase() ||
+                                                                    s.product?.name?.toLowerCase() === item.description.toLowerCase()
+                                                                )
+
+                                                                return (
+                                                                    <div
+                                                                        key={item.id}
+                                                                        onClick={() => handleTogglePoItem(item.id)}
+                                                                        className={`p-3.5 flex items-start gap-3 cursor-pointer transition-colors ${isChecked ? 'bg-amber-50/40 hover:bg-amber-50/70' : 'hover:bg-slate-50 opacity-70'}`}
+                                                                    >
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isChecked}
+                                                                            onChange={() => {}} // handled by parent div
+                                                                            className="mt-1 w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                                                        />
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                                <p className="text-xs font-bold text-slate-800 leading-tight">
+                                                                                    {matchedSku ? (matchedSku.product?.name || matchedSku.name) : item.description}
+                                                                                </p>
+                                                                                {matchedSku && (
+                                                                                    <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase">
+                                                                                        {matchedSku.code}
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                            {matchedSku && matchedSku.name && matchedSku.name !== matchedSku.product?.name && (
+                                                                                <p className="text-[10px] text-slate-500 mt-0.5">{matchedSku.name}</p>
+                                                                            )}
+                                                                            <div className="flex items-center gap-3 mt-1.5 text-[10px] font-semibold text-slate-500">
+                                                                                <span>Qty: <strong className="text-slate-800">{item.qty} {item.unit}</strong></span>
+                                                                                <span>·</span>
+                                                                                <span>Biaya: <strong className="text-slate-800">{fmt(item.unitPrice || 0)}</strong></span>
+                                                                                <span>·</span>
+                                                                                <span>Total: <strong className="text-emerald-700">{fmt(item.amount || (item.qty * (item.unitPrice || 0)))}</strong></span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )
+                                                            })
+                                                        )}
+                                                    </div>
+                                                </>
+                                            )
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-3 p-6 border-t border-slate-100 bg-slate-50/50">
+                                <Button type="button" variant="outline" onClick={() => setPoImportModalOpen(false)} className="flex-1 rounded-xl h-11 font-bold uppercase">Batal</Button>
+                                <Button
+                                    type="button"
+                                    disabled={!selectedPoId || Object.values(selectedPoItems).filter(Boolean).length === 0}
+                                    onClick={handleApplyPoItemsToBom}
+                                    className="flex-1 rounded-xl h-11 bg-amber-600 hover:bg-amber-700 text-white font-bold uppercase shadow-lg shadow-amber-600/20 disabled:opacity-50"
+                                >
+                                    Tambahkan ke BOM ({Object.values(selectedPoItems).filter(Boolean).length})
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Release Material Modal */}
+            <AnimatePresence>
+                {releaseModalOpen && viewing && (
+                    <div className="fixed inset-0 z-[300] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm text-slate-900">
+                        <motion.div
+                            initial={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }}
+                            animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1 }}
+                            exit={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95 }}
+                            className="bg-white rounded-t-[2.5rem] md:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                            
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-amber-100 bg-amber-50/50">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-600/20"><Package size={16} /></div>
+                                    <div>
+                                        <h2 className="font-extrabold text-slate-900 text-sm uppercase tracking-wider">Rilis Pengambilan Stock ke Gudang</h2>
+                                        <p className="text-[10px] text-amber-700 font-bold">{viewing.number}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setReleaseModalOpen(false)}><X size={20} className="text-slate-400 hover:text-slate-700" /></button>
+                            </div>
+
+                            <div className="p-6 space-y-4 overflow-y-auto">
+                                <div>
+                                    <label className={lc}>Pilih Gudang Asal Material <span className="text-rose-500">*</span></label>
+                                    <select required value={releaseWarehouse} onChange={e => setReleaseWarehouse(e.target.value)} className={ic}>
+                                        <option value="">— Pilih Gudang —</option>
+                                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className={lc}>Daftar Material yang Akan Dirilis:</label>
+                                    <div className="bg-slate-50 rounded-2xl border border-slate-100 p-3 max-h-48 overflow-y-auto divide-y divide-slate-100 text-xs">
+                                        {viewing.items.filter(i => i.type === 'MATERIAL' && (i.source === 'STOCK' || !i.source) && !i.isReleased && i.skuId).map((it, idx) => (
+                                            <div key={idx} className="py-2 flex items-center justify-between gap-2">
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-slate-800 truncate">{it.description}</p>
+                                                    <p className="text-[10px] text-slate-400">{it.sku?.code || ''}</p>
+                                                </div>
+                                                <span className="text-xs font-black text-amber-700 whitespace-nowrap">{it.qty} {it.unit}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 p-6 pt-3 border-t border-slate-100">
+                                <Button type="button" variant="outline" onClick={() => setReleaseModalOpen(false)} className="flex-1 rounded-xl h-11 font-bold uppercase">Batal</Button>
+                                <Button
+                                    type="button"
+                                    disabled={releasing || !releaseWarehouse}
+                                    onClick={async () => {
+                                        await handleReleaseMaterials(viewing.id)
+                                        setReleaseModalOpen(false)
+                                        await openDetail(viewing)
+                                    }}
+                                    className="flex-1 rounded-xl h-11 bg-amber-600 hover:bg-amber-700 text-white font-bold uppercase shadow-lg shadow-amber-600/20 disabled:opacity-50"
+                                >
+                                    {releasing ? 'Memproses...' : 'Konfirmasi Rilis'}
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
             {/* PDF Modal */}
             <AnimatePresence>
                 {pdfOpen && viewing && (
@@ -1308,13 +1780,16 @@ export default function WorkOrdersPage() {
     )
 }
 
-function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function Section({ title, icon, extra, children }: { title: string; icon: React.ReactNode; extra?: React.ReactNode; children: React.ReactNode }) {
     return (
         <div className="space-y-4">
-            <div className="flex items-center gap-2">
-                {icon}
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-700">{title}</h3>
-                <div className="flex-1 h-px bg-slate-100" />
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {icon}
+                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-700 truncate">{title}</h3>
+                    <div className="flex-1 h-px bg-slate-100 hidden sm:block" />
+                </div>
+                {extra}
             </div>
             {children}
         </div>
@@ -1330,3 +1805,4 @@ function InfoBlock({ label, value, icon }: { label: string; value?: string | nul
         </div>
     )
 }
+

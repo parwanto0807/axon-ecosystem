@@ -2563,7 +2563,14 @@ const WO_INCLUDE = {
   tasks: { orderBy: { sortOrder: 'asc' } },
   stockMovements: { include: { items: true }, orderBy: { createdAt: 'desc' } },
   surveyExpenses: { orderBy: { createdAt: 'desc' } },
-  reports: { include: { photos: true, task: { select: { id: true, title: true } } }, orderBy: { date: 'desc' } }
+  reports: { include: { photos: true, task: { select: { id: true, title: true } } }, orderBy: { date: 'desc' } },
+  purchaseOrders: {
+    include: {
+      vendor: true,
+      items: true
+    },
+    orderBy: { date: 'desc' }
+  }
 };
 
 app.get('/api/work-orders', async (req, res) => {
@@ -4048,6 +4055,7 @@ async function getAccountTypeBalance(types, endDate, startDate = null) {
     by: ['coaId'],
     where: {
       journalEntry: {
+        status: 'POSTED',
         date: {
           lte: endDate,
           ...(startDate && { gte: startDate })
@@ -4996,7 +5004,7 @@ app.get('/api/purchase-orders/:id/receivable-items', async (req, res) => {
     const { id } = req.params;
     const po = await prisma.purchaseOrder.findUnique({
       where: { id },
-      include: { items: true }
+      include: { items: { orderBy: { no: 'asc' } } }
     });
 
     if (!po) return res.status(404).json({ message: 'Purchase Order not found' });
@@ -5008,7 +5016,15 @@ app.get('/api/purchase-orders/:id/receivable-items', async (req, res) => {
         type: 'IN',
         status: 'CONFIRMED'
       },
-      include: { items: true }
+      include: {
+        items: {
+          include: {
+            sku: {
+              include: { product: true }
+            }
+          }
+        }
+      }
     });
 
     // 2. Get all existing Bills for this PO (PurchaseInvoice)
@@ -5020,32 +5036,69 @@ app.get('/api/purchase-orders/:id/receivable-items', async (req, res) => {
       include: { items: true }
     });
 
-    // 3. Aggregate Received Qty
-    const receivedQtyMap = {}; // description -> qty
+    // 3. Load SKUs for rich lookup
+    const allSkus = await prisma.productSKU.findMany({
+      include: { product: true }
+    });
+
+    const skuByCode = new Map();
+    const skuById = new Map();
+    allSkus.forEach(s => {
+      if (s.code) skuByCode.set(s.code.trim().toLowerCase(), s);
+      skuById.set(s.id, s);
+    });
+
+    // 4. Calculate total received per unique SKU/Item key from Stock In movements
+    const receivedPool = {};
     movements.forEach(m => {
       m.items.forEach(it => {
-        // Stock In automation logic puts PO item description into notes
-        const key = it.notes || ''; 
-        receivedQtyMap[key] = (receivedQtyMap[key] || 0) + it.qty;
+        const key = (it.sku?.code || it.skuId || it.notes || '').trim().toLowerCase();
+        if (key) {
+          receivedPool[key] = (receivedPool[key] || 0) + it.qty;
+        }
       });
     });
 
-    // 4. Aggregate Billed Qty
-    const billedQtyMap = {};
+    // 5. Calculate total billed per unique key
+    const billedPool = {};
     invoices.forEach(inv => {
       inv.items.forEach(it => {
-        billedQtyMap[it.description] = (billedQtyMap[it.description] || 0) + it.qty;
+        const key = (it.description || '').trim().toLowerCase();
+        if (key) {
+          billedPool[key] = (billedPool[key] || 0) + it.qty;
+        }
       });
     });
 
-    // 5. Match with PO items
+    // 6. Match and allocate FIFO to PO items
+    const poolBalance = { ...receivedPool };
+    const billedBalance = { ...billedPool };
+
     const receivableItems = po.items.map(poItem => {
-      const qtyReceived = receivedQtyMap[poItem.description] || 0;
-      const qtyBilled = billedQtyMap[poItem.description] || 0;
+      const desc = (poItem.description || '').trim().toLowerCase();
+      const matchedSku = skuByCode.get(desc);
+      const key = (matchedSku?.code || desc).toLowerCase();
+
+      let qtyReceived = 0;
+      if (movements.length === 0) {
+        // If no stock movements exist for this PO (e.g. Service/Jasa PO or direct billing),
+        // default received to PO item qty so it can be billed directly.
+        qtyReceived = poItem.qty;
+      } else {
+        const avail = poolBalance[key] || 0;
+        qtyReceived = Math.min(poItem.qty, avail);
+        poolBalance[key] = Math.max(0, avail - qtyReceived);
+      }
+
+      const bAvail = billedBalance[key] || 0;
+      const qtyBilled = Math.min(qtyReceived, bAvail);
+      billedBalance[key] = Math.max(0, bAvail - qtyBilled);
+
       const remainingQty = Math.max(0, qtyReceived - qtyBilled);
 
       return {
         ...poItem,
+        productName: matchedSku?.product?.name || null,
         qtyReceived,
         qtyBilled,
         remainingQty
@@ -5428,7 +5481,7 @@ app.patch('/api/purchase-invoices/:id/post', async (req, res) => {
       // 4. Update Invoice Status
       const updatedInvoice = await tx.purchaseInvoice.update({
         where: { id: invoiceId },
-        data: { status: 'POSTED' },
+        data: { status: invoice.paymentType === 'CASH' ? 'PAID' : 'POSTED' },
         include: { vendor: true, items: true }
       });
 

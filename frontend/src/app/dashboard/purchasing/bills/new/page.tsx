@@ -57,26 +57,34 @@ function NewVendorBillForm() {
         const fetchReceivableItems = async () => {
             setLoading(true)
             try {
-                const selectedPo = pos.find(p => p.id === billData.purchaseOrderId)
-                if (!selectedPo) return
+                let selectedPo = pos.find(p => p.id === billData.purchaseOrderId)
+                if (!selectedPo) {
+                    const poRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${billData.purchaseOrderId}`)
+                    if (poRes.ok) {
+                        selectedPo = await poRes.json()
+                    }
+                }
 
                 // 1. Set basic info from PO
-                setBillData(prev => ({
-                    ...prev,
-                    vendorId: selectedPo.vendorId,
-                    tax: selectedPo.tax,
-                    paymentType: selectedPo.paymentType || 'CREDIT'
-                }))
+                if (selectedPo) {
+                    setBillData(prev => ({
+                        ...prev,
+                        vendorId: selectedPo.vendorId || prev.vendorId,
+                        tax: selectedPo.tax !== undefined ? selectedPo.tax : prev.tax,
+                        paymentType: selectedPo.paymentType || 'CREDIT'
+                    }))
+                }
 
                 // 2. Fetch specific received items from backend
                 const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${billData.purchaseOrderId}/receivable-items`)
                 const receivableItems = await res.json()
 
                 if (Array.isArray(receivableItems) && receivableItems.length > 0) {
+                    setError(null)
                     setItems(receivableItems.map((i: any) => ({
                         id: i.id || Date.now().toString() + Math.random(),
                         no: i.no,
-                        description: i.description,
+                        description: i.productName ? `${i.description} - ${i.productName}` : i.description,
                         qty: i.remainingQty, // Use the calculated remaining receivable qty
                         unit: i.unit,
                         unitPrice: i.unitPrice,
