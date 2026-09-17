@@ -5255,7 +5255,7 @@ app.patch('/api/purchase-orders/:id/status', async (req, res) => {
                   return {
                     skuId: sku ? sku.id : 'unknown', // Fallback if SKU not found
                     qty: item.qty,
-                    unitCost: item.unitPrice,
+                    unitCost: item.discount ? item.unitPrice * (1 - (item.discount / 100)) : item.unitPrice,
                     notes: item.description
                   };
                 }).filter(i => i.skuId !== 'unknown') // Only sync valid skus
@@ -5411,8 +5411,32 @@ app.patch('/api/purchase-invoices/:id/post', async (req, res) => {
       const unbilledAcc = await tx.systemAccount.findUnique({ where: { key: 'UNBILLED_RECEIPT' }, include: { coa: true } });
       const staffAdvAcc = await tx.systemAccount.findUnique({ where: { key: 'STAFF_ADVANCE' }, include: { coa: true } });
       const cashAcc = await tx.systemAccount.findUnique({ where: { key: 'CASH' }, include: { coa: true } });
+      const cogsAcc = await tx.systemAccount.findUnique({ where: { key: 'COGS' }, include: { coa: true } })
+        || await tx.systemAccount.findUnique({ where: { key: 'PURCHASE_EXPENSE' }, include: { coa: true } });
 
       if (!apAcc || !unbilledAcc) throw new Error('Required System Accounts (ACCOUNTS_PAYABLE or UNBILLED_RECEIPT) not mapped');
+
+      // Check if PO has confirmed Stock In movements
+      let hasStockIn = false;
+      if (invoice.purchaseOrderId) {
+        const po = await tx.purchaseOrder.findUnique({ where: { id: invoice.purchaseOrderId } });
+        if (po) {
+          const mCount = await tx.stockMovement.count({
+            where: {
+              referenceNumber: po.number,
+              type: 'IN',
+              status: 'CONFIRMED'
+            }
+          });
+          hasStockIn = mCount > 0;
+        }
+      }
+
+      // Determine debit account: If Stock In exists, clear Unbilled Receipt. Otherwise, charge directly to COGS / Expense
+      const debitCoaId = hasStockIn ? unbilledAcc.coaId : (cogsAcc?.coaId || unbilledAcc.coaId);
+      const debitDesc = hasStockIn 
+        ? `Menghapus Akrual Stock IN untuk Bill ${invoice.number}`
+        : `Beban Pengadaan / Jasa: ${invoice.number} (${invoice.vendor.name})`;
 
       let journalItems = [];
 
@@ -5421,10 +5445,10 @@ app.patch('/api/purchase-invoices/:id/post', async (req, res) => {
         
         journalItems = [
           {
-            coaId: unbilledAcc.coaId,
+            coaId: debitCoaId,
             debit: invoice.grandTotal,
             credit: 0,
-            description: 'Menghapus Akrual Stock IN'
+            description: debitDesc
           },
           {
             coaId: apAcc.coaId,
@@ -5449,10 +5473,10 @@ app.patch('/api/purchase-invoices/:id/post', async (req, res) => {
         // Standard Credit Bill
         journalItems = [
           {
-            coaId: unbilledAcc.coaId,
+            coaId: debitCoaId,
             debit: invoice.grandTotal,
             credit: 0,
-            description: `Menghapus Akrual Stock IN untuk Bill ${invoice.number}`
+            description: debitDesc
           },
           {
             coaId: apAcc.coaId,
