@@ -429,13 +429,25 @@ router.get('/tickets', async (req, res) => {
     if (picId) where.picId = String(picId);
     if (assignedTo) where.assignedTo = String(assignedTo);
     if (ticketType) where.ticketType = String(ticketType);
-    if (search) where.summary = { contains: String(search), mode: 'insensitive' };
+    if (search) {
+      const q = String(search).trim();
+      where.OR = [
+        { ticketNumber: { contains: q, mode: 'insensitive' } },
+        { summary: { contains: q, mode: 'insensitive' } },
+        { reporterName: { contains: q, mode: 'insensitive' } },
+        { location: { name: { contains: q, mode: 'insensitive' } } },
+        { asset: { assetCode: { contains: q, mode: 'insensitive' } } },
+        { asset: { name: { contains: q, mode: 'insensitive' } } },
+        { pic: { name: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
     if (from || to) {
       where.createdAt = {};
       if (from) where.createdAt.gte = new Date(String(from));
       if (to) where.createdAt.lte = new Date(String(to));
     }
     if (pending === 'true') where.status = 'PENDING';
+    const limitNum = req.query.limit ? Math.min(Math.max(1, Number(req.query.limit)), 2000) : 1000;
     // sla filter: breach?
     const tickets = await prisma.itOslTicket.findMany({
       where,
@@ -452,7 +464,7 @@ router.get('/tickets', async (req, res) => {
         _count: { select: { notes: true } },
       },
       orderBy: [{ createdAt: 'desc' }],
-      take: 200,
+      take: limitNum,
     });
     // enrich with SLA + duplicate hint
     const enriched = tickets.map(t => {
@@ -719,6 +731,32 @@ router.put('/tickets/:id', async (req, res) => {
     await auditLog({ entityType: 'TICKET', entityId: t.id, action: 'UPDATE', newValue: JSON.stringify(data), actorUserId: req.body.actorUserId || null, ticketId: t.id, req });
     res.json(updated);
   } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+// Delete ticket (admin only)
+router.delete('/tickets/:id', async (req, res) => {
+  if(!requireAdmin(req,res)) return
+  try{
+    await prisma.itOslTicket.delete({ where:{ id: req.params.id }})
+    await prisma.itOslAuditLog.create({ data:{ entityType:'TICKET', entityId:req.params.id, action:'DELETE', actorUserId: req.headers['x-user-id'] || null }})
+    res.json({ ok:true })
+  }catch(e){ res.status(400).json({ message:e.message })}
+});
+// Bulk delete (admin) — body {ids: string[]} or ?all=true for trial wipe
+router.post('/tickets/bulk-delete', async (req,res)=>{
+  if(!requireAdmin(req,res)) return
+  try{
+    const { ids, all } = req.body || {}
+    let count=0
+    if(all){
+      const del = await prisma.itOslTicket.deleteMany({})
+      count = del.count
+    } else if(Array.isArray(ids) && ids.length){
+      const del = await prisma.itOslTicket.deleteMany({ where:{ id:{ in: ids }}})
+      count = del.count
+    } else return res.status(400).json({ message:'ids[] atau all=true wajib' })
+    res.json({ ok:true, count })
+  }catch(e){ res.status(400).json({ message:e.message })}
 });
 
 // Parts

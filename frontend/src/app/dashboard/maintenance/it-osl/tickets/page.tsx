@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Plus, Search, Clock3, AlertTriangle, Wrench, History, X, Loader2, ImagePlus, Trash2, Check, Package, User, MessageSquare, Phone, Users } from "lucide-react"
+import { 
+  Plus, Search, Clock3, AlertTriangle, Wrench, History, X, Loader2, 
+  ImagePlus, Trash2, Check, Package, User, MessageSquare, Users, 
+  LayoutGrid, LayoutList, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, 
+  ArrowUpDown, RotateCcw, Copy, Download, MapPin, CheckSquare, Square, Filter, Tag,
+  SlidersHorizontal, ChevronDown, Sparkles
+} from "lucide-react"
 import { useSession } from "next-auth/react"
 
 const API = process.env.NEXT_PUBLIC_API_URL
@@ -88,20 +94,53 @@ export default function ItOslTicketsPage() {
   const currentUserName = session?.user?.name || null
   const currentRole = (session?.user as { role?:string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
-  const [tickets, setTickets] = useState<Ticket[]>([])
+  
+  // Data Sources
+  const [allTickets, setAllTickets] = useState<Ticket[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [assets, setAssets] = useState<AssetOpt[]>([])
   const [pics, setPics] = useState<PicOpt[]>([])
   const [users, setUsers] = useState<UserOpt[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Filters
   const [q, setQ] = useState("")
-  const [status, setStatus] = useState<string>("")
-  const [severity, setSeverity] = useState<string>("")
-  const [picFilter, setPicFilter] = useState<string>("")
+  const [filterStatus, setFilterStatus] = useState<string>("")
+  const [filterSeverity, setFilterSeverity] = useState<string>("")
+  const [filterLocation, setFilterLocation] = useState<string>("")
+  const [filterCategory, setFilterCategory] = useState<string>("")
+  const [filterPic, setFilterPic] = useState<string>("")
+  const [filterAssignee, setFilterAssignee] = useState<string>("")
+  const [filterType, setFilterType] = useState<string>("")
+  const [filterBreachOnly, setFilterBreachOnly] = useState<boolean>(false)
+  const [showMobileFilters, setShowMobileFilters] = useState<boolean>(false)
+
+  // View & Pagination
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table")
+  const [pageSize, setPageSize] = useState<number>(25)
+  const [currentPage, setCurrentPage] = useState<number>(1)
+
+  // Sorting
+  const [sortBy, setSortBy] = useState<string>("createdAt")
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+
+  // Multi-Selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
+
+  // Quick-Log Modal
   const [showQuick, setShowQuick] = useState(false)
-  const [quick, setQuick] = useState({ summary: "", locationId: "", categoryId: "", severity: "MEDIUM" as string, ticketType: "INCIDENT" as string, assetId: "", picId: "", assignedTo: "", reporterName: "", reportChannel: "" })
+  const [quick, setQuick] = useState({ 
+    summary: "", locationId: "", categoryId: "", severity: "MEDIUM" as string, 
+    ticketType: "INCIDENT" as string, assetId: "", picId: "", assignedTo: "", 
+    reporterName: "", reportChannel: "" 
+  })
   const [saving, setSaving] = useState(false)
+  const [assetQuery, setAssetQuery] = useState("")
+  const [showAssetPicker, setShowAssetPicker] = useState(false)
+
+  // Detail Drawer & Work-Items
   const [detailId, setDetailId] = useState<string | null>(null)
   const [detail, setDetail] = useState<TicketDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
@@ -111,34 +150,42 @@ export default function ItOslTicketsPage() {
   const [newFiles, setNewFiles] = useState<FileList | null>(null)
   const [adding, setAdding] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const [assetQuery, setAssetQuery] = useState("")
-  const [showAssetPicker, setShowAssetPicker] = useState(false)
 
+  // Load all initial datasets
   const load = async () => {
     setLoading(true)
     try {
       const [tRes, lRes, cRes, aRes, pRes, uRes] = await Promise.all([
-        fetch(`${API}/api/it-osl/tickets?${new URLSearchParams({ ...(q ? { search: q } : {}), ...(status ? { status } : {}), ...(severity ? { severity } : {}), ...(picFilter ? { picId: picFilter } : {}) }).toString()}`),
+        fetch(`${API}/api/it-osl/tickets?limit=1500`),
         fetch(`${API}/api/it-osl/locations`),
         fetch(`${API}/api/it-osl/categories`),
         fetch(`${API}/api/it-osl/assets`),
         fetch(`${API}/api/it-osl/pics`),
         fetch(`${API}/api/users`, { headers: { "x-user-role":"SUPER_ADMIN" } }).then(r=> r.ok? r.json().then((j: unknown)=> Array.isArray(j)? j : (j as { users?: UserOpt[] })?.users || []): []).catch(()=>[]),
       ])
-      if (tRes.ok) setTickets(await tRes.json())
+      if (tRes.ok) {
+        const data = await tRes.json()
+        setAllTickets(Array.isArray(data) ? data : [])
+      }
       if (lRes.ok) setLocations(await lRes.json())
       if (cRes.ok) setCategories(await cRes.json())
       if (aRes.ok) setAssets(await aRes.json())
       if (pRes.ok) setPics(await pRes.json())
       if (Array.isArray(uRes) && uRes.length) setUsers(uRes as UserOpt[])
-    } catch {}
-    setLoading(false)
+    } catch (e) {
+      console.error("Failed to load tickets data:", e)
+    } finally {
+      setLoading(false)
+    }
   }
-  useEffect(() => { load() }, [q, status, severity, picFilter])
+
+  useEffect(() => { load() }, [])
   
-  // prefill reporter & assignee from session
+  // prefill reporter & assignee in Quick-Log from session
   useEffect(()=>{
-    if(showQuick && currentUserName && !quick.reporterName) setQuick(q=> ({...q, reporterName: currentUserName || "", assignedTo: currentUserId || q.assignedTo }))
+    if(showQuick && currentUserName && !quick.reporterName) {
+      setQuick(q=> ({...q, reporterName: currentUserName || "", assignedTo: currentUserId || q.assignedTo }))
+    }
   },[showQuick, currentUserName, currentUserId])
 
   const loadDetail = async (id:string) => {
@@ -168,6 +215,292 @@ export default function ItOslTicketsPage() {
 
   const quickAsset = useMemo(()=> assets.find(a=> a.id===quick.assetId) || null,[assets, quick.assetId])
 
+  // --- Filtering & Sorting on large dataset ---
+  const filteredTickets = useMemo(() => {
+    let result = [...allTickets]
+
+    // Search query across fields
+    if (q.trim()) {
+      const term = q.trim().toLowerCase()
+      result = result.filter(t => 
+        (t.ticketNumber && t.ticketNumber.toLowerCase().includes(term)) ||
+        (t.summary && t.summary.toLowerCase().includes(term)) ||
+        (t.reporterName && t.reporterName.toLowerCase().includes(term)) ||
+        (t.location?.name && t.location.name.toLowerCase().includes(term)) ||
+        (t.category?.name && t.category.name.toLowerCase().includes(term)) ||
+        (t.category?.groupName && t.category.groupName.toLowerCase().includes(term)) ||
+        (t.asset?.name && t.asset.name.toLowerCase().includes(term)) ||
+        (t.asset?.assetCode && t.asset.assetCode.toLowerCase().includes(term)) ||
+        (t.pic?.name && t.pic.name.toLowerCase().includes(term)) ||
+        (t.assignedUser?.name && t.assignedUser.name.toLowerCase().includes(term))
+      )
+    }
+
+    // Status filter
+    if (filterStatus) {
+      if (filterStatus === "RESOLVED_ALL") {
+        result = result.filter(t => t.status === "RESOLVED" || t.status === "CLOSED")
+      } else {
+        result = result.filter(t => t.status === filterStatus)
+      }
+    }
+
+    // Severity filter
+    if (filterSeverity) {
+      result = result.filter(t => t.severity === filterSeverity)
+    }
+
+    // Location filter
+    if (filterLocation) {
+      result = result.filter(t => t.location?.id === filterLocation)
+    }
+
+    // Category filter
+    if (filterCategory) {
+      result = result.filter(t => t.category?.id === filterCategory || t.category?.groupName === filterCategory)
+    }
+
+    // PIC Unit filter
+    if (filterPic) {
+      result = result.filter(t => t.picId === filterPic)
+    }
+
+    // Assignee filter
+    if (filterAssignee) {
+      result = result.filter(t => t.assignedTo === filterAssignee)
+    }
+
+    // Type filter
+    if (filterType) {
+      result = result.filter(t => t.ticketType === filterType)
+    }
+
+    // Breach only filter
+    if (filterBreachOnly) {
+      result = result.filter(t => t.slaStatus === "BREACH")
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      let valA: string | number = ""
+      let valB: string | number = ""
+
+      if (sortBy === "createdAt") {
+        valA = new Date(a.createdAt).getTime()
+        valB = new Date(b.createdAt).getTime()
+      } else if (sortBy === "ticketNumber") {
+        valA = a.ticketNumber || ""
+        valB = b.ticketNumber || ""
+      } else if (sortBy === "severity") {
+        const order: Record<string, number> = { CRITICAL: 3, MEDIUM: 2, LOW: 1 }
+        valA = order[a.severity] || 0
+        valB = order[b.severity] || 0
+      } else if (sortBy === "status") {
+        valA = a.status || ""
+        valB = b.status || ""
+      } else if (sortBy === "location") {
+        valA = a.location?.name || ""
+        valB = b.location?.name || ""
+      }
+
+      if (valA < valB) return sortDir === "asc" ? -1 : 1
+      if (valA > valB) return sortDir === "asc" ? 1 : -1
+      return 0
+    })
+
+    return result
+  }, [allTickets, q, filterStatus, filterSeverity, filterLocation, filterCategory, filterPic, filterAssignee, filterType, filterBreachOnly, sortBy, sortDir])
+
+  // KPI Metrics calculation
+  const metrics = useMemo(() => {
+    const total = allTickets.length
+    const countNew = allTickets.filter(t => t.status === "NEW").length
+    const countProgress = allTickets.filter(t => t.status === "IN_PROGRESS").length
+    const countPending = allTickets.filter(t => t.status === "PENDING").length
+    const countResolved = allTickets.filter(t => t.status === "RESOLVED" || t.status === "CLOSED").length
+    const countBreach = allTickets.filter(t => t.slaStatus === "BREACH").length
+    return { total, countNew, countProgress, countPending, countResolved, countBreach }
+  }, [allTickets])
+
+  // Pagination calculation
+  const totalPages = Math.ceil(filteredTickets.length / pageSize) || 1
+  const paginatedTickets = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredTickets.slice(start, start + pageSize)
+  }, [filteredTickets, currentPage, pageSize])
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [q, filterStatus, filterSeverity, filterLocation, filterCategory, filterPic, filterAssignee, filterType, filterBreachOnly, pageSize])
+
+  const handleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortDir(prev => prev === "asc" ? "desc" : "asc")
+    } else {
+      setSortBy(field)
+      setSortDir("desc")
+    }
+  }
+
+  // Multi-selection handlers
+  const handleSelectAllOnPage = () => {
+    const allOnPageIds = paginatedTickets.map(t => t.id)
+    const isAllSelected = allOnPageIds.every(id => selectedIds.has(id))
+    const next = new Set(selectedIds)
+    if (isAllSelected) {
+      allOnPageIds.forEach(id => next.delete(id))
+    } else {
+      allOnPageIds.forEach(id => next.add(id))
+    }
+    setSelectedIds(next)
+  }
+
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedCode(text)
+    setTimeout(() => setCopiedCode(null), 1800)
+  }
+
+  // Export CSV of filtered tickets
+  const handleExportCSV = (dataToExport: Ticket[] = filteredTickets) => {
+    if (dataToExport.length === 0) return alert("Tidak ada data tiket untuk diunduh.")
+    
+    const headers = [
+      "Nomor Tiket", "Uraian Masalah", "Tipe Tiket", "Tingkat Severity", 
+      "Status", "SLA Status", "FRT (Menit)", "Unit Lokasi", "Kategori Masalah", 
+      "Grup Kategori", "Kode Aset", "Nama Aset", "PIC Unit", "Telepon PIC", 
+      "Pelapor", "Teknisi IT", "Waktu Dibuat", "Waktu Direspon"
+    ]
+
+    const rows = dataToExport.map(t => [
+      `"${t.ticketNumber || ""}"`,
+      `"${(t.summary || "").replace(/"/g, '""')}"`,
+      `"${t.ticketType || ""}"`,
+      `"${t.severity || ""}"`,
+      `"${t.status || ""}"`,
+      `"${t.slaStatus || ""}"`,
+      `"${t.frtMinutes != null ? t.frtMinutes : ""}"`,
+      `"${t.location?.name || ""}"`,
+      `"${t.category?.name || ""}"`,
+      `"${t.category?.groupName || ""}"`,
+      `"${t.asset?.assetCode || ""}"`,
+      `"${(t.asset?.name || "").replace(/"/g, '""')}"`,
+      `"${t.pic?.name || ""}"`,
+      `"${t.pic?.phone || ""}"`,
+      `"${t.reporterName || ""}"`,
+      `"${t.assignedUser?.name || t.assignedUser?.email || ""}"`,
+      `"${t.createdAt ? new Date(t.createdAt).toLocaleString('id-ID') : ""}"`,
+      `"${t.acknowledgedAt ? new Date(t.acknowledgedAt).toLocaleString('id-ID') : ""}"`,
+    ])
+
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n")
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", `Data_Tiket_IT_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // Batch Status Transition
+  const handleBatchStatus = async (toStatus: string) => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Ubah ${selectedIds.size} tiket terpilih menjadi status ${toStatus}?`)) return
+    
+    setLoading(true)
+    try {
+      for (const id of Array.from(selectedIds)) {
+        await fetch(`${API}/api/it-osl/tickets/${id}/status`, {
+          method: "PATCH",
+          headers: { 
+            "Content-Type": "application/json", 
+            "x-user-role": currentRole || "ADMIN", 
+            "x-user-id": currentUserId || "" 
+          },
+          body: JSON.stringify({ to: toStatus, actorUserId: currentUserId || "system" })
+        })
+      }
+      setSelectedIds(new Set())
+      await load()
+    } catch (e) {
+      alert("Sebagian status gagal diperbarui.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Single Ticket Actions
+  const changeStatus = async (id: string, to: string) => {
+    const body: Record<string, unknown> = { to, actorUserId: currentUserId || "system" }
+    if (to === "PENDING") {
+      const reason = prompt("Alasan Tertahan: Menunggu sparepart / approval / vendor / jendela maintenance / konfirmasi user / Lainnya")
+      if (!reason) return
+      const exp = prompt("Estimasi tindak lanjut (YYYY-MM-DD HH:mm) — harus > sekarang, contoh 2026-09-20 09:00")
+      if (!exp) return
+      body.reason = reason
+      body.expectedResumeAt = exp.replace(" ", "T")
+    }
+    if (to === "RESOLVED") {
+      const rc = prompt("Akar Masalah (min 15 karakter)")
+      const ca = prompt("Tindakan Perbaikan (min 15 karakter)")
+      if (!rc || !ca) return
+      body.rootCause = rc
+      body.correctiveAction = ca
+      body.solutionCategory = "Perbaikan"
+      body.assetCondition = "NORMAL"
+    }
+    const res = await fetch(`${API}/api/it-osl/tickets/${id}/status`, { 
+      method: "PATCH", 
+      headers: { "Content-Type": "application/json", "x-user-role": "SUPER_ADMIN", "x-user-id": currentUserId || "" }, 
+      body: JSON.stringify(body) 
+    })
+    const d = await res.json()
+    if (!res.ok) alert(d.message)
+    else { load(); if(detailId===id) loadDetail(id) }
+  }
+
+  const connectAsset = async (ticketId:string, assetId:string) => {
+    const res = await fetch(`${API}/api/it-osl/tickets/${ticketId}`, { 
+      method:"PUT", 
+      headers:{ "Content-Type":"application/json" }, 
+      body: JSON.stringify({ assetId: assetId || null, actorUserId: currentUserId }) 
+    })
+    const d = await res.json()
+    if(!res.ok) alert(d.message)
+    else { load(); if(detailId===ticketId) loadDetail(ticketId) }
+  }
+
+  const reassign = async (ticketId:string, userId:string) => {
+    const res = await fetch(`${API}/api/it-osl/tickets/${ticketId}/reassign`, { 
+      method:"POST", 
+      headers:{ "Content-Type":"application/json" }, 
+      body: JSON.stringify({ toUserId: userId || null, actorUserId: currentUserId }) 
+    })
+    const d = await res.json()
+    if(!res.ok) alert(d.message)
+    else { load(); if(detailId===ticketId) loadDetail(ticketId) }
+  }
+
+  const connectPic = async (ticketId:string, picId:string) => {
+    const res = await fetch(`${API}/api/it-osl/tickets/${ticketId}`, { 
+      method:"PUT", 
+      headers:{ "Content-Type":"application/json" }, 
+      body: JSON.stringify({ picId: picId || null, actorUserId: currentUserId }) 
+    })
+    const d = await res.json()
+    if(!res.ok) alert(d.message)
+    else { load(); if(detailId===ticketId) loadDetail(ticketId) }
+  }
+
   const submitQuick = async () => {
     if (quick.summary.trim().length < 5) return alert("Uraian minimal 5 karakter")
     if (!quick.locationId) return alert("Lokasi wajib")
@@ -183,6 +516,7 @@ export default function ItOslTicketsPage() {
         reportChannel: quick.reportChannel || "Tatap Muka",
         reporterName: quick.reporterName || undefined,
         assetId: quick.assetId || undefined,
+        picId: quick.picId || undefined,
         assignedTo: quick.assignedTo || undefined,
         createdBy: currentUserId || undefined,
       }
@@ -204,51 +538,7 @@ export default function ItOslTicketsPage() {
     } finally { setSaving(false) }
   }
 
-  const changeStatus = async (id: string, to: string) => {
-    const body: Record<string, unknown> = { to, actorUserId: currentUserId || "system" }
-    if (to === "PENDING") {
-      const reason = prompt("Alasan Tertahan: Menunggu sparepart / approval / vendor / jendela maintenance / konfirmasi user / Lainnya")
-      if (!reason) return
-      const exp = prompt("Estimasi tindak lanjut (YYYY-MM-DD HH:mm) — harus > sekarang, contoh 2026-09-20 09:00")
-      if (!exp) return
-      body.reason = reason
-      body.expectedResumeAt = exp.replace(" ", "T")
-    }
-    if (to === "RESOLVED") {
-      const rc = prompt("Akar Masalah (min 15 karakter)")
-      const ca = prompt("Tindakan Perbaikan (min 15 karakter)")
-      if (!rc || !ca) return
-      body.rootCause = rc
-      body.correctiveAction = ca
-      body.solutionCategory = "Perbaikan"
-      body.assetCondition = "NORMAL"
-    }
-    const res = await fetch(`${API}/api/it-osl/tickets/${id}/status`, { method: "PATCH", headers: { "Content-Type": "application/json", "x-user-role": "SUPER_ADMIN", "x-user-id": currentUserId || "" }, body: JSON.stringify(body) })
-    const d = await res.json()
-    if (!res.ok) alert(d.message)
-    else { load(); if(detailId===id) loadDetail(id) }
-  }
-
-  const connectAsset = async (ticketId:string, assetId:string) => {
-    const res = await fetch(`${API}/api/it-osl/tickets/${ticketId}`, { method:"PUT", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ assetId: assetId || null, actorUserId: currentUserId }) })
-    const d = await res.json()
-    if(!res.ok) alert(d.message)
-    else { load(); if(detailId===ticketId) loadDetail(ticketId) }
-  }
-  const reassign = async (ticketId:string, userId:string) => {
-    const res = await fetch(`${API}/api/it-osl/tickets/${ticketId}/reassign`, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ toUserId: userId || null, actorUserId: currentUserId }) })
-    const d = await res.json()
-    if(!res.ok) alert(d.message)
-    else { load(); if(detailId===ticketId) loadDetail(ticketId) }
-  }
-
-  const connectPic = async (ticketId:string, picId:string) => {
-    const res = await fetch(`${API}/api/it-osl/tickets/${ticketId}`, { method:"PUT", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ picId: picId || null, actorUserId: currentUserId }) })
-    const d = await res.json()
-    if(!res.ok) alert(d.message)
-    else { load(); if(detailId===ticketId) loadDetail(ticketId) }
-  }
-
+  // Work items functions
   const addWorkItem = async () => {
     if(!detailId) return
     if(!newDesc.trim() || newDesc.trim().length<5) return alert("Uraian item minimal 5 karakter — jelaskan pekerjaan yang dilakukan")
@@ -260,7 +550,6 @@ export default function ItOslTicketsPage() {
       })
       const item = await res.json()
       if(!res.ok) throw new Error(item.message)
-      // upload photos if any
       if(newFiles && newFiles.length>0){
         const fd = new FormData()
         Array.from(newFiles).forEach(f=> fd.append("photos", f))
@@ -300,14 +589,6 @@ export default function ItOslTicketsPage() {
     if(!res.ok){ const d=await res.json(); alert(d.message) } else loadDetail(detailId)
   }
 
-  const tabs: { id: string; label: string }[] = [
-    { id: "", label: "Semua" },
-    { id: "NEW", label: "NEW" },
-    { id: "IN_PROGRESS", label: "Aktif" },
-    { id: "PENDING", label: "Tertahan" },
-    { id: "RESOLVED", label: "Selesai" },
-  ]
-
   const phaseCounts = useMemo(()=>{
     if(!detail) return { ANALISA:0, PENGERJAAN:0, HASIL:0 }
     const c = { ANALISA:0, PENGERJAAN:0, HASIL:0 } as Record<string,number>
@@ -315,303 +596,999 @@ export default function ItOslTicketsPage() {
     return c
   },[detail])
 
+  // Count active filters
+  const activeFilterCount = useMemo(() => {
+    let cnt = 0
+    if (q) cnt++
+    if (filterStatus) cnt++
+    if (filterSeverity) cnt++
+    if (filterLocation) cnt++
+    if (filterCategory) cnt++
+    if (filterPic) cnt++
+    if (filterAssignee) cnt++
+    if (filterType) cnt++
+    if (filterBreachOnly) cnt++
+    return cnt
+  }, [q, filterStatus, filterSeverity, filterLocation, filterCategory, filterPic, filterAssignee, filterType, filterBreachOnly])
+
+  const resetFilters = () => {
+    setQ("")
+    setFilterStatus("")
+    setFilterSeverity("")
+    setFilterLocation("")
+    setFilterCategory("")
+    setFilterPic("")
+    setFilterAssignee("")
+    setFilterType("")
+    setFilterBreachOnly(false)
+  }
+
   return (
-    <div className="w-full max-w-full px-3 sm:px-4 md:px-6 lg:px-8 py-3.5 sm:py-6 space-y-3.5 sm:space-y-4 pb-28 md:pb-6 overflow-hidden">
-      {/* Header */}
-      <header className="flex items-center justify-between gap-3 w-full">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 shadow-sm shadow-indigo-600/30">
-            <Wrench size={18} className="text-white" />
+    <div className="w-full max-w-full px-2.5 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-6 space-y-3 sm:space-y-4 pb-28 md:pb-8 overflow-x-hidden">
+      
+      {/* ── HEADER ──────────────────────────────────────────────────────── */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 w-full">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/30 text-white">
+            <Wrench size={18} className="sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-base sm:text-xl font-black text-slate-900 truncate tracking-tight">Tiket & Quick-Log</h1>
-            <p className="text-[10px] sm:text-xs text-slate-500 truncate">Target ≤20 detik • scan QR isi lokasi+aset</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-2xl font-black text-slate-900 tracking-tight truncate">Tiket & Quick-Log</h1>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-200/80 text-indigo-700 text-[10px] font-mono font-black shrink-0">
+                {filteredTickets.length} Tiket
+              </span>
+            </div>
+            <p className="text-[11px] sm:text-xs text-slate-500 truncate mt-0.5">SLA response time & logging terstruktur</p>
           </div>
         </div>
-        <button 
-          onClick={() => setShowQuick(true)} 
-          className="px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shrink-0 shadow-md shadow-indigo-600/25 transition"
-        >
-          <Plus size={15} strokeWidth={2.5} /> 
-          <span>Quick-Log</span>
-        </button>
+
+        {/* Action Buttons */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <button
+            onClick={() => handleExportCSV()}
+            title="Download CSV"
+            className="p-2 sm:px-3 sm:py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 bg-white shadow-sm"
+          >
+            <Download size={14} className="text-slate-500" />
+            <span className="hidden sm:inline">Export CSV</span>
+          </button>
+
+          <button
+            onClick={load}
+            title="Muat Ulang"
+            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition active:scale-95 bg-white shadow-sm"
+          >
+            <History size={15} />
+          </button>
+
+          <button 
+            onClick={() => setShowQuick(true)} 
+            className="flex-1 sm:flex-none px-3.5 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/30 transition"
+          >
+            <Plus size={16} strokeWidth={2.5} /> 
+            <span>Quick-Log</span>
+          </button>
+        </div>
       </header>
 
-      {/* Filter & Search Toolbar - 100% Mobile Friendly */}
-      <div className="w-full bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-2.5">
-        {/* Search */}
-        <div className="relative w-full">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input 
-            value={q} 
-            onChange={(e)=>setQ(e.target.value)} 
-            placeholder="Cari uraian / nomor tiket…" 
-            className="w-full pl-10 pr-9 py-2.5 sm:py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" 
-          />
-          {q && (
-            <button 
-              onClick={()=>setQ("")} 
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full"
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-        
-        {/* Filter Controls Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 w-full">
-          {/* Status Tabs with horizontal scrolling */}
-          <div className="w-full sm:w-auto overflow-x-auto no-scrollbar py-0.5">
-            <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-max">
-              {tabs.map((t)=>(
-                <button 
-                  key={t.id} 
-                  onClick={()=>setStatus(t.id)} 
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
-                    status===t.id ? "bg-white shadow-sm text-indigo-600 font-extrabold" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+      {/* ── KPI METRIC CARDS (INTERACTIVE 1-CLICK FILTERS) ────────────────── */}
+      {/* Scrollable on mobile with snap, grid on desktop */}
+      <div className="flex sm:grid sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 w-full overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1 snap-x">
+        {/* Total */}
+        <button
+          onClick={() => { setFilterStatus(""); setFilterBreachOnly(false); }}
+          className={`min-w-[105px] sm:min-w-0 p-2.5 sm:p-3 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between shrink-0 snap-start ${
+            !filterStatus && !filterBreachOnly 
+              ? "bg-slate-900 border-slate-900 text-white shadow-md shadow-slate-900/20" 
+              : "bg-white border-slate-100 hover:border-slate-200 text-slate-800 shadow-sm"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold opacity-70">Total</span>
+            <Tag size={12} className="opacity-50" />
           </div>
+          <p className="text-lg sm:text-2xl font-black mt-1.5 sm:mt-2 tracking-tight">{metrics.total}</p>
+        </button>
 
-          {/* Severity, PIC + Reload */}
-          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-            <select 
-              value={picFilter} 
-              onChange={(e)=>setPicFilter(e.target.value)} 
-              className="flex-1 sm:flex-none px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            >
-              <option value="">Semua PIC Unit</option>
-              {pics.map(p=> <option key={p.id} value={p.id}>{p.name} {p.department ? `(${p.department})` : ''}</option>)}
-            </select>
-
-            <select 
-              value={severity} 
-              onChange={(e)=>setSeverity(e.target.value)} 
-              className="flex-1 sm:flex-none px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            >
-              <option value="">Semua severity</option>
-              <option value="CRITICAL">Critical</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="LOW">Low</option>
-            </select>
-            
-            <button 
-              onClick={load} 
-              title="Muat ulang" 
-              className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 active:scale-95 transition shrink-0 flex items-center justify-center"
-            >
-              <History size={15} />
-            </button>
+        {/* NEW */}
+        <button
+          onClick={() => { setFilterStatus("NEW"); setFilterBreachOnly(false); }}
+          className={`min-w-[105px] sm:min-w-0 p-2.5 sm:p-3 rounded-2xl border text-left transition-all flex flex-col justify-between shrink-0 snap-start ${
+            filterStatus === "NEW" 
+              ? "bg-slate-800 border-slate-800 text-white shadow-md" 
+              : "bg-white border-slate-100 hover:border-slate-200 text-slate-800 shadow-sm"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold text-slate-500">Baru</span>
+            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-slate-400"></span>
           </div>
-        </div>
+          <p className="text-lg sm:text-2xl font-black mt-1.5 sm:mt-2 text-slate-900 tracking-tight">{metrics.countNew}</p>
+        </button>
+
+        {/* IN_PROGRESS */}
+        <button
+          onClick={() => { setFilterStatus("IN_PROGRESS"); setFilterBreachOnly(false); }}
+          className={`min-w-[115px] sm:min-w-0 p-2.5 sm:p-3 rounded-2xl border text-left transition-all flex flex-col justify-between shrink-0 snap-start ${
+            filterStatus === "IN_PROGRESS" 
+              ? "bg-sky-600 border-sky-600 text-white shadow-md shadow-sky-600/20" 
+              : "bg-white border-slate-100 hover:border-sky-200 text-slate-800 shadow-sm"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold text-sky-600">Dikerjakan</span>
+            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-sky-500 animate-pulse"></span>
+          </div>
+          <p className="text-lg sm:text-2xl font-black mt-1.5 sm:mt-2 text-sky-700 tracking-tight">{metrics.countProgress}</p>
+        </button>
+
+        {/* PENDING */}
+        <button
+          onClick={() => { setFilterStatus("PENDING"); setFilterBreachOnly(false); }}
+          className={`min-w-[105px] sm:min-w-0 p-2.5 sm:p-3 rounded-2xl border text-left transition-all flex flex-col justify-between shrink-0 snap-start ${
+            filterStatus === "PENDING" 
+              ? "bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-500/20" 
+              : "bg-white border-slate-100 hover:border-amber-200 text-slate-800 shadow-sm"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold text-amber-600">Tertahan</span>
+            <Clock3 size={12} className="text-amber-500" />
+          </div>
+          <p className="text-lg sm:text-2xl font-black mt-1.5 sm:mt-2 text-amber-700 tracking-tight">{metrics.countPending}</p>
+        </button>
+
+        {/* RESOLVED / CLOSED */}
+        <button
+          onClick={() => { setFilterStatus("RESOLVED_ALL"); setFilterBreachOnly(false); }}
+          className={`min-w-[105px] sm:min-w-0 p-2.5 sm:p-3 rounded-2xl border text-left transition-all flex flex-col justify-between shrink-0 snap-start ${
+            filterStatus === "RESOLVED_ALL" 
+              ? "bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-600/20" 
+              : "bg-white border-slate-100 hover:border-emerald-200 text-slate-800 shadow-sm"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold text-emerald-600">Selesai</span>
+            <Check size={12} className="text-emerald-500" />
+          </div>
+          <p className="text-lg sm:text-2xl font-black mt-1.5 sm:mt-2 text-emerald-700 tracking-tight">{metrics.countResolved}</p>
+        </button>
+
+        {/* SLA BREACH ALERT */}
+        <button
+          onClick={() => { setFilterBreachOnly(prev => !prev); setFilterStatus(""); }}
+          className={`min-w-[115px] sm:min-w-0 p-2.5 sm:p-3 rounded-2xl border text-left transition-all flex flex-col justify-between shrink-0 snap-start ${
+            filterBreachOnly 
+              ? "bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-600/30" 
+              : metrics.countBreach > 0 
+                ? "bg-rose-50/60 border-rose-200 text-rose-800 hover:bg-rose-50 shadow-sm" 
+                : "bg-white border-slate-100 text-slate-800 shadow-sm"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] sm:text-[10px] uppercase tracking-wider font-extrabold text-rose-600">SLA Breach</span>
+            <AlertTriangle size={12} className="text-rose-500" />
+          </div>
+          <p className="text-lg sm:text-2xl font-black mt-1.5 sm:mt-2 text-rose-600 tracking-tight">{metrics.countBreach}</p>
+        </button>
       </div>
 
-      {/* Ticket Grid */}
+      {/* ── ADVANCED SEARCH & FILTER CONTROLS ────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm space-y-2.5">
+        {/* Search Bar + Mobile Filter Toggle + Controls */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Cari nomor tiket, uraian, pelapor, lokasi, PIC..."
+              className="w-full pl-10 pr-9 py-2 sm:py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+            />
+            {q && (
+              <button
+                onClick={() => setQ("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          {/* Controls Group */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+            {/* Mobile Filter Toggle Button */}
+            <button
+              onClick={() => setShowMobileFilters(prev => !prev)}
+              className={`sm:hidden px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition active:scale-95 ${
+                showMobileFilters || activeFilterCount > 0
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                  : "bg-white border-slate-200 text-slate-700"
+              }`}
+            >
+              <SlidersHorizontal size={13} />
+              <span>Filter</span>
+              {activeFilterCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+
+            <div className="flex items-center gap-2">
+              {/* Page Size */}
+              <div className="flex items-center gap-1 text-xs text-slate-500">
+                <span className="hidden sm:inline">Baris:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="px-2 py-1.5 sm:px-2.5 sm:py-2 rounded-xl border border-slate-200 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              {/* View Switcher (Desktop only) */}
+              <div className="hidden md:flex items-center p-1 bg-slate-100 rounded-xl">
+                <button
+                  onClick={() => setViewMode("table")}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    viewMode === "table" ? "bg-white shadow-sm text-indigo-600" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  title="Tampilan Tabel"
+                >
+                  <LayoutList size={16} />
+                </button>
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    viewMode === "grid" ? "bg-white shadow-sm text-indigo-600" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                  title="Tampilan Kartu"
+                >
+                  <LayoutGrid size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Dropdowns Grid: Hidden on mobile unless toggled, always visible on sm+ */}
+        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-2 border-t border-slate-100 ${
+          showMobileFilters ? "block" : "hidden sm:grid"
+        }`}>
+          {/* Status Filter */}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700"
+          >
+            <option value="">Semua Status</option>
+            <option value="NEW">Baru (NEW)</option>
+            <option value="IN_PROGRESS">Sedang Dikerjakan</option>
+            <option value="PENDING">Tertahan (PENDING)</option>
+            <option value="RESOLVED">Selesai (RESOLVED)</option>
+            <option value="CLOSED">Ditutup (CLOSED)</option>
+          </select>
+
+          {/* Severity Filter */}
+          <select
+            value={filterSeverity}
+            onChange={(e) => setFilterSeverity(e.target.value)}
+            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700"
+          >
+            <option value="">Semua Severity</option>
+            <option value="CRITICAL">Critical</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="LOW">Low</option>
+          </select>
+
+          {/* Location Filter */}
+          <select
+            value={filterLocation}
+            onChange={(e) => setFilterLocation(e.target.value)}
+            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700"
+          >
+            <option value="">Semua Lokasi</option>
+            {locations.map(l => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+
+          {/* Category Filter */}
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700"
+          >
+            <option value="">Semua Kategori</option>
+            {catsGrouped.map(([g, items]) => (
+              <optgroup key={g} label={g}>
+                {items.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+
+          {/* PIC Unit Filter */}
+          <select
+            value={filterPic}
+            onChange={(e) => setFilterPic(e.target.value)}
+            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700"
+          >
+            <option value="">Semua PIC Unit</option>
+            {pics.map(p => (
+              <option key={p.id} value={p.id}>{p.name} {p.department ? `(${p.department})` : ''}</option>
+            ))}
+          </select>
+
+          {/* Technician Assignee Filter */}
+          <select
+            value={filterAssignee}
+            onChange={(e) => setFilterAssignee(e.target.value)}
+            className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700"
+          >
+            <option value="">Semua Teknisi</option>
+            {users.map(u => (
+              <option key={u.id} value={u.id}>{u.name || u.email}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Active Filter Chips */}
+        {activeFilterCount > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap pt-1 text-xs">
+            <span className="text-slate-400 font-bold text-[11px] flex items-center gap-1">
+              <Filter size={12} /> Filter Aktif:
+            </span>
+
+            {q && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200/60 font-medium text-[11px]">
+                Cari: &ldquo;{q}&rdquo;
+                <button onClick={() => setQ("")} className="hover:text-indigo-900"><X size={12} /></button>
+              </span>
+            )}
+
+            {filterStatus && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 font-medium text-[11px]">
+                Status: {filterStatus}
+                <button onClick={() => setFilterStatus("")} className="hover:text-slate-900"><X size={12} /></button>
+              </span>
+            )}
+
+            {filterSeverity && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 font-medium text-[11px]">
+                Severity: {filterSeverity}
+                <button onClick={() => setFilterSeverity("")} className="hover:text-amber-900"><X size={12} /></button>
+              </span>
+            )}
+
+            {filterLocation && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 font-medium text-[11px]">
+                Lokasi: {locations.find(l => l.id === filterLocation)?.name}
+                <button onClick={() => setFilterLocation("")} className="hover:text-slate-900"><X size={12} /></button>
+              </span>
+            )}
+
+            {filterPic && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium text-[11px]">
+                PIC: {pics.find(p => p.id === filterPic)?.name}
+                <button onClick={() => setFilterPic("")} className="hover:text-indigo-900"><X size={12} /></button>
+              </span>
+            )}
+
+            {filterBreachOnly && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold text-[11px]">
+                Hanya SLA Breach
+                <button onClick={() => setFilterBreachOnly(false)} className="hover:text-rose-900"><X size={12} /></button>
+              </span>
+            )}
+
+            <button
+              onClick={resetFilters}
+              className="text-[11px] text-rose-600 hover:text-rose-700 font-bold ml-1 flex items-center gap-0.5 underline underline-offset-2"
+            >
+              <RotateCcw size={11} /> Reset Semua
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── FLOATING BATCH ACTION BAR ────────────────────────────────────── */}
+      <AnimatePresence>
+        {selectedIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 text-xs w-[92%] sm:w-auto max-w-xl justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-black text-xs flex items-center justify-center">
+                {selectedIds.size}
+              </span>
+              <span className="font-bold text-slate-200 hidden sm:inline">tiket dipilih</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleBatchStatus("IN_PROGRESS")}
+                className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 font-bold text-white transition active:scale-95 text-[11px]"
+              >
+                Kerjakan
+              </button>
+
+              <button
+                onClick={() => {
+                  const sel = allTickets.filter(t => selectedIds.has(t.id))
+                  handleExportCSV(sel)
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 font-bold text-slate-200 transition active:scale-95 text-[11px] flex items-center gap-1"
+              >
+                <Download size={12} /> CSV
+              </button>
+
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white"
+                title="Batal Pilih"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── CONTENT (RESPONSIVE HYBRID: MOBILE CARD LIST & DESKTOP TABLE/GRID) ── */}
       {loading ? (
-        <div className="text-center py-20 text-slate-400 text-sm flex flex-col items-center justify-center gap-2.5">
-          <Loader2 className="animate-spin text-indigo-600" size={24}/> 
-          <span className="font-medium">Memuat tiket…</span>
+        <div className="text-center py-20 text-slate-400 text-sm flex flex-col items-center justify-center gap-2.5 bg-white rounded-2xl border border-slate-100">
+          <Loader2 className="animate-spin text-indigo-600" size={28}/> 
+          <span className="font-bold text-slate-700">Memuat basis data tiket…</span>
+        </div>
+      ) : filteredTickets.length === 0 ? (
+        <div className="py-16 text-center bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
+          <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto">
+            <Search size={22} />
+          </div>
+          <h3 className="font-black text-slate-800 text-sm sm:text-base">Tidak ada tiket yang cocok</h3>
+          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+            Silakan periksa kata kunci pencarian atau ubah kombinasi filter status dan lokasi.
+          </p>
+          <button
+            onClick={resetFilters}
+            className="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 font-bold text-xs hover:bg-indigo-100 transition"
+          >
+            Reset Filter Pencarian
+          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3.5 sm:gap-4 w-full">
-          {tickets.map((t)=> (
-            <motion.div 
-              key={t.id} 
-              initial={{opacity:0, y:6}} 
-              animate={{opacity:1, y:0}} 
-              className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between w-full"
-            >
-              <div className="w-full">
-                {/* Header Badge */}
-                <div className="flex items-center justify-between gap-2 w-full">
-                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-900 text-white tracking-wider shrink-0">{t.ticketNumber}</span>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 ${
-                    t.severity==="CRITICAL" ? "bg-rose-100 text-rose-700 font-extrabold" : 
-                    t.severity==="LOW" ? "bg-emerald-100 text-emerald-700" : 
-                    "bg-amber-100 text-amber-700"
-                  }`}>
-                    {t.severity}
-                  </span>
-                </div>
-
-                {/* Summary */}
-                <h2 className="font-black text-slate-900 text-base mt-2 line-clamp-2 leading-snug break-words">{t.summary}</h2>
-                <p className="text-[11px] text-slate-400 mt-1 truncate">
-                  {t.location?.name || "-"} • {t.category?.groupName} › {t.category?.name} • {t.ticketType}
-                </p>
-
-                {/* Badges */}
-                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 text-[11px]">
-                  {/* PIC Badge */}
-                  {t.pic ? (
-                    <span className="inline-flex items-center gap-1 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-lg text-indigo-900 font-semibold">
-                      <User size={11} className="text-indigo-600 shrink-0"/>
-                      <span className="truncate max-w-[130px]">{t.pic.name} {t.pic.department ? `(${t.pic.department})` : ''}</span>
-                      {t.pic.phone && (
-                        <a 
-                          href={`https://wa.me/${t.pic.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          onClick={(e)=>e.stopPropagation()} 
-                          className="text-emerald-600 hover:text-emerald-700 ml-0.5 inline-flex items-center" 
-                          title={`Chat WhatsApp ${t.pic.name}`}
-                        >
-                          <MessageSquare size={11} className="shrink-0" />
-                        </a>
+        <>
+          {/* 📱 1. NATIVE MOBILE CARDS (Visible on mobile screens < md) */}
+          <div className="md:hidden space-y-3 w-full">
+            {paginatedTickets.map((t) => {
+              const isSelected = selectedIds.has(t.id)
+              const isBreached = t.slaStatus === "BREACH"
+              return (
+                <div 
+                  key={t.id}
+                  onClick={() => { setDetail(null); setDetailId(t.id); }}
+                  className={`bg-white rounded-2xl border p-3.5 shadow-sm transition-all active:scale-[0.99] space-y-2.5 ${
+                    isSelected ? "border-indigo-400 bg-indigo-50/30" : "border-slate-100"
+                  }`}
+                >
+                  {/* Top Bar: Number + Copy + Severity + Status */}
+                  <div className="flex items-center justify-between gap-1.5 w-full">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-mono text-[10px] font-black bg-slate-900 text-white px-2 py-0.5 rounded-md shrink-0">
+                        {t.ticketNumber}
+                      </span>
+                      {isBreached && (
+                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-500 text-white shrink-0">
+                          BREACH
+                        </span>
                       )}
-                    </span>
-                  ) : t.reporterName ? (
-                    <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-lg text-slate-600 truncate max-w-[120px]">
-                      <User size={11} className="text-slate-400 shrink-0"/>
-                      <span className="truncate">{t.reporterName}</span>
-                    </span>
-                  ) : null}
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                        t.severity === "CRITICAL" ? "bg-rose-100 text-rose-700 font-extrabold" : 
+                        t.severity === "LOW" ? "bg-emerald-100 text-emerald-700" : 
+                        "bg-amber-100 text-amber-700"
+                      }`}>
+                        {t.severity}
+                      </span>
 
-                  {/* Technician Assignee */}
-                  <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-lg text-slate-700">
-                    <Wrench size={11} className="text-slate-400 shrink-0"/>
-                    <span className="truncate max-w-[120px] font-medium">{t.assignedUser?.name || t.assignedUser?.email || <span className="text-slate-400">Tanpa Teknisi</span>}</span>
-                  </span>
+                      <span className={`px-2 py-0.5 rounded-full font-extrabold text-[9px] uppercase tracking-wider ${
+                        t.status === "NEW" ? "bg-slate-100 text-slate-700" : 
+                        t.status === "IN_PROGRESS" ? "bg-sky-100 text-sky-700 font-black" : 
+                        t.status === "PENDING" ? "bg-amber-100 text-amber-700 font-black" : 
+                        t.status === "RESOLVED" ? "bg-indigo-100 text-indigo-700 font-black" : 
+                        "bg-emerald-100 text-emerald-700"
+                      }`}>
+                        {t.status}
+                      </span>
+                    </div>
+                  </div>
 
-                  {/* Asset Badge */}
-                  <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-lg text-slate-700 font-mono text-[10px]">
-                    <Package size={11} className="text-slate-400 shrink-0"/>
-                    <span className="truncate max-w-[110px] font-bold">{t.asset ? t.asset.assetCode : <span className="text-slate-400 font-sans font-normal">Tanpa aset</span>}</span>
-                  </span>
-                </div>
+                  {/* Summary */}
+                  <div>
+                    <h2 className="font-black text-slate-900 text-sm leading-snug break-words">{t.summary}</h2>
+                    <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                      {t.category?.groupName ? `${t.category.groupName} › ` : ""}{t.category?.name || "Umum"} • {t.ticketType}
+                    </p>
+                  </div>
 
-                {/* Status & Timing */}
-                <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100 text-[11px]">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider ${
-                      t.status==="NEW" ? "bg-slate-100 text-slate-700" : 
-                      t.status==="IN_PROGRESS" ? "bg-sky-100 text-sky-700 font-black" : 
-                      t.status==="PENDING" ? "bg-amber-100 text-amber-700 font-black" : 
-                      t.status==="RESOLVED" ? "bg-indigo-100 text-indigo-700 font-black" : 
-                      "bg-emerald-100 text-emerald-700"
-                    }`}>
-                      {t.status}
+                  {/* Badges Row: Location, Asset, PIC, Assignee */}
+                  <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                    <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-lg text-slate-700 font-medium">
+                      <MapPin size={10} className="text-slate-400 shrink-0" />
+                      <span className="truncate max-w-[120px]">{t.location?.name || "-"}</span>
                     </span>
-                    {t.slaStatus==="BREACH" && (
-                      <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white font-black text-[9px] flex items-center gap-0.5">
-                        <AlertTriangle size={9}/> BREACH
+
+                    {t.asset && (
+                      <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-lg text-indigo-700 font-mono font-bold">
+                        <Package size={10} className="text-indigo-500 shrink-0" />
+                        <span className="truncate max-w-[100px]">{t.asset.assetCode}</span>
+                      </span>
+                    )}
+
+                    {t.pic ? (
+                      <span className="inline-flex items-center gap-1 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-lg text-indigo-900 font-semibold">
+                        <User size={10} className="text-indigo-600 shrink-0" />
+                        <span className="truncate max-w-[110px]">{t.pic.name}</span>
+                        {t.pic.phone && (
+                          <a 
+                            href={`https://wa.me/${t.pic.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            onClick={(e)=>e.stopPropagation()} 
+                            className="text-emerald-600 hover:text-emerald-700 ml-0.5"
+                          >
+                            <MessageSquare size={10} />
+                          </a>
+                        )}
+                      </span>
+                    ) : t.reporterName ? (
+                      <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-lg text-slate-600 truncate max-w-[110px]">
+                        <User size={10} className="text-slate-400 shrink-0" />
+                        <span className="truncate">{t.reporterName}</span>
+                      </span>
+                    ) : null}
+
+                    {t.assignedUser && (
+                      <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-lg text-slate-700">
+                        <Wrench size={10} className="text-slate-400 shrink-0" />
+                        <span className="truncate max-w-[100px]">{t.assignedUser.name || t.assignedUser.email}</span>
                       </span>
                     )}
                   </div>
-                  <span className="text-slate-400 flex items-center gap-1 font-medium text-[10px]">
-                    <Clock3 size={11} className="text-slate-400"/>
-                    {t.frtMinutes!=null ? `${t.frtMinutes}m FRT` : `${Math.round((Date.now()-new Date(t.createdAt).getTime())/60000)}m`}
-                  </span>
-                </div>
-              </div>
 
-              {/* Action Buttons - Clean 2-Row / Grid Layout */}
-              <div className="mt-3.5 pt-2.5 border-t border-slate-100 w-full flex flex-col gap-2">
-                {t.status==="NEW" && (
-                  <div className="grid grid-cols-2 gap-2 w-full">
-                    <button 
-                      onClick={()=>changeStatus(t.id,"IN_PROGRESS")} 
-                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs font-bold transition shadow-sm text-center"
-                    >
-                      Kerjakan
-                    </button>
-                    <button 
-                      onClick={()=> { setDetail(null); setDetailId(t.id); }} 
-                      disabled={loadingDetail && detailId===t.id} 
-                      className="w-full py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] text-xs font-bold text-slate-700 transition flex items-center justify-center gap-1"
-                    >
-                      {loadingDetail && detailId===t.id ? <Loader2 size={13} className="animate-spin text-indigo-600"/> : "Detail"}
-                    </button>
-                  </div>
-                )}
-                
-                {t.status==="IN_PROGRESS" && (
-                  <div className="flex flex-col gap-2 w-full">
-                    <div className="grid grid-cols-2 gap-2 w-full">
-                      <button 
-                        onClick={()=>changeStatus(t.id,"PENDING")} 
-                        className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white text-xs font-bold transition shadow-sm text-center"
+                  {/* Footer Timing & Quick Actions */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-[10px]" onClick={(e)=>e.stopPropagation()}>
+                    <span className="text-slate-400 flex items-center gap-1 font-medium">
+                      <Clock3 size={11} className="text-slate-400"/>
+                      {t.frtMinutes!=null ? `${t.frtMinutes}m FRT` : `${Math.round((Date.now()-new Date(t.createdAt).getTime())/60000)}m lalu`}
+                    </span>
+
+                    <div className="flex items-center gap-1.5">
+                      {t.status==="NEW" && (
+                        <button
+                          onClick={()=>changeStatus(t.id,"IN_PROGRESS")}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[10px] active:scale-95 transition"
+                        >
+                          Kerjakan
+                        </button>
+                      )}
+                      {t.status==="IN_PROGRESS" && (
+                        <button
+                          onClick={()=>changeStatus(t.id,"RESOLVED")}
+                          className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[10px] active:scale-95 transition"
+                        >
+                          Selesai
+                        </button>
+                      )}
+                      {t.status==="PENDING" && (
+                        <button
+                          onClick={()=>changeStatus(t.id,"IN_PROGRESS")}
+                          className="px-2.5 py-1 rounded-lg bg-sky-600 text-white font-bold text-[10px] active:scale-95 transition"
+                        >
+                          Lanjut
+                        </button>
+                      )}
+                      <button
+                        onClick={()=> { setDetail(null); setDetailId(t.id); }}
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold text-[10px] active:scale-95 transition"
                       >
-                        Tunda
-                      </button>
-                      <button 
-                        onClick={()=>changeStatus(t.id,"RESOLVED")} 
-                        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold transition shadow-sm text-center"
-                      >
-                        Selesai
+                        Detail
                       </button>
                     </div>
-                    <button 
-                      onClick={()=> { setDetail(null); setDetailId(t.id); }} 
-                      disabled={loadingDetail && detailId===t.id} 
-                      className="w-full py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] text-xs font-bold text-slate-700 transition flex items-center justify-center gap-1"
-                    >
-                      {loadingDetail && detailId===t.id ? <Loader2 size={13} className="animate-spin text-indigo-600"/> : "Detail"}
-                    </button>
                   </div>
-                )}
-                
-                {t.status==="PENDING" && (
-                  <div className="grid grid-cols-2 gap-2 w-full">
-                    <button 
-                      onClick={()=>changeStatus(t.id,"IN_PROGRESS")} 
-                      className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-[0.98] text-white text-xs font-bold transition shadow-sm text-center"
-                    >
-                      Lanjutkan
-                    </button>
-                    <button 
-                      onClick={()=> { setDetail(null); setDetailId(t.id); }} 
-                      disabled={loadingDetail && detailId===t.id} 
-                      className="w-full py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] text-xs font-bold text-slate-700 transition flex items-center justify-center gap-1"
-                    >
-                      {loadingDetail && detailId===t.id ? <Loader2 size={13} className="animate-spin text-indigo-600"/> : "Detail"}
-                    </button>
-                  </div>
-                )}
-                
-                {t.status==="RESOLVED" && (
-                  <div className="grid grid-cols-2 gap-2 w-full">
-                    <button 
-                      onClick={()=>changeStatus(t.id,"CLOSED")} 
-                      className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white text-xs font-bold transition shadow-sm text-center"
-                    >
-                      Tutup
-                    </button>
-                    <button 
-                      onClick={()=> { setDetail(null); setDetailId(t.id); }} 
-                      disabled={loadingDetail && detailId===t.id} 
-                      className="w-full py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] text-xs font-bold text-slate-700 transition flex items-center justify-center gap-1"
-                    >
-                      {loadingDetail && detailId===t.id ? <Loader2 size={13} className="animate-spin text-indigo-600"/> : "Detail"}
-                    </button>
-                  </div>
-                )}
+                </div>
+              )
+            })}
+          </div>
 
-                {t.status==="CLOSED" && (
-                  <button 
-                    onClick={()=> { setDetail(null); setDetailId(t.id); }} 
-                    disabled={loadingDetail && detailId===t.id} 
-                    className="w-full py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-[0.98] text-xs font-bold text-slate-700 transition flex items-center justify-center gap-1"
-                  >
-                    {loadingDetail && detailId===t.id ? <Loader2 size={13} className="animate-spin text-indigo-600"/> : "Detail Tiket"}
-                  </button>
-                )}
+          {/* 💻 2. DESKTOP VIEW (Visible on md+ screens) */}
+          <div className="hidden md:block">
+            {viewMode === "table" ? (
+              /* DENSE ENTERPRISE DATA TABLE */
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col justify-between">
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-left text-xs border-collapse min-w-[900px]">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                        <th className="p-3 w-10 text-center">
+                          <button onClick={handleSelectAllOnPage} className="text-slate-400 hover:text-slate-700">
+                            {paginatedTickets.length > 0 && paginatedTickets.every(t => selectedIds.has(t.id)) ? (
+                              <CheckSquare size={16} className="text-indigo-600" />
+                            ) : (
+                              <Square size={16} />
+                            )}
+                          </button>
+                        </th>
+                        <th className="py-3 px-2 cursor-pointer select-none" onClick={() => handleSort("ticketNumber")}>
+                          <div className="flex items-center gap-1">
+                            <span>No. Tiket</span>
+                            <ArrowUpDown size={11} className={sortBy === "ticketNumber" ? "text-indigo-600" : "text-slate-300"} />
+                          </div>
+                        </th>
+                        <th className="py-3 px-3 cursor-pointer select-none" onClick={() => handleSort("createdAt")}>
+                          <div className="flex items-center gap-1">
+                            <span>Waktu & FRT</span>
+                            <ArrowUpDown size={11} className={sortBy === "createdAt" ? "text-indigo-600" : "text-slate-300"} />
+                          </div>
+                        </th>
+                        <th className="py-3 px-3">Uraian Masalah & Kategori</th>
+                        <th className="py-3 px-2.5">Lokasi & Aset</th>
+                        <th className="py-3 px-2.5">PIC / Pelapor</th>
+                        <th className="py-3 px-2.5">Teknisi IT</th>
+                        <th className="py-3 px-2 cursor-pointer select-none" onClick={() => handleSort("severity")}>
+                          <div className="flex items-center gap-1">
+                            <span>Severity</span>
+                            <ArrowUpDown size={11} className={sortBy === "severity" ? "text-indigo-600" : "text-slate-300"} />
+                          </div>
+                        </th>
+                        <th className="py-3 px-2 cursor-pointer select-none" onClick={() => handleSort("status")}>
+                          <div className="flex items-center gap-1">
+                            <span>Status</span>
+                            <ArrowUpDown size={11} className={sortBy === "status" ? "text-indigo-600" : "text-slate-300"} />
+                          </div>
+                        </th>
+                        <th className="py-3 px-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {paginatedTickets.map((t) => {
+                        const isSelected = selectedIds.has(t.id)
+                        const isBreached = t.slaStatus === "BREACH"
+                        return (
+                          <tr 
+                            key={t.id}
+                            onClick={() => { setDetail(null); setDetailId(t.id); }}
+                            className={`hover:bg-indigo-50/40 transition-colors cursor-pointer group ${
+                              isSelected ? "bg-indigo-50/60" : ""
+                            }`}
+                          >
+                            <td className="p-3 text-center" onClick={(e) => { e.stopPropagation(); toggleSelect(t.id); }}>
+                              <button className="text-slate-400 hover:text-slate-700">
+                                {isSelected ? <CheckSquare size={16} className="text-indigo-600" /> : <Square size={16} />}
+                              </button>
+                            </td>
+
+                            <td className="py-3 px-2 font-mono">
+                              <div className="flex items-center gap-1">
+                                <span className="font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded text-[11px] group-hover:bg-white border border-slate-200/60">
+                                  {t.ticketNumber}
+                                </span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); copyToClipboard(t.ticketNumber); }}
+                                  className="text-slate-300 hover:text-indigo-600 p-0.5 rounded"
+                                  title="Salin nomor tiket"
+                                >
+                                  {copiedCode === t.ticketNumber ? <Check size={12} className="text-emerald-600"/> : <Copy size={12}/>}
+                                </button>
+                              </div>
+                              {isBreached && (
+                                <span className="inline-block mt-1 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-rose-500 text-white">
+                                  SLA BREACH
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-3 text-slate-500 whitespace-nowrap">
+                              <p className="font-bold text-slate-800 text-[11px]">
+                                {new Date(t.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })} • {new Date(t.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                <Clock3 size={10} />
+                                {t.frtMinutes != null ? `${t.frtMinutes}m FRT` : `${Math.round((Date.now() - new Date(t.createdAt).getTime()) / 60000)}m lalu`}
+                              </p>
+                            </td>
+
+                            <td className="py-3 px-3 max-w-[280px]">
+                              <p className="font-extrabold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">
+                                {t.summary}
+                              </p>
+                              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-medium truncate max-w-[150px]">
+                                  {t.category?.groupName ? `${t.category.groupName} › ` : ""}{t.category?.name || "Umum"}
+                                </span>
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-500">
+                                  {t.ticketType}
+                                </span>
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-2.5">
+                              <p className="font-bold text-slate-800 flex items-center gap-1 truncate max-w-[160px]">
+                                <MapPin size={11} className="text-slate-400 shrink-0" />
+                                <span className="truncate">{t.location?.name || "-"}</span>
+                              </p>
+                              {t.asset ? (
+                                <p className="text-[10px] text-indigo-700 font-mono font-bold flex items-center gap-1 mt-0.5 truncate max-w-[160px]">
+                                  <Package size={10} className="text-indigo-500 shrink-0" />
+                                  <span className="truncate">{t.asset.assetCode}</span>
+                                </p>
+                              ) : (
+                                <p className="text-[10px] text-slate-400 font-normal">Tanpa aset</p>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-2.5">
+                              {t.pic ? (
+                                <div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-bold text-slate-900 truncate max-w-[130px]">{t.pic.name}</span>
+                                    {t.pic.phone && (
+                                      <a
+                                        href={`https://wa.me/${t.pic.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded"
+                                        title={`WhatsApp ${t.pic.name}`}
+                                      >
+                                        <MessageSquare size={12} />
+                                      </a>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 truncate max-w-[130px]">{t.pic.department || "Unit Klien"}</p>
+                                </div>
+                              ) : t.reporterName ? (
+                                <div>
+                                  <p className="font-bold text-slate-800 truncate max-w-[130px]">{t.reporterName}</p>
+                                  <p className="text-[10px] text-slate-400">Pelapor</p>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">—</span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-2.5">
+                              {t.assignedUser ? (
+                                <div className="flex items-center gap-1">
+                                  <Wrench size={11} className="text-slate-400 shrink-0" />
+                                  <span className="font-semibold text-slate-800 truncate max-w-[120px]">
+                                    {t.assignedUser.name || t.assignedUser.email}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 font-normal text-[10px]">Belum ditugaskan</span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-2">
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                                t.severity === "CRITICAL" ? "bg-rose-100 text-rose-700" :
+                                t.severity === "LOW" ? "bg-emerald-100 text-emerald-700" :
+                                "bg-amber-100 text-amber-700"
+                              }`}>
+                                {t.severity}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-2 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-full font-extrabold text-[10px] uppercase tracking-wider inline-flex items-center gap-1 ${
+                                t.status === "NEW" ? "bg-slate-100 text-slate-700" :
+                                t.status === "IN_PROGRESS" ? "bg-sky-100 text-sky-700 font-black" :
+                                t.status === "PENDING" ? "bg-amber-100 text-amber-700 font-black" :
+                                t.status === "RESOLVED" ? "bg-indigo-100 text-indigo-700 font-black" :
+                                "bg-emerald-100 text-emerald-700"
+                              }`}>
+                                {t.status === "IN_PROGRESS" && <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />}
+                                {t.status}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1.5">
+                                {t.status === "NEW" && (
+                                  <button
+                                    onClick={() => changeStatus(t.id, "IN_PROGRESS")}
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-sm active:scale-95 transition"
+                                  >
+                                    Kerjakan
+                                  </button>
+                                )}
+                                {t.status === "IN_PROGRESS" && (
+                                  <button
+                                    onClick={() => changeStatus(t.id, "RESOLVED")}
+                                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] shadow-sm active:scale-95 transition"
+                                  >
+                                    Selesai
+                                  </button>
+                                )}
+                                {t.status === "PENDING" && (
+                                  <button
+                                    onClick={() => changeStatus(t.id, "IN_PROGRESS")}
+                                    className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-[10px] shadow-sm active:scale-95 transition"
+                                  >
+                                    Lanjut
+                                  </button>
+                                )}
+
+                                <button
+                                  onClick={() => { setDetail(null); setDetailId(t.id); }}
+                                  className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-[10px] shadow-sm active:scale-95 transition"
+                                >
+                                  Detail
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </motion.div>
-          ))}
-          {tickets.length===0 && (
-            <div className="col-span-full py-16 text-center text-slate-400 text-sm bg-white rounded-2xl border border-slate-100">
-              Belum ada tiket yang cocok. Tekan tombol <b className="text-indigo-600">Quick-Log</b> untuk membuat tiket baru.
+            ) : (
+              /* GRID VIEW */
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 sm:gap-4 w-full">
+                {paginatedTickets.map((t) => (
+                  <motion.div 
+                    key={t.id} 
+                    initial={{opacity:0, y:6}} 
+                    animate={{opacity:1, y:0}} 
+                    className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between w-full"
+                  >
+                    <div className="w-full">
+                      <div className="flex items-center justify-between gap-2 w-full">
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-900 text-white tracking-wider shrink-0">
+                          {t.ticketNumber}
+                        </span>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 ${
+                          t.severity==="CRITICAL" ? "bg-rose-100 text-rose-700 font-extrabold" : 
+                          t.severity==="LOW" ? "bg-emerald-100 text-emerald-700" : 
+                          "bg-amber-100 text-amber-700"
+                        }`}>
+                          {t.severity}
+                        </span>
+                      </div>
+
+                      <h2 className="font-black text-slate-900 text-base mt-2 line-clamp-2 leading-snug break-words">{t.summary}</h2>
+                      <p className="text-[11px] text-slate-400 mt-1 truncate">
+                        {t.location?.name || "-"} • {t.category?.groupName} › {t.category?.name} • {t.ticketType}
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2.5 text-[11px]">
+                        {t.pic ? (
+                          <span className="inline-flex items-center gap-1 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-lg text-indigo-900 font-semibold">
+                            <User size={11} className="text-indigo-600 shrink-0"/>
+                            <span className="truncate max-w-[130px]">{t.pic.name} {t.pic.department ? `(${t.pic.department})` : ''}</span>
+                            {t.pic.phone && (
+                              <a 
+                                href={`https://wa.me/${t.pic.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                onClick={(e)=>e.stopPropagation()} 
+                                className="text-emerald-600 hover:text-emerald-700 ml-0.5 inline-flex items-center" 
+                              >
+                                <MessageSquare size={11} className="shrink-0" />
+                              </a>
+                            )}
+                          </span>
+                        ) : t.reporterName ? (
+                          <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-lg text-slate-600 truncate max-w-[120px]">
+                            <User size={11} className="text-slate-400 shrink-0"/>
+                            <span className="truncate">{t.reporterName}</span>
+                          </span>
+                        ) : null}
+
+                        <span className="inline-flex items-center gap-1 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-lg text-slate-700 font-mono text-[10px]">
+                          <Package size={11} className="text-slate-400 shrink-0"/>
+                          <span className="truncate max-w-[110px] font-bold">{t.asset ? t.asset.assetCode : <span className="text-slate-400 font-sans font-normal">Tanpa aset</span>}</span>
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100 text-[11px]">
+                        <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider ${
+                          t.status==="NEW" ? "bg-slate-100 text-slate-700" : 
+                          t.status==="IN_PROGRESS" ? "bg-sky-100 text-sky-700 font-black" : 
+                          t.status==="PENDING" ? "bg-amber-100 text-amber-700 font-black" : 
+                          t.status==="RESOLVED" ? "bg-indigo-100 text-indigo-700 font-black" : 
+                          "bg-emerald-100 text-emerald-700"
+                        }`}>
+                          {t.status}
+                        </span>
+                        <span className="text-slate-400 flex items-center gap-1 font-medium text-[10px]">
+                          <Clock3 size={11} className="text-slate-400"/>
+                          {t.frtMinutes!=null ? `${t.frtMinutes}m FRT` : `${Math.round((Date.now()-new Date(t.createdAt).getTime())/60000)}m`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3.5 pt-2.5 border-t border-slate-100 w-full flex items-center gap-2">
+                      <button 
+                        onClick={()=> { setDetail(null); setDetailId(t.id); }} 
+                        className="w-full py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition"
+                      >
+                        Detail Tiket
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── PAGINATION BAR (COMPACT & 100% RESPONSIVE) ────────────────── */}
+          <div className="p-3 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs text-slate-500">
+            <div className="font-medium text-center sm:text-left text-[11px] sm:text-xs">
+              Menampilkan <b className="text-slate-800">{(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredTickets.length)}</b> dari <b className="text-slate-800">{filteredTickets.length}</b> tiket
             </div>
-          )}
-        </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Halaman Pertama"
+              >
+                <ChevronsLeft size={13} />
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Sebelumnya"
+              >
+                <ChevronLeft size={13} />
+              </button>
+
+              <span className="px-2.5 py-1 font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                {currentPage} / {totalPages}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Berikutnya"
+              >
+                <ChevronRight size={13} />
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Halaman Terakhir"
+              >
+                <ChevronsRight size={13} />
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
-      {/* Quick-Log Bottom-Sheet / Modal */}
+      {/* ── QUICK-LOG MODAL (≤20 DETIK) ──────────────────────────────────── */}
       <AnimatePresence>
         {showQuick && (
           <motion.div 
@@ -839,14 +1816,14 @@ export default function ItOslTicketsPage() {
         )}
       </AnimatePresence>
 
-      {/* Detail Slide Drawer */}
+      {/* ── DETAIL SLIDE DRAWER (100% MOBILE RESPONSIVE & UNIFIED SCROLL) ── */}
       <AnimatePresence>
-        {(detailId) && (
+        {detailId && (
           <motion.div 
             initial={{opacity:0}} 
             animate={{opacity:1}} 
             exit={{opacity:0}} 
-            className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex justify-end" 
+            className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex justify-end" 
             onClick={()=>{setDetailId(null); setDetail(null)}}
           >
             <motion.div 
@@ -855,157 +1832,223 @@ export default function ItOslTicketsPage() {
               exit={{x:"100%"}} 
               transition={{type:"spring", damping:28, stiffness:300}}
               onClick={(e)=>e.stopPropagation()} 
-              className="bg-white w-full sm:max-w-[620px] lg:max-w-[720px] h-[100dvh] flex flex-col shadow-2xl"
+              className="bg-slate-50 w-full sm:max-w-[620px] lg:max-w-[720px] h-[100dvh] flex flex-col shadow-2xl overflow-hidden"
             >
               {loadingDetail && !detail ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8 bg-white">
                   <Loader2 size={36} className="animate-spin text-indigo-600"/>
                   <p className="text-sm font-bold text-slate-700">Memuat detail tiket…</p>
                   <p className="text-xs text-slate-400">Mohon tunggu sebentar</p>
                 </div>
               ) : detail ? (
                 <>
-                {/* Drawer Header */}
-                <div className="p-4 sm:p-5 border-b shrink-0 bg-slate-50">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-mono text-[10px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded">{detail.ticketNumber}</span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded ${
-                          detail.severity==="CRITICAL"?"bg-rose-100 text-rose-600":detail.severity==="LOW"?"bg-emerald-100 text-emerald-600":"bg-amber-100 text-amber-600"
-                        }`}>
-                          {detail.severity}
-                        </span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded ${
-                          detail.status==="NEW"?"bg-slate-200 text-slate-800":detail.status==="IN_PROGRESS"?"bg-sky-100 text-sky-700":detail.status==="PENDING"?"bg-amber-100 text-amber-700":detail.status==="RESOLVED"?"bg-indigo-100 text-indigo-700":"bg-emerald-100 text-emerald-700"
-                        }`}>
-                          {detail.status}
-                        </span>
-                        {detail.slaStatus==="BREACH" && <span className="text-[10px] font-black bg-rose-500 text-white px-2 py-0.5 rounded-full">BREACH</span>}
-                      </div>
-                      <h3 className="font-black text-slate-900 text-sm sm:text-base mt-2 break-words">{detail.summary}</h3>
-                      <p className="text-[11px] sm:text-xs text-slate-500 mt-1 break-words">
-                        {detail.location?.name} • {detail.category?.groupName} › {detail.category?.name} • {detail.ticketType} 
-                        {detail.asset?.name ? ` • ${detail.asset.name} (${detail.asset.assetCode})`: ""}
-                      </p>
-                    </div>
-                    <button 
-                      onClick={()=>{setDetailId(null); setDetail(null)}} 
-                      className="p-2 rounded-xl hover:bg-slate-200 active:scale-95 shrink-0 border border-slate-200 bg-white text-slate-600"
-                    >
-                      <X size={18}/>
-                    </button>
-                  </div>
-
-                  {/* Summary Metas */}
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-3 text-[11px]">
-                    <div className="bg-white rounded-xl p-2 border border-slate-100"><p className="text-slate-400 font-bold uppercase text-[9px]">Dibuat</p><p className="font-bold truncate text-slate-800">{new Date(detail.createdAt).toLocaleString('id-ID', { dateStyle:'short', timeStyle:'short' })}</p></div>
-                    <div className="bg-white rounded-xl p-2 border border-slate-100"><p className="text-slate-400 font-bold uppercase text-[9px]">Direspon</p><p className="font-bold truncate text-slate-800">{detail.acknowledgedAt? `${detail.frtMinutes}m` : "-"}</p></div>
-                    <div className="bg-white rounded-xl p-2 border border-slate-100"><p className="text-slate-400 font-bold uppercase text-[9px]">Pelapor</p><p className="font-bold truncate text-slate-800">{detail.reporterName || "-"}</p></div>
-                  </div>
-
-                  {/* Asset, PIC & Technician Controls */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
-                    {/* PIC Unit Card */}
-                    <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-100 flex flex-col justify-between">
-                      <div>
-                        <p className="text-slate-400 font-bold uppercase text-[9px] flex items-center justify-between">
-                          <span className="flex items-center gap-1"><Users size={11} className="text-indigo-600"/> PIC Unit (Klien)</span>
-                          {detail.pic?.phone && (
-                            <a 
-                              href={`https://wa.me/${detail.pic.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')}`} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-0.5 text-[10px]"
-                              title="Chat WhatsApp"
-                            >
-                              <MessageSquare size={11} /> WA
-                            </a>
-                          )}
-                        </p>
-                        <div className="mt-1 space-y-1">
-                          {detail.pic ? (
-                            <div className="text-xs">
-                              <p className="font-bold text-slate-800 truncate">{detail.pic.name}</p>
-                              <p className="text-[10px] text-slate-500 truncate">{detail.pic.department || "-"} • {detail.pic.phone || "-"}</p>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-slate-400">Belum ditautkan PIC</p>
-                          )}
-                        </div>
-                      </div>
-                      <select 
-                        value={detail.pic?.id || detail.picId || ""} 
-                        onChange={(e)=> connectPic(detail.id, e.target.value)} 
-                        className="w-full px-2 py-1.5 rounded-lg border text-xs bg-white mt-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      >
-                        <option value="">— Ganti/Set PIC —</option>
-                        {pics.map(p=> <option key={p.id} value={p.id}>{p.name} {p.department ? `(${p.department})` : ''}</option>)}
-                      </select>
-                    </div>
-
-                    {/* Asset Card */}
-                    <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-100 flex flex-col justify-between">
-                      <div>
-                        <p className="text-slate-400 font-bold uppercase text-[9px] flex items-center gap-1"><Package size={11} className="text-indigo-600"/> Aset Terhubung</p>
-                        <div className="mt-1 space-y-1">
-                          {detail.asset ? (
-                            <div className="flex items-center justify-between text-xs bg-slate-50 p-1 rounded-lg border">
-                              <span className="font-bold text-slate-800 truncate">{detail.asset.name} <span className="font-mono text-[10px] text-slate-400 font-normal">({detail.asset.assetCode})</span></span>
-                              <button onClick={()=>connectAsset(detail.id,"")} className="text-[9px] px-1.5 py-0.5 rounded border text-rose-600 hover:bg-rose-50 font-medium shrink-0 ml-1">Lepas</button>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-slate-400">Tanpa aset</p>
-                          )}
-                        </div>
-                      </div>
-                      <select 
-                        value={detail.asset?.id || detail.assetId || ""} 
-                        onChange={(e)=> connectAsset(detail.id, e.target.value)} 
-                        className="w-full px-2 py-1.5 rounded-lg border text-xs bg-white mt-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      >
-                        <option value="">— Hubungkan aset —</option>
-                        {assets.map(a=> <option key={a.id} value={a.id}>{a.name} ({a.assetCode})</option>)}
-                      </select>
-                    </div>
-                    
-                    {/* Technician Assignee */}
-                    <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-100 flex flex-col justify-between">
-                      <div>
-                        <p className="text-slate-400 font-bold uppercase text-[9px] flex items-center gap-1"><Wrench size={11} className="text-indigo-600"/> Teknisi IT</p>
-                        <div className="mt-1 space-y-1">
-                          <p className="text-xs text-slate-800 truncate font-semibold">{detail.assignedUser?.name || detail.assignedUser?.email || <span className="text-slate-400 font-normal">— belum ditugaskan</span>}</p>
-                        </div>
-                      </div>
-                      <select 
-                        value={detail.assignedTo || ""} 
-                        onChange={(e)=> reassign(detail.id, e.target.value)} 
-                        className="w-full px-2 py-1.5 rounded-lg border text-xs bg-white mt-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      >
-                        <option value="">— Alihkan Teknisi —</option>
-                        {users.map(u=> <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Status Action Buttons in Drawer */}
-                  <div className="flex gap-1.5 mt-3 flex-wrap">
-                    {detail.status==="NEW" && <button onClick={()=>changeStatus(detail.id,"IN_PROGRESS")} className="px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold active:scale-95 transition">Kerjakan</button>}
-                    {detail.status==="IN_PROGRESS" && (
-                      <>
-                        <button onClick={()=>changeStatus(detail.id,"PENDING")} className="px-3.5 py-2 rounded-xl bg-amber-500 text-white text-xs font-bold active:scale-95 transition">Tunda</button>
-                        <button onClick={()=>changeStatus(detail.id,"RESOLVED")} className="px-3.5 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold active:scale-95 transition">Selesai</button>
-                      </>
+                {/* 1. Compact Sticky Top Bar */}
+                <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-4 sm:px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 shadow-xs">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                    <span className="font-mono text-xs font-black bg-slate-900 text-white px-2 py-0.5 rounded-md shrink-0">
+                      {detail.ticketNumber}
+                    </span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                      detail.severity==="CRITICAL"?"bg-rose-100 text-rose-700":detail.severity==="LOW"?"bg-emerald-100 text-emerald-700":"bg-amber-100 text-amber-700"
+                    }`}>
+                      {detail.severity}
+                    </span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                      detail.status==="NEW"?"bg-slate-200 text-slate-800":detail.status==="IN_PROGRESS"?"bg-sky-100 text-sky-700 font-black":detail.status==="PENDING"?"bg-amber-100 text-amber-700 font-black":detail.status==="RESOLVED"?"bg-indigo-100 text-indigo-700 font-black":"bg-emerald-100 text-emerald-700 font-black"
+                    }`}>
+                      {detail.status}
+                    </span>
+                    {detail.slaStatus==="BREACH" && (
+                      <span className="text-[9px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full">
+                        BREACH
+                      </span>
                     )}
-                    {detail.status==="PENDING" && <button onClick={()=>changeStatus(detail.id,"IN_PROGRESS")} className="px-3.5 py-2 rounded-xl bg-sky-600 text-white text-xs font-bold active:scale-95 transition">Lanjutkan</button>}
-                    {detail.status==="RESOLVED" && <button onClick={()=>changeStatus(detail.id,"CLOSED")} className="px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold active:scale-95 transition">Tutup</button>}
                   </div>
+
+                  <button 
+                    onClick={()=>{setDetailId(null); setDetail(null)}} 
+                    className="p-1.5 sm:p-2 rounded-xl hover:bg-slate-100 active:scale-95 shrink-0 text-slate-500 hover:text-slate-800 transition"
+                    title="Tutup Sheet"
+                  >
+                    <X size={20}/>
+                  </button>
                 </div>
 
-                {/* Drawer Body */}
-                <div className="flex-1 overflow-y-auto">
-                  {/* Phase Tabs */}
-                  <div className="sticky top-0 z-10 bg-white border-b flex gap-1.5 p-2 sm:p-2.5 shadow-sm">
+                {/* 2. Unified Scrollable Container (Smooth full-page scroll) */}
+                <div className="flex-1 overflow-y-auto overscroll-contain">
+                  
+                  {/* Summary & Meta Header */}
+                  <div className="p-4 sm:p-5 bg-white border-b border-slate-200 space-y-3.5">
+                    {/* Ticket Title */}
+                    <div>
+                      <h2 className="font-black text-slate-900 text-base sm:text-lg leading-snug break-words">{detail.summary}</h2>
+                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-slate-700">{detail.location?.name || "-"}</span>
+                        <span>•</span>
+                        <span>{detail.category?.groupName ? `${detail.category.groupName} › ` : ""}{detail.category?.name || "Umum"}</span>
+                        <span>•</span>
+                        <span className="px-1.5 py-0.2 rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-600">{detail.ticketType}</span>
+                      </p>
+                    </div>
+
+                    {/* Summary Metas Grid */}
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+                        <p className="text-slate-400 font-bold uppercase text-[9px]">Dibuat</p>
+                        <p className="font-bold text-slate-800 truncate text-[11px] sm:text-xs mt-0.5">
+                          {new Date(detail.createdAt).toLocaleDateString('id-ID', { day:'numeric', month:'short' })} • {new Date(detail.createdAt).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })}
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+                        <p className="text-slate-400 font-bold uppercase text-[9px]">Respon (FRT)</p>
+                        <p className="font-bold text-slate-800 truncate text-[11px] sm:text-xs mt-0.5">
+                          {detail.acknowledgedAt ? `${detail.frtMinutes}m` : <span className="text-slate-400 font-normal">Belum</span>}
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+                        <p className="text-slate-400 font-bold uppercase text-[9px]">Pelapor</p>
+                        <p className="font-bold text-slate-800 truncate text-[11px] sm:text-xs mt-0.5">
+                          {detail.reporterName || "-"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Quick Status Action Buttons */}
+                    <div className="flex gap-2 pt-1 flex-wrap">
+                      {detail.status==="NEW" && (
+                        <button 
+                          onClick={()=>changeStatus(detail.id,"IN_PROGRESS")} 
+                          className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
+                        >
+                          Mulai Kerjakan Tiket
+                        </button>
+                      )}
+                      {detail.status==="IN_PROGRESS" && (
+                        <>
+                          <button 
+                            onClick={()=>changeStatus(detail.id,"PENDING")} 
+                            className="flex-1 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
+                          >
+                            Tunda (Pending)
+                          </button>
+                          <button 
+                            onClick={()=>changeStatus(detail.id,"RESOLVED")} 
+                            className="flex-1 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
+                          >
+                            Selesaikan Tiket
+                          </button>
+                        </>
+                      )}
+                      {detail.status==="PENDING" && (
+                        <button 
+                          onClick={()=>changeStatus(detail.id,"IN_PROGRESS")} 
+                          className="flex-1 py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
+                        >
+                          Lanjutkan Pengerjaan
+                        </button>
+                      )}
+                      {detail.status==="RESOLVED" && (
+                        <button 
+                          onClick={()=>changeStatus(detail.id,"CLOSED")} 
+                          className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
+                        >
+                          Tutup Tiket (Closed)
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Connected Entities: 3 Responsive Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                      {/* PIC Unit Card */}
+                      <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <span className="flex items-center gap-1"><Users size={12} className="text-indigo-600"/> PIC Unit</span>
+                            {detail.pic?.phone && (
+                              <a 
+                                href={`https://wa.me/${detail.pic.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-0.5 text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200"
+                                title="Chat WhatsApp"
+                              >
+                                <MessageSquare size={10} /> WA
+                              </a>
+                            )}
+                          </div>
+                          <div className="mt-1.5">
+                            {detail.pic ? (
+                              <div className="text-xs">
+                                <p className="font-extrabold text-slate-800 truncate">{detail.pic.name}</p>
+                                <p className="text-[10px] text-slate-500 truncate mt-0.5">{detail.pic.department || "Unit Klien"} • {detail.pic.phone || "-"}</p>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-400">Belum ditautkan PIC</p>
+                            )}
+                          </div>
+                        </div>
+                        <select 
+                          value={detail.pic?.id || detail.picId || ""} 
+                          onChange={(e)=> connectPic(detail.id, e.target.value)} 
+                          className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs bg-white mt-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
+                        >
+                          <option value="">— Ganti/Set PIC —</option>
+                          {pics.map(p=> <option key={p.id} value={p.id}>{p.name} {p.department ? `(${p.department})` : ''}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Asset Card */}
+                      <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200 flex flex-col justify-between">
+                        <div>
+                          <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider flex items-center gap-1">
+                            <Package size={12} className="text-indigo-600"/> Aset Terhubung
+                          </p>
+                          <div className="mt-1.5">
+                            {detail.asset ? (
+                              <div className="flex items-center justify-between text-xs bg-white p-1.5 rounded-lg border border-slate-200">
+                                <span className="font-bold text-slate-800 truncate text-[11px]">{detail.asset.name} <span className="font-mono text-[10px] text-slate-400 font-normal">({detail.asset.assetCode})</span></span>
+                                <button onClick={()=>connectAsset(detail.id,"")} className="text-[9px] px-1.5 py-0.5 rounded border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold shrink-0 ml-1">Lepas</button>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-400">Tanpa aset terhubung</p>
+                            )}
+                          </div>
+                        </div>
+                        <select 
+                          value={detail.asset?.id || detail.assetId || ""} 
+                          onChange={(e)=> connectAsset(detail.id, e.target.value)} 
+                          className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs bg-white mt-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
+                        >
+                          <option value="">— Hubungkan aset —</option>
+                          {assets.map(a=> <option key={a.id} value={a.id}>{a.name} ({a.assetCode})</option>)}
+                        </select>
+                      </div>
+                      
+                      {/* Technician Assignee */}
+                      <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200 flex flex-col justify-between">
+                        <div>
+                          <p className="text-slate-400 font-bold uppercase text-[10px] tracking-wider flex items-center gap-1">
+                            <Wrench size={12} className="text-indigo-600"/> Teknisi IT
+                          </p>
+                          <div className="mt-1.5">
+                            <p className="text-xs text-slate-800 truncate font-extrabold">{detail.assignedUser?.name || detail.assignedUser?.email || <span className="text-slate-400 font-normal">— Belum ada</span>}</p>
+                            <p className="text-[10px] text-slate-400 truncate mt-0.5">Penanggung jawab</p>
+                          </div>
+                        </div>
+                        <select 
+                          value={detail.assignedTo || ""} 
+                          onChange={(e)=> reassign(detail.id, e.target.value)} 
+                          className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs bg-white mt-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
+                        >
+                          <option value="">— Alihkan Teknisi —</option>
+                          {users.map(u=> <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Sticky 3-Phase Tabs Bar */}
+                  <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200 flex gap-1.5 p-2.5 shadow-xs">
                     {PHASES.map(p=>{
                       const cnt = phaseCounts[p.id]
                       const isActive = activePhase===p.id
@@ -1013,11 +2056,11 @@ export default function ItOslTicketsPage() {
                         <button 
                           key={p.id} 
                           onClick={()=>setActivePhase(p.id as typeof activePhase)} 
-                          className={`flex-1 py-2 sm:py-2 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${
+                          className={`flex-1 py-2 px-1.5 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${
                             isActive ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                           }`}
                         >
-                          <span className="flex items-center gap-1">
+                          <span className="flex items-center gap-1 text-[11px] sm:text-xs">
                             <p.icon size={13} className="shrink-0"/> 
                             <span>{p.label}</span>
                             {cnt > 0 && (
@@ -1032,29 +2075,31 @@ export default function ItOslTicketsPage() {
                     })}
                   </div>
 
-                  <div className="p-3.5 sm:p-5 space-y-4">
-                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-800 leading-relaxed">
-                      {activePhase==="ANALISA" && "Analisa: cek gejala, log, ukur, foto kondisi awal. Minimal 5 karakter tiap item, bisa lampirkan banyak foto."}
-                      {activePhase==="PENGERJAAN" && "Pengerjaan: langkah eksekusi — bongkar, ganti, crimping, konfigurasi. Foto tiap langkah."}
-                      {activePhase==="HASIL" && "Hasil: verifikasi normal, uji operasional, foto after, serah terima."}
+                  {/* 4. Phase Content & Work Items Feed (Spacious bottom layout) */}
+                  <div className="p-4 sm:p-5 space-y-4 pb-36 sm:pb-24">
+                    {/* Guidance Tip */}
+                    <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-xs text-amber-900 leading-relaxed">
+                      {activePhase==="ANALISA" && "💡 Analisa: Diagnosis gejala, log error, pengukuran voltase/sinyal, dan foto kondisi awal perangkat."}
+                      {activePhase==="PENGERJAAN" && "💡 Pengerjaan: Langkah eksekusi perbaikan — bongkar, crimping, replace part, dan foto langkah kerja."}
+                      {activePhase==="HASIL" && "💡 Hasil: Uji verifikasi fungsional, serah terima unit, dan foto hasil akhir yang telah normal."}
                     </div>
 
-                    {/* Work Items Feed */}
+                    {/* Existing Work Items Feed */}
                     <div className="space-y-3">
                       {(detail.workItems||[]).filter(w=> w.phase===activePhase).length===0 && (
-                        <div className="py-8 text-center text-xs text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
-                          Belum ada item {activePhase} — tambah di bawah
+                        <div className="py-8 text-center text-xs text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl bg-white">
+                          Belum ada catatan {activePhase.toLowerCase()} — tambahkan pekerjaan di form bawah
                         </div>
                       )}
                       {(detail.workItems||[]).filter(w=> w.phase===activePhase).map(w=>(
-                        <div key={w.id} className="bg-white border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-2.5">
+                        <div key={w.id} className="bg-white border border-slate-200 rounded-2xl p-3.5 sm:p-4 shadow-sm space-y-2.5">
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
-                              {w.title && <p className="font-black text-slate-900 text-sm truncate">{w.title}</p>}
-                              <p className="text-sm text-slate-700 whitespace-pre-wrap break-words mt-0.5 leading-relaxed">{w.description}</p>
-                              <p className="text-[10px] text-slate-400 mt-1">
-                                {new Date(w.createdAt).toLocaleString('id-ID', { dateStyle:'short', timeStyle:'short' })} 
-                                {w.creator?.name ? ` • ${w.creator.name}` : ""} • {w.status}
+                              {w.title && <p className="font-extrabold text-slate-900 text-sm">{w.title}</p>}
+                              <p className="text-xs sm:text-sm text-slate-700 whitespace-pre-wrap break-words mt-0.5 leading-relaxed">{w.description}</p>
+                              <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
+                                <span>{new Date(w.createdAt).toLocaleString('id-ID', { dateStyle:'short', timeStyle:'short' })}</span>
+                                {w.creator?.name && <span>• {w.creator.name}</span>}
                               </p>
                             </div>
                             {isAdmin ? (
@@ -1066,11 +2111,12 @@ export default function ItOslTicketsPage() {
                             )}
                           </div>
 
+                          {/* Photos Gallery */}
                           {w.attachments.length>0 && (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 pt-1">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                               {w.attachments.map(a=>(
-                                <div key={a.id} className="relative group rounded-xl overflow-hidden border border-slate-200">
-                                  <img src={`${process.env.NEXT_PUBLIC_API_URL}${a.url}`} alt={a.fileName||"foto"} className="w-full h-24 object-cover"/>
+                                <div key={a.id} className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                                  <img src={`${process.env.NEXT_PUBLIC_API_URL}${a.url}`} alt={a.fileName||"foto"} className="w-full h-24 sm:h-28 object-cover"/>
                                   {isAdmin && (
                                     <button onClick={()=>delAttachment(w.id, a.id)} className="absolute top-1 right-1 w-6 h-6 bg-rose-500 text-white rounded-full flex items-center justify-center shadow hover:bg-rose-600" title="Hapus foto">
                                       <X size={12}/>
@@ -1081,71 +2127,95 @@ export default function ItOslTicketsPage() {
                             </div>
                           )}
 
+                          {/* Attach more photos */}
                           <div className="pt-2 border-t border-slate-100">
-                            <label className="text-[11px] font-bold text-slate-500 flex items-center gap-1 cursor-pointer">
-                              <ImagePlus size={13}/> Tambah foto ke item ini
+                            <label className="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer">
+                              <ImagePlus size={13}/> Tambah foto dokumentasi
                             </label>
                             <input 
                               type="file" 
                               multiple 
                               accept="image/*" 
                               onChange={(e)=> { if(e.target.files) attachMore(w.id, e.target.files); e.target.value="" }} 
-                              className="mt-1 block w-full text-xs text-slate-500 file:mr-2.5 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:bg-indigo-600 file:text-white file:font-bold hover:file:bg-indigo-700"
+                              className="mt-1 block w-full text-xs text-slate-500 file:mr-2.5 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:bg-slate-100 file:text-slate-700 file:font-bold hover:file:bg-slate-200"
                             />
                           </div>
                         </div>
                       ))}
                     </div>
 
-                    {/* Add Work Item Form */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 sm:p-4 space-y-3">
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Tambah Item {activePhase}</h4>
+                    {/* Add Work Item Form (Spacious, Clear & Touch-Friendly) */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                          <Plus size={14} className="text-indigo-600"/> Catat Pekerjaan {activePhase}
+                        </h4>
+                        <span className="text-[10px] text-slate-400 font-medium">Langkah per langkah</span>
+                      </div>
+                      
                       <input 
                         value={newTitle} 
                         onChange={(e)=>setNewTitle(e.target.value)} 
-                        placeholder="Judul singkat opsional — cth: Cek kabel LAN" 
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                        placeholder="Judul singkat (opsional) — cth: Pengecekan jalur adaptor" 
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" 
                       />
+
                       <textarea 
                         value={newDesc} 
                         onChange={(e)=>setNewDesc(e.target.value)} 
-                        placeholder={activePhase==="ANALISA"? "Analisa: gejala, dugaan penyebab, pengukuran…" : activePhase==="PENGERJAAN"? "Pengerjaan: langkah yang dilakukan, alat dipakai…" : "Hasil: verifikasi, uji, status akhir…"} 
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm min-h-[80px] bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                        placeholder={activePhase==="ANALISA"? "Jelaskan temuan analisa, gejala gangguan, pengukuran voltase…" : activePhase==="PENGERJAAN"? "Uraikan tindakan perbaikan yang dilakukan, penggantian part…" : "Jelaskan hasil akhir pengujian, verifikasi fungsi, serah terima…"} 
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm min-h-[90px] sm:min-h-[110px] bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition leading-relaxed" 
                       />
+
                       <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Foto (&gt;1 boleh)</label>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1">Upload Foto Dokumentasi</label>
                         <input 
                           ref={fileRef} 
                           type="file" 
                           multiple 
                           accept="image/*" 
                           onChange={(e)=> setNewFiles(e.target.files)} 
-                          className="block w-full text-xs text-slate-500 file:mr-2.5 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:bg-slate-900 file:text-white file:font-bold"
+                          className="block w-full text-xs text-slate-500 file:mr-2.5 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:bg-slate-900 file:text-white file:font-bold hover:file:bg-slate-800 transition"
                         />
-                        {newFiles && <p className="text-[10px] text-slate-500 mt-1">{newFiles.length} foto dipilih</p>}
+                        {newFiles && <p className="text-[10px] text-emerald-600 font-bold mt-1">✓ {newFiles.length} foto terpilih untuk diupload</p>}
                       </div>
+
                       <button 
                         onClick={addWorkItem} 
                         disabled={adding} 
-                        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-black text-sm flex items-center justify-center gap-2 shadow-md shadow-indigo-600/25 transition disabled:opacity-60"
+                        className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-indigo-600/30 transition disabled:opacity-60"
                       >
-                        {adding ? <Loader2 className="animate-spin" size={14}/> : <Plus size={14}/>} 
-                        Simpan Item {activePhase}
+                        {adding ? <Loader2 className="animate-spin" size={15}/> : <Plus size={15}/>} 
+                        Simpan Catatan {activePhase}
                       </button>
                     </div>
 
+                    {/* Resolution Summary (If resolved/closed) */}
                     {(detail.rootCause || detail.correctiveAction) && (
-                      <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-1.5 text-xs text-slate-700">
-                        <h4 className="font-black uppercase tracking-wider text-slate-900">Ringkasan Penyelesaian</h4>
-                        {detail.rootCause && <p><b>Akar Masalah:</b> {detail.rootCause}</p>}
-                        {detail.correctiveAction && <p><b>Tindakan:</b> {detail.correctiveAction}</p>}
+                      <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 space-y-2 text-xs text-slate-700 shadow-sm">
+                        <h4 className="font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                          <Check size={14} className="text-emerald-600"/> Ringkasan Akar Masalah & Solusi
+                        </h4>
+                        {detail.rootCause && (
+                          <div className="bg-white/80 p-2.5 rounded-xl border border-emerald-100">
+                            <span className="font-bold text-slate-800 block text-[11px]">Akar Masalah:</span>
+                            <p className="mt-0.5 text-slate-600 leading-relaxed">{detail.rootCause}</p>
+                          </div>
+                        )}
+                        {detail.correctiveAction && (
+                          <div className="bg-white/80 p-2.5 rounded-xl border border-emerald-100">
+                            <span className="font-bold text-slate-800 block text-[11px]">Tindakan Perbaikan:</span>
+                            <p className="mt-0.5 text-slate-600 leading-relaxed">{detail.correctiveAction}</p>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
-                </div>
 
-                <div className="p-3 border-t bg-slate-50 text-[10px] text-slate-500 text-center">
-                  Audit: status change & work-item tercatat otomatis
+                    {/* Integrated Audit Note in Scrollable Body */}
+                    <div className="pt-2 text-center text-[10px] text-slate-400">
+                      Audit log: Setiap perubahan status & catatan pengerjaan tercatat otomatis dengan timestamp
+                    </div>
+                  </div>
                 </div>
                 </>
               ) : null}
@@ -1154,17 +2224,17 @@ export default function ItOslTicketsPage() {
         )}
       </AnimatePresence>
 
-      <div className="text-[11px] text-slate-400 px-1">
-        Offline: draft Quick-Log tersimpan lokal bila sinyal hilang — sinkron saat online kembali.
+      <div className="text-[10px] sm:text-[11px] text-slate-400 px-1 text-center sm:text-left">
+        Target FRT SLA otomatis dihitung berdasarkan tingkat severity tiket.
       </div>
 
-      {/* Mobile Floating Action Button (FAB) - Elevated above bottom nav */}
+      {/* Mobile Floating Action Button (FAB) */}
       <button 
         onClick={()=>setShowQuick(true)} 
-        className="fixed bottom-24 right-4 sm:hidden w-13 h-13 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 flex items-center justify-center z-40 active:scale-90 transition-transform"
+        className="fixed bottom-20 right-4 sm:hidden w-12 h-12 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 flex items-center justify-center z-40 active:scale-90 transition-transform"
         aria-label="Quick-Log Tiket Baru"
       >
-        <Plus size={24} strokeWidth={2.5} />
+        <Plus size={22} strokeWidth={2.5} />
       </button>
     </div>
   )
