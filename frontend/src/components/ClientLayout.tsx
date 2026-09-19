@@ -32,12 +32,12 @@ export function ClientLayout({
     }, [])
 
     return (
-        <div className="flex min-h-screen bg-[#f8fafc] relative font-sans">
+        <div className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-[#f8fafc] relative font-sans">
             {/* Global Command Palette — Ctrl+K anywhere */}
             <CommandPalette />
             {/* Main Application Container with Dynamic Blur */}
             <div 
-                className={`flex-1 flex flex-col min-h-screen transition-all duration-700 ease-in-out ${
+                className={`flex-1 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden transition-all duration-700 ease-in-out ${
                     isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-[280px]'
                 }`}
             >
@@ -101,8 +101,8 @@ export function ClientLayout({
                     </div>
                 </header>
                 
-                <main className="flex-1 transition-all duration-300 ease-in-out pb-32 mt-14 lg:mt-0">
-                    <div className="w-full h-full">
+                <main className="flex-1 min-w-0 max-w-full transition-all duration-300 ease-in-out pb-32 mt-14 lg:mt-0 overflow-x-hidden">
+                    <div className="w-full min-w-0 max-w-full h-full">
                         {children}
                     </div>
                 </main>

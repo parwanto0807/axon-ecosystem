@@ -26,6 +26,8 @@ let lastTrafficStats = {};
 app.use(cors());
 app.use(express.json());
 app.use('/public', express.static(path.join(__dirname, 'public')));
+const itOslRouter = require('./routes/it-osl');
+app.use('/api/it-osl', itOslRouter);
 
 // --- RBAC MIDDLEWARE ---
 const checkRole = (allowedRoles) => (req, res, next) => {
@@ -2400,6 +2402,11 @@ app.post('/api/stock-movements/:id/confirm', async (req, res) => {
       if (movement.status !== 'DRAFT') throw new Error('Already confirmed or cancelled');
 
       const upsertStock = async (warehouseId, skuId, delta) => {
+        if (delta < 0) {
+          const existing = await tx.warehouseStock.findUnique({ where: { warehouseId_skuId: { warehouseId, skuId } } });
+          const avail = existing?.quantity || 0;
+          if (avail + delta < 0) throw new Error(`Stok tidak cukup SKU ${skuId} di gudang ${warehouseId}: tersedia ${avail}, butuh ${-delta}`);
+        }
         await tx.warehouseStock.upsert({
           where: { warehouseId_skuId: { warehouseId, skuId } },
           create: { warehouseId, skuId, quantity: Math.max(0, delta) },
@@ -2448,7 +2455,7 @@ app.post('/api/stock-movements/:id/confirm', async (req, res) => {
         }
       }
 
-      // 2. Journaling (Single consolidated entry per Stock Movement)
+       // 2. Journaling (Single consolidated entry per Stock Movement)
       if (totalAmount > 0) {
         if (result.type === 'IN' || result.type === 'BEGINNING') {
            await postJournalFromSystemKey({
@@ -2461,9 +2468,8 @@ app.post('/api/stock-movements/:id/confirm', async (req, res) => {
              prismaTx: tx
            });
         } else if (result.type === 'OUT') {
-           // Fallback or handle based on other keys if necessary
            await postJournalFromSystemKey({
-             systemKey: 'COGS', // Ensure COGS key exists or handle fallback
+             systemKey: 'COGS',
              counterSystemKey: 'INVENTORY_PUSAT',
              amount: totalAmount,
              description: `Stock OUT: ${result.number} (${result.items.length} items)`,
@@ -2471,6 +2477,37 @@ app.post('/api/stock-movements/:id/confirm', async (req, res) => {
              type: 'INVENTORY',
              prismaTx: tx
            });
+        } else if (result.type === 'OPNAME' || result.type === 'ADJUSTMENT') {
+           let adjAmount = 0;
+           for (const it of result.items) {
+             const delta = it.qty - (it.systemQty || 0);
+             adjAmount += Math.abs(delta) * (Number(it.unitCost) || 0);
+           }
+           if (adjAmount > 0) {
+             const isPositive = result.items.reduce((s,it)=> s + (it.qty - (it.systemQty||0)), 0) > 0;
+             // ponytail: OPNAME pakai INVENTORY_ADJUSTMENT_ACCOUNT, upgrade ke COA selisih khusus jika ada
+             if (isPositive) {
+               await postJournalFromSystemKey({
+                 systemKey: 'INVENTORY_PUSAT',
+                 counterSystemKey: 'INVENTORY_ADJUSTMENT_ACCOUNT',
+                 amount: adjAmount,
+                 description: `Opname +: ${result.number}`,
+                 reference: result.number,
+                 type: 'STOCK_MOVEMENT',
+                 prismaTx: tx
+               });
+             } else {
+               await postJournalFromSystemKey({
+                 systemKey: 'INVENTORY_ADJUSTMENT_ACCOUNT',
+                 counterSystemKey: 'INVENTORY_PUSAT',
+                 amount: adjAmount,
+                 description: `Opname -: ${result.number}`,
+                 reference: result.number,
+                 type: 'STOCK_MOVEMENT',
+                 prismaTx: tx
+               });
+             }
+           }
         }
       }
 
@@ -3842,10 +3879,11 @@ app.delete('/api/system-accounts/:id', async (req, res) => {
 app.get('/api/reports/ledger', async (req, res) => {
   try {
     const { coaId, startDate, endDate } = req.query;
-    const where = {};
+    const where = { journalEntry: { status: 'POSTED' } };
     if (coaId) where.coaId = coaId;
     if (startDate || endDate) {
       where.journalEntry = {
+        status: 'POSTED',
         date: {
           ...(startDate && { gte: new Date(startDate + 'T00:00:00') }),
           ...(endDate && { lte: new Date(endDate + 'T23:59:59.999') })
@@ -3887,7 +3925,7 @@ app.get('/api/reports/trial-balance', async (req, res) => {
     const items = await prisma.journalItem.groupBy({
       by: ['coaId'],
       where: {
-        journalEntry: { date: { lte: endDate } }
+        journalEntry: { status: 'POSTED', date: { lte: endDate } }
       },
       _sum: { debit: true, credit: true }
     });
@@ -4104,6 +4142,7 @@ app.get('/api/reports/cash-flow', async (req, res) => {
       where: {
         coaId: { in: cashAccounts.map(a => a.id) },
         journalEntry: {
+          status: 'POSTED',
           date: { gte: start, lte: end }
         }
       },
@@ -4163,7 +4202,7 @@ app.get('/api/reports/cash-flow-forecast', async (req, res) => {
       by: ['coaId'],
       where: {
         coaId: { in: cashAccountIds },
-        journalEntry: { date: { lt: startOfCurrentMonth } }
+        journalEntry: { status: 'POSTED', date: { lt: startOfCurrentMonth } }
       },
       _sum: { debit: true, credit: true }
     });
@@ -4175,7 +4214,7 @@ app.get('/api/reports/cash-flow-forecast', async (req, res) => {
     // ── 3. Current Balance (all journal items to date) ────────────────────────
     const balancesNow = await prisma.journalItem.groupBy({
       by: ['coaId'],
-      where: { coaId: { in: cashAccountIds } },
+      where: { coaId: { in: cashAccountIds }, journalEntry: { status: 'POSTED' } },
       _sum: { debit: true, credit: true }
     });
     let currentBalance = 0;
@@ -4471,7 +4510,7 @@ app.get('/api/reports/executive-summary', async (req, res) => {
       by: ['coaId'],
       where: {
         coaId: { in: cashAccountIds },
-        journalEntry: { date: { lte: end }, status: { notIn: ['DRAFT', 'CANCELLED', 'VOID'] } }
+        journalEntry: { date: { lte: end }, status: 'POSTED' }
       },
       _sum: { debit: true, credit: true }
     });
@@ -4531,7 +4570,7 @@ app.get('/api/reports/executive-summary', async (req, res) => {
     const operatingCashItems = await prisma.journalItem.findMany({
       where: {
         coaId: { in: cashAccountIds },
-        journalEntry: { date: { gte: start, lte: end }, status: { notIn: ['DRAFT', 'CANCELLED', 'VOID'] } }
+        journalEntry: { date: { gte: start, lte: end }, status: 'POSTED' }
       }
     });
     let netOperatingCashFlow = 0;

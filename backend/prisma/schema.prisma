@@ -50,6 +50,16 @@ model User {
   businessCategory BusinessCategory? @relation(fields: [businessCategoryId], references: [id])
   employee      Employee?
   maintenanceRuns DailyMaintenanceRun[]
+  itOslAssets     ItOslAsset[]     @relation("ItOslAssetPic")
+  itOslAssignedTickets ItOslTicket[] @relation("ItOslAssigned")
+  itOslCreatedTickets  ItOslTicket[] @relation("ItOslCreator")
+  itOslPendings    ItOslTicketPending[]
+  itOslNotes      ItOslTicketNote[]
+  itOslAuditLogs  ItOslAuditLog[]
+  itOslPmSchedules ItOslPmSchedule[]
+  itOslPmExecutions ItOslPmExecution[]
+  itOslHandovers  ItOslHandover[]
+  itOslWorkItems  ItOslTicketWorkItem[] @relation("ItOslWorkItemCreator")
 }
 
 model VerificationToken {
@@ -1718,4 +1728,283 @@ model ProfitDistribution {
   updatedAt             DateTime        @updatedAt
   investorLoan          InvestorLoan    @relation(fields: [investorLoanId], references: [id], onDelete: Cascade)
   bankAccount           BankAccount?    @relation(fields: [bankAccountId], references: [id])
+}
+
+// ─── IT-OSL: IT Operations & Incident Service Log (PRD v2) ────────────────────
+
+model ItOslLocation {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tickets   ItOslTicket[]
+  assets    ItOslAsset[]
+  pics      ItOslPic[]
+  pmSchedules ItOslPmSchedule[]
+}
+
+model ItOslPic {
+  id          String         @id @default(cuid())
+  name        String
+  position    String?
+  department  String?
+  phone       String?
+  email       String?
+  locationId  String?
+  location    ItOslLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  notes       String?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  assets      ItOslAsset[]
+  tickets     ItOslTicket[]
+}
+
+model ItOslCategory {
+  id        String   @id @default(cuid())
+  name      String
+  groupName String
+  parentId  String?
+  parent    ItOslCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children  ItOslCategory[] @relation("CategoryHierarchy")
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tickets   ItOslTicket[]
+
+  @@unique([groupName, name])
+}
+
+model ItOslAsset {
+  id            String    @id @default(cuid())
+  assetCode     String    @unique
+  name          String
+  assetType     String?
+  brandModel    String?
+  serialNumber  String?   @unique
+  locationId    String?
+  location      ItOslLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  purchaseDate  DateTime?
+  warrantyUntil DateTime?
+  status        String    @default("ACTIVE") // ACTIVE IN_REPAIR RETIRED
+  picUserId     String?
+  picUser       User?     @relation("ItOslAssetPic", fields: [picUserId], references: [id], onDelete: SetNull)
+  picId         String?
+  pic           ItOslPic? @relation(fields: [picId], references: [id], onDelete: SetNull)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  tickets       ItOslTicket[]
+  pmSchedules   ItOslPmSchedule[]
+}
+
+model ItOslTicket {
+  id                String    @id @default(cuid())
+  ticketNumber      String    @unique
+  ticketType        String    @default("INCIDENT") // INCIDENT REQUEST PM
+  summary           String
+  reporterName      String?
+  reportChannel     String?   // WhatsApp · Telepon · Tatap Muka · Inspeksi Mandiri · Email · Sistem Monitoring
+  locationId        String
+  location          ItOslLocation @relation(fields: [locationId], references: [id])
+  assetId           String?
+  asset             ItOslAsset?   @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  picId             String?
+  pic               ItOslPic?     @relation(fields: [picId], references: [id], onDelete: SetNull)
+  categoryId        String
+  category          ItOslCategory @relation(fields: [categoryId], references: [id])
+  severity          String    @default("MEDIUM") // LOW MEDIUM CRITICAL
+  status            String    @default("NEW") // NEW IN_PROGRESS PENDING RESOLVED CLOSED CANCELLED DUPLICATE REOPENED
+  rootCause         String?   @db.Text
+  correctiveAction  String?   @db.Text
+  solutionCategory  String?   // Perbaikan · Penggantian Komponen · Konfigurasi Ulang · Reset/Restart · Eskalasi ke Vendor · Edukasi User · Tidak Ditemukan Masalah
+  assetCondition    String?   // NORMAL TEMPORARY BROKEN
+  isPreventable     Boolean?
+  parentTicketId    String?
+  parentTicket      ItOslTicket?  @relation("TicketHierarchy", fields: [parentTicketId], references: [id])
+  childTickets      ItOslTicket[] @relation("TicketHierarchy")
+  assignedTo        String?
+  assignedUser      User?     @relation("ItOslAssigned", fields: [assignedTo], references: [id], onDelete: SetNull)
+  createdBy         String?
+  creator           User?     @relation("ItOslCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  reportedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  acknowledgedAt    DateTime?
+  resolvedAt        DateTime?
+  closedAt          DateTime?
+  reopenedCount     Int       @default(0)
+  totalPendingSec   Int       @default(0)
+  updatedAt         DateTime  @updatedAt
+  clientTime        DateTime?
+  pendings          ItOslTicketPending[]
+  parts             ItOslTicketPart[]
+  attachments       ItOslTicketAttachment[]
+  notes             ItOslTicketNote[]
+  auditLogs         ItOslAuditLog[]
+  workItems         ItOslTicketWorkItem[]
+}
+
+model ItOslTicketPending {
+  id                String   @id @default(cuid())
+  ticketId          String
+  ticket            ItOslTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  reason            String   // Menunggu sparepart · Menunggu approval anggaran · Koordinasi vendor · Menunggu jendela maintenance · Menunggu konfirmasi user · Lainnya
+  externalParty     String?
+  notes             String?
+  expectedResumeAt  DateTime?
+  startedAt         DateTime @default(now())
+  endedAt           DateTime?
+  createdBy         String?
+  creator           User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt         DateTime @default(now())
+}
+
+model ItOslTicketPart {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    ItOslTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  partName  String
+  quantity  Float    @default(1)
+  unit      String   @default("pcs")
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model ItOslTicketAttachment {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    ItOslTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  url       String
+  fileName  String?
+  mimeType  String?
+  type      String   @default("INITIAL") // INITIAL RESOLUTION
+  createdAt DateTime @default(now())
+}
+
+model ItOslTicketNote {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    ItOslTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+}
+
+model ItOslAuditLog {
+  id           String   @id @default(cuid())
+  entityType   String   // TICKET ASSET etc
+  entityId     String
+  action       String   // CREATE UPDATE STATUS_CHANGE
+  fieldName    String?
+  oldValue     String?  @db.Text
+  newValue     String?  @db.Text
+  actorUserId  String?
+  actor        User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  ipAddress    String?
+  userAgent    String?
+  ticketId     String?
+  ticket       ItOslTicket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([ticketId])
+}
+
+model ItOslPmSchedule {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  frequency   String   @default("WEEKLY") // DAILY WEEKLY MONTHLY
+  locationId  String?
+  location    ItOslLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  assetId     String?
+  asset       ItOslAsset?    @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  isActive    Boolean  @default(true)
+  createdBy   String?
+  creator     User?    @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  checkItems  ItOslPmCheckItem[]
+  executions  ItOslPmExecution[]
+}
+
+model ItOslPmCheckItem {
+  id         String   @id @default(cuid())
+  scheduleId String
+  schedule   ItOslPmSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  name       String
+  order      Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  executionItems ItOslPmExecutionItem[]
+}
+
+model ItOslPmExecution {
+  id          String   @id @default(cuid())
+  scheduleId  String
+  schedule    ItOslPmSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  executedBy  String?
+  executor    User?    @relation(fields: [executedBy], references: [id], onDelete: SetNull)
+  executedAt  DateTime @default(now())
+  notes       String?  @db.Text
+  status      String   @default("COMPLETED") // COMPLETED ISSUE_FOUND
+  createdAt   DateTime @default(now())
+  items       ItOslPmExecutionItem[]
+}
+
+model ItOslPmExecutionItem {
+  id          String   @id @default(cuid())
+  executionId String
+  execution   ItOslPmExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  checkItemId String?
+  checkItem   ItOslPmCheckItem? @relation(fields: [checkItemId], references: [id], onDelete: SetNull)
+  name        String
+  result      String   @default("NORMAL") // NORMAL ATTENTION ISSUE
+  notes       String?
+}
+
+model ItOslHandover {
+  id            String   @id @default(cuid())
+  date          DateTime @default(now())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  openingAt     DateTime?
+  closingAt     DateTime?
+  openingNotes  String?  @db.Text
+  closingNotes  String?  @db.Text
+  handoverNotes String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ItOslTicketWorkItem {
+  id          String   @id @default(cuid())
+  ticketId    String
+  ticket      ItOslTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  phase       String   // ANALISA, PENGERJAAN, HASIL
+  title       String?
+  description String   @db.Text
+  status      String   @default("OPEN") // OPEN, DONE, CANCELLED
+  createdBy   String?
+  creator     User?    @relation("ItOslWorkItemCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  attachments ItOslTicketWorkItemAttachment[]
+
+  @@index([ticketId, phase])
+}
+
+model ItOslTicketWorkItemAttachment {
+  id         String   @id @default(cuid())
+  workItemId String
+  workItem   ItOslTicketWorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  url        String
+  fileName   String?
+  mimeType   String?
+  createdAt  DateTime @default(now())
 }

@@ -127,6 +127,17 @@ const translations: any = {
         invoiceTemplate: 'Template Invoice',
         development: 'Development',
         developmentPlanning: 'Planning & Progress',
+        itMaintenance: 'IT Maintenance',
+        itOsl: 'IT-OSL Service Log',
+        dashboardOsl: 'Dashboard OSL',
+        ticketsOsl: 'Tiket & Quick-Log',
+        assetRegistry: 'Registri Aset + QR',
+        picDirectory: 'Direktori PIC',
+        pmChecklist: 'PM Checklist',
+        handover: 'Serah Terima Shift',
+        oslReports: 'Laporan OSL',
+        masterOsl: 'Master OSL',
+        checklistDaily: 'Checklist Harian',
     },
     EN: {
         overview: 'Overview',
@@ -197,6 +208,17 @@ const translations: any = {
         invoiceTemplate: 'Invoice Template',
         development: 'Development',
         developmentPlanning: 'Planning & Progress',
+        itMaintenance: 'IT Maintenance',
+        itOsl: 'IT-OSL Service Log',
+        dashboardOsl: 'Dashboard OSL',
+        ticketsOsl: 'Tickets & Quick-Log',
+        assetRegistry: 'Asset Registry + QR',
+        picDirectory: 'PIC Directory',
+        pmChecklist: 'PM Checklist',
+        handover: 'Shift Handover',
+        oslReports: 'OSL Reports',
+        masterOsl: 'OSL Master',
+        checklistDaily: 'Daily Checklist',
     }
 }
 
@@ -260,11 +282,11 @@ const getMenuItems = (t: any) => [
         label: t.salesPipeline,
         requiredDepartment: ['SALES'],
         children: [
+            { id: 'quotations', icon: FileText, label: t.quotations, path: '/dashboard/sales/quotations' },
+            { id: 'orders', icon: ShoppingBag, label: t.salesOrders, path: '/dashboard/sales/orders' },
             { id: 'projects', icon: Briefcase, label: t.projects, path: '/dashboard/sales/projects' },
             { id: 'surveys', icon: MapPin, label: t.surveys, path: '/dashboard/sales/surveys' },
             { id: 'proposals', icon: ClipboardList, label: t.proposals, path: '/dashboard/sales/proposals' },
-            { id: 'quotations', icon: FileText, label: t.quotations, path: '/dashboard/sales/quotations' },
-            { id: 'orders', icon: ShoppingBag, label: t.salesOrders, path: '/dashboard/sales/orders' },
             { id: 'contracts', icon: FileText, label: t.contracts, path: '/dashboard/contracts' }
         ]
     },
@@ -332,11 +354,16 @@ const getMenuItems = (t: any) => [
         label: t.finance,
         requiredDepartment: ['FINANCE'],
         children: [
+            { id: 'coa', icon: TableProperties, label: t.coa, path: '/dashboard/finance/coa' },
+            { id: 'banks', icon: Landmark, label: t.bankAccounts, path: '/dashboard/finance/banks' },
+            { id: 'opening-balances', icon: LayoutGrid, label: t.openingBalances, path: '/dashboard/finance/opening-balances' },
+            { id: 'system-accounts', icon: Settings, label: t.systemSettings, path: '/dashboard/finance/system-accounts' },
             { id: 'invoices', icon: Receipt, label: t.customerInvoices, path: '/dashboard/finance/invoices' },
-            { id: 'investor-loans', icon: Landmark, label: t.investorLoans, path: '/dashboard/finance/investor-loans' },
             { id: 'operational-expenses', icon: Wallet, label: t.operationalCosts, path: '/dashboard/finance/operational-expenses' },
             { id: 'approvals', icon: ShieldCheck, label: t.operationalApprovals, path: '/dashboard/finance/approvals' },
             { id: 'expense-reports', icon: Receipt, label: t.accountabilityReports, path: '/dashboard/finance/expenses' },
+            { id: 'investor-loans', icon: Landmark, label: t.investorLoans, path: '/dashboard/finance/investor-loans' },
+            { id: 'journals', icon: BookOpen, label: t.journals, path: '/dashboard/finance/journals' },
             {
                 id: 'reports',
                 icon: BarChart3,
@@ -351,11 +378,6 @@ const getMenuItems = (t: any) => [
                     { id: 'forecast', label: t.cashProjection, icon: BarChart3, path: '/dashboard/finance/reports/cash-flow-forecast' },
                 ]
             },
-            { id: 'coa', icon: TableProperties, label: t.coa, path: '/dashboard/finance/coa' },
-            { id: 'journals', icon: BookOpen, label: t.journals, path: '/dashboard/finance/journals' },
-            { id: 'opening-balances', icon: LayoutGrid, label: t.openingBalances, path: '/dashboard/finance/opening-balances' },
-            { id: 'system-accounts', icon: Settings, label: t.systemSettings, path: '/dashboard/finance/system-accounts' },
-            { id: 'banks', icon: Landmark, label: t.bankAccounts, path: '/dashboard/finance/banks' },
         ]
     },
     {
@@ -391,9 +413,17 @@ const getMenuItems = (t: any) => [
     {
         id: 'it-maintenance',
         icon: Wrench,
-        label: 'IT Maintenance',
+        label: t.itMaintenance,
         children: [
-            { id: 'it-checklist', icon: ClipboardList, label: 'IT Checklist', path: '/dashboard/maintenance' },
+            { id: 'it-osl-dashboard', icon: BarChart3, label: t.dashboardOsl, path: '/dashboard/maintenance/it-osl' },
+            { id: 'it-osl-tickets', icon: ClipboardList, label: t.ticketsOsl, path: '/dashboard/maintenance/it-osl/tickets' },
+            { id: 'it-osl-assets', icon: Database, label: t.assetRegistry, path: '/dashboard/maintenance/it-osl/assets' },
+            { id: 'it-osl-pics', icon: Users, label: t.picDirectory, path: '/dashboard/maintenance/it-osl/pics' },
+            { id: 'it-osl-pm', icon: Calendar, label: t.pmChecklist, path: '/dashboard/maintenance/it-osl/pm' },
+            { id: 'it-osl-handovers', icon: ArrowLeftRight, label: t.handover, path: '/dashboard/maintenance/it-osl/handovers' },
+            { id: 'it-osl-reports', icon: FileText, label: t.oslReports, path: '/dashboard/maintenance/it-osl/reports' },
+            { id: 'it-osl-settings', icon: Settings, label: t.masterOsl, path: '/dashboard/maintenance/it-osl/settings', requiredRoles: ['ADMIN', 'SUPER_ADMIN'] },
+            { id: 'it-checklist', icon: ClipboardList, label: t.checklistDaily, path: '/dashboard/maintenance' },
             { id: 'it-mikrotik', icon: Network, label: t.mikrotikMonitoring, path: '/dashboard/operational/mikrotik' },
         ]
     },
