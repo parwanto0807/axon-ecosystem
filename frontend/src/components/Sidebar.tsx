@@ -416,6 +416,7 @@ const getMenuItems = (t: any) => [
         label: t.itMaintenance,
         children: [
             { id: 'it-osl-dashboard', icon: BarChart3, label: t.dashboardOsl, path: '/dashboard/maintenance/it-osl' },
+            { id: 'it-osl-customers', icon: Building2, label: 'Data Customer (B2B)', path: '/dashboard/maintenance/it-osl/customers', requiredRoles: ['SUPER_ADMIN'] },
             { id: 'it-osl-tickets', icon: ClipboardList, label: t.ticketsOsl, path: '/dashboard/maintenance/it-osl/tickets' },
             { id: 'it-osl-assets', icon: Database, label: t.assetRegistry, path: '/dashboard/maintenance/it-osl/assets' },
             { id: 'it-osl-pics', icon: Users, label: t.picDirectory, path: '/dashboard/maintenance/it-osl/pics' },

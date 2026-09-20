@@ -16,6 +16,25 @@ async function processItOslImage(file){
   return `/public/it-osl/${name}`;
 }
 
+// ── UPLOAD (Multiple & Single Images) ───────────────────────────────────────
+router.post('/upload', uploadMem.array('files', 10), async (req, res) => {
+  try {
+    const files = req.files || (req.file ? [req.file] : []);
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: 'Tidak ada file gambar yang diunggah' });
+    }
+    const urls = [];
+    for (const file of files) {
+      const url = await processItOslImage(file);
+      urls.push(url);
+    }
+    res.json({ urls, url: urls[0] });
+  } catch (e) {
+    console.error('[IT-OSL upload error]', e);
+    res.status(500).json({ message: e.message });
+  }
+});
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function requireAdmin(req, res){
   const role = String(req.headers['x-user-role']||'').toUpperCase()
@@ -102,24 +121,426 @@ function slaThresholdMinutes(severity) {
   return 240;
 }
 
+// ── RBAC Customer Scoping Helper ───────────────────────────────────────────
+async function getCustomerScope(req) {
+  const role = String(req.headers['x-user-role'] || '').toUpperCase();
+  const userId = req.headers['x-user-id'];
+  const userEmail = req.headers['x-user-email'];
+
+  // Super Admin & Admin have global access across all customers
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+    return { isGlobal: true, allowedCustomerIds: null };
+  }
+
+  let resolvedUserId = userId;
+  if (!resolvedUserId && userEmail) {
+    const user = await prisma.user.findUnique({
+      where: { email: String(userEmail) },
+      select: { id: true, role: true }
+    }).catch(() => null);
+    if (user) {
+      resolvedUserId = user.id;
+      const uRole = String(user.role).toUpperCase();
+      if (uRole === 'SUPER_ADMIN' || uRole === 'ADMIN') {
+        return { isGlobal: true, allowedCustomerIds: null };
+      }
+    }
+  }
+
+  // If userId was provided without explicit admin role header, double-check in DB
+  if (resolvedUserId && !role) {
+    const user = await prisma.user.findUnique({
+      where: { id: String(resolvedUserId) },
+      select: { role: true }
+    }).catch(() => null);
+    if (user && (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN')) {
+      return { isGlobal: true, allowedCustomerIds: null };
+    }
+  }
+
+  if (!resolvedUserId) {
+    // If not authenticated, restrict access completely
+    return { isGlobal: false, allowedCustomerIds: [] };
+  }
+
+  // Operational users only access customers assigned to them
+  const assignments = await prisma.itOslUserCustomer.findMany({
+    where: { userId: String(resolvedUserId) },
+    select: { customerId: true }
+  });
+  const allowedCustomerIds = assignments.map(a => a.customerId);
+  return { isGlobal: false, allowedCustomerIds };
+}
+
+function applyCustomerFilter(where, scope, reqCustomerId) {
+  if (scope.isGlobal) {
+    if (reqCustomerId) where.customerId = String(reqCustomerId);
+    return;
+  }
+  
+  if (!scope.allowedCustomerIds || scope.allowedCustomerIds.length === 0) {
+    where.customerId = '__NO_ACCESS_PERMITTED__';
+    return;
+  }
+
+  if (reqCustomerId) {
+    const cid = String(reqCustomerId);
+    if (!scope.allowedCustomerIds.includes(cid)) {
+      where.customerId = '__NO_ACCESS_PERMITTED__';
+    } else {
+      where.customerId = cid;
+    }
+  } else {
+    where.customerId = { in: scope.allowedCustomerIds };
+  }
+}
+
+// ── CUSTOMERS (Unified with Central Master Customer & RBAC Assignment) ──────
+router.get('/customers', async (req, res) => {
+  try {
+    const scope = await getCustomerScope(req);
+    const { search, isActive } = req.query;
+    
+    // Only B2B (CORPORATE / not INDIVIDUAL)
+    const where = {
+      type: { not: 'INDIVIDUAL' }
+    };
+
+    if (search) {
+      where.AND = [
+        {
+          OR: [
+            { name: { contains: String(search), mode: 'insensitive' } },
+            { code: { contains: String(search), mode: 'insensitive' } },
+            { phone: { contains: String(search), mode: 'insensitive' } },
+            { email: { contains: String(search), mode: 'insensitive' } },
+            { company: { contains: String(search), mode: 'insensitive' } },
+          ]
+        }
+      ];
+    }
+    if (isActive !== undefined) where.isActive = isActive === 'true';
+
+    if (!scope.isGlobal) {
+      where.id = { in: scope.allowedCustomerIds };
+    }
+
+    const customers = await prisma.customer.findMany({
+      where,
+      include: {
+        itOslAssignedUsers: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true, department: true } }
+          }
+        },
+        pics: true,
+        _count: {
+          select: {
+            itOslAssets: true,
+            itOslTickets: true,
+            itOslPics: true,
+            itOslLocations: true,
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    const mapped = customers.map(c => ({
+      ...c,
+      assignedUsers: c.itOslAssignedUsers || [],
+      _count: {
+        assets: c._count?.itOslAssets || 0,
+        tickets: c._count?.itOslTickets || 0,
+        pics: (c._count?.itOslPics || 0) + (c.pics?.length || 0),
+        locations: c._count?.itOslLocations || 0,
+      }
+    }));
+
+    res.json(mapped);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+router.get('/customers/:id', async (req, res) => {
+  try {
+    const scope = await getCustomerScope(req);
+    if (!scope.isGlobal && !scope.allowedCustomerIds.includes(req.params.id)) {
+      return res.status(403).json({ message: 'Anda tidak memiliki akses ke customer ini' });
+    }
+
+    const customer = await prisma.customer.findUnique({
+      where: { id: req.params.id },
+      include: {
+        itOslLocations: { orderBy: { name: 'asc' } },
+        itOslPics: { orderBy: { name: 'asc' } },
+        pics: { orderBy: { name: 'asc' } },
+        itOslAssets: { include: { location: true, pic: true }, orderBy: { name: 'asc' }, take: 50 },
+        itOslAssignedUsers: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true, department: true } }
+          }
+        },
+        _count: {
+          select: {
+            itOslAssets: true,
+            itOslTickets: true,
+            itOslPics: true,
+            itOslLocations: true,
+          }
+        }
+      }
+    });
+
+    if (!customer) return res.status(404).json({ message: 'Customer tidak ditemukan' });
+
+    const mapped = {
+      ...customer,
+      locations: customer.itOslLocations || [],
+      pics: [...(customer.itOslPics || []), ...(customer.pics || [])],
+      assets: customer.itOslAssets || [],
+      assignedUsers: customer.itOslAssignedUsers || [],
+      _count: {
+        assets: customer._count?.itOslAssets || 0,
+        tickets: customer._count?.itOslTickets || 0,
+        pics: (customer._count?.itOslPics || 0) + (customer.pics?.length || 0),
+        locations: customer._count?.itOslLocations || 0,
+      }
+    };
+
+    res.json(mapped);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+router.post('/customers', async (req, res) => {
+  try {
+    const { code, name, type, company, phone, email, address, isActive, assignedUserIds } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ message: 'Nama customer wajib diisi' });
+
+    let custCode = (code || '').trim().toUpperCase();
+    if (!custCode) {
+      custCode = name.trim().replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || `CUST-${Date.now().toString().slice(-4)}`;
+    }
+
+    const existing = await prisma.customer.findUnique({ where: { code: custCode } });
+    if (existing) {
+      custCode = `${custCode}-${Date.now().toString().slice(-4)}`;
+    }
+
+    const customer = await prisma.customer.create({
+      data: {
+        code: custCode,
+        name: name.trim(),
+        type: type || 'CORPORATE',
+        company: company ? company.trim() : null,
+        phone: phone ? phone.trim() : null,
+        email: email ? email.trim() : null,
+        address: address ? address.trim() : null,
+        isActive: isActive !== undefined ? Boolean(isActive) : true,
+      }
+    });
+
+    if (Array.isArray(assignedUserIds) && assignedUserIds.length > 0) {
+      for (const uid of assignedUserIds) {
+        if (uid) {
+          await prisma.itOslUserCustomer.create({
+            data: { userId: uid, customerId: customer.id }
+          }).catch(() => {});
+        }
+      }
+    }
+
+    const created = await prisma.customer.findUnique({
+      where: { id: customer.id },
+      include: {
+        itOslAssignedUsers: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } }
+          }
+        },
+        _count: { select: { itOslAssets: true, itOslTickets: true, itOslPics: true, itOslLocations: true } }
+      }
+    });
+
+    const mapped = {
+      ...created,
+      assignedUsers: created?.itOslAssignedUsers || [],
+      _count: {
+        assets: created?._count?.itOslAssets || 0,
+        tickets: created?._count?.itOslTickets || 0,
+        pics: created?._count?.itOslPics || 0,
+        locations: created?._count?.itOslLocations || 0,
+      }
+    };
+
+    res.status(201).json(mapped);
+  } catch (e) {
+    res.status(400).json({ message: e.message });
+  }
+});
+
+router.put('/customers/:id', async (req, res) => {
+  try {
+    const { code, name, type, company, phone, email, address, isActive, assignedUserIds } = req.body;
+    const data = {};
+    if (code !== undefined) data.code = code.trim().toUpperCase();
+    if (name !== undefined) data.name = name.trim();
+    if (type !== undefined) data.type = type;
+    if (company !== undefined) data.company = company ? company.trim() : null;
+    if (phone !== undefined) data.phone = phone ? phone.trim() : null;
+    if (email !== undefined) data.email = email ? email.trim() : null;
+    if (address !== undefined) data.address = address ? address.trim() : null;
+    if (isActive !== undefined) data.isActive = Boolean(isActive);
+
+    await prisma.customer.update({
+      where: { id: req.params.id },
+      data,
+    });
+
+    if (Array.isArray(assignedUserIds)) {
+      await prisma.itOslUserCustomer.deleteMany({ where: { customerId: req.params.id } });
+      for (const uid of assignedUserIds) {
+        if (uid) {
+          await prisma.itOslUserCustomer.create({
+            data: { userId: uid, customerId: req.params.id }
+          }).catch(() => {});
+        }
+      }
+    }
+
+    const updated = await prisma.customer.findUnique({
+      where: { id: req.params.id },
+      include: {
+        itOslAssignedUsers: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } }
+          }
+        },
+        _count: { select: { itOslAssets: true, itOslTickets: true, itOslPics: true, itOslLocations: true } }
+      }
+    });
+
+    const mapped = {
+      ...updated,
+      assignedUsers: updated?.itOslAssignedUsers || [],
+      _count: {
+        assets: updated?._count?.itOslAssets || 0,
+        tickets: updated?._count?.itOslTickets || 0,
+        pics: updated?._count?.itOslPics || 0,
+        locations: updated?._count?.itOslLocations || 0,
+      }
+    };
+
+    res.json(mapped);
+  } catch (e) {
+    res.status(400).json({ message: e.message });
+  }
+});
+
+router.post('/customers/:id/assign-technicians', async (req, res) => {
+  try {
+    const { assignedUserIds } = req.body;
+    if (!Array.isArray(assignedUserIds)) {
+      return res.status(400).json({ message: 'assignedUserIds harus berupa array' });
+    }
+    await prisma.itOslUserCustomer.deleteMany({ where: { customerId: req.params.id } });
+    for (const uid of assignedUserIds) {
+      if (uid) {
+        await prisma.itOslUserCustomer.create({
+          data: { userId: uid, customerId: req.params.id }
+        }).catch(() => {});
+      }
+    }
+    const updated = await prisma.customer.findUnique({
+      where: { id: req.params.id },
+      include: {
+        itOslAssignedUsers: {
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true, department: true } }
+          }
+        }
+      }
+    });
+    res.json({ ok: true, assignedUsers: updated?.itOslAssignedUsers || [] });
+  } catch (e) {
+    res.status(400).json({ message: e.message });
+  }
+});
+
+router.delete('/customers/:id', async (req, res) => {
+  try {
+    if (!requireAdmin(req, res)) return;
+    const assetCnt = await prisma.itOslAsset.count({ where: { customerId: req.params.id } });
+    const ticketCnt = await prisma.itOslTicket.count({ where: { customerId: req.params.id } });
+    if (assetCnt > 0 || ticketCnt > 0) {
+      await prisma.customer.update({ where: { id: req.params.id }, data: { isActive: false } });
+      return res.json({ ok: true, message: 'Customer dinonaktifkan karena memiliki data aset/tiket terhubung' });
+    }
+    await prisma.customer.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ message: e.message });
+  }
+});
+
+// ── USERS OPERASIONAL LIST FOR ASSIGNMENT ──────────────────────────────────
+router.get('/users-operasional', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true, email: true, role: true, department: true },
+      orderBy: { name: 'asc' }
+    });
+    res.json(users);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
 // ── LOCATIONS ──────────────────────────────────────────────────────────────
 router.get('/locations', async (req, res) => {
   try {
-    const locs = await prisma.itOslLocation.findMany({ orderBy: { name: 'asc' } });
+    const scope = await getCustomerScope(req);
+    const { customerId } = req.query;
+    const where = {};
+    applyCustomerFilter(where, scope, customerId);
+
+    const locs = await prisma.itOslLocation.findMany({
+      where,
+      include: { customer: true },
+      orderBy: { name: 'asc' }
+    });
     res.json(locs);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 router.post('/locations', async (req, res) => {
   try {
-    const { code, name, address } = req.body;
+    const { code, name, address, customerId } = req.body;
     if (!code || !name) return res.status(400).json({ message: 'code & name wajib' });
-    const loc = await prisma.itOslLocation.create({ data: { code, name, address } });
+    const loc = await prisma.itOslLocation.create({
+      data: { code, name, address, customerId: customerId || null },
+      include: { customer: true }
+    });
     res.status(201).json(loc);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 router.put('/locations/:id', async (req, res) => {
   try {
-    const loc = await prisma.itOslLocation.update({ where: { id: req.params.id }, data: req.body });
+    const { code, name, address, customerId, isActive } = req.body;
+    const data = {};
+    if (code !== undefined) data.code = code;
+    if (name !== undefined) data.name = name;
+    if (address !== undefined) data.address = address;
+    if (customerId !== undefined) data.customerId = customerId || null;
+    if (isActive !== undefined) data.isActive = Boolean(isActive);
+
+    const loc = await prisma.itOslLocation.update({
+      where: { id: req.params.id },
+      data,
+      include: { customer: true }
+    });
     res.json(loc);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
@@ -155,7 +576,8 @@ router.delete('/categories/:id', async (req, res) => {
 // ── PICS (Dedicated PIC Contact Directory) ─────────────────────────────────
 router.get('/pics', async (req, res) => {
   try {
-    const { search, locationId, department, isActive } = req.query;
+    const scope = await getCustomerScope(req);
+    const { search, locationId, department, isActive, customerId } = req.query;
     const where = {};
     if (search) {
       where.OR = [
@@ -169,11 +591,13 @@ router.get('/pics', async (req, res) => {
     if (locationId) where.locationId = String(locationId);
     if (department) where.department = { contains: String(department), mode: 'insensitive' };
     if (isActive !== undefined) where.isActive = isActive === 'true';
+    applyCustomerFilter(where, scope, customerId);
 
     const pics = await prisma.itOslPic.findMany({
       where,
       include: {
         location: true,
+        customer: true,
         _count: { select: { assets: true, tickets: true } },
       },
       orderBy: [{ name: 'asc' }],
@@ -193,6 +617,7 @@ router.get('/pics/:id', async (req, res) => {
       where: { id: req.params.id },
       include: {
         location: true,
+        customer: true,
         assets: { include: { location: true }, orderBy: { name: 'asc' } },
         tickets: { include: { category: true, location: true }, orderBy: { createdAt: 'desc' }, take: 30 },
         _count: { select: { assets: true, tickets: true } },
@@ -205,7 +630,7 @@ router.get('/pics/:id', async (req, res) => {
 
 router.post('/pics', async (req, res) => {
   try {
-    const { name, position, department, phone, email, locationId, notes, isActive } = req.body;
+    const { name, position, department, phone, email, locationId, customerId, notes, isActive } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ message: 'Nama PIC wajib diisi' });
     const pic = await prisma.itOslPic.create({
       data: {
@@ -215,10 +640,11 @@ router.post('/pics', async (req, res) => {
         phone: phone ? phone.trim() : null,
         email: email ? email.trim() : null,
         locationId: locationId || null,
+        customerId: customerId || null,
         notes: notes ? notes.trim() : null,
         isActive: isActive !== undefined ? Boolean(isActive) : true,
       },
-      include: { location: true },
+      include: { location: true, customer: true },
     });
     res.status(201).json(pic);
   } catch (e) { res.status(400).json({ message: e.message }); }
@@ -226,7 +652,7 @@ router.post('/pics', async (req, res) => {
 
 router.put('/pics/:id', async (req, res) => {
   try {
-    const { name, position, department, phone, email, locationId, notes, isActive } = req.body;
+    const { name, position, department, phone, email, locationId, customerId, notes, isActive } = req.body;
     const data = {};
     if (name !== undefined) data.name = name.trim();
     if (position !== undefined) data.position = position ? position.trim() : null;
@@ -234,13 +660,14 @@ router.put('/pics/:id', async (req, res) => {
     if (phone !== undefined) data.phone = phone ? phone.trim() : null;
     if (email !== undefined) data.email = email ? email.trim() : null;
     if (locationId !== undefined) data.locationId = locationId || null;
+    if (customerId !== undefined) data.customerId = customerId || null;
     if (notes !== undefined) data.notes = notes ? notes.trim() : null;
     if (isActive !== undefined) data.isActive = Boolean(isActive);
 
     const pic = await prisma.itOslPic.update({
       where: { id: req.params.id },
       data,
-      include: { location: true },
+      include: { location: true, customer: true },
     });
     res.json(pic);
   } catch (e) { res.status(400).json({ message: e.message }); }
@@ -292,7 +719,8 @@ router.post('/pics/import', async (req, res) => {
 // ── ASSETS ─────────────────────────────────────────────────────────────────
 router.get('/assets', async (req, res) => {
   try {
-    const { search, status, locationId, picId, picUserId, assignedTo } = req.query;
+    const scope = await getCustomerScope(req);
+    const { search, status, locationId, picId, picUserId, assignedTo, customerId } = req.query;
     const where = {};
     if (search) where.OR = [{ name: { contains: String(search), mode: 'insensitive' } }, { assetCode: { contains: String(search), mode: 'insensitive' } }, { serialNumber: { contains: String(search), mode: 'insensitive' } }, { brandModel: { contains: String(search), mode: 'insensitive' } }];
     if (status) where.status = String(status);
@@ -300,10 +728,13 @@ router.get('/assets', async (req, res) => {
     if (picId) where.picId = String(picId);
     const picUser = picUserId || assignedTo;
     if (picUser) where.picUserId = String(picUser);
+    applyCustomerFilter(where, scope, customerId);
+
     const assets = await prisma.itOslAsset.findMany({
       where,
       include: {
         location: true,
+        customer: true,
         pic: { select: { id: true, name: true, phone: true, department: true, position: true } },
         picUser: { select: { id: true, name: true, email: true } },
         _count: { select: { tickets: true } },
@@ -327,6 +758,7 @@ router.get('/assets/:id', async (req, res) => {
       where: { id: req.params.id },
       include: {
         location: true,
+        customer: true,
         pic: true,
         picUser: { select: { id: true, name: true } },
         tickets: { include: { category: true, location: true }, orderBy: { createdAt: 'desc' }, take: 50 },
@@ -338,7 +770,7 @@ router.get('/assets/:id', async (req, res) => {
 });
 router.post('/assets', async (req, res) => {
   try {
-    const { assetCode, name, assetType, brandModel, serialNumber, locationId, purchaseDate, warrantyUntil, status, picId, picUserId, notes } = req.body;
+    const { assetCode, name, assetType, brandModel, serialNumber, locationId, customerId, purchaseDate, warrantyUntil, status, picId, picUserId, notes, photos } = req.body;
     if (!name) return res.status(400).json({ message: 'name wajib' });
     const code = assetCode || `AST-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
     const asset = await prisma.itOslAsset.create({
@@ -346,14 +778,16 @@ router.post('/assets', async (req, res) => {
         assetCode: code,
         name, assetType: assetType || null, brandModel: brandModel || null, serialNumber: serialNumber || null,
         locationId: locationId || null,
+        customerId: customerId || null,
         purchaseDate: purchaseDate ? new Date(purchaseDate) : null,
         warrantyUntil: warrantyUntil ? new Date(warrantyUntil) : null,
         status: status || 'ACTIVE',
         picId: picId || null,
         picUserId: picUserId || null,
         notes: notes || null,
+        photos: Array.isArray(photos) ? JSON.stringify(photos) : (typeof photos === 'string' ? photos : null),
       },
-      include: { location: true, pic: true },
+      include: { location: true, pic: true, customer: true },
     });
     await auditLog({ entityType: 'ASSET', entityId: asset.id, action: 'CREATE', newValue: name, actorUserId: req.headers['x-user-id'] || null, req });
     res.status(201).json(asset);
@@ -361,7 +795,7 @@ router.post('/assets', async (req, res) => {
 });
 router.put('/assets/:id', async (req, res) => {
   try {
-    const { name, assetType, brandModel, serialNumber, locationId, purchaseDate, warrantyUntil, status, notes, picId, picUserId, assetCode } = req.body;
+    const { name, assetType, brandModel, serialNumber, locationId, customerId, purchaseDate, warrantyUntil, status, notes, picId, picUserId, assetCode, photos } = req.body;
     const data = {};
     if (name !== undefined) data.name = name;
     if (assetType !== undefined) data.assetType = assetType || null;
@@ -369,16 +803,18 @@ router.put('/assets/:id', async (req, res) => {
     if (serialNumber !== undefined) data.serialNumber = serialNumber || null;
     if (assetCode !== undefined) data.assetCode = assetCode;
     if (locationId !== undefined) data.locationId = locationId || null;
+    if (customerId !== undefined) data.customerId = customerId || null;
     if (picId !== undefined) data.picId = picId || null;
     if (picUserId !== undefined) data.picUserId = picUserId || null;
     if (purchaseDate !== undefined) data.purchaseDate = purchaseDate ? new Date(purchaseDate) : null;
     if (warrantyUntil !== undefined) data.warrantyUntil = warrantyUntil ? new Date(warrantyUntil) : null;
     if (status !== undefined) data.status = status;
     if (notes !== undefined) data.notes = notes;
+    if (photos !== undefined) data.photos = Array.isArray(photos) ? JSON.stringify(photos) : (typeof photos === 'string' ? photos : null);
     const asset = await prisma.itOslAsset.update({
       where: { id: req.params.id },
       data,
-      include: { location: true, pic: true, picUser: { select: { id:true, name:true, email:true } } }
+      include: { location: true, pic: true, customer: true, picUser: { select: { id:true, name:true, email:true } } }
     });
     await auditLog({ entityType:'ASSET', entityId: asset.id, action:'UPDATE', newValue: JSON.stringify(data), actorUserId: req.headers['x-user-id']||null, req });
     res.json(asset);
@@ -419,7 +855,8 @@ router.post('/assets/import', async (req, res) => {
 // ── TICKETS ─────────────────────────────────────────────────────────────────
 router.get('/tickets', async (req, res) => {
   try {
-    const { status, severity, categoryId, locationId, assetId, picId, assignedTo, search, ticketType, from, to, pending, sla } = req.query;
+    const scope = await getCustomerScope(req);
+    const { status, severity, categoryId, locationId, assetId, picId, assignedTo, search, ticketType, from, to, pending, sla, customerId } = req.query;
     const where = {};
     if (status) where.status = String(status);
     if (severity) where.severity = String(severity);
@@ -429,6 +866,8 @@ router.get('/tickets', async (req, res) => {
     if (picId) where.picId = String(picId);
     if (assignedTo) where.assignedTo = String(assignedTo);
     if (ticketType) where.ticketType = String(ticketType);
+    applyCustomerFilter(where, scope, customerId);
+
     if (search) {
       const q = String(search).trim();
       where.OR = [
@@ -439,6 +878,7 @@ router.get('/tickets', async (req, res) => {
         { asset: { assetCode: { contains: q, mode: 'insensitive' } } },
         { asset: { name: { contains: q, mode: 'insensitive' } } },
         { pic: { name: { contains: q, mode: 'insensitive' } } },
+        { customer: { name: { contains: q, mode: 'insensitive' } } },
       ];
     }
     if (from || to) {
@@ -454,6 +894,7 @@ router.get('/tickets', async (req, res) => {
       include: {
         location: true,
         category: true,
+        customer: true,
         asset: { include: { location: true } },
         pic: { select: { id: true, name: true, phone: true, department: true, position: true } },
         assignedUser: { select: { id: true, name: true, email: true } },
@@ -488,11 +929,13 @@ router.get('/tickets', async (req, res) => {
 
 router.get('/tickets/:id', async (req, res) => {
   try {
+    const scope = await getCustomerScope(req);
     const t = await prisma.itOslTicket.findUnique({
       where: { id: req.params.id },
       include: {
         location: true,
         category: true,
+        customer: true,
         asset: { include: { location: true } },
         pic: true,
         assignedUser: { select: { id: true, name: true, email: true } },
@@ -508,6 +951,9 @@ router.get('/tickets/:id', async (req, res) => {
       },
     });
     if (!t) return res.status(404).json({ message: 'Ticket not found' });
+    if (!scope.isGlobal && (!t.customerId || !scope.allowedCustomerIds.includes(t.customerId))) {
+      return res.status(403).json({ message: 'Anda tidak memiliki akses ke tiket customer ini' });
+    }
     res.json(t);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -515,8 +961,9 @@ router.get('/tickets/:id', async (req, res) => {
 // Quick-Log create (4 field wajib per PRD §4.2) + progressive disclosure
 router.post('/tickets', async (req, res) => {
   try {
+    const scope = await getCustomerScope(req);
     const {
-      summary, locationId, categoryId, severity, ticketType,
+      summary, locationId, categoryId, severity, ticketType, customerId,
       reporterName, reportChannel, reportedAt, assetId, picId,
       channel, // alias
       assignedTo, createdBy, clientTime,
@@ -532,6 +979,22 @@ router.post('/tickets', async (req, res) => {
     if (!loc) return res.status(400).json({ message: 'Lokasi tidak ditemukan' });
     const cat = await prisma.itOslCategory.findUnique({ where: { id: categoryId } });
     if (!cat) return res.status(400).json({ message: 'Kategori tidak ditemukan' });
+
+    // Resolve customerId if not explicitly passed: from asset or location
+    let finalCustomerId = customerId || null;
+    if (!finalCustomerId && assetId) {
+      const assetObj = await prisma.itOslAsset.findUnique({ where: { id: assetId }, select: { customerId: true } });
+      if (assetObj?.customerId) finalCustomerId = assetObj.customerId;
+    }
+    if (!finalCustomerId && loc.customerId) {
+      finalCustomerId = loc.customerId;
+    }
+
+    if (!scope.isGlobal) {
+      if (!finalCustomerId || !scope.allowedCustomerIds.includes(finalCustomerId)) {
+        return res.status(403).json({ message: 'Anda tidak memiliki hak akses untuk membuat tiket pada customer ini' });
+      }
+    }
 
     // If picId provided, optionally lookup PIC name if reporterName is not provided
     let finalReporterName = reporterName || null;
@@ -561,6 +1024,7 @@ router.post('/tickets', async (req, res) => {
           reporterName: finalReporterName,
           reportChannel: reportChannel || channel || null,
           locationId,
+          customerId: finalCustomerId,
           assetId: assetId || null,
           picId: picId || null,
           categoryId,
@@ -571,7 +1035,7 @@ router.post('/tickets', async (req, res) => {
           reportedAt: reported,
           clientTime: clientTime ? new Date(clientTime) : null,
         },
-        include: { location: true, category: true, asset: true, pic: true },
+        include: { location: true, category: true, asset: true, pic: true, customer: true },
       });
       await tx.itOslAuditLog.create({
         data: { entityType: 'TICKET', entityId: t.id, action: 'CREATE', newValue: summary, actorUserId: createdBy || null, ticketId: t.id },
@@ -586,10 +1050,14 @@ router.post('/tickets', async (req, res) => {
 // Generic status transition endpoint
 router.patch('/tickets/:id/status', async (req, res) => {
   try {
+    const scope = await getCustomerScope(req);
     const { to, actorUserId, reason, notes, externalParty, expectedResumeAt, rootCause, correctiveAction, solutionCategory, assetCondition, isPreventable } = req.body;
     const id = req.params.id;
     const ticket = await prisma.itOslTicket.findUnique({ where: { id }, include: { pendings: true } });
     if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+    if (!scope.isGlobal && (!ticket.customerId || !scope.allowedCustomerIds.includes(ticket.customerId))) {
+      return res.status(403).json({ message: 'Anda tidak memiliki hak akses memproses tiket customer ini' });
+    }
     const from = ticket.status;
     const target = String(to).toUpperCase();
     // Allow REOPENED alias
@@ -700,6 +1168,7 @@ router.patch('/tickets/:id/status', async (req, res) => {
             ticketType: 'REQUEST',
             summary: `Pengadaan pengganti aset ${ticket.assetId} — tindak lanjut ${ticket.ticketNumber}`,
             locationId: ticket.locationId,
+            customerId: ticket.customerId || null,
             categoryId: ticket.categoryId,
             severity: 'MEDIUM',
             status: 'NEW',
@@ -717,8 +1186,12 @@ router.patch('/tickets/:id/status', async (req, res) => {
 // Update ticket details (limited fields before closed)
 router.put('/tickets/:id', async (req, res) => {
   try {
+    const scope = await getCustomerScope(req);
     const t = await prisma.itOslTicket.findUnique({ where: { id: req.params.id } });
     if (!t) return res.status(404).json({ message: 'Ticket not found' });
+    if (!scope.isGlobal && (!t.customerId || !scope.allowedCustomerIds.includes(t.customerId))) {
+      return res.status(403).json({ message: 'Anda tidak memiliki izin mengubah tiket customer ini' });
+    }
     if (['CLOSED','CANCELLED','DUPLICATE'].includes(t.status)) return res.status(403).json({ message: 'Tiket terminal read-only' });
     const allowed = ['summary','severity','categoryId','locationId','assetId','picId','assignedTo','reporterName','reportChannel'];
     const data = {};
@@ -907,18 +1380,31 @@ router.delete('/tickets/:id/work-items/:workItemId/attachments/:attachmentId', a
 // ── DASHBOARD KPIs ───────────────────────────────────────────────────────────
 router.get('/dashboard', async (req, res) => {
   try {
-    const { from, to } = req.query;
+    const scope = await getCustomerScope(req);
+    const { from, to, customerId } = req.query;
     const start = from ? new Date(String(from)) : new Date(new Date().setHours(0,0,0,0));
     const end = to ? new Date(String(to)) : new Date();
+    
     const whereRange = { createdAt: { gte: start, lte: end } };
+    applyCustomerFilter(whereRange, scope, customerId);
+
+    const wherePending = { status: 'PENDING' };
+    applyCustomerFilter(wherePending, scope, customerId);
+
+    const whereCritical = { severity: 'CRITICAL', status: { in: ['NEW','IN_PROGRESS','PENDING'] } };
+    applyCustomerFilter(whereCritical, scope, customerId);
+
+    const whereResolved = { status: { in: ['RESOLVED','CLOSED'] }, resolvedAt: { not: null }, acknowledgedAt: { not: null }, ticketType: { not: 'REQUEST' } };
+    applyCustomerFilter(whereResolved, scope, customerId);
+
     const [total, byStatus, bySeverity, pendingOver, criticalBreach, recent] = await Promise.all([
       prisma.itOslTicket.count({ where: whereRange }),
       prisma.itOslTicket.groupBy({ by: ['status'], where: whereRange, _count: { _all: true } }),
       prisma.itOslTicket.groupBy({ by: ['severity'], where: whereRange, _count: { _all: true } }),
-      prisma.itOslTicket.count({ where: { status: 'PENDING' } }),
+      prisma.itOslTicket.count({ where: wherePending }),
       // critical breach >15m
-      prisma.itOslTicket.findMany({ where: { severity: 'CRITICAL', status: { in: ['NEW','IN_PROGRESS','PENDING'] } }, select: { createdAt: true, acknowledgedAt: true, ticketNumber: true, summary: true, id: true } }),
-      prisma.itOslTicket.findMany({ where: whereRange, include: { location: true, category: true }, orderBy: { updatedAt: 'desc' }, take: 10 }),
+      prisma.itOslTicket.findMany({ where: whereCritical, select: { createdAt: true, acknowledgedAt: true, ticketNumber: true, summary: true, id: true } }),
+      prisma.itOslTicket.findMany({ where: whereRange, include: { location: true, category: true, customer: true }, orderBy: { updatedAt: 'desc' }, take: 10 }),
     ]);
     const breachCritical = criticalBreach.filter(t => {
       const thresh = 15;
@@ -926,7 +1412,7 @@ router.get('/dashboard', async (req, res) => {
       const mins = (Date.now() - new Date(t.createdAt).getTime())/60000; return mins > thresh;
     });
     // MTTR avg
-    const resolved = await prisma.itOslTicket.findMany({ where: { status: { in: ['RESOLVED','CLOSED'] }, resolvedAt: { not: null }, acknowledgedAt: { not: null }, ticketType: { not: 'REQUEST' } }, select: { acknowledgedAt: true, resolvedAt: true, totalPendingSec: true } });
+    const resolved = await prisma.itOslTicket.findMany({ where: whereResolved, select: { acknowledgedAt: true, resolvedAt: true, totalPendingSec: true } });
     let avgMttrMin = 0;
     if (resolved.length >= 1) {
       const sum = resolved.reduce((s, r) => {
@@ -936,7 +1422,9 @@ router.get('/dashboard', async (req, res) => {
       }, 0);
       avgMttrMin = Math.round(sum / resolved.length);
     }
-    const active = await prisma.itOslTicket.count({ where: { status: { in: ['NEW','IN_PROGRESS','PENDING'] } } });
+    const whereActive = { status: { in: ['NEW','IN_PROGRESS','PENDING'] } };
+    applyCustomerFilter(whereActive, scope, customerId);
+    const active = await prisma.itOslTicket.count({ where: whereActive });
     res.json({
       total, active, pendingOver, avgMttrMin,
       byStatus: Object.fromEntries(byStatus.map(b => [b.status, b._count._all])),
@@ -952,12 +1440,18 @@ router.get('/dashboard', async (req, res) => {
 // ── REPORTS ──────────────────────────────────────────────────────────────────
 router.get('/reports/daily', async (req, res) => {
   try {
-    const dateStr = req.query.date ? String(req.query.date) : new Date().toISOString().slice(0,10);
+    const scope = await getCustomerScope(req);
+    const { date, customerId } = req.query;
+    const dateStr = date ? String(date) : new Date().toISOString().slice(0,10);
     const d = new Date(dateStr + 'T00:00:00');
     const next = new Date(d); next.setDate(d.getDate()+1);
+    
+    const where = { createdAt: { gte: d, lt: next } };
+    applyCustomerFilter(where, scope, customerId);
+
     const tickets = await prisma.itOslTicket.findMany({
-      where: { createdAt: { gte: d, lt: next } },
-      include: { category: true, location: true, parts: true },
+      where,
+      include: { category: true, location: true, customer: true, parts: true },
       orderBy: { createdAt: 'asc' },
     });
     const done = tickets.filter(t => ['RESOLVED','CLOSED'].includes(t.status)).length;
@@ -967,7 +1461,10 @@ router.get('/reports/daily', async (req, res) => {
     if (withFrt.length) avgFrt = Math.round(withFrt.reduce((s,t)=> s + (new Date(t.acknowledgedAt).getTime()- new Date(t.createdAt).getTime())/60000,0)/withFrt.length);
     const partsAgg = {};
     tickets.forEach(t => t.parts.forEach(p => { const k = p.partName; partsAgg[k] = (partsAgg[k]||0)+ p.quantity; }));
-    const recurring = await prisma.itOslAsset.findMany({ include: { tickets: { where: { createdAt: { gte: new Date(Date.now()-90*24*3600*1000) } }, select: { categoryId: true } } } });
+
+    const whereAsset = {};
+    applyCustomerFilter(whereAsset, scope, customerId);
+    const recurring = await prisma.itOslAsset.findMany({ where: whereAsset, include: { tickets: { where: { createdAt: { gte: new Date(Date.now()-90*24*3600*1000) } }, select: { categoryId: true } } } });
     const recurringList = recurring.filter(a => {
       const m = {}; a.tickets.forEach(t=>{ m[t.categoryId]=(m[t.categoryId]||0)+1}); return Object.values(m).some(c=>c>=3);
     }).map(a=> ({ id:a.id, name:a.name, assetCode:a.assetCode }));
@@ -978,15 +1475,7 @@ router.get('/reports/daily', async (req, res) => {
       const st = t.status === 'PENDING' ? 'PENDING' : (['RESOLVED','CLOSED'].includes(t.status) ? 'Selesai' : t.status);
       text += `${i+1}. [${st}] ${t.category.groupName || t.category.name} — ${t.summary}\n`;
       if (t.correctiveAction) text += `   → ${t.correctiveAction}\n`;
-      if (t.status === 'PENDING') {
-        const p = t.pendings?.[0] || null;
-        // pendings not included in above include? include pendings
-      }
     });
-    const pendings = await prisma.itOslTicketPending.findMany({ where: { ticketId: { in: tickets.filter(t=>t.status==='PENDING').map(t=>t.id) } }, orderBy:{ startedAt:'desc'} });
-    if (pending) {
-      // already listed, add extra lines for pending details
-    }
     if (Object.keys(partsAgg).length) {
       text += `\n🔩 SUKU CADANG TERPAKAI\n`;
       Object.entries(partsAgg).forEach(([k,v])=> text += `• ${k} — ${v} pcs\n`);
@@ -1001,11 +1490,17 @@ router.get('/reports/daily', async (req, res) => {
 
 router.get('/reports/monthly', async (req, res) => {
   try {
-    const ym = req.query.ym ? String(req.query.ym) : new Date().toISOString().slice(0,7); // YYYY-MM
+    const scope = await getCustomerScope(req);
+    const { ym: reqYm, customerId } = req.query;
+    const ym = reqYm ? String(reqYm) : new Date().toISOString().slice(0,7); // YYYY-MM
     const [y,m] = ym.split('-').map(Number);
     const start = new Date(y, m-1, 1);
     const end = new Date(y, m, 1);
-    const tickets = await prisma.itOslTicket.findMany({ where: { createdAt: { gte: start, lt: end } }, include: { category: true, location: true, asset: true } });
+    
+    const where = { createdAt: { gte: start, lt: end } };
+    applyCustomerFilter(where, scope, customerId);
+
+    const tickets = await prisma.itOslTicket.findMany({ where, include: { category: true, location: true, customer: true, asset: true } });
     const byCategory = {};
     tickets.forEach(t => { const k = t.category.groupName || t.category.name; byCategory[k]=(byCategory[k]||0)+1; });
     const bySeverity = {};
@@ -1025,21 +1520,30 @@ router.get('/reports/monthly', async (req, res) => {
 // ── PM SCHEDULES ─────────────────────────────────────────────────────────────
 router.get('/pm/schedules', async (req, res) => {
   try {
-    const list = await prisma.itOslPmSchedule.findMany({ include: { location: true, asset: true, checkItems: true, _count: { select: { executions: true } } }, orderBy: { createdAt: 'desc' } });
+    const scope = await getCustomerScope(req);
+    const { customerId } = req.query;
+    const where = {};
+    applyCustomerFilter(where, scope, customerId);
+
+    const list = await prisma.itOslPmSchedule.findMany({
+      where,
+      include: { location: true, asset: true, customer: true, checkItems: true, _count: { select: { executions: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
     res.json(list);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 router.post('/pm/schedules', async (req, res) => {
   try {
-    const { title, description, frequency, locationId, assetId, checkItems, createdBy } = req.body;
+    const { title, description, frequency, locationId, assetId, customerId, checkItems, createdBy } = req.body;
     if (!title) return res.status(400).json({ message: 'title wajib' });
     const s = await prisma.itOslPmSchedule.create({
       data: {
         title, description: description || null, frequency: frequency || 'WEEKLY',
-        locationId: locationId || null, assetId: assetId || null, createdBy: createdBy || null,
+        locationId: locationId || null, assetId: assetId || null, customerId: customerId || null, createdBy: createdBy || null,
         checkItems: checkItems && Array.isArray(checkItems) ? { create: checkItems.map((n,i)=>({ name: String(n.name||n), order: i })) } : undefined,
       },
-      include: { checkItems: true },
+      include: { checkItems: true, customer: true },
     });
     res.status(201).json(s);
   } catch (e) { res.status(400).json({ message: e.message }); }

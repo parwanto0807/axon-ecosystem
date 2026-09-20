@@ -7,11 +7,18 @@ import {
   ImagePlus, Trash2, Check, Package, User, MessageSquare, Users, 
   LayoutGrid, LayoutList, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, 
   ArrowUpDown, RotateCcw, Copy, Download, MapPin, CheckSquare, Square, Filter, Tag,
-  SlidersHorizontal, ChevronDown, Sparkles
+  SlidersHorizontal, ChevronDown, Sparkles, Building2
 } from "lucide-react"
 import { useSession } from "next-auth/react"
 
 const API = process.env.NEXT_PUBLIC_API_URL
+
+type CustomerOpt = {
+  id: string
+  code: string
+  name: string
+  companyType?: string | null
+}
 
 type PicOpt = {
   id: string
@@ -21,6 +28,7 @@ type PicOpt = {
   phone: string | null
   email: string | null
   locationId: string | null
+  customerId?: string | null
   location?: { name: string } | null
   isActive: boolean
 }
@@ -36,6 +44,8 @@ type Ticket = {
   frtMinutes: number | null
   location: { id: string; name: string } | null
   category: { id: string; name: string; groupName: string } | null
+  customerId?: string | null
+  customer?: { id: string; name: string; code: string } | null
   asset: { id: string; name: string; assetCode: string } | null
   assetId: string | null
   picId: string | null
@@ -77,9 +87,9 @@ type TicketDetail = Ticket & {
   notes: { id:string; content:string }[]
 }
 
-type Location = { id: string; code: string; name: string }
+type Location = { id: string; code: string; name: string; customerId?: string | null }
 type Category = { id: string; name: string; groupName: string }
-type AssetOpt = { id: string; assetCode: string; name: string; location?: { name:string }|null; picUser?: { name:string|null }|null }
+type AssetOpt = { id: string; assetCode: string; name: string; customerId?: string | null; location?: { name:string }|null; picUser?: { name:string|null }|null }
 type UserOpt = { id: string; name: string | null; email: string | null }
 
 const PHASES = [
@@ -94,9 +104,16 @@ export default function ItOslTicketsPage() {
   const currentUserName = session?.user?.name || null
   const currentRole = (session?.user as { role?:string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
+
+  const getAuthHeaders = (): Record<string, string> => ({
+    "x-user-id": currentUserId || "",
+    "x-user-role": currentRole || "",
+    "x-user-email": session?.user?.email || "",
+  })
   
   // Data Sources
   const [allTickets, setAllTickets] = useState<Ticket[]>([])
+  const [customers, setCustomers] = useState<CustomerOpt[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [assets, setAssets] = useState<AssetOpt[]>([])
@@ -106,6 +123,7 @@ export default function ItOslTicketsPage() {
 
   // Filters
   const [q, setQ] = useState("")
+  const [filterCustomer, setFilterCustomer] = useState<string>("")
   const [filterStatus, setFilterStatus] = useState<string>("")
   const [filterSeverity, setFilterSeverity] = useState<string>("")
   const [filterLocation, setFilterLocation] = useState<string>("")
@@ -134,7 +152,7 @@ export default function ItOslTicketsPage() {
   const [quick, setQuick] = useState({ 
     summary: "", locationId: "", categoryId: "", severity: "MEDIUM" as string, 
     ticketType: "INCIDENT" as string, assetId: "", picId: "", assignedTo: "", 
-    reporterName: "", reportChannel: "" 
+    reporterName: "", reportChannel: "", customerId: ""
   })
   const [saving, setSaving] = useState(false)
   const [assetQuery, setAssetQuery] = useState("")
@@ -155,13 +173,15 @@ export default function ItOslTicketsPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const [tRes, lRes, cRes, aRes, pRes, uRes] = await Promise.all([
-        fetch(`${API}/api/it-osl/tickets?limit=1500`),
-        fetch(`${API}/api/it-osl/locations`),
-        fetch(`${API}/api/it-osl/categories`),
-        fetch(`${API}/api/it-osl/assets`),
-        fetch(`${API}/api/it-osl/pics`),
+      const headers = getAuthHeaders()
+      const [tRes, lRes, cRes, aRes, pRes, uRes, custRes] = await Promise.all([
+        fetch(`${API}/api/it-osl/tickets?limit=1500`, { headers }),
+        fetch(`${API}/api/it-osl/locations`, { headers }),
+        fetch(`${API}/api/it-osl/categories`, { headers }),
+        fetch(`${API}/api/it-osl/assets`, { headers }),
+        fetch(`${API}/api/it-osl/pics`, { headers }),
         fetch(`${API}/api/users`, { headers: { "x-user-role":"SUPER_ADMIN" } }).then(r=> r.ok? r.json().then((j: unknown)=> Array.isArray(j)? j : (j as { users?: UserOpt[] })?.users || []): []).catch(()=>[]),
+        fetch(`${API}/api/it-osl/customers`, { headers }),
       ])
       if (tRes.ok) {
         const data = await tRes.json()
@@ -172,6 +192,16 @@ export default function ItOslTicketsPage() {
       if (aRes.ok) setAssets(await aRes.json())
       if (pRes.ok) setPics(await pRes.json())
       if (Array.isArray(uRes) && uRes.length) setUsers(uRes as UserOpt[])
+      if (custRes.ok) {
+        const custList = await custRes.json()
+        const cArr = Array.isArray(custList) ? custList : []
+        setCustomers(cArr)
+        // If non-admin user is only assigned to 1 customer, auto-assign
+        if (!isAdmin && cArr.length === 1) {
+          setFilterCustomer(cArr[0].id)
+          setQuick(q => ({ ...q, customerId: q.customerId || cArr[0].id }))
+        }
+      }
     } catch (e) {
       console.error("Failed to load tickets data:", e)
     } finally {
@@ -179,7 +209,11 @@ export default function ItOslTicketsPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (session !== undefined) {
+      load()
+    }
+  }, [session?.user?.email, currentUserId, currentRole])
   
   // prefill reporter & assignee in Quick-Log from session
   useEffect(()=>{
@@ -191,7 +225,7 @@ export default function ItOslTicketsPage() {
   const loadDetail = async (id:string) => {
     setLoadingDetail(true)
     try{
-      const res = await fetch(`${API}/api/it-osl/tickets/${id}`)
+      const res = await fetch(`${API}/api/it-osl/tickets/${id}`, { headers: getAuthHeaders() })
       if(res.ok) setDetail(await res.json())
     }catch{}
     setLoadingDetail(false)
@@ -208,16 +242,35 @@ export default function ItOslTicketsPage() {
   }, [categories])
 
   const filteredAssets = useMemo(()=>{
+    let list = assets
+    if (quick.customerId) {
+      list = list.filter(a => !a.customerId || a.customerId === quick.customerId)
+    }
     const q = assetQuery.trim().toLowerCase()
-    if(!q) return assets.slice(0,20)
-    return assets.filter(a=> `${a.assetCode} ${a.name} ${a.location?.name||""}`.toLowerCase().includes(q)).slice(0,20)
-  },[assets, assetQuery])
+    if(!q) return list.slice(0,20)
+    return list.filter(a=> `${a.assetCode} ${a.name} ${a.location?.name||""}`.toLowerCase().includes(q)).slice(0,20)
+  },[assets, assetQuery, quick.customerId])
 
   const quickAsset = useMemo(()=> assets.find(a=> a.id===quick.assetId) || null,[assets, quick.assetId])
+
+  const quickLocations = useMemo(() => {
+    if (!quick.customerId) return locations
+    return locations.filter(l => !l.customerId || l.customerId === quick.customerId)
+  }, [locations, quick.customerId])
+
+  const quickPics = useMemo(() => {
+    if (!quick.customerId) return pics
+    return pics.filter(p => !p.customerId || p.customerId === quick.customerId)
+  }, [pics, quick.customerId])
 
   // --- Filtering & Sorting on large dataset ---
   const filteredTickets = useMemo(() => {
     let result = [...allTickets]
+
+    // Customer filter
+    if (filterCustomer) {
+      result = result.filter(t => t.customerId === filterCustomer)
+    }
 
     // Search query across fields
     if (q.trim()) {
@@ -423,8 +476,7 @@ export default function ItOslTicketsPage() {
           method: "PATCH",
           headers: { 
             "Content-Type": "application/json", 
-            "x-user-role": currentRole || "ADMIN", 
-            "x-user-id": currentUserId || "" 
+            ...getAuthHeaders()
           },
           body: JSON.stringify({ to: toStatus, actorUserId: currentUserId || "system" })
         })
@@ -460,7 +512,7 @@ export default function ItOslTicketsPage() {
     }
     const res = await fetch(`${API}/api/it-osl/tickets/${id}/status`, { 
       method: "PATCH", 
-      headers: { "Content-Type": "application/json", "x-user-role": "SUPER_ADMIN", "x-user-id": currentUserId || "" }, 
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() }, 
       body: JSON.stringify(body) 
     })
     const d = await res.json()
@@ -471,7 +523,7 @@ export default function ItOslTicketsPage() {
   const connectAsset = async (ticketId:string, assetId:string) => {
     const res = await fetch(`${API}/api/it-osl/tickets/${ticketId}`, { 
       method:"PUT", 
-      headers:{ "Content-Type":"application/json" }, 
+      headers:{ "Content-Type":"application/json", ...getAuthHeaders() }, 
       body: JSON.stringify({ assetId: assetId || null, actorUserId: currentUserId }) 
     })
     const d = await res.json()
@@ -482,7 +534,7 @@ export default function ItOslTicketsPage() {
   const reassign = async (ticketId:string, userId:string) => {
     const res = await fetch(`${API}/api/it-osl/tickets/${ticketId}/reassign`, { 
       method:"POST", 
-      headers:{ "Content-Type":"application/json" }, 
+      headers:{ "Content-Type":"application/json", ...getAuthHeaders() }, 
       body: JSON.stringify({ toUserId: userId || null, actorUserId: currentUserId }) 
     })
     const d = await res.json()
@@ -493,7 +545,7 @@ export default function ItOslTicketsPage() {
   const connectPic = async (ticketId:string, picId:string) => {
     const res = await fetch(`${API}/api/it-osl/tickets/${ticketId}`, { 
       method:"PUT", 
-      headers:{ "Content-Type":"application/json" }, 
+      headers:{ "Content-Type":"application/json", ...getAuthHeaders() }, 
       body: JSON.stringify({ picId: picId || null, actorUserId: currentUserId }) 
     })
     const d = await res.json()
@@ -511,25 +563,26 @@ export default function ItOslTicketsPage() {
         summary: quick.summary.trim(),
         locationId: quick.locationId,
         categoryId: quick.categoryId,
+        customerId: quick.customerId || undefined,
         severity: quick.severity,
         ticketType: quick.ticketType,
-        reportChannel: quick.reportChannel || "Tatap Muka",
-        reporterName: quick.reporterName || undefined,
         assetId: quick.assetId || undefined,
         picId: quick.picId || undefined,
+        reporterName: quick.reporterName || undefined,
+        reportChannel: quick.reportChannel || "Sistem IT",
         assignedTo: quick.assignedTo || undefined,
         createdBy: currentUserId || undefined,
       }
       const res = await fetch(`${API}/api/it-osl/tickets`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": currentUserId || "system" },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || "Gagal")
       if (data.duplicateHint) alert(`Duplikat terdeteksi: ${data.duplicateHint.ticketNumber} (lokasi+kategori sama 2 jam terakhir)`)
       setShowQuick(false)
-      setQuick({ summary: "", locationId: "", categoryId: "", severity: "MEDIUM", ticketType: "INCIDENT", assetId:"", picId:"", assignedTo:"", reporterName:"", reportChannel:"" })
+      setQuick({ summary: "", locationId: "", categoryId: "", severity: "MEDIUM", ticketType: "INCIDENT", assetId:"", picId:"", assignedTo:"", reporterName:"", reportChannel:"", customerId: (!isAdmin && customers.length === 1 ? customers[0].id : "") })
       setAssetQuery("")
       load()
     } catch (e: unknown) {
@@ -545,7 +598,7 @@ export default function ItOslTicketsPage() {
     setAdding(true)
     try{
       const res = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items`, {
-        method:"POST", headers:{ "Content-Type":"application/json" },
+        method:"POST", headers:{ "Content-Type":"application/json", ...getAuthHeaders() },
         body: JSON.stringify({ phase: activePhase, title: newTitle || null, description: newDesc, createdBy: currentUserId || undefined })
       })
       const item = await res.json()
@@ -553,7 +606,7 @@ export default function ItOslTicketsPage() {
       if(newFiles && newFiles.length>0){
         const fd = new FormData()
         Array.from(newFiles).forEach(f=> fd.append("photos", f))
-        const up = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${item.id}/photos`, { method:"POST", body: fd })
+        const up = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${item.id}/photos`, { method:"POST", headers: { "x-user-id": currentUserId || "", "x-user-role": currentRole || "" }, body: fd })
         const upData = await up.json()
         if(!up.ok) alert("Item tersimpan, tapi foto gagal: "+(upData.message||""))
       }
@@ -566,7 +619,7 @@ export default function ItOslTicketsPage() {
   const delWorkItem = async (wid:string) => {
     if(!isAdmin) return alert("Hanya Admin/SuperAdmin boleh hapus")
     if(!detailId || !confirm("Hapus item pekerjaan ini? Foto ikut terhapus")) return
-    const res = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${wid}`, { method:"DELETE", headers:{ "x-user-role": currentRole || "", "x-user-id": currentUserId || "" } })
+    const res = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${wid}`, { method:"DELETE", headers: getAuthHeaders() })
     const d = await res.json()
     if(!res.ok) return alert(d.message || "Gagal hapus — hanya Admin")
     if(detailId) loadDetail(detailId)
@@ -575,7 +628,7 @@ export default function ItOslTicketsPage() {
   const delAttachment = async (wid:string, aid:string)=>{
     if(!isAdmin) return alert("Hanya Admin/SuperAdmin boleh hapus foto")
     if(!detailId || !confirm("Hapus foto ini?")) return
-    const res = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${wid}/attachments/${aid}`, { method:"DELETE", headers:{ "x-user-role": currentRole || "", "x-user-id": currentUserId || "" } })
+    const res = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${wid}/attachments/${aid}`, { method:"DELETE", headers: getAuthHeaders() })
     const d = await res.json()
     if(!res.ok) return alert(d.message || "Gagal hapus — hanya Admin")
     if(detailId) loadDetail(detailId)
@@ -585,7 +638,7 @@ export default function ItOslTicketsPage() {
     if(!files || files.length===0 || !detailId) return
     const fd = new FormData()
     Array.from(files).forEach(f=> fd.append("photos", f))
-    const res = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${wid}/photos`, { method:"POST", body: fd })
+    const res = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${wid}/photos`, { method:"POST", headers: { "x-user-id": currentUserId || "", "x-user-role": currentRole || "" }, body: fd })
     if(!res.ok){ const d=await res.json(); alert(d.message) } else loadDetail(detailId)
   }
 
@@ -1595,7 +1648,7 @@ export default function ItOslTicketsPage() {
             initial={{opacity:0}} 
             animate={{opacity:1}} 
             exit={{opacity:0}} 
-            className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" 
+            className="fixed inset-0 z-[150] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" 
             onClick={()=>setShowQuick(false)}
           >
             <motion.div 
@@ -1619,6 +1672,26 @@ export default function ItOslTicketsPage() {
               </div>
 
               <div className="space-y-3">
+                {/* Customer Selector */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between mb-1">
+                    <span className="flex items-center gap-1"><Building2 size={12} className="text-indigo-600" /> Customer / Klien</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Opsional</span>
+                  </label>
+                  <select
+                    value={quick.customerId}
+                    onChange={(e)=> setQuick({...quick, customerId: e.target.value})}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  >
+                    <option value="">— Pilih Customer / Klien (Opsional) —</option>
+                    {customers.map(c=> (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="text-[11px] font-bold text-slate-600 block mb-1">Uraian Masalah *</label>
                   <input 
@@ -1640,7 +1713,7 @@ export default function ItOslTicketsPage() {
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                     >
                       <option value="">— Pilih Lokasi —</option>
-                      {locations.map((l)=>(<option key={l.id} value={l.id}>{l.name}</option>))}
+                      {quickLocations.map((l)=>(<option key={l.id} value={l.id}>{l.name}</option>))}
                     </select>
                   </div>
                   <div>
@@ -1732,7 +1805,7 @@ export default function ItOslTicketsPage() {
                     value={quick.picId} 
                     onChange={(e)=>{
                       const pId = e.target.value;
-                      const selPic = pics.find(p=> p.id === pId);
+                      const selPic = quickPics.find(p=> p.id === pId);
                       setQuick(prev=> ({
                         ...prev,
                         picId: pId,
@@ -1743,7 +1816,7 @@ export default function ItOslTicketsPage() {
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   >
                     <option value="">— Pilih PIC Unit (Opsional) —</option>
-                    {pics.map(p=> (
+                    {quickPics.map(p=> (
                       <option key={p.id} value={p.id}>
                         {p.name} {p.department ? `(${p.department})` : ''} {p.phone ? `• ${p.phone}` : ''}
                       </option>
@@ -1823,7 +1896,7 @@ export default function ItOslTicketsPage() {
             initial={{opacity:0}} 
             animate={{opacity:1}} 
             exit={{opacity:0}} 
-            className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex justify-end" 
+            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex justify-end" 
             onClick={()=>{setDetailId(null); setDetail(null)}}
           >
             <motion.div 
