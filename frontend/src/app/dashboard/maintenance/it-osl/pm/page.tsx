@@ -3,12 +3,24 @@
 import { useEffect, useState } from "react"
 import { CalendarCheck, Plus, CheckCircle2, AlertTriangle, X, Loader2, Settings2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useSession } from "next-auth/react"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
 type Schedule = { id: string; title: string; frequency: string; isActive: boolean; checkItems: { id: string; name: string }[]; _count?: { executions: number } }
 
 export default function ItOslPmPage() {
+  const { data: session } = useSession()
+  const currentUserId = (session?.user as { id?: string })?.id || ""
+  const currentRole = (session?.user as { role?: string })?.role || ""
+  const currentEmail = session?.user?.email || ""
+
+  const getAuthHeaders = (): Record<string, string> => ({
+    "x-user-id": currentUserId,
+    "x-user-role": currentRole,
+    "x-user-email": currentEmail,
+  })
+
   const [list, setList] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ title: "", frequency: "WEEKLY", itemsText: "" })
@@ -18,11 +30,15 @@ export default function ItOslPmPage() {
 
   const load = async () => {
     setLoading(true)
-    const res = await fetch(`${API}/api/it-osl/pm/schedules`)
+    const res = await fetch(`${API}/api/it-osl/pm/schedules`, { headers: getAuthHeaders() })
     if (res.ok) setList(await res.json())
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (session !== undefined) {
+      load()
+    }
+  }, [session?.user?.email, currentUserId, currentRole])
 
   const create = async () => {
     if (!form.title) return alert("Judul wajib diisi")

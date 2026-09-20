@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { Activity, AlertTriangle, CheckCircle2, Clock3, Layers, TrendingUp, Wrench, Search, MapPin } from "lucide-react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
@@ -21,19 +22,32 @@ type Dashboard = {
 }
 
 export default function ItOslDashboardPage() {
+  const { data: session } = useSession()
+  const currentUserId = (session?.user as { id?: string })?.id || ""
+  const currentRole = (session?.user as { role?: string })?.role || ""
+  const currentEmail = session?.user?.email || ""
+
+  const getAuthHeaders = (): Record<string, string> => ({
+    "x-user-id": currentUserId,
+    "x-user-role": currentRole,
+    "x-user-email": currentEmail,
+  })
+
   const [data, setData] = useState<Dashboard | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch(`${API}/api/it-osl/dashboard`)
+        const res = await fetch(`${API}/api/it-osl/dashboard`, { headers: getAuthHeaders() })
         if (res.ok) setData(await res.json())
       } catch {}
       setLoading(false)
     }
-    load()
-  }, [])
+    if (session !== undefined) {
+      load()
+    }
+  }, [session?.user?.email, currentUserId, currentRole])
 
   if (loading) return <div className="p-8 text-center text-slate-400 text-sm">Memuat dashboard…</div>
   if (!data) return <div className="p-8 text-center text-rose-500">Gagal memuat</div>

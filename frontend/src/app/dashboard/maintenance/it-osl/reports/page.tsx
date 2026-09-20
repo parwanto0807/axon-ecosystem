@@ -2,10 +2,22 @@
 
 import { useEffect, useState } from "react"
 import { FileText, Copy, Share2, Calendar, Loader2 } from "lucide-react"
+import { useSession } from "next-auth/react"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
 export default function ItOslReportsPage() {
+  const { data: session } = useSession()
+  const currentUserId = (session?.user as { id?: string })?.id || ""
+  const currentRole = (session?.user as { role?: string })?.role || ""
+  const currentEmail = session?.user?.email || ""
+
+  const getAuthHeaders = (): Record<string, string> => ({
+    "x-user-id": currentUserId,
+    "x-user-role": currentRole,
+    "x-user-email": currentEmail,
+  })
+
   const [date, setDate] = useState(()=> new Date().toISOString().slice(0,10))
   const [ym, setYm] = useState(()=> new Date().toISOString().slice(0,7))
   const [daily, setDaily] = useState<{ text: string; done: number; pending: number; avgFrt: number } | null>(null)
@@ -15,18 +27,18 @@ export default function ItOslReportsPage() {
 
   const loadDaily = async () => {
     setLoadingDaily(true)
-    const res = await fetch(`${API}/api/it-osl/reports/daily?date=${date}`)
+    const res = await fetch(`${API}/api/it-osl/reports/daily?date=${date}`, { headers: getAuthHeaders() })
     if (res.ok) setDaily(await res.json())
     setLoadingDaily(false)
   }
   const loadMonthly = async () => {
     setLoadingMonthly(true)
-    const res = await fetch(`${API}/api/it-osl/reports/monthly?ym=${ym}`)
+    const res = await fetch(`${API}/api/it-osl/reports/monthly?ym=${ym}`, { headers: getAuthHeaders() })
     if (res.ok) setMonthly(await res.json())
     setLoadingMonthly(false)
   }
-  useEffect(()=>{ loadDaily() },[date])
-  useEffect(()=>{ loadMonthly() },[ym])
+  useEffect(()=>{ if (session !== undefined) loadDaily() },[date, session?.user?.email, currentUserId, currentRole])
+  useEffect(()=>{ if (session !== undefined) loadMonthly() },[ym, session?.user?.email, currentUserId, currentRole])
 
   const copyDaily = async () => {
     if (!daily?.text) return

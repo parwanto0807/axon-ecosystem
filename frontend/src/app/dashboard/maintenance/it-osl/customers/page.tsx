@@ -66,8 +66,16 @@ const COMPANY_TYPES = [
 
 export default function CustomersPage() {
   const { data: session, status } = useSession()
-  const userRole = (session?.user as { role?: string })?.role || ""
-  const isSuperAdmin = userRole === "SUPER_ADMIN"
+  const currentUserId = (session?.user as { id?: string })?.id || ""
+  const currentRole = (session?.user as { role?: string })?.role || ""
+  const currentEmail = session?.user?.email || ""
+  const isSuperAdmin = currentRole === "SUPER_ADMIN"
+
+  const getAuthHeaders = (): Record<string, string> => ({
+    "x-user-id": currentUserId,
+    "x-user-role": currentRole,
+    "x-user-email": currentEmail,
+  })
 
   const [customers, setCustomers] = useState<Customer[]>([])
   const [operasionalUsers, setOperasionalUsers] = useState<UserOpt[]>([])
@@ -108,9 +116,10 @@ export default function CustomersPage() {
   const loadData = async () => {
     setLoading(true)
     try {
+      const headers = getAuthHeaders()
       const [cRes, uRes] = await Promise.all([
-        fetch(`${API}/api/it-osl/customers`),
-        fetch(`${API}/api/it-osl/users-operasional`),
+        fetch(`${API}/api/it-osl/customers`, { headers }),
+        fetch(`${API}/api/it-osl/users-operasional`, { headers }),
       ])
       if (cRes.ok) {
         const d = await cRes.json()
@@ -128,13 +137,15 @@ export default function CustomersPage() {
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    if (session !== undefined) {
+      loadData()
+    }
+  }, [session?.user?.email, currentUserId, currentRole])
 
   const loadDetail = async (id: string) => {
     setLoadingDetail(true)
     try {
-      const res = await fetch(`${API}/api/it-osl/customers/${id}`)
+      const res = await fetch(`${API}/api/it-osl/customers/${id}`, { headers: getAuthHeaders() })
       if (res.ok) {
         setDetail(await res.json())
       }
@@ -212,7 +223,7 @@ export default function CustomersPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({
           code: form.code.trim() || undefined,
           name: form.name.trim(),
@@ -245,7 +256,7 @@ export default function CustomersPage() {
   const deleteCustomer = async (id: string, name: string) => {
     if (!confirm(`Hapus customer "${name}"?`)) return
     try {
-      const res = await fetch(`${API}/api/it-osl/customers/${id}`, { method: "DELETE" })
+      const res = await fetch(`${API}/api/it-osl/customers/${id}`, { method: "DELETE", headers: getAuthHeaders() })
       const d = await res.json()
       if (!res.ok) throw new Error(d.message || "Gagal menghapus customer")
       loadData()
