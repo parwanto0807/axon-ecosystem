@@ -50,6 +50,8 @@ export default function SalesOrderPDFModal({ order, company, onClose }:
             const light = [241, 245, 249] as [number, number, number]
             let y = M
 
+            let cy = y
+            let logoWidth = 0
             // Logo
             if (company.logo) {
                 try {
@@ -59,17 +61,19 @@ export default function SalesOrderPDFModal({ order, company, onClose }:
                         const cv = document.createElement('canvas')
                         cv.width = img.naturalWidth; cv.height = img.naturalHeight
                         cv.getContext('2d')!.drawImage(img, 0, 0)
-                        doc.addImage(cv.toDataURL('image/png'), 'PNG', M, y, 22, 22)
+                        const h = 12
+                        logoWidth = (img.naturalWidth / img.naturalHeight) * h
+                        doc.addImage(cv.toDataURL('image/png'), 'PNG', M, y, logoWidth, h)
                     }
                 } catch { /* skip */ }
             }
 
             // Company info
-            const ix = company.logo ? M + 26 : M
+            const ix = logoWidth > 0 ? M + logoWidth + 5 : M
             doc.setFont('helvetica', 'bold').setFontSize(14).setTextColor(...dark)
-            doc.text(company.name || 'PT. Axon Ecosystem', ix, y + 5)
+            doc.text(company.name || 'PT. Axon Ecosystem', ix, y + 6)
             doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...gray)
-            let cy = y + 11
+            cy = y + 11
             if (company.legalName && company.legalName !== company.name) { doc.text(company.legalName, ix, cy); cy += 4 }
             if (company.address) {
                 const addrParts = [company.address, [company.city, company.province].filter(Boolean).join(', '), company.postalCode].filter(Boolean).join(' — ')
@@ -219,15 +223,21 @@ export default function SalesOrderPDFModal({ order, company, onClose }:
                                 {company.logo && <img src={`${process.env.NEXT_PUBLIC_API_URL}${company.logo}`} alt="logo" style={{ height: 60, width: 'auto', objectFit: 'contain' }} />}
                                 <div>
                                     <div style={{ fontWeight: 900, fontSize: 17, color: '#0f172a', marginBottom: 3, letterSpacing: 0.3 }}>{company.name || 'PT. Axon Ecosystem'}</div>
-                                    <div style={{ fontSize: 9, color: '#64748b', marginTop: 3, lineHeight: 1.5 }}>
-                                        {company.address}
-                                        {(company.city || company.province) && (
-                                            <span>, {[company.city, company.province].filter(Boolean).join(', ')}{company.postalCode ? ` ${company.postalCode}` : ''}</span>
-                                        )}
-                                    </div>
-                                    <div style={{ marginTop: 3 }}>
+                                    {company.legalName && company.legalName !== company.name && (
+                                        <div style={{ fontSize: 9, color: '#64748b', marginBottom: 2, fontStyle: 'italic' }}>{company.legalName}</div>
+                                    )}
+                                    {company.address && (
+                                        <div style={{ fontSize: 9, color: '#64748b', marginTop: 3, lineHeight: 1.5 }}>
+                                            {company.address}
+                                            {(company.city || company.province) && (
+                                                <span>, {[company.city, company.province].filter(Boolean).join(', ')}{company.postalCode ? ` ${company.postalCode}` : ''}</span>
+                                            )}
+                                        </div>
+                                    )}
+                                    <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column', gap: 1 }}>
                                         {company.phone && <div style={{ fontSize: 9, color: '#64748b' }}>Tel: {company.phone}</div>}
                                         {company.email && <div style={{ fontSize: 9, color: '#64748b' }}>Email: {company.email}</div>}
+                                        {company.taxId && <div style={{ fontSize: 9, color: '#64748b' }}>NPWP: {company.taxId}</div>}
                                     </div>
                                 </div>
                             </div>

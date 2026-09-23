@@ -67,6 +67,7 @@ const ImagePreviewModal = ({ url, onClose }: { url: string; onClose: () => void 
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function SalesOrdersPage() {
     const { data: session } = useSession()
+    const userRole = (session?.user as any)?.role
     const [orders, setOrders] = useState<SalesOrder[]>([])
     const [customers, setCustomers] = useState<Customer[]>([])
     const [products, setProducts] = useState<any[]>([])
@@ -102,15 +103,16 @@ export default function SalesOrdersPage() {
     }, [openStatusId])
 
     const load = useCallback(async () => {
+        if (!userRole) return
         setLoading(true)
         try {
             const [oR, cR, pR, coR, qR, prR, bcR] = await Promise.all([
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products`),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/company`, { headers: { 'x-user-role': userRole } }),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations`),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`, { headers: { 'x-user-role': 'ADMIN' } }),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects`, { headers: { 'x-user-role': userRole } }),
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`),
             ])
             setOrders(await oR.json())
@@ -122,7 +124,7 @@ export default function SalesOrdersPage() {
             setBusinessCategories(await bcR.json())
         } catch { showToast('error', 'Failed to load data') }
         finally { setLoading(false) }
-    }, [showToast])
+    }, [userRole, showToast])
 
     useEffect(() => { load() }, [load])
 

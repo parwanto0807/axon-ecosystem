@@ -11,7 +11,7 @@ import {
     Users, Play, Pause, Check, UploadCloud,
     LayoutGrid, BarChart3, Loader2, CalendarDays, Paperclip, Trash,
     Clock, FileText, TrendingUp, Activity, ChevronLeft, ChevronRight,
-    FileDown, Eye
+    FileDown, Eye, Megaphone, GraduationCap, MapPin, Laptop, NotebookPen, Download, Printer
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -96,7 +96,8 @@ function DevelopmentContent() {
     const [projects, setProjects] = useState<any[]>([])
     const [orders, setOrders] = useState<any[]>([])
     const [selectedId, setSelectedId] = useState<string | null>(null)
-    const [tab, setTab] = useState<'MATRIX' | 'MEETINGS'>('MATRIX')
+    const [tab, setTab] = useState<'MATRIX' | 'MEETINGS' | 'TRAINING'>('MATRIX')
+    const [trainingPreview, setTrainingPreview] = useState(false)
     const [search, setSearch] = useState('')
     const [loading, setLoading] = useState(true)
     const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -133,8 +134,8 @@ function DevelopmentContent() {
             setOrders(Array.isArray(ordRes) ? ordRes : [])
 
             const paramPlanning = searchParams.get('planning') || searchParams.get('id')
-            const paramTab = searchParams.get('tab')
-            if (paramTab === 'MEETINGS') setTab('MEETINGS')
+            const paramTab = searchParams.get('tab') as any
+            if (paramTab === 'MEETINGS' || paramTab === 'TRAINING' || paramTab === 'MATRIX') setTab(paramTab)
 
             if (validPlans.length > 0) {
                 if (paramPlanning && validPlans.some((p: Planning) => p.id === paramPlanning)) {
@@ -152,9 +153,9 @@ function DevelopmentContent() {
     // React to query params dynamically
     useEffect(() => {
         const paramPlanning = searchParams.get('planning') || searchParams.get('id')
-        const paramTab = searchParams.get('tab')
+        const paramTab = searchParams.get('tab') as any
         if (paramPlanning) setSelectedId(paramPlanning)
-        if (paramTab === 'MEETINGS') setTab('MEETINGS')
+        if (paramTab === 'MEETINGS' || paramTab === 'TRAINING' || paramTab === 'MATRIX') setTab(paramTab)
     }, [searchParams])
 
     const selected = plans.find(p => p.id === selectedId) || null
@@ -560,11 +561,69 @@ function DevelopmentContent() {
         doc.setFontSize(6.5)
         doc.setTextColor(...C.slate300)
         doc.text(`${selected.number} — ${m.title}`, 12, pageH - 5)
-        doc.text('Digenerate oleh Axon Ecosystem', pageW - 12, pageH - 5, { align:'right' })
+        doc.text('Digenerate oleh PT. GRAFINDO MITRASEMESTA', pageW - 12, pageH - 5, { align:'right' })
 
         doc.save(`${isUndangan ? 'Undangan' : 'Notulen'} - ${m.title}.pdf`)
         showToast('success', 'Surat Rapat berhasil diunduh!')
     }, [selected, showToast])
+
+    const exportTrainingPDF = useCallback(async () => {
+        const jsPDFModule = await import('jspdf')
+        const autoTableModule = await import('jspdf-autotable')
+        const jsPDF = jsPDFModule.default
+        const autoTable = (autoTableModule as any).default
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+        const pageW = doc.internal.pageSize.getWidth()
+        const pageH = doc.internal.pageSize.getHeight()
+        const C = { indigo:[99,102,241] as [number,number,number], emerald:[16,185,129] as [number,number,number], slate50:[248,250,252] as [number,number,number], slate100:[241,245,249] as [number,number,number], slate300:[203,213,225] as [number,number,number], slate500:[100,116,139] as [number,number,number], slate700:[51,65,85] as [number,number,number], slate900:[15,23,42] as [number,number,number], white:[255,255,255] as [number,number,number] }
+        doc.setFillColor(...C.indigo)
+        doc.rect(0, 0, pageW, 26, 'F')
+        doc.setTextColor(...C.white)
+        doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.text('SURAT PEMBERITAHUAN', 14, 11)
+        doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.text('PT. GRAFINDO MITRASEMESTA — Tim IT & System Development', 14, 16.5)
+        doc.setFontSize(7.5); doc.text('No. 012/ERP-TRN/IX/2026  •  21 September 2026', pageW - 14, 11, {align:'right'})
+        doc.setFontSize(7); doc.text('Perihal: Jadwal & Persiapan Training Onsite ERP', pageW - 14, 16.5, {align:'right'})
+        let y = 34
+        doc.setTextColor(...C.slate900); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.text('Jadwal dan Persiapan Training/Pendampingan Onsite Aplikasi ERP (Desk-to-Desk)', 14, y, {maxWidth: pageW-28} as any); y+=7
+        doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C.slate500)
+        const intro = 'Sehubungan dengan kelanjutan pengembangan dan implementasi sistem operasional terpadu (PT. GRAFINDO MITRASEMESTA), bersama surat ini kami sampaikan bahwa Tim IT akan mendatangi langsung setiap meja kerja (desk-to-desk) untuk memberikan Training & Pendampingan Onsite Aplikasi ERP bagi seluruh departemen terkait.'
+        const lines = doc.splitTextToSize(intro, pageW - 28); doc.text(lines, 14, y); y += lines.length*3.8 + 5
+        autoTable(doc, { startY: y, margin:{left:14,right:14}, body:[
+            ['Nomor','012/ERP-TRN/IX/2026','Tanggal','21 September 2026'],
+            ['Dari','Tim IT & System Development','Kepada','Seluruh Kepala Departemen & Tim Terkait'],
+            ['Perihal',{content:'Jadwal dan Persiapan Training/Pendampingan Onsite Aplikasi ERP (Desk-to-Desk)',colSpan:3}],
+        ], styles:{fontSize:7.5,cellPadding:2.2,textColor:C.slate700,lineColor:C.slate100,lineWidth:0.25}, columnStyles:{0:{cellWidth:22,fontStyle:'bold',fillColor:C.slate50,textColor:C.slate900},1:{cellWidth:62},2:{cellWidth:22,fontStyle:'bold',fillColor:C.slate50,textColor:C.slate900},3:{cellWidth:'auto'}} })
+        y = (doc as any).lastAutoTable.finalY + 6
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...C.slate900); doc.text('1. Jadwal Kunjungan Onsite Tim IT', 14, y); y+=4
+        autoTable(doc, { startY: y, margin:{left:14,right:14}, head:[['No','Departemen','Hari / Tanggal','Waktu','Metode','Tempat']], body:[
+            ['1','Customer Service (CS)','Selasa, 22 September 2026','09.00 WIB s.d. Selesai','Kunjungan langsung','Meja kerja / area CS'],
+            ['2','DEPO','Rabu, 23 September 2026','09.00 WIB s.d. Selesai','Kunjungan langsung','Meja kerja / area Depo'],
+            ['3','Sparepart','Kamis, 24 September 2026','09.00 WIB s.d. Selesai','Kunjungan langsung','Gudang & Sparepart'],
+            ['4','Finance','Senin, 28 September 2026','09.00 WIB s.d. Selesai','Kunjungan langsung','Ruang Finance'],
+        ], styles:{fontSize:7.2,cellPadding:2,textColor:C.slate700,lineColor:C.slate100,lineWidth:0.25}, headStyles:{fillColor:C.indigo,textColor:C.white,fontStyle:'bold',fontSize:7.5}, alternateRowStyles:{fillColor:C.slate50}, columnStyles:{0:{cellWidth:10.4,halign:'center'},1:{cellWidth:32},2:{cellWidth:42},3:{cellWidth:32,halign:'center'},4:{cellWidth:32},5:{cellWidth:36}} })
+        y = (doc as any).lastAutoTable.finalY + 6
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...C.slate900); doc.text('2. Hal-Hal yang Perlu Dipersiapkan oleh User', 14, y); y+=4
+        autoTable(doc, { startY: y, margin:{left:14,right:14}, head:[['No','Kategori','Detail Persiapan']], body:[
+            ['1','Kesiapan Perangkat & Jaringan','Pastikan PC/Laptop di meja kerja menyala dan terhubung ke jaringan internet/kantor dengan stabil. Browser utama (Chrome/Firefox/Edge) sudah siap digunakan.'],
+            ['2','Akses Akun Sistem','Pembuatan dan verifikasi akun login akan langsung dipandu dan disiapkan oleh Tim IT pada saat kunjungan di meja Anda.'],
+            ['3','Catatan / Buku Kerja','Siapkan catatan kecil untuk menuliskan poin-poin penting atau instruksi cepat yang diberikan oleh Tim IT selama pendampingan.'],
+            ['4','Keberadaan di Meja','Mohon agar setiap staf/user terkait berada di tempat kerjanya masing-masing sesuai jadwal tanggal giliran departemennya.'],
+        ], styles:{fontSize:7.2,cellPadding:2.5,textColor:C.slate700,lineColor:C.slate100,lineWidth:0.25}, headStyles:{fillColor:[14,165,233] as any,textColor:C.white,fontStyle:'bold',fontSize:7.5}, alternateRowStyles:{fillColor:C.slate50}, columnStyles:{0:{cellWidth:10.4,halign:'center'},1:{cellWidth:42},2:{cellWidth:'auto'}} })
+        y = (doc as any).lastAutoTable.finalY + 8
+        const closing = 'Demikian surat pemberitahuan ini kami sampaikan. Atas perhatian, kesiapan, dan kerjasama dari seluruh rekan-rekan departemen, kami ucapkan terima kasih.'
+        const clines = doc.splitTextToSize(closing, pageW-28); if (y + clines.length*3.8 + 40 > pageH-10) { doc.addPage(); y = 14 }
+        doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(...C.slate700); doc.text(clines, 14, y); y += clines.length*3.8 + 6
+        if (y + 36 > pageH-10) { doc.addPage(); y = 14 }
+        const sigX = pageW - 14 - 52
+        doc.setFontSize(7.5); doc.setTextColor(...C.slate700); doc.text('Hormat kami,', sigX+26, y, {align:'center'})
+        try { const img = new Image(); img.crossOrigin='anonymous'; await new Promise<void>((res,rej)=>{ img.onload=()=>res(); img.onerror=()=>rej(); img.src='/TTD Fix.png' }); if (img.complete && img.naturalWidth>0){ const cv=document.createElement('canvas'); cv.width=img.naturalWidth; cv.height=img.naturalHeight; cv.getContext('2d')!.drawImage(img,0,0); const ratio=img.naturalHeight/img.naturalWidth; const tw=28; doc.addImage(cv.toDataURL('image/png'),'PNG', sigX+12, y+4, tw, tw*ratio) } } catch {}
+        doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...C.slate900); doc.text('Parwanto', sigX+26, y+24, {align:'center'})
+        doc.setDrawColor(...C.slate300); doc.setLineWidth(0.25); doc.line(sigX, y+25.5, sigX+52, y+25.5)
+        doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...C.slate700); doc.text('Tim IT & System Development', sigX+26, y+29, {align:'center'})
+        doc.setFontSize(6.5); doc.setTextColor(...C.slate500); doc.text('(Parwanto / System Developer)', sigX+26, y+32, {align:'center'})
+        const totalPages=(doc as any).internal.getNumberOfPages(); for(let i=1;i<=totalPages;i++){ doc.setPage(i); doc.setFontSize(6); doc.setTextColor(...C.slate300); doc.text('PT. GRAFINDO MITRASEMESTA — Surat Pemberitahuan No. 012/ERP-TRN/IX/2026', 14, pageH-5); doc.text(`Hal ${i} dari ${totalPages}`, pageW-14, pageH-5, {align:'right'}) }
+        doc.save('Surat-Pemberitahuan-Training-ERP-012-ERP-TRN-IX-2026.pdf'); showToast('success','Surat Training berhasil diunduh!')
+    }, [showToast])
 
     const filtered = plans.filter(p =>
         p.number.toLowerCase().includes(search.toLowerCase()) ||
@@ -755,11 +814,39 @@ function DevelopmentContent() {
                     {/* ── RIGHT: DETAIL ───────────────────────────────────── */}
                     <div className="space-y-4 min-w-0">
                         {!selected ? (
-                            <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-20 text-center">
-                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 flex items-center justify-center mx-auto mb-4"><ClipboardList size={28} className="text-indigo-300" /></div>
-                                <p className="font-bold text-slate-400 text-sm">{t.selectPlan}</p>
-                                <p className="text-xs text-slate-300 mt-1">Pilih planning dari daftar di sebelah kiri</p>
-                            </div>
+                            <>
+                                <div className="flex gap-1 bg-white rounded-xl border border-slate-100 p-1 shadow-sm w-fit flex-wrap">
+                                    {([{key:'MATRIX',icon:BarChart3,label:t.matrix},{key:'MEETINGS',icon:CalendarDays,label:t.meetings,count:0},{key:'TRAINING',icon:GraduationCap,label:t.training}] as any[]).map(({key,icon:Icon,label,count}: any) => (
+                                        <button key={key} onClick={() => setTab(key as any)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${tab===key?'bg-indigo-600 text-white shadow-md shadow-indigo-600/20':'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>
+                                            <Icon size={13} />{label}
+                                            {count!==undefined&&count>0&&<span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${tab===key?'bg-white/20 text-white':'bg-slate-100 text-slate-500'}`}>{count}</span>}
+                                        </button>
+                                    ))}
+                                </div>
+                                {tab==='TRAINING' ? (
+                                    <motion.div key="training-empty" initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2"><div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center"><GraduationCap size={13} className="text-indigo-600" /></div><h3 className="text-sm font-black text-slate-700">{t.trainingTitle}</h3><span className="hidden sm:inline-flex px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-[9px] font-black text-indigo-600">{t.trainingNo}</span></div>
+                                            <div className="flex gap-2"><Button variant="outline" onClick={()=>setTrainingPreview(true)} className="h-9 rounded-xl border-slate-200 text-xs font-bold gap-1.5"><Eye size={13} className="text-indigo-600"/> Preview</Button><Button onClick={exportTrainingPDF} className="h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold gap-1.5"><Download size={13}/> Unduh PDF</Button></div>
+                                        </div>
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                            <div className="bg-indigo-600 px-6 py-4 text-white flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Surat Pemberitahuan</p><p className="text-sm font-black">Jadwal dan Persiapan Training Onsite ERP — Desk-to-Desk</p><p className="text-[10px] text-indigo-200 mt-0.5">Tim IT & System Development · 21 September 2026</p></div><span className="hidden md:inline-flex px-3 py-1 rounded-lg bg-white/15 border border-white/20 text-[10px] font-black">No. 012/ERP-TRN/IX/2026</span></div>
+                                            <div className="p-6 space-y-5">
+                                                <p className="text-xs leading-relaxed text-slate-600">Sehubungan dengan kelanjutan pengembangan dan implementasi sistem operasional terpadu (PT. GRAFINDO MITRASEMESTA), bersama surat ini kami sampaikan bahwa Tim IT akan mendatangi langsung setiap meja kerja (desk-to-desk) untuk memberikan Training & Pendampingan Onsite Aplikasi ERP.</p>
+                                                <div className="rounded-xl border border-slate-200 overflow-hidden text-[11px]"><div className="grid grid-cols-2 divide-x divide-slate-200 border-b border-slate-200"><div className="p-2.5 bg-slate-50"><span className="block text-[9px] font-black uppercase text-slate-400">Nomor</span><span className="font-bold text-slate-800">012/ERP-TRN/IX/2026</span></div><div className="p-2.5 bg-slate-50"><span className="block text-[9px] font-black uppercase text-slate-400">Tanggal</span><span className="font-bold text-slate-800">21 September 2026</span></div></div><div className="grid grid-cols-2 divide-x divide-slate-200"><div className="p-2.5"><span className="block text-[9px] font-black uppercase text-slate-400">Dari</span><span className="font-bold text-slate-800">Tim IT & System Development</span></div><div className="p-2.5"><span className="block text-[9px] font-black uppercase text-slate-400">Kepada</span><span className="font-bold text-slate-800">Kepala Departemen & Tim Terkait (CS, Depo, Sparepart, Finance)</span></div></div></div>
+                                                <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">1. Jadwal Kunjungan Onsite — 09.00 WIB s.d. Selesai</p><div className="rounded-xl border border-slate-200 overflow-hidden"><div className="grid grid-cols-4 bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200"><span className="p-2">Departemen</span><span className="p-2">Hari / Tanggal</span><span className="p-2">Metode</span><span className="p-2">Tempat</span></div>{[{d:'Customer Service (CS)',t:'Selasa, 22 Sep 2026'},{d:'DEPO',t:'Rabu, 23 Sep 2026'},{d:'Sparepart',t:'Kamis, 24 Sep 2026'},{d:'Finance',t:'Senin, 28 Sep 2026'}].map(r=>(<div key={r.d} className="grid grid-cols-4 text-[11px] border-b last:border-0 border-slate-100"><span className="p-2.5 font-bold text-slate-800">{r.d}</span><span className="p-2.5 text-slate-600">{r.t}</span><span className="p-2.5 text-slate-600">Kunjungan langsung</span><span className="p-2.5 text-slate-600">{r.d.includes('CS')?'Area CS':r.d==='DEPO'?'Area Depo':r.d==='Sparepart'?'Gudang & Sparepart':'Ruang Finance'}</span></div>))}</div></div>
+                                                <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">2. Hal-Hal yang Perlu Dipersiapkan</p><div className="grid md:grid-cols-2 gap-2.5">{[{k:'Perangkat & Jaringan',v:'PC/Laptop ON & internet stabil · Browser Chrome/Firefox/Edge siap',i:Laptop},{k:'Akses Akun',v:'Pembuatan & verifikasi akun dipandu Tim IT langsung di meja',i:Users},{k:'Catatan Kerja',v:'Siapkan catatan kecil untuk poin penting',i:NotebookPen},{k:'Keberadaan di Meja',v:'Berada di meja sesuai jadwal departemen',i:MapPin}].map(x=>(<div key={x.k} className="rounded-xl bg-slate-50 border border-slate-200 p-3 flex gap-2.5"><x.i size={14} className="text-indigo-600 shrink-0 mt-0.5"/><div><p className="text-[10px] font-black text-slate-800">{x.k}</p><p className="text-[11px] text-slate-600 leading-snug">{x.v}</p></div></div>))}</div></div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ) : (
+                                    <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-20 text-center">
+                                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-50 flex items-center justify-center mx-auto mb-4"><ClipboardList size={28} className="text-indigo-300" /></div>
+                                        <p className="font-bold text-slate-400 text-sm">{t.selectPlan}</p>
+                                        <p className="text-xs text-slate-300 mt-1">Pilih planning dari daftar di sebelah kiri</p>
+                                    </div>
+                                )}
+                            </>
                         ) : (
                             <>
                                 {/* SUMMARY CARD */}
@@ -845,8 +932,8 @@ function DevelopmentContent() {
                                 </motion.div>
 
                                 {/* TABS */}
-                                <div className="flex gap-1 bg-white rounded-xl border border-slate-100 p-1 shadow-sm w-fit">
-                                    {([{key:'MATRIX',icon:BarChart3,label:t.matrix},{key:'MEETINGS',icon:CalendarDays,label:t.meetings,count:selected.meetings.length}] as any[]).map(({key,icon:Icon,label,count}) => (
+                                <div className="flex gap-1 bg-white rounded-xl border border-slate-100 p-1 shadow-sm w-fit flex-wrap">
+                                    {([{key:'MATRIX',icon:BarChart3,label:t.matrix},{key:'MEETINGS',icon:CalendarDays,label:t.meetings,count:selected.meetings.length},{key:'TRAINING',icon:GraduationCap,label:t.training}] as any[]).map(({key,icon:Icon,label,count}) => (
                                         <button key={key} onClick={() => setTab(key)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${tab===key?'bg-indigo-600 text-white shadow-md shadow-indigo-600/20':'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>
                                             <Icon size={13} />{label}
                                             {count!==undefined&&count>0&&<span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${tab===key?'bg-white/20 text-white':'bg-slate-100 text-slate-500'}`}>{count}</span>}
@@ -1032,6 +1119,69 @@ function DevelopmentContent() {
                                                         </motion.div>
                                                     )
                                                 })}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {tab==='TRAINING'&&(
+                                    <motion.div key="training" initial={{opacity:0,y:6}} animate={{opacity:1,y:0}} className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center"><GraduationCap size={13} className="text-indigo-600" /></div>
+                                                <h3 className="text-sm font-black text-slate-700">{t.trainingTitle}</h3>
+                                                <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-[9px] font-black text-indigo-600">{t.trainingNo}</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button variant="outline" onClick={()=>setTrainingPreview(true)} className="h-9 rounded-xl border-slate-200 text-xs font-bold gap-1.5"><Eye size={13} className="text-indigo-600" /> Preview</Button>
+                                                <Button onClick={exportTrainingPDF} className="h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold gap-1.5"><Download size={13} /> Unduh PDF</Button>
+                                            </div>
+                                        </div>
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                            <div className="bg-indigo-600 px-6 py-4 text-white flex items-center justify-between">
+                                                <div><p className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Surat Pemberitahuan</p><p className="text-sm font-black">Jadwal dan Persiapan Training Onsite ERP — Desk-to-Desk</p><p className="text-[10px] text-indigo-200 mt-0.5">Tim IT & System Development · 21 September 2026</p></div>
+                                                <span className="hidden md:inline-flex px-3 py-1 rounded-lg bg-white/15 border border-white/20 text-[10px] font-black">No. 012/ERP-TRN/IX/2026</span>
+                                            </div>
+                                            <div className="p-6 space-y-5">
+                                                <p className="text-xs leading-relaxed text-slate-600">Sehubungan dengan kelanjutan pengembangan dan implementasi sistem operasional terpadu (PT. GRAFINDO MITRASEMESTA), bersama surat ini kami sampaikan bahwa Tim IT akan mendatangi langsung setiap meja kerja (desk-to-desk) untuk memberikan Training & Pendampingan Onsite Aplikasi ERP.</p>
+                                                <div className="rounded-xl border border-slate-200 overflow-hidden text-[11px]">
+                                                    <div className="grid grid-cols-2 divide-x divide-slate-200 border-b border-slate-200"><div className="p-2.5 bg-slate-50"><span className="block text-[9px] font-black uppercase text-slate-400">Nomor</span><span className="font-bold text-slate-800">012/ERP-TRN/IX/2026</span></div><div className="p-2.5 bg-slate-50"><span className="block text-[9px] font-black uppercase text-slate-400">Tanggal</span><span className="font-bold text-slate-800">21 September 2026</span></div></div>
+                                                    <div className="grid grid-cols-2 divide-x divide-slate-200"><div className="p-2.5"><span className="block text-[9px] font-black uppercase text-slate-400">Dari</span><span className="font-bold text-slate-800">Tim IT & System Development</span></div><div className="p-2.5"><span className="block text-[9px] font-black uppercase text-slate-400">Kepada</span><span className="font-bold text-slate-800">Kepala Departemen & Tim Terkait (CS, Depo, Sparepart, Finance)</span></div></div>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">1. Jadwal Kunjungan Onsite Tim IT — 09.00 WIB s.d. Selesai</p>
+                                                    <div className="rounded-xl border border-slate-200 overflow-hidden">
+                                                        <div className="grid grid-cols-4 bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200"><span className="p-2">Departemen</span><span className="p-2">Hari / Tanggal</span><span className="p-2">Metode</span><span className="p-2">Tempat</span></div>
+                                                        {[
+                                                            {d:'Customer Service (CS)', t:'Selasa, 22 Sep 2026'},
+                                                            {d:'DEPO', t:'Rabu, 23 Sep 2026'},
+                                                            {d:'Sparepart', t:'Kamis, 24 Sep 2026'},
+                                                            {d:'Finance', t:'Senin, 28 Sep 2026'},
+                                                        ].map(r=>(
+                                                            <div key={r.d} className="grid grid-cols-4 text-[11px] border-b last:border-0 border-slate-100"><span className="p-2.5 font-bold text-slate-800">{r.d}</span><span className="p-2.5 text-slate-600">{r.t}</span><span className="p-2.5 text-slate-600">Kunjungan langsung</span><span className="p-2.5 text-slate-600">{r.d.includes('CS')?'Area CS':r.d==='DEPO'?'Area Depo':r.d==='Sparepart'?'Gudang & Sparepart':'Ruang Finance'}</span></div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">2. Hal-Hal yang Perlu Dipersiapkan</p>
+                                                    <div className="grid md:grid-cols-2 gap-2.5">
+                                                        {[
+                                                            {k:'Perangkat & Jaringan', v:'PC/Laptop ON & internet stabil · Browser Chrome/Firefox/Edge siap', i:Laptop},
+                                                            {k:'Akses Akun', v:'Pembuatan & verifikasi akun dipandu Tim IT langsung di meja', i:Users},
+                                                            {k:'Catatan Kerja', v:'Siapkan catatan kecil untuk poin penting', i:NotebookPen},
+                                                            {k:'Keberadaan di Meja', v:'Berada di meja sesuai jadwal departemen', i:MapPin},
+                                                        ].map(x=>(
+                                                            <div key={x.k} className="rounded-xl bg-slate-50 border border-slate-200 p-3 flex gap-2.5"><x.i size={14} className="text-indigo-600 shrink-0 mt-0.5" /><div><p className="text-[10px] font-black text-slate-800">{x.k}</p><p className="text-[11px] text-slate-600 leading-snug">{x.v}</p></div></div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-end pt-2">
+                                                    <div className="text-center">
+                                                        <p className="text-[10px] text-slate-500">Hormat kami,</p><p className="text-xs font-bold text-slate-800">Tim IT & System Development</p><p className="text-[10px] text-slate-400">(Parwanto / System Developer)</p>
+                                                        <div className="mt-2 w-32 h-10 mx-auto opacity-40 flex items-center justify-center border border-dashed border-slate-300 rounded-lg text-[9px] text-slate-400">TTD</div>
+                                                    </div>
+                                                </div>
+                                                <button onClick={()=>setTrainingPreview(true)} className="w-full mt-2 h-9 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1.5"><Eye size={13} /> Preview Surat Lengkap</button>
                                             </div>
                                         </div>
                                     </motion.div>
@@ -1508,6 +1658,12 @@ const ID = {
     addActivity: 'Tambah Aktivitas',
     save: 'Simpan',
     schedule: 'Jadwalkan',
+    training: 'Jadwal Training',
+    trainingTitle: 'Training & Pendampingan Onsite ERP — Desk-to-Desk',
+    trainingNo: 'No. 012/ERP-TRN/IX/2026',
+    trainingDesc: 'Tim IT kunjungi tiap meja kerja sesuai jadwal. Siapkan perangkat & berada di meja.',
+    showLetter: 'Lihat Surat',
+    hideLetter: 'Sembunyikan Surat',
 }
 
 const EN = {
@@ -1544,4 +1700,10 @@ const EN = {
     addActivity: 'Add Activity',
     save: 'Save',
     schedule: 'Schedule',
+    training: 'Training Schedule',
+    trainingTitle: 'ERP Onsite Training & Assistance — Desk-to-Desk',
+    trainingNo: 'No. 012/ERP-TRN/IX/2026',
+    trainingDesc: 'IT team visits each desk per schedule. Prepare device & be at desk.',
+    showLetter: 'View Letter',
+    hideLetter: 'Hide Letter',
 }
