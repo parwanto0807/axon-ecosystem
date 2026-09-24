@@ -177,7 +177,7 @@ function NewVendorBillForm() {
                 body: JSON.stringify(payload)
             })
 
-            if (!res.ok) throw new Error('Failed to save Vendor Bill')
+            if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message || 'Failed to save Vendor Bill') }
 
             router.push('/dashboard/purchasing/bills')
             router.refresh()

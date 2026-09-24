@@ -5369,25 +5369,50 @@ app.get('/api/purchase-invoices/:id', async (req, res) => {
 app.post('/api/purchase-invoices', async (req, res) => {
   try {
     const { items, ...invoiceData } = req.body;
-    
-    let number = invoiceData.number;
-    if (!number) {
-      const count = await prisma.purchaseInvoice.count();
-      number = `PI-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
+    if (invoiceData.purchaseOrderId) {
+      const existing = await prisma.purchaseInvoice.findFirst({ where: { purchaseOrderId: invoiceData.purchaseOrderId, status: { not: 'CANCELLED' } } });
+      if (existing) return res.status(400).json({ message: `PO sudah memiliki Bill ${existing.number} (${existing.status}). 1 PO = 1 Bill.` });
+      const po = await prisma.purchaseOrder.findUnique({ where: { id: invoiceData.purchaseOrderId } });
+      if (po && Number(invoiceData.grandTotal) > po.grandTotal + 0.01) return res.status(400).json({ message: `GrandTotal Bill (Rp ${Number(invoiceData.grandTotal).toLocaleString('id-ID')}) melebihi PO ${po.number} (Rp ${po.grandTotal.toLocaleString('id-ID')})` });
     }
-
+    let number = invoiceData.number?.trim();
+    if (!number) {
+      const year = new Date().getFullYear();
+      const last = await prisma.purchaseInvoice.findFirst({ where: { number: { startsWith: `PI-${year}-` } }, orderBy: { number: 'desc' } });
+      let next = 1;
+      if (last) { const m = last.number.match(/PI-\d+-(\d+)/); if (m) next = parseInt(m[1], 10) + 1; }
+      for (let i = 0; i < 20; i++) {
+        const cand = `PI-${year}-${String(next + i).padStart(3, '0')}`;
+        const exists = await prisma.purchaseInvoice.findUnique({ where: { number: cand } });
+        if (!exists) { number = cand; break; }
+      }
+      if (!number) number = `PI-${year}-${String(next).padStart(3, '0')}-${Date.now().toString().slice(-4)}`;
+    }
     const invoice = await prisma.purchaseInvoice.create({
       data: {
         ...invoiceData,
         date: invoiceData.date ? new Date(invoiceData.date) : new Date(),
         number,
-        items: {
-          create: items || []
-        }
+        items: { create: items || [] }
       },
       include: { vendor: true, items: true }
     });
     res.json(invoice);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+app.delete('/api/purchase-invoices/:id', async (req, res) => {
+  try {
+    const inv = await prisma.purchaseInvoice.findUnique({ where: { id: req.params.id } });
+    if (!inv) return res.status(404).json({ message: 'Bill not found' });
+    if (inv.status === 'POSTED' || inv.status === 'PAID') return res.status(400).json({ message: 'Bill POSTED/PAID tidak bisa dihapus. Void journal terlebih dahulu.' });
+    const je = await prisma.journalEntry.findMany({ where: { OR: [{ reference: inv.number }, { number: `JV-PI-${inv.number}` }, { number: `JV-PI-PAY-${inv.number}` }] } });
+    await prisma.$transaction(async (tx) => {
+      for (const j of je) { await tx.journalItem.deleteMany({ where: { journalEntryId: j.id } }); await tx.journalEntry.delete({ where: { id: j.id } }); }
+      await tx.purchaseInvoiceItem.deleteMany({ where: { purchaseInvoiceId: inv.id } });
+      await tx.purchaseInvoice.delete({ where: { id: inv.id } });
+    });
+    res.json({ message: `Deleted ${inv.number} + ${je.length} journals` });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
