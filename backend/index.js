@@ -3371,6 +3371,100 @@ app.get('/api/invoices/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+// Rekapan Order-to-Cash per Customer:
+// Penawaran (Quotation) -> PO/SalesOrder -> Ditagih (Invoice) -> Dibayar (Payment)
+// + PO yang belum ditagih. Support filter ?customerId= & ?status=
+app.get('/api/sales-billing-recap', async (req, res) => {
+  try {
+    const { customerId, status } = req.query;
+    const whereSO = { ...(customerId ? { customerId } : {}) };
+    const whereQuo = { ...(customerId ? { customerId } : {}) };
+
+    const [salesOrders, quotations] = await Promise.all([
+      prisma.salesOrder.findMany({
+        where: whereSO,
+        include: {
+          customer: true,
+          quotation: true,
+          invoices: { where: { NOT: { status: 'CANCELLED' } }, include: { payments: true } }
+        },
+        orderBy: { date: 'desc' }
+      }),
+      prisma.quotation.findMany({
+        // REJECTED tidak masuk rekapan
+        where: { ...whereQuo, NOT: { status: 'REJECTED' } },
+        include: { customer: true, salesOrders: { select: { id: true, number: true } } },
+        orderBy: { date: 'desc' }
+      })
+    ]);
+
+    const rows = salesOrders
+      // SO yang penawarannya REJECTED juga tidak masuk rekapan
+      .filter((so) => !so.quotation || so.quotation.status !== 'REJECTED')
+      .map((so) => {
+      const validInvoices = (so.invoices || []).filter((inv) => inv.status !== 'DRAFT' && inv.status !== 'CANCELLED');
+      const invoicedTotal = validInvoices.reduce((s, inv) => s + (Number(inv.grandTotal) || 0), 0);
+      const paidTotal = validInvoices.reduce((s, inv) => s + ((inv.payments || [])
+        .filter((p) => p.status === 'SUCCESS')
+        .reduce((a, p) => a + (Number(p.amount) || 0), 0)), 0);
+      const poTotal = Number(so.grandTotal) || 0;
+      const unbilledTotal = Math.max(poTotal - invoicedTotal, 0);
+      const unpaidTotal = Math.max(invoicedTotal - paidTotal, 0);
+      let billingStatus = 'PO_BELUM_TAGIH';
+      if (so.status === 'CANCELLED') billingStatus = 'CANCELLED';
+      else if (paidTotal >= invoicedTotal && invoicedTotal > 0 && invoicedTotal >= poTotal) billingStatus = 'LUNAS';
+      else if (paidTotal > 0 && unpaidTotal > 0) billingStatus = 'SEBAGIAN_DIBAYAR';
+      else if (invoicedTotal > 0 && paidTotal <= 0) billingStatus = 'SUDAH_TAGIH_BELUM_BAYAR';
+      else if (invoicedTotal > 0 && invoicedTotal < poTotal) billingStatus = 'SEBAGIAN_DITAGIH';
+      else if (invoicedTotal <= 0) billingStatus = 'PO_BELUM_TAGIH';
+
+      return {
+        id: so.id,
+        customerId: so.customerId,
+        customer: so.customer ? { id: so.customer.id, code: so.customer.code, name: so.customer.name, company: so.customer.company } : null,
+        quotationNumber: so.quotation?.number || null,
+        quotationSubject: so.quotation?.subject || so.subject || null,
+        soSubject: so.subject || null,
+        quotationId: so.quotationId || null,
+        soNumber: so.number,
+        poNumber: so.poNumber || null,
+        soDate: so.date,
+        soStatus: so.status,
+        poTotal,
+        invoices: validInvoices.map((inv) => ({
+          id: inv.id, number: inv.number, date: inv.date, dueDate: inv.dueDate,
+          status: inv.status, grandTotal: Number(inv.grandTotal) || 0,
+          paid: (inv.payments || []).filter((p) => p.status === 'SUCCESS').reduce((a, p) => a + (Number(p.amount) || 0), 0)
+        })),
+        invoicedTotal,
+        paidTotal,
+        unbilledTotal,
+        unpaidTotal,
+        billingStatus,
+      };
+    });
+
+    const filtered = status && status !== 'ALL' ? rows.filter((r) => r.billingStatus === status) : rows;
+    const quotationsWithoutSO = quotations.filter((q) => !q.salesOrders || q.salesOrders.length === 0)
+      .map((q) => ({
+        id: q.id, number: q.number, date: q.date, status: q.status, subject: q.subject || null,
+        grandTotal: Number(q.grandTotal) || 0,
+        customer: q.customer ? { id: q.customer.id, code: q.customer.code, name: q.customer.name } : null,
+      }));
+
+    const summary = filtered.reduce((acc, r) => ({
+      poTotal: acc.poTotal + r.poTotal,
+      invoicedTotal: acc.invoicedTotal + r.invoicedTotal,
+      paidTotal: acc.paidTotal + r.paidTotal,
+      unbilledTotal: acc.unbilledTotal + r.unbilledTotal,
+      unpaidTotal: acc.unpaidTotal + r.unpaidTotal,
+      count: acc.count + 1,
+    }), { poTotal: 0, invoicedTotal: 0, paidTotal: 0, unbilledTotal: 0, unpaidTotal: 0, count: 0 });
+
+    res.json({ rows: filtered, quotationsWithoutSO, summary });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 app.post('/api/invoices', async (req, res) => {
   try {
     const { items = [], ...data } = req.body;
@@ -3418,6 +3512,8 @@ app.post('/api/invoices', async (req, res) => {
 app.patch('/api/invoices/:id/post', async (req, res) => {
   try {
     const { id } = req.params;
+    // Timeout dinaikkan: posting invoice + jurnal auto butuh ~10 query berurutan,
+    // melebihi default 5 detik saat data sudah banyak.
     const inv = await prisma.$transaction(async (tx) => {
       const result = await tx.invoice.update({
         where: { id },
@@ -3503,7 +3599,7 @@ app.patch('/api/invoices/:id/post', async (req, res) => {
       });
 
       return result;
-    });
+    }, { timeout: 20000 });
     res.json(inv);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
@@ -3618,7 +3714,7 @@ app.patch('/api/invoices/:id/pay', async (req, res) => {
       });
 
       return result;
-    });
+    }, { timeout: 20000 });
 
     res.json(inv);
   } catch (e) { res.status(400).json({ message: e.message }); }

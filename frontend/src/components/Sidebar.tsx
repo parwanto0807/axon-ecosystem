@@ -72,6 +72,7 @@ const translations: any = {
         proposals: 'Proposal',
         quotations: 'Penawaran',
         salesOrders: 'Pesanan Penjualan',
+        salesRecap: 'Rekap Penagihan',
         contracts: 'Kontrak / SPK',
         inventory: 'Inventaris',
         stockMonitor: 'Monitor Stok',
@@ -153,6 +154,7 @@ const translations: any = {
         proposals: 'Proposals',
         quotations: 'Quotations',
         salesOrders: 'Sales Orders',
+        salesRecap: 'Billing Recap',
         contracts: 'Contracts / SPK',
         inventory: 'Inventory',
         stockMonitor: 'Stock Monitor',
@@ -274,19 +276,20 @@ const getMenuItems = (t: any) => [
         id: 'sales-group',
         label: 'SALES',
         isHeader: true,
-        requiredDepartment: ['SALES']
+        requiredDepartment: ['SALES', 'FINANCE']
     },
     {
         id: 'sales',
         icon: ShoppingCart,
         label: t.salesPipeline,
-        requiredDepartment: ['SALES'],
+        requiredDepartment: ['SALES', 'FINANCE'],
         children: [
-            { id: 'quotations', icon: FileText, label: t.quotations, path: '/dashboard/sales/quotations' },
-            { id: 'orders', icon: ShoppingBag, label: t.salesOrders, path: '/dashboard/sales/orders' },
-            { id: 'projects', icon: Briefcase, label: t.projects, path: '/dashboard/sales/projects' },
-            { id: 'surveys', icon: MapPin, label: t.surveys, path: '/dashboard/sales/surveys' },
-            { id: 'proposals', icon: ClipboardList, label: t.proposals, path: '/dashboard/sales/proposals' },
+            { id: 'quotations', icon: FileText, label: t.quotations, path: '/dashboard/sales/quotations', requiredDepartment: ['SALES'] },
+            { id: 'orders', icon: ShoppingBag, label: t.salesOrders, path: '/dashboard/sales/orders', requiredDepartment: ['SALES'] },
+            { id: 'monitoring', icon: BarChart3, label: t.salesRecap, path: '/dashboard/sales/monitoring', requiredDepartment: ['SALES', 'FINANCE'] },
+            { id: 'projects', icon: Briefcase, label: t.projects, path: '/dashboard/sales/projects', requiredDepartment: ['SALES'] },
+            { id: 'surveys', icon: MapPin, label: t.surveys, path: '/dashboard/sales/surveys', requiredDepartment: ['SALES'] },
+            { id: 'proposals', icon: ClipboardList, label: t.proposals, path: '/dashboard/sales/proposals', requiredDepartment: ['SALES'] },
             { id: 'contracts', icon: FileText, label: t.contracts, path: '/dashboard/contracts' }
         ]
     },
