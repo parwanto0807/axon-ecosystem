@@ -126,22 +126,22 @@ export default function SalesMonitoringPDFModal({
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.96, y: 10 }}
                     transition={{ duration: 0.2 }}
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col w-full max-w-6xl h-[92vh] overflow-hidden"
+                    className="bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col w-full max-w-6xl h-[92vh] overflow-hidden"
                 >
                     {/* Header */}
-                    <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/60">
+                    <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-indigo-600/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
                                 <FileText size={18} />
                             </div>
                             <div>
-                                <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                                <h3 className="text-sm sm:text-base font-black text-slate-900 flex items-center gap-2">
                                     Pratinjau Cetak PDF Monitoring Penjualan
-                                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                                         Pure jsPDF
                                     </span>
                                 </h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                <p className="text-xs text-slate-500">
                                     Format A4 Landscape · {rows.length} Dokumen Pesanan · Siap Cetak & Simpan
                                 </p>
                             </div>
@@ -153,7 +153,7 @@ export default function SalesMonitoringPDFModal({
                                 size="sm"
                                 onClick={handleDownload}
                                 disabled={loading || isDownloading}
-                                className="h-9 px-3.5 text-xs font-bold gap-1.5"
+                                className="h-9 px-3.5 text-xs font-bold gap-1.5 border-slate-200 bg-white hover:bg-slate-100 text-slate-700"
                             >
                                 {isDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                                 Unduh File
@@ -169,7 +169,7 @@ export default function SalesMonitoringPDFModal({
                             </Button>
                             <button
                                 onClick={onClose}
-                                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors ml-1"
+                                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 transition-colors ml-1"
                             >
                                 <X size={20} />
                             </button>
@@ -177,7 +177,7 @@ export default function SalesMonitoringPDFModal({
                     </div>
 
                     {/* Content Preview Frame */}
-                    <div className="flex-1 bg-slate-100 dark:bg-slate-950 relative overflow-hidden flex items-center justify-center">
+                    <div className="flex-1 bg-slate-100 relative overflow-hidden flex items-center justify-center">
                         {loading ? (
                             <div className="flex flex-col items-center gap-3 text-slate-500">
                                 <Loader2 size={36} className="animate-spin text-indigo-600" />
@@ -197,7 +197,7 @@ export default function SalesMonitoringPDFModal({
                     </div>
 
                     {/* Footer Info */}
-                    <div className="px-5 py-2.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+                    <div className="px-5 py-2.5 bg-white border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
                         <span className="flex items-center gap-1.5 font-medium">
                             <CheckCircle2 size={13} className="text-emerald-500" /> Dokumen di-render menggunakan vector engine jsPDF resolusi tinggi
                         </span>
