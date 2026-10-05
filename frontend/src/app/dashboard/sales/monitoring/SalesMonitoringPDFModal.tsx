@@ -24,6 +24,9 @@ interface SalesMonitoringPDFModalProps {
     userName?: string
 }
 
+// Stable empty reference so the preview-regen effect doesn't loop when the toggle is off
+const EMPTY_QUO: QuotationOnlyPDF[] = []
+
 export default function SalesMonitoringPDFModal({
     isOpen,
     onClose,
@@ -40,6 +43,14 @@ export default function SalesMonitoringPDFModal({
     const [pdfUrl, setPdfUrl] = useState<string | null>(null)
     const [isPrinting, setIsPrinting] = useState(false)
     const [isDownloading, setIsDownloading] = useState(false)
+    // Slider: sertakan / sembunyikan section "Tanpa Data Penawaran" di preview & cetak
+    const [includeQuo, setIncludeQuo] = useState(true)
+    const effectiveQuo = includeQuo ? quotationsWithoutSO : EMPTY_QUO
+
+    // Reset toggle tiap kali modal dibuka
+    useEffect(() => {
+        if (isOpen) setIncludeQuo(true)
+    }, [isOpen])
 
     useEffect(() => {
         let active = true
@@ -48,7 +59,7 @@ export default function SalesMonitoringPDFModal({
             generateSalesMonitoringPDF({
                 rows,
                 summary,
-                quotationsWithoutSO,
+                quotationsWithoutSO: effectiveQuo,
                 selectedCustomer,
                 selectedStatus,
                 statusLabel,
@@ -72,7 +83,7 @@ export default function SalesMonitoringPDFModal({
                 URL.revokeObjectURL(pdfUrl)
             }
         }
-    }, [isOpen, rows, summary, quotationsWithoutSO, selectedCustomer, selectedStatus, statusLabel, company, userName])
+    }, [isOpen, rows, summary, effectiveQuo, selectedCustomer, selectedStatus, statusLabel, company, userName])
 
     const handlePrint = async () => {
         setIsPrinting(true)
@@ -80,7 +91,7 @@ export default function SalesMonitoringPDFModal({
             await generateSalesMonitoringPDF({
                 rows,
                 summary,
-                quotationsWithoutSO,
+                quotationsWithoutSO: effectiveQuo,
                 selectedCustomer,
                 selectedStatus,
                 statusLabel,
@@ -101,7 +112,7 @@ export default function SalesMonitoringPDFModal({
             await generateSalesMonitoringPDF({
                 rows,
                 summary,
-                quotationsWithoutSO,
+                quotationsWithoutSO: effectiveQuo,
                 selectedCustomer,
                 selectedStatus,
                 statusLabel,
@@ -142,7 +153,8 @@ export default function SalesMonitoringPDFModal({
                                     </span>
                                 </h3>
                                 <p className="text-xs text-slate-500">
-                                    Format A4 Landscape · {rows.length} Dokumen Pesanan · Siap Cetak & Simpan
+                                    Format A4 Landscape · {rows.length} Dokumen Pesanan
+                                    {includeQuo && quotationsWithoutSO.length > 0 && ` + ${quotationsWithoutSO.length} Penawaran`} · Siap Cetak & Simpan
                                 </p>
                             </div>
                         </div>
@@ -175,6 +187,34 @@ export default function SalesMonitoringPDFModal({
                             </button>
                         </div>
                     </div>
+
+                    {/* Slider: Tampilkan / Sembunyikan section Tanpa Data Penawaran */}
+                    {quotationsWithoutSO.length > 0 && (
+                        <div className="px-5 py-2 bg-amber-50/70 border-b border-amber-100 flex items-center justify-between gap-3">
+                            <span className="text-xs font-semibold text-amber-800 flex items-center gap-2">
+                                <FileText size={13} className="text-amber-600" />
+                                Tanpa Data Penawaran
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                    {quotationsWithoutSO.length} Dokumen
+                                </span>
+                                <span className="hidden sm:inline text-amber-600/80 font-medium">
+                                    {includeQuo ? "— ikut dicetak" : "— disembunyikan"}
+                                </span>
+                            </span>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={includeQuo}
+                                title={includeQuo ? "Sembunyikan section penawaran" : "Tampilkan section penawaran"}
+                                onClick={() => setIncludeQuo(v => !v)}
+                                className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${includeQuo ? "bg-amber-500" : "bg-slate-300"}`}
+                            >
+                                <span
+                                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${includeQuo ? "left-[22px]" : "left-0.5"}`}
+                                />
+                            </button>
+                        </div>
+                    )}
 
                     {/* Content Preview Frame */}
                     <div className="flex-1 bg-slate-100 relative overflow-hidden flex items-center justify-center">
