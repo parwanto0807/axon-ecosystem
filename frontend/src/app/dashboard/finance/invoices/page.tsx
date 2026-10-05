@@ -24,7 +24,7 @@ interface Invoice {
     deliveryOrderId?: string; deliveryOrder?: { number: string };
     bankAccountId?: string; bankAccount?: BankAccount;
     signerName?: string; signerPosition?: string;
-    currency: string; subtotal: number; tax: number; discount: number;
+    currency: string; subtotal: number; tax: number; discountType?: string; discount: number;
     discountAmt: number; taxAmt: number; grandTotal: number;
     payments?: { id: string; amount: number; date: string; status: string; notes?: string }[];
     notes?: string; paymentTerms?: string; invoiceType?: string; terminType?: string; terminPercent?: number; terminNominal?: number;
@@ -110,7 +110,7 @@ export default function InvoicesPage() {
         bankAccountId: '', signerName: '', signerPosition: '',
         date: new Date().toISOString().split('T')[0],
         dueDate: '', notes: '', paymentTerms: '', invoiceType: 'STANDARD', terminType: 'PERCENT', terminPercent: 30, terminNominal: 0,
-        subtotal: 0, tax: 11, discount: 0, discountAmt: 0, taxAmt: 0, grandTotal: 0,
+        subtotal: 0, tax: 11, discountType: 'PERCENTAGE', discount: 0, discountAmt: 0, taxAmt: 0, grandTotal: 0,
         items: [] as InvoiceItem[]
     })
 
@@ -144,11 +144,14 @@ export default function InvoicesPage() {
 
     useEffect(() => { loadData() }, [loadData])
 
-    const calculateTotals = (items: InvoiceItem[], taxRate: number, discRate: number) => {
+    const calculateTotals = (items: InvoiceItem[], taxRate: number, discValue: number, discountType: string = 'PERCENTAGE') => {
         const subtotal = items.reduce((acc, it) => acc + (it.amount || 0), 0)
-        const discountAmt = (subtotal * discRate) / 100
-        const taxAmt = ((subtotal - discountAmt) * taxRate) / 100
-        const grandTotal = subtotal - discountAmt + taxAmt
+        const discountAmt = discountType === 'AMOUNT'
+            ? Math.min(Math.max(discValue, 0), subtotal)
+            : (subtotal * Math.min(Math.max(discValue, 0), 100)) / 100
+        const taxable = Math.max(0, subtotal - discountAmt)
+        const taxAmt = (taxable * Math.max(taxRate, 0)) / 100
+        const grandTotal = taxable + taxAmt
         return { subtotal, discountAmt, taxAmt, grandTotal }
     }
 
@@ -225,13 +228,13 @@ export default function InvoicesPage() {
 
     const addItem = () => {
         const newItems = [...form.items, { no: form.items.length + 1, description: '', qty: 1, unit: 'pcs', unitPrice: 0, discount: 0, amount: 0 }]
-        const totals = calculateTotals(newItems, form.tax, form.discount)
+        const totals = calculateTotals(newItems, form.tax, form.discount, (form as any).discountType)
         setForm(prev => ({ ...prev, items: newItems, ...totals }))
     }
 
     const removeItem = (idx: number) => {
         const newItems = form.items.filter((_, i) => i !== idx).map((it, i) => ({ ...it, no: i + 1 }))
-        const totals = calculateTotals(newItems, form.tax, form.discount)
+        const totals = calculateTotals(newItems, form.tax, form.discount, (form as any).discountType)
         setForm(prev => ({ ...prev, items: newItems, ...totals }))
     }
 
@@ -245,7 +248,7 @@ export default function InvoicesPage() {
             updated.amount = qty * price * (1 - disc / 100);
             return updated;
         });
-        const totals = calculateTotals(newItems, form.tax, form.discount)
+        const totals = calculateTotals(newItems, form.tax, form.discount, (form as any).discountType)
         setForm(prev => ({ ...prev, items: newItems, ...totals }))
     }
 
@@ -288,7 +291,7 @@ export default function InvoicesPage() {
                 }));
             }
 
-            const totals = calculateTotals(items, form.tax, 0);
+            const totals = calculateTotals(items, form.tax, form.discount, (form as any).discountType);
             const linkedDo = deliveryOrders.find(d => d.salesOrderId === soId);
             setForm(prev => ({
                 ...prev,
@@ -510,6 +513,7 @@ export default function InvoicesPage() {
                                                             terminNominal: inv.terminNominal || 0,
                                                             subtotal: inv.subtotal,
                                                             tax: inv.tax,
+                                                            discountType: (inv as any).discountType || 'PERCENTAGE',
                                                             discount: inv.discount,
                                                             discountAmt: inv.discountAmt,
                                                             taxAmt: inv.taxAmt,
@@ -617,6 +621,7 @@ export default function InvoicesPage() {
                                                 terminNominal: inv.terminNominal || 0,
                                                 subtotal: inv.subtotal,
                                                 tax: inv.tax,
+                                                discountType: (inv as any).discountType || 'PERCENTAGE',
                                                 discount: inv.discount,
                                                 discountAmt: inv.discountAmt,
                                                 taxAmt: inv.taxAmt,
@@ -965,16 +970,47 @@ export default function InvoicesPage() {
                                         <div className="flex items-center justify-between text-xs font-bold text-muted-foreground px-1">
                                             <div className="flex items-center gap-2">
                                                 <span>Discount</span>
-                                                <input
-                                                    type="number" value={form.discount}
+                                                <select
+                                                    value={(form as any).discountType}
                                                     onChange={e => {
-                                                        const disc = Number(e.target.value) || 0;
-                                                        const totals = calculateTotals(form.items, form.tax, disc);
-                                                        setForm({ ...form, discount: disc, ...totals });
+                                                        const dt = e.target.value;
+                                                        const totals = calculateTotals(form.items, form.tax, 0, dt);
+                                                        setForm({ ...form, discountType: dt, discount: 0, ...totals });
                                                     }}
-                                                    className="w-12 h-6 px-1 rounded-md bg-slate-100 border-none text-[10px] font-black text-center focus:ring-0"
-                                                />
-                                                <Percent size={10} />
+                                                    className="h-6 px-1 rounded-md bg-slate-100 border-none text-[10px] font-black focus:ring-0 text-emerald-700 cursor-pointer"
+                                                    title="Tipe diskon: persen atau nominal rupiah"
+                                                >
+                                                    <option value="PERCENTAGE">%</option>
+                                                    <option value="AMOUNT">Rp</option>
+                                                </select>
+                                                {(form as any).discountType === 'AMOUNT' ? (
+                                                    <div className="relative">
+                                                        <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400">Rp</span>
+                                                        <input
+                                                            type="number" min="0" value={form.discount || ''}
+                                                            placeholder="0"
+                                                            onChange={e => {
+                                                                const disc = Number(e.target.value) || 0;
+                                                                const totals = calculateTotals(form.items, form.tax, disc, 'AMOUNT');
+                                                                setForm({ ...form, discount: disc, ...totals });
+                                                            }}
+                                                            className="w-28 h-6 pl-7 pr-1 rounded-md bg-slate-100 border-none text-[10px] font-black text-right focus:ring-0"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            type="number" min="0" max="100" value={form.discount}
+                                                            onChange={e => {
+                                                                const disc = Number(e.target.value) || 0;
+                                                                const totals = calculateTotals(form.items, form.tax, disc, 'PERCENTAGE');
+                                                                setForm({ ...form, discount: disc, ...totals });
+                                                            }}
+                                                            className="w-12 h-6 px-1 rounded-md bg-slate-100 border-none text-[10px] font-black text-center focus:ring-0"
+                                                        />
+                                                        <Percent size={10} />
+                                                    </div>
+                                                )}
                                             </div>
                                             <span>- {fmt(form.discountAmt)}</span>
                                         </div>
@@ -985,7 +1021,7 @@ export default function InvoicesPage() {
                                                     type="number" value={form.tax}
                                                     onChange={e => {
                                                         const tx = Number(e.target.value) || 0;
-                                                        const totals = calculateTotals(form.items, tx, form.discount);
+                                                        const totals = calculateTotals(form.items, tx, form.discount, (form as any).discountType);
                                                         setForm({ ...form, tax: tx, ...totals });
                                                     }}
                                                     className="w-12 h-6 px-1 rounded-md bg-slate-100 border-none text-[10px] font-black text-center focus:ring-0"

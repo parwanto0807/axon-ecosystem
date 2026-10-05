@@ -14,7 +14,7 @@ interface Invoice {
     deliveryOrder?: { number: string };
     bankAccount?: { bankName: string; accountNumber: string; accountHolder: string; branch?: string };
     signerName?: string; signerPosition?: string;
-    currency: string; subtotal: number; tax: number; discount: number;
+    currency: string; subtotal: number; tax: number; discountType?: string; discount: number;
     discountAmt: number; taxAmt: number; grandTotal: number;
     notes?: string; paymentTerms?: string; invoiceType?: string; terminPercent?: number;
     items: InvoiceItem[];
@@ -167,7 +167,7 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
             // Totals
             const bx = W - M - 80
             const tots: [string, string][] = [['Subtotal', fr(invoice.subtotal)]]
-            if (invoice.discount > 0) tots.push([`Diskon (${invoice.discount}%)`, `- ${fr(invoice.discountAmt)}`])
+            if (invoice.discountAmt > 0) tots.push([invoice.discountType === 'AMOUNT' ? 'Diskon (Nominal)' : `Diskon (${invoice.discount}%)`, `- ${fr(invoice.discountAmt)}`])
             tots.push([`PPN (${invoice.tax}%)`, `+ ${fr(invoice.taxAmt)}`])
             doc.setFontSize(8)
             tots.forEach(([k, v]) => {
@@ -378,9 +378,9 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                                     <span>Subtotal</span>
                                     <span className={`font-bold ${isPrintMode ? 'text-black' : 'text-slate-900'}`}>{fr(invoice.subtotal)}</span>
                                 </div>
-                                {invoice.discount > 0 && (
+                                {invoice.discountAmt > 0 && (
                                     <div className={`flex justify-between ${isPrintMode ? 'text-black font-bold' : 'text-rose-600'}`}>
-                                        <span>Diskon ({invoice.discount}%)</span>
+                                        <span>Diskon ({invoice.discountType === 'AMOUNT' ? 'Nominal' : `${invoice.discount}%`})</span>
                                         <span className="font-bold">- {fr(invoice.discountAmt)}</span>
                                     </div>
                                 )}

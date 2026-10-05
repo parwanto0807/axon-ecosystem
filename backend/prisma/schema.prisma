@@ -612,6 +612,7 @@ model Invoice {
   contractId      String?
   currency        String           @default("IDR")
   subtotal        Float            @default(0)
+  discountType    String           @default("PERCENTAGE")
   discount        Float            @default(0)
   tax             Float            @default(11)
   discountAmt     Float            @default(0)

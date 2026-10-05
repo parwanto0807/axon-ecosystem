@@ -17,7 +17,7 @@ interface Invoice {
     deliveryOrder?: { number: string };
     bankAccount?: { bankName: string; accountNumber: string; accountHolder: string };
     signerName?: string; signerPosition?: string;
-    currency: string; subtotal: number; tax: number; discount: number;
+    currency: string; subtotal: number; tax: number; discountType?: string; discount: number;
     discountAmt: number; taxAmt: number; grandTotal: number;
     notes?: string; paymentTerms?: string;
     items: InvoiceItem[];
@@ -269,7 +269,7 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                             </div>
                             {invoice.discountAmt > 0 && (
                                 <div className="flex justify-between items-center text-sm font-medium text-rose-400 uppercase tracking-widest">
-                                    <span>Discount ({invoice.discount}%)</span>
+                                    <span>Discount ({invoice.discountType === 'AMOUNT' ? 'Nominal' : `${invoice.discount}%`})</span>
                                     <span>- {fmt(invoice.discountAmt)}</span>
                                 </div>
                             )}
