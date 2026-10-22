@@ -1,4 +1,5 @@
 import withPWAInit from "@ducanh2912/next-pwa";
+import { buildHeaderRules, resolveCspMode } from "./security-headers.mjs";
 
 const withPWA = withPWAInit({
   dest: "public",
@@ -7,9 +8,18 @@ const withPWA = withPWAInit({
   skipWaiting: true,
 });
 
+const isDev = process.env.NODE_ENV !== "production";
+
+/**
+ * CSP default report-only; ubah lewat env CSP_MODE=enforce setelah masa
+ * observasi (PRD E1.3). HSTS hanya dikirim di production.
+ */
+const cspMode = resolveCspMode();
+
 const nextConfig = {
   reactStrictMode: true,
   turbopack: {},
+  poweredByHeader: false,
   images: {
     remotePatterns: [
       {
@@ -22,31 +32,9 @@ const nextConfig = {
       },
     ],
   },
-  /* async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: http://localhost:5003 https://*; connect-src 'self' http://localhost:5003 https://*; font-src 'self' data:; frame-src 'self'; object-src 'none';"
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY'
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff'
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'origin-when-cross-origin'
-          }
-        ]
-      }
-    ]
-  } */
+  async headers() {
+    return buildHeaderRules({ isDev, cspMode });
+  },
 };
 
 export default withPWA(nextConfig);
