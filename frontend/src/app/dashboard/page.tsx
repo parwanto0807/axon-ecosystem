@@ -675,7 +675,7 @@ export default function DashboardPage() {
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         className="rounded-2xl overflow-hidden relative"
-        style={{ background: "linear-gradient(120deg, #312e81, #1e1b4b)", boxShadow: "0 12px 32px rgba(49,46,129,0.25)" }}
+        style={{ background: "linear-gradient(120deg, #0f766e, #042f2c)", boxShadow: "0 12px 32px rgba(15,118,110,0.25)" }}
       >
         <div className="absolute top-0 right-0 w-56 h-56 bg-indigo-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
         <div className="relative p-5 lg:p-6 flex flex-col lg:flex-row lg:items-center gap-4">

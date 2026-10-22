@@ -38,7 +38,7 @@ export default function PurchaseOrderPDFModal({ order, company, onClose }:
             const { default: autoTable } = await import('jspdf-autotable')
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
             const W = 210; const M = 15
-            const indigo = [79, 70, 229] as [number, number, number]
+            const indigo = [0, 165, 137] as [number, number, number]
             const dark = [15, 23, 42] as [number, number, number]
             const gray = [100, 116, 139] as [number, number, number]
             const white = [255, 255, 255] as [number, number, number]
@@ -185,11 +185,11 @@ export default function PurchaseOrderPDFModal({ order, company, onClose }:
     }
 
     return (
-        <div className="fixed inset-0 z-[150] flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-[150] flex items-stretch sm:items-start justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
             <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}
-                className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl my-4">
+                className="bg-white sm:rounded-3xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-auto sm:my-4 flex flex-col overflow-hidden">
 
-                <div className="flex items-center justify-between px-8 py-4 border-b border-slate-100 bg-slate-50 rounded-t-3xl">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-8 py-3 sm:py-4 border-b border-slate-100 bg-slate-50 sm:rounded-t-3xl">
                     <div className="flex items-center gap-3">
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${sc.color}`}>{order.number}</span>
                         <span className="text-slate-500 text-sm font-medium">{v?.name}</span>
@@ -204,10 +204,10 @@ export default function PurchaseOrderPDFModal({ order, company, onClose }:
                     </div>
                 </div>
 
-                <div style={{ padding: '24px', background: '#f1f5f9' }}>
-                    <div style={{ background: '#fff', maxWidth: 794, margin: '0 auto', padding: '40px 48px', fontFamily: 'Arial,sans-serif', fontSize: 11, color: '#0f172a', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,.1)' }}>
+                <div className="p-2 sm:p-6 bg-slate-100 flex-1 overflow-y-auto overflow-x-hidden">
+                    <div className="pdf-a4-fit" style={{ background: '#fff', width: 794, maxWidth: 794, margin: '0 auto', padding: '40px 48px', fontFamily: 'Arial,sans-serif', fontSize: 11, color: '#0f172a', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,.1)' }}>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #4f46e5', paddingBottom: 18, marginBottom: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '3px solid #00a589', paddingBottom: 18, marginBottom: 0 }}>
                             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
                                 {company.logo && <img src={`${process.env.NEXT_PUBLIC_API_URL}${company.logo}`} alt="logo" style={{ height: 60, width: 'auto', objectFit: 'contain' }} />}
                                 <div>
@@ -243,7 +243,7 @@ export default function PurchaseOrderPDFModal({ order, company, onClose }:
                         </div>
 
                         <div style={{ textAlign: 'center', padding: '10px 0 18px', borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
-                            <span style={{ fontWeight: 900, fontSize: 14, color: '#4f46e5', letterSpacing: 3, textTransform: 'uppercase' }}>Purchase Order</span>
+                            <span style={{ fontWeight: 900, fontSize: 14, color: '#00a589', letterSpacing: 3, textTransform: 'uppercase' }}>Purchase Order</span>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 24 }}>
@@ -272,7 +272,7 @@ export default function PurchaseOrderPDFModal({ order, company, onClose }:
 
                         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 10 }}>
                             <thead>
-                                <tr style={{ background: '#4f46e5', color: '#fff' }}>
+                                <tr style={{ background: '#00a589', color: '#fff' }}>
                                     {['No', 'Deskripsi', 'Qty', 'Satuan', 'Harga Satuan', 'Disc%', 'Jumlah'].map((h, i) => (
                                         <th key={h} style={{ padding: '8px 10px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase', textAlign: i === 1 ? 'left' : i >= 4 ? 'right' : 'center' }}>{h}</th>
                                     ))}
@@ -303,9 +303,9 @@ export default function PurchaseOrderPDFModal({ order, company, onClose }:
                                         <span style={{ color: '#64748b' }}>{k}</span><span style={{ fontWeight: 600, color: '#1e293b' }}>{val}</span>
                                     </div>
                                 ))}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid #4f46e5' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '2px solid #00a589' }}>
                                     <span style={{ fontWeight: 900, color: '#0f172a', textTransform: 'uppercase' }}>TOTAL PESANAN</span>
-                                    <span style={{ fontWeight: 900, color: '#4f46e5', fontSize: 15 }}>Rp {order.grandTotal?.toLocaleString('id-ID')}</span>
+                                    <span style={{ fontWeight: 900, color: '#00a589', fontSize: 15 }}>Rp {order.grandTotal?.toLocaleString('id-ID')}</span>
                                 </div>
                             </div>
                         </div>

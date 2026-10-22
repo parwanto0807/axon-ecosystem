@@ -48,7 +48,7 @@ export default function WorkOrderPDFModal({ workOrder, company, onClose }:
             const { default: autoTable } = await import('jspdf-autotable')
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
             const W = 210; const M = 15
-            const indigo = [79, 70, 229] as [number, number, number]
+            const indigo = [0, 165, 137] as [number, number, number]
             const amber = [217, 119, 6] as [number, number, number]
             const dark = [15, 23, 42] as [number, number, number]
             const gray = [100, 116, 139] as [number, number, number]
@@ -272,11 +272,11 @@ export default function WorkOrderPDFModal({ workOrder, company, onClose }:
     const pr = WO_PRIORITY[workOrder.priority] || WO_PRIORITY.NORMAL
 
     return (
-        <div className="fixed inset-0 z-[250] flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-[250] flex items-stretch sm:items-start justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
             <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}
-                className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl my-4">
+                className="bg-white sm:rounded-3xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-auto sm:my-4 flex flex-col overflow-hidden">
 
-                <div className="flex items-center justify-between px-8 py-4 border-b border-slate-100 bg-slate-50 rounded-t-3xl sticky top-0 z-10">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-8 py-3 sm:py-4 border-b border-slate-100 bg-slate-50 sm:rounded-t-3xl sticky top-0 z-10">
                     <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-3">
                             <span className={`inline-flex items-center px-2 py-1.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-amber-600 text-white`}>{workOrder.number}</span>
@@ -296,7 +296,7 @@ export default function WorkOrderPDFModal({ workOrder, company, onClose }:
 
                 <div className="p-8 bg-slate-100/50">
                     {/* Visual Preview Container */}
-                    <div className="bg-white mx-auto shadow-sm border border-slate-200" style={{ width: '210mm', minHeight: '297mm', padding: '15mm', fontFamily: 'Arial, sans-serif' }}>
+                    <div className="pdf-a4-fit bg-white mx-auto shadow-sm border border-slate-200" style={{ width: '210mm', minHeight: '297mm', padding: '15mm', fontFamily: 'Arial, sans-serif' }}>
 
                         {/* Header */}
                         <div className="flex justify-between items-start border-b-[3px] border-amber-600 pb-4 mb-5">

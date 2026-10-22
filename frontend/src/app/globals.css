@@ -360,3 +360,63 @@ body {
     padding-bottom: 1.125rem;
   }
 }
+
+/* ---------------------------------------------------------------
+   PDF A4 preview
+   Layout cetak tetap 794px, tapi di layar kecil di-zoom agar muat.
+   Pakai @media screen supaya tidak memengaruhi hasil print.
+---------------------------------------------------------------- */
+.pdf-a4-fit {
+  width: 794px;
+  max-width: 794px;
+}
+
+@media screen and (max-width: 1024px) { .pdf-a4-fit { zoom: 0.95; } }
+@media screen and (max-width: 860px)  { .pdf-a4-fit { zoom: 0.80; } }
+@media screen and (max-width: 700px)  { .pdf-a4-fit { zoom: 0.66; } }
+@media screen and (max-width: 560px)  { .pdf-a4-fit { zoom: 0.52; } }
+@media screen and (max-width: 430px)  { .pdf-a4-fit { zoom: 0.42; } }
+@media screen and (max-width: 360px)  { .pdf-a4-fit { zoom: 0.38; } }
+
+/* ---------------------------------------------------------------
+   Brand alignment
+   Semua aksen "indigo" diselaraskan ke Electric Teal (#00C9A7)
+   supaya konsisten dengan landing page & login.
+---------------------------------------------------------------- */
+:root {
+  --color-indigo-50:  #ecfdf8;
+  --color-indigo-100: #d0faf0;
+  --color-indigo-200: #a5f3e2;
+  --color-indigo-300: #6ee7d2;
+  --color-indigo-400: #34d3b8;
+  --color-indigo-500: #12b8a0;
+  --color-indigo-600: #00a589;
+  --color-indigo-700: #008f78;
+  --color-indigo-800: #0f766e;
+  --color-indigo-900: #115e56;
+  --color-indigo-950: #042f2c;
+}
+
+/* Violet/purple accents → teal (konsistensi modul) */
+:root {
+  --color-violet-50:  #ecfdf8;
+  --color-violet-100: #d0faf0;
+  --color-violet-200: #a5f3e2;
+  --color-violet-300: #6ee7d2;
+  --color-violet-400: #34d3b8;
+  --color-violet-500: #12b8a0;
+  --color-violet-600: #00a589;
+  --color-violet-700: #008f78;
+  --color-violet-800: #0f766e;
+  --color-violet-900: #115e56;
+  --color-purple-50:  #ecfdf8;
+  --color-purple-100: #d0faf0;
+  --color-purple-200: #a5f3e2;
+  --color-purple-300: #6ee7d2;
+  --color-purple-400: #34d3b8;
+  --color-purple-500: #12b8a0;
+  --color-purple-600: #00a589;
+  --color-purple-700: #008f78;
+  --color-purple-800: #0f766e;
+  --color-purple-900: #115e56;
+}

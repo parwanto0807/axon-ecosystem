@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
     Mail,
     Lock,
+    Eye,
+    EyeOff,
     ArrowRight,
     Loader2,
     AlertCircle,
@@ -71,6 +73,7 @@ export default function LoginPage() {
     const [success, setSuccess] = useState(false)
     const [isMounted, setIsMounted] = useState(false)
     const [focusedField, setFocusedField] = useState<string | null>(null)
+    const [showPassword, setShowPassword] = useState(false)
 
 
     useEffect(() => {
@@ -250,7 +253,7 @@ export default function LoginPage() {
                     <span className="font-black text-xl tracking-tighter" style={{ color: "#0D1117" }}>AXON</span>
                 </div>
 
-                <div className="w-full max-w-md">
+                <div className="w-full max-w-md rounded-3xl border border-white bg-white/70 p-6 sm:p-8 shadow-[0_24px_70px_-40px_rgba(13,17,23,0.25)] backdrop-blur-sm lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-none">
                     {/* Header */}
                     <motion.div
                         initial={{ y: -16, opacity: 0 }}
@@ -358,7 +361,7 @@ export default function LoginPage() {
                                 <input
                                     id="password"
                                     name="password"
-                                    type="password"
+                                    type={showPassword ? "text" : "password"}
                                     required
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -366,7 +369,7 @@ export default function LoginPage() {
                                     onBlur={() => setFocusedField(null)}
                                     placeholder="••••••••"
                                     autoComplete="current-password"
-                                    className="w-full pl-11 pr-4 py-3.5 rounded-xl outline-none transition-all text-sm font-semibold placeholder:font-normal"
+                                    className="w-full pl-11 pr-12 py-3.5 rounded-xl outline-none transition-all text-sm font-semibold placeholder:font-normal"
                                     style={{
                                         background: focusedField === 'password' ? '#fff' : 'rgba(255,255,255,0.8)',
                                         border: focusedField === 'password' ? '1.5px solid #00C9A7' : '1.5px solid #e2e8f0',
@@ -374,6 +377,24 @@ export default function LoginPage() {
                                         color: '#0D1117',
                                     }}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((v) => !v)}
+                                    aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center transition-colors hover:bg-slate-100"
+                                    style={{ color: '#94a3b8' }}
+                                >
+                                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                                </button>
+                            </div>
+                            <div className="flex justify-end pt-1">
+                                <a
+                                    href="mailto:admin@axon.com?subject=Reset%20Password%20Axon%20Portal"
+                                    className="text-[11px] font-bold tracking-wide transition-colors hover:underline"
+                                    style={{ color: '#00A589' }}
+                                >
+                                    Lupa password?
+                                </a>
                             </div>
                         </div>
 

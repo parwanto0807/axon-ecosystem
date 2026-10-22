@@ -3,6 +3,7 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { X, Download, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PdfPreview } from "@/components/pdf/PdfPreview"
 
 interface InvoiceItem { no: number; description: string; qty: number; unit: string; unitPrice: number; discount: number; amount: number }
 interface Invoice {
@@ -47,7 +48,7 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
             const { default: autoTable } = await import('jspdf-autotable')
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
             const W = 210; const M = 15
-            const indigo = isPrintMode ? ([0, 0, 0] as [number, number, number]) : ([79, 70, 229] as [number, number, number])
+            const indigo = isPrintMode ? ([0, 0, 0] as [number, number, number]) : ([0, 165, 137] as [number, number, number])
             const dark = isPrintMode ? ([0, 0, 0] as [number, number, number]) : ([15, 23, 42] as [number, number, number])
             const gray = isPrintMode ? ([0, 0, 0] as [number, number, number]) : ([100, 116, 139] as [number, number, number])
             const white = [255, 255, 255] as [number, number, number]
@@ -238,19 +239,19 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
     }
 
     return (
-        <div className="fixed inset-0 z-[150] flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-[150] flex items-stretch sm:items-start justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
             <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}
-                className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl my-4">
+                className="bg-white sm:rounded-3xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-auto sm:my-4 flex flex-col overflow-hidden">
 
-                <div className="flex items-center justify-between px-8 py-4 border-b border-slate-100 bg-slate-50 rounded-t-3xl">
-                    <div className="flex items-center gap-3">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${sc.color}`}>{invoice.number}</span>
-                        <span className="text-slate-500 text-sm font-medium">{c?.name}</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 px-4 sm:px-8 py-3 sm:py-4 border-b border-slate-100 bg-slate-50 sm:rounded-t-3xl">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${sc.color}`}>{invoice.number}</span>
+                        <span className="text-slate-500 text-xs sm:text-sm font-medium truncate max-w-[42vw]">{c?.name}</span>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-4 px-4 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-end">
+                        <div className="flex items-center gap-3 sm:gap-4 px-2 sm:px-4 py-1.5 bg-slate-50 rounded-xl border border-slate-200">
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Tanda Tangan</span>
+                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight hidden sm:inline">Tanda Tangan</span>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" checked={showSignature} onChange={(e) => setShowSignature(e.target.checked)} className="sr-only peer" />
                                     <div className="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600"></div>
@@ -258,7 +259,7 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                             </div>
                             <div className="w-px h-4 bg-slate-200"></div>
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight">Mode Print</span>
+                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight hidden sm:inline">Mode Print</span>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" checked={isPrintMode} onChange={(e) => setIsPrintMode(e.target.checked)} className="sr-only peer" />
                                     <div className="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-slate-900"></div>
@@ -279,8 +280,9 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                     </div>
                 </div>
 
-                <div className="p-8 bg-slate-100 min-h-[600px]">
-                    <div className="bg-white max-w-[794px] mx-auto p-12 shadow-xl rounded-sm font-sans text-slate-900 leading-relaxed overflow-hidden">
+                <div className="p-2 sm:p-8 bg-slate-100 flex-1 overflow-y-auto overflow-x-hidden">
+                    <PdfPreview>
+                    <div className="bg-white max-w-[794px] w-full mx-auto p-12 shadow-xl rounded-sm font-sans text-slate-900 leading-relaxed overflow-hidden">
 
                         <div className={`flex justify-between items-start border-b-4 ${isPrintMode ? 'border-black' : 'border-indigo-600'} pb-6 mb-8`}>
                             <div className="flex gap-4 items-start">
@@ -441,6 +443,7 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                         )}
 
                     </div>
+                    </PdfPreview>
                 </div>
             </motion.div>
         </div>

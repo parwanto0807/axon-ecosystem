@@ -61,7 +61,7 @@ export default function ContractPDFModal({ contract, company, onClose }: { contr
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
             const W = 210; const M = 20
             const contentWidth = W - (M * 2)
-            const indigo = [79, 70, 229] as [number, number, number]
+            const indigo = [0, 165, 137] as [number, number, number]
             const dark = [15, 23, 42] as [number, number, number]
             const gray = [100, 116, 139] as [number, number, number]
             let y = M
@@ -174,7 +174,7 @@ export default function ContractPDFModal({ contract, company, onClose }: { contr
     }
 
     return (
-        <div className="fixed inset-0 z-[150] flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-[150] flex items-stretch sm:items-start justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
             <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
                 className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl my-4 overflow-hidden">
                 
@@ -202,7 +202,7 @@ export default function ContractPDFModal({ contract, company, onClose }: { contr
 
                 {/* A4 Preview Canvas */}
                 <div className="p-10 bg-slate-100/50">
-                    <div className="bg-white mx-auto shadow-2xl p-16 font-serif text-[#0f172a]" style={{ width: '210mm', minHeight: '297mm', color: '#1e293b' }}>
+                    <div className="pdf-a4-fit bg-white mx-auto shadow-2xl p-16 font-serif text-[#0f172a]" style={{ width: '210mm', minHeight: '297mm', color: '#1e293b' }}>
                         {/* Letterhead */}
                         <div className="flex justify-between items-start border-b-[3px] border-indigo-600 pb-6 mb-10">
                             <div className="flex gap-6 items-start">

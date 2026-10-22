@@ -388,7 +388,7 @@ export default function InvoicesPage() {
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                         <input
-                            type="text" placeholder="Cari nomor Invoice atau Customer..."
+                            type="text" placeholder="Cari invoice / customer..."
                             value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
                             className="w-full pl-12 pr-4 h-12 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-emerald-600/20 font-medium transition-all"
                         />

@@ -39,7 +39,7 @@ export default function BASTPDFModal({ bastData, company, onClose }:
             const { default: autoTable } = await import('jspdf-autotable')
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
             const W = 210; const M = 15
-            const indigo = [79, 70, 229] as [number, number, number]
+            const indigo = [0, 165, 137] as [number, number, number]
             const dark = [15, 23, 42] as [number, number, number]
             const gray = [100, 116, 139] as [number, number, number]
             const white = [255, 255, 255] as [number, number, number]
@@ -202,11 +202,11 @@ export default function BASTPDFModal({ bastData, company, onClose }:
     }
 
     return (
-        <div className="fixed inset-0 z-[150] flex items-start justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-[150] flex items-stretch sm:items-start justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto overflow-x-hidden">
             <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}
-                className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl my-4">
+                className="bg-white sm:rounded-3xl shadow-2xl w-full max-w-4xl h-[100dvh] sm:h-auto sm:my-4 flex flex-col overflow-hidden">
 
-                <div className="flex items-center justify-between px-8 py-4 border-b border-slate-100 bg-slate-50 rounded-t-3xl">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-8 py-3 sm:py-4 border-b border-slate-100 bg-slate-50 sm:rounded-t-3xl">
                     <div className="flex items-center gap-3">
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${sc.color}`}>{bastData.number}</span>
                         <span className="text-slate-500 text-sm font-medium">{bastData.project?.name || bastData.workOrder?.title || 'BAST'}</span>
@@ -221,8 +221,8 @@ export default function BASTPDFModal({ bastData, company, onClose }:
                     </div>
                 </div>
 
-                <div className="p-10 bg-slate-100 min-h-[700px]">
-                    <div className="bg-white max-w-[794px] mx-auto p-16 shadow-2xl rounded-sm font-sans text-slate-900 leading-relaxed overflow-hidden">
+                <div className="p-2 sm:p-10 bg-slate-100 flex-1 overflow-y-auto overflow-x-hidden">
+                    <div className="pdf-a4-fit bg-white max-w-[794px] mx-auto p-16 shadow-2xl rounded-sm font-sans text-slate-900 leading-relaxed overflow-hidden">
 
                         {/* Company Header (Preview) */}
                         <div className="flex items-center gap-4 mb-8 border-b border-slate-50 pb-6">
