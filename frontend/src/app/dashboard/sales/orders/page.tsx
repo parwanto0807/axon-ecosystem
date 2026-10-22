@@ -284,31 +284,33 @@ export default function SalesOrdersPage() {
                 </div>
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-center gap-3">
-                <div className="relative w-full md:w-auto flex-1 min-w-0">
-                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO#, PO#, customer..."
-                        className="pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white w-full md:w-72 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm placeholder:text-slate-300" />
+            <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <div className="relative w-full sm:w-72 sm:shrink-0">
+                        <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search SO#, PO#, customer..."
+                            className="pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white w-full focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm placeholder:text-slate-300" />
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+                        <select value={filterBusinessCategory} onChange={e => setFilterBusinessCategory(e.target.value)}
+                            className="min-w-0 flex-1 sm:flex-none bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none">
+                            <option value="ALL">All Business Units</option>
+                            {Array.isArray(businessCategories) && businessCategories.map(bc => <option key={bc.id} value={bc.id}>{bc.name}</option>)}
+                        </select>
+                        <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
+                            className="min-w-0 flex-1 sm:flex-none bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none">
+                            <option value="ALL">All Projects</option>
+                            {Array.isArray(projects) && projects.map(p => <option key={p.id} value={p.id}>{p.number} - {p.name}</option>)}
+                        </select>
+                    </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
+                <div className="flex flex-wrap items-center gap-1.5">
                     {['ALL', ...Object.keys(STATUS_CONFIG)].map(s => (
                         <button key={s} onClick={() => setFilterStatus(s)}
                             className={`px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap font-bold uppercase tracking-wider transition-all ${filterStatus === s ? 'bg-indigo-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
                             {s === 'ALL' ? 'All Status' : STATUS_CONFIG[s].label}
                         </button>
                     ))}
-                </div>
-                <div className="md:ml-auto w-full md:w-auto flex items-center gap-2">
-                    <select value={filterBusinessCategory} onChange={e => setFilterBusinessCategory(e.target.value)}
-                        className="w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none">
-                        <option value="ALL">All Business Units</option>
-                        {Array.isArray(businessCategories) && businessCategories.map(bc => <option key={bc.id} value={bc.id}>{bc.name}</option>)}
-                    </select>
-                    <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
-                        className="w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none">
-                        <option value="ALL">All Projects</option>
-                        {Array.isArray(projects) && projects.map(p => <option key={p.id} value={p.id}>{p.number} - {p.name}</option>)}
-                    </select>
                 </div>
             </div>
 
@@ -326,13 +328,13 @@ export default function SalesOrdersPage() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400 border-b border-slate-100 bg-slate-50/80">
-                                <th className="px-5 py-3.5">SO Number</th>
-                                <th className="px-5 py-3.5">Customer</th>
-                                <th className="px-5 py-3.5">Date</th>
-                                <th className="px-5 py-3.5">Perihal</th>
-                                <th className="px-5 py-3.5 text-right">Grand Total</th>
-                                <th className="px-5 py-3.5 text-center">Status</th>
-                                <th className="px-5 py-3.5 text-right">Actions</th>
+                                <th className="px-4 py-3.5">SO Number</th>
+                                <th className="px-4 py-3.5">Customer</th>
+                                <th className="px-4 py-3.5">Date</th>
+                                <th className="px-4 py-3.5 hidden min-[1400px]:table-cell">Perihal</th>
+                                <th className="px-4 py-3.5 text-right">Grand Total</th>
+                                <th className="px-4 py-3.5 text-center">Status</th>
+                                <th className="px-4 py-3.5 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -342,11 +344,11 @@ export default function SalesOrdersPage() {
                                 return (
                                     <motion.tr key={o.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * .03 }}
                                         className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
-                                        <td className="px-5 py-4">
+                                        <td className="px-4 py-4">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{o.number}</span>
+                                                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest whitespace-nowrap">{o.number}</span>
                                                 {o.businessCategory && (
-                                                    <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100">
+                                                    <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100 whitespace-nowrap">
                                                         {o.businessCategory.name}
                                                     </span>
                                                 )}
@@ -364,7 +366,7 @@ export default function SalesOrdersPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-5 py-4">
+                                        <td className="px-4 py-4">
                                             <p className="font-bold text-slate-800 text-sm">{o.customer?.name}</p>
                                             <div className="flex items-center gap-1.5 mt-1">
                                                 <span className="text-[10px] text-slate-400 font-medium">PO: {o.poNumber || '-'}</span>
@@ -376,18 +378,18 @@ export default function SalesOrdersPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-5 py-4 text-[11px] text-slate-500 font-medium">{fmtDate(o.date)}</td>
-                                        <td className="px-5 py-4">{o.subject || '-'}</td>
-                                        <td className="px-5 py-4 text-right">
+                                        <td className="px-4 py-4 text-[11px] text-slate-500 font-medium whitespace-nowrap">{fmtDate(o.date)}</td>
+                                        <td className="px-4 py-4 hidden min-[1400px]:table-cell">{o.subject || '-'}</td>
+                                        <td className="px-4 py-4 text-right whitespace-nowrap">
                                             <p className="text-[10px] text-slate-500">Sblm Disc: {fmt(o.subtotal)}</p>
                                             {o.discountAmt > 0 && <p className="text-[10px] text-rose-500">Disc: -{fmt(o.discountAmt)}</p>}
                                             <p className="font-bold text-slate-900 text-sm mt-0.5">{fmt(o.grandTotal)}</p>
                                             <p className="text-[9px] text-slate-400">{o.items?.length || 0} items</p>
                                         </td>
-                                        <td className="px-5 py-4 text-center">
+                                        <td className="px-4 py-4 text-center">
                                             <div className="relative status-dropdown inline-block">
                                                 <span onClick={() => setOpenStatusId(openStatusId === o.id ? null : o.id)}
-                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border cursor-pointer ${sc.color}`}>
+                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border cursor-pointer whitespace-nowrap ${sc.color}`}>
                                                     <Icon size={9} /> {sc.label}
                                                 </span>
                                                 {openStatusId === o.id && (
@@ -402,7 +404,7 @@ export default function SalesOrdersPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-5 py-4 text-right">
+                                        <td className="px-4 py-4 text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end gap-1">
                                                 <button onClick={() => setViewModal(o)} title="View PDF"
                                                     className="w-7 h-7 rounded-lg text-emerald-600 hover:bg-emerald-50 flex items-center justify-center transition-colors"><Eye size={14} /></button>
@@ -432,7 +434,7 @@ export default function SalesOrdersPage() {
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                                             <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{o.number}</span>
                                             {o.businessCategory && (
-                                                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100">{o.businessCategory.name}</span>
+                                                <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider border border-indigo-100 whitespace-nowrap">{o.businessCategory.name}</span>
                                             )}
                                         </div>
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
