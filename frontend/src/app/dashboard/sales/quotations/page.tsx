@@ -622,7 +622,7 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                                                     className="w-full text-sm bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
                                             </td>
                                             <td className="px-2 py-2">
-                                                <input type="number" min="0" step="100" value={it.unitPrice} onChange={e => updateItem(idx, { unitPrice: +e.target.value })}
+                                                <input type="number" min="0" step="any" value={it.unitPrice} onChange={e => updateItem(idx, { unitPrice: +e.target.value })}
                                                     className="w-full text-sm bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-right focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
                                             </td>
                                             <td className="px-2 py-2">
@@ -630,7 +630,7 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                                                     className="w-full text-sm bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
                                             </td>
                                             <td className="px-2 py-2">
-                                                <input type="number" min="0" step="100" value={it.costPrice || 0} onChange={e => updateItem(idx, { costPrice: +e.target.value })}
+                                                <input type="number" min="0" step="any" value={it.costPrice || 0} onChange={e => updateItem(idx, { costPrice: +e.target.value })}
                                                     className="w-full text-sm bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 text-right focus:outline-none focus:ring-2 focus:ring-amber-500/20" />
                                             </td>
                                             <td className="px-3 py-2 text-right">
