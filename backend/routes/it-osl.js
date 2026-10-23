@@ -7,6 +7,12 @@ const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
 const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+const { buildRbac, isGlobalRole, isFieldRole, normalizeRole } = require('../utils/itOslRbac');
+const rbac = buildRbac(prisma);
+const requirePermission = rbac.requirePermission;
+
+// Semua route IT-OSL memakai actor terverifikasi (role dibaca dari DB).
+router.use(rbac.attachActor);
 const itOslUploadDir = path.join(__dirname, '..', 'public', 'it-osl');
 if (!fs.existsSync(itOslUploadDir)) fs.mkdirSync(itOslUploadDir, { recursive: true });
 async function processItOslImage(file){
@@ -17,7 +23,7 @@ async function processItOslImage(file){
 }
 
 // ── UPLOAD (Multiple & Single Images) ───────────────────────────────────────
-router.post('/upload', uploadMem.array('files', 10), async (req, res) => {
+router.post('/upload', requirePermission('TICKET_CREATE'), uploadMem.array('files', 10), async (req, res) => {
   try {
     const files = req.files || (req.file ? [req.file] : []);
     if (!files || files.length === 0) {
@@ -37,13 +43,27 @@ router.post('/upload', uploadMem.array('files', 10), async (req, res) => {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function requireAdmin(req, res){
-  const role = String(req.headers['x-user-role']||'').toUpperCase()
-  if(role!=='ADMIN' && role!=='SUPER_ADMIN'){
-    res.status(403).json({ message:'Hanya Admin/SuperAdmin boleh hapus data tiket' })
+  const actor = req.itOslActor || {};
+  const role = normalizeRole(actor.role || req.headers['x-user-role']);
+  if(!actor.verified || (role !== 'ADMIN' && role !== 'SUPER_ADMIN')){
+    res.status(403).json({ message:'Hanya Admin/SuperAdmin yang boleh melakukan aksi ini' })
     return false
   }
   return true
 }
+function requireSuperAdmin(req, res){
+  const actor = req.itOslActor || {};
+  const role = normalizeRole(actor.role || req.headers['x-user-role']);
+  if(!actor.verified || role !== 'SUPER_ADMIN'){
+    res.status(403).json({ message:'Aksi ini hanya untuk SuperAdmin' })
+    return false
+  }
+  return true
+}
+const superAdminOnly = (req, res, next) => {
+  if (!requireSuperAdmin(req, res)) return;
+  next();
+};
 async function generateTicketNumber(tx) {
   const now = new Date();
   const ym = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -123,80 +143,109 @@ function slaThresholdMinutes(severity) {
 
 // ── RBAC Customer Scoping Helper ───────────────────────────────────────────
 async function getCustomerScope(req) {
-  const role = String(req.headers['x-user-role'] || '').toUpperCase();
-  const userId = req.headers['x-user-id'];
-  const userEmail = req.headers['x-user-email'];
+  // Actor sudah di-resolve oleh middleware (role dari DB, bukan header).
+  const actor = req.itOslActor || (await rbac.resolveActor(req));
+  const role = normalizeRole(actor.role);
+  const userId = actor.id;
 
-  // Super Admin & Admin have global access across all customers
-  if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
+  // Super Admin & Admin punya akses global ke semua customer
+  if (actor.verified && isGlobalRole(role)) {
     return { isGlobal: true, allowedCustomerIds: null };
   }
 
-  let resolvedUserId = userId;
-  if (!resolvedUserId && userEmail) {
-    const user = await prisma.user.findUnique({
-      where: { email: String(userEmail) },
-      select: { id: true, role: true }
-    }).catch(() => null);
-    if (user) {
-      resolvedUserId = user.id;
-      const uRole = String(user.role).toUpperCase();
-      if (uRole === 'SUPER_ADMIN' || uRole === 'ADMIN') {
-        return { isGlobal: true, allowedCustomerIds: null };
-      }
-    }
+  if (!userId) {
+    // Tanpa sesi valid: tidak ada akses data customer sama sekali
+    return { isGlobal: false, allowedCustomerIds: [], userId: null, role };
   }
 
-  // If userId was provided without explicit admin role header, double-check in DB
-  if (resolvedUserId && !role) {
-    const user = await prisma.user.findUnique({
-      where: { id: String(resolvedUserId) },
-      select: { role: true }
-    }).catch(() => null);
-    if (user && (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN')) {
-      return { isGlobal: true, allowedCustomerIds: null };
-    }
-  }
-
-  if (!resolvedUserId) {
-    // If not authenticated, restrict access completely
-    return { isGlobal: false, allowedCustomerIds: [] };
-  }
-
-  // Operational users only access customers assigned to them
+  // User lapangan hanya boleh mengakses customer yang di-assign ke dirinya
   const assignments = await prisma.itOslUserCustomer.findMany({
-    where: { userId: String(resolvedUserId) },
+    where: { userId: String(userId) },
     select: { customerId: true }
   });
   const allowedCustomerIds = assignments.map(a => a.customerId);
-  return { isGlobal: false, allowedCustomerIds };
+  return { isGlobal: false, allowedCustomerIds, userId, role };
 }
 
-function applyCustomerFilter(where, scope, reqCustomerId) {
+function applyCustomerFilter(where, scope, reqCustomerId, options = {}) {
+  const includeShared = options.includeShared !== false;
   if (scope.isGlobal) {
     if (reqCustomerId) where.customerId = String(reqCustomerId);
     return;
   }
-  
-  if (!scope.allowedCustomerIds || scope.allowedCustomerIds.length === 0) {
-    where.customerId = '__NO_ACCESS_PERMITTED__';
-    return;
-  }
+
+  const allowed = Array.isArray(scope.allowedCustomerIds) ? scope.allowedCustomerIds : [];
+
+  // Data dengan customerId = null dianggap data bersama/legacy (mis. lokasi
+  // gedung internal yang belum dipetakan ke customer). Untuk tiket, data
+  // seperti ini TIDAK boleh terlihat lintas customer (includeShared: false).
+  const sharedOrAllowed = [
+    ...(allowed.length ? [{ customerId: { in: allowed } }] : []),
+    ...(includeShared ? [{ customerId: null }] : []),
+  ];
 
   if (reqCustomerId) {
     const cid = String(reqCustomerId);
-    if (!scope.allowedCustomerIds.includes(cid)) {
+    if (!allowed.includes(cid)) {
       where.customerId = '__NO_ACCESS_PERMITTED__';
     } else {
       where.customerId = cid;
     }
-  } else {
-    where.customerId = { in: scope.allowedCustomerIds };
+    return;
   }
+
+  if (sharedOrAllowed.length === 0) {
+    where.customerId = '__NO_ACCESS_PERMITTED__';
+    return;
+  }
+
+  where.AND = [...(Array.isArray(where.AND) ? where.AND : []), { OR: sharedOrAllowed }];
+}
+
+// ── Ticket-level authorization (dipakai sub-resource: parts, notes, work items) ──
+function ticketScopeAllowed(scope, ticket) {
+  return Boolean(scope.isGlobal) || Boolean(ticket.customerId && scope.allowedCustomerIds.includes(ticket.customerId));
+}
+
+// Engineer/Staff boleh melihat tiket miliknya, tiket yang ia buat, dan antrean
+// yang belum ditugaskan — sejalan dengan filter pada GET /tickets.
+function ticketVisibleToActor(actor, ticket) {
+  if (!isFieldRole(normalizeRole(actor.role)) || !actor.id) return true;
+  return !ticket.assignedTo || ticket.assignedTo === actor.id || ticket.createdBy === actor.id;
+}
+
+// Untuk mutasi, engineer hanya boleh menyentuh tiket yang ditugaskan padanya
+// atau tiket yang ia buat sendiri.
+function ticketWritableByActor(actor, ticket) {
+  if (!isFieldRole(normalizeRole(actor.role)) || !actor.id) return true;
+  return ticket.assignedTo === actor.id || ticket.createdBy === actor.id;
+}
+
+async function loadTicketForActor(req, res, ticketId, options = {}) {
+  const scope = await getCustomerScope(req);
+  const ticket = await prisma.itOslTicket.findUnique({
+    where: { id: String(ticketId) },
+    select: { id: true, customerId: true, assignedTo: true, createdBy: true, status: true },
+  });
+  if (!ticket) {
+    res.status(404).json({ message: 'Ticket not found' });
+    return null;
+  }
+  if (!ticketScopeAllowed(scope, ticket)) {
+    res.status(403).json({ message: 'Anda tidak memiliki akses ke tiket customer ini' });
+    return null;
+  }
+  const actor = req.itOslActor || {};
+  const allowed = options.write ? ticketWritableByActor(actor, ticket) : ticketVisibleToActor(actor, ticket);
+  if (!allowed) {
+    res.status(403).json({ message: 'Tiket ini ditugaskan ke teknisi lain' });
+    return null;
+  }
+  return ticket;
 }
 
 // ── CUSTOMERS (Unified with Central Master Customer & RBAC Assignment) ──────
-router.get('/customers', async (req, res) => {
+router.get('/customers', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const { search, isActive } = req.query;
@@ -263,7 +312,7 @@ router.get('/customers', async (req, res) => {
   }
 });
 
-router.get('/customers/:id', async (req, res) => {
+router.get('/customers/:id', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     if (!scope.isGlobal && !scope.allowedCustomerIds.includes(req.params.id)) {
@@ -315,7 +364,7 @@ router.get('/customers/:id', async (req, res) => {
   }
 });
 
-router.post('/customers', async (req, res) => {
+router.post('/customers', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { code, name, type, company, phone, email, address, isActive, assignedUserIds } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ message: 'Nama customer wajib diisi' });
@@ -382,7 +431,7 @@ router.post('/customers', async (req, res) => {
   }
 });
 
-router.put('/customers/:id', async (req, res) => {
+router.put('/customers/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { code, name, type, company, phone, email, address, isActive, assignedUserIds } = req.body;
     const data = {};
@@ -440,7 +489,7 @@ router.put('/customers/:id', async (req, res) => {
   }
 });
 
-router.post('/customers/:id/assign-technicians', async (req, res) => {
+router.post('/customers/:id/assign-technicians', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { assignedUserIds } = req.body;
     if (!Array.isArray(assignedUserIds)) {
@@ -470,7 +519,7 @@ router.post('/customers/:id/assign-technicians', async (req, res) => {
   }
 });
 
-router.delete('/customers/:id', async (req, res) => {
+router.delete('/customers/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     if (!requireAdmin(req, res)) return;
     const assetCnt = await prisma.itOslAsset.count({ where: { customerId: req.params.id } });
@@ -487,7 +536,22 @@ router.delete('/customers/:id', async (req, res) => {
 });
 
 // ── USERS OPERASIONAL LIST FOR ASSIGNMENT ──────────────────────────────────
-router.get('/users-operasional', async (req, res) => {
+// Daftar user yang boleh dipilih sebagai penanggung jawab tiket (teknisi/lead).
+// Tidak mengekspos data sensitif dan tidak memerlukan akses user-management.
+router.get('/assignable-users', requirePermission('TICKET_CREATE'), async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { role: { in: ['OPERATIONAL', 'MANAGER', 'ADMIN', 'SUPER_ADMIN'] } },
+      select: { id: true, name: true, role: true, department: true },
+      orderBy: { name: 'asc' },
+    });
+    res.json(users);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+router.get('/users-operasional', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       select: { id: true, name: true, email: true, role: true, department: true },
@@ -500,7 +564,7 @@ router.get('/users-operasional', async (req, res) => {
 });
 
 // ── LOCATIONS ──────────────────────────────────────────────────────────────
-router.get('/locations', async (req, res) => {
+router.get('/locations', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const { customerId } = req.query;
@@ -515,7 +579,7 @@ router.get('/locations', async (req, res) => {
     res.json(locs);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
-router.post('/locations', async (req, res) => {
+router.post('/locations', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { code, name, address, customerId } = req.body;
     if (!code || !name) return res.status(400).json({ message: 'code & name wajib' });
@@ -526,7 +590,7 @@ router.post('/locations', async (req, res) => {
     res.status(201).json(loc);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.put('/locations/:id', async (req, res) => {
+router.put('/locations/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { code, name, address, customerId, isActive } = req.body;
     const data = {};
@@ -544,19 +608,19 @@ router.put('/locations/:id', async (req, res) => {
     res.json(loc);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.delete('/locations/:id', async (req, res) => {
+router.delete('/locations/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
   try { await prisma.itOslLocation.delete({ where: { id: req.params.id } }); res.json({ ok: true }); }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 // ── CATEGORIES ─────────────────────────────────────────────────────────────
-router.get('/categories', async (req, res) => {
+router.get('/categories', requirePermission('VIEW'), async (req, res) => {
   try {
     const cats = await prisma.itOslCategory.findMany({ orderBy: [{ groupName: 'asc' }, { order: 'asc' }] });
     res.json(cats);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
-router.post('/categories', async (req, res) => {
+router.post('/categories', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { name, groupName, parentId, order } = req.body;
     if (!name || !groupName) return res.status(400).json({ message: 'name & groupName wajib' });
@@ -564,17 +628,17 @@ router.post('/categories', async (req, res) => {
     res.status(201).json(cat);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.put('/categories/:id', async (req, res) => {
+router.put('/categories/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
   try { const cat = await prisma.itOslCategory.update({ where: { id: req.params.id }, data: req.body }); res.json(cat); }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.delete('/categories/:id', async (req, res) => {
+router.delete('/categories/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
   try { await prisma.itOslCategory.delete({ where: { id: req.params.id } }); res.json({ ok: true }); }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 // ── PICS (Dedicated PIC Contact Directory) ─────────────────────────────────
-router.get('/pics', async (req, res) => {
+router.get('/pics', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const { search, locationId, department, isActive, customerId } = req.query;
@@ -611,7 +675,7 @@ router.get('/pics', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-router.get('/pics/:id', async (req, res) => {
+router.get('/pics/:id', requirePermission('VIEW'), async (req, res) => {
   try {
     const pic = await prisma.itOslPic.findUnique({
       where: { id: req.params.id },
@@ -628,7 +692,7 @@ router.get('/pics/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-router.post('/pics', async (req, res) => {
+router.post('/pics', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { name, position, department, phone, email, locationId, customerId, notes, isActive } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ message: 'Nama PIC wajib diisi' });
@@ -650,7 +714,7 @@ router.post('/pics', async (req, res) => {
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-router.put('/pics/:id', async (req, res) => {
+router.put('/pics/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { name, position, department, phone, email, locationId, customerId, notes, isActive } = req.body;
     const data = {};
@@ -673,7 +737,7 @@ router.put('/pics/:id', async (req, res) => {
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-router.delete('/pics/:id', async (req, res) => {
+router.delete('/pics/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const assetCnt = await prisma.itOslAsset.count({ where: { picId: req.params.id } });
     const ticketCnt = await prisma.itOslTicket.count({ where: { picId: req.params.id } });
@@ -686,7 +750,7 @@ router.delete('/pics/:id', async (req, res) => {
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-router.post('/pics/import', async (req, res) => {
+router.post('/pics/import', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { pics } = req.body;
     if (!Array.isArray(pics)) return res.status(400).json({ message: 'pics must be array' });
@@ -717,7 +781,7 @@ router.post('/pics/import', async (req, res) => {
 });
 
 // ── ASSETS ─────────────────────────────────────────────────────────────────
-router.get('/assets', async (req, res) => {
+router.get('/assets', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const { search, status, locationId, picId, picUserId, assignedTo, customerId } = req.query;
@@ -752,7 +816,7 @@ router.get('/assets', async (req, res) => {
     res.json(enriched);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
-router.get('/assets/:id', async (req, res) => {
+router.get('/assets/:id', requirePermission('VIEW'), async (req, res) => {
   try {
     const a = await prisma.itOslAsset.findUnique({
       where: { id: req.params.id },
@@ -768,7 +832,7 @@ router.get('/assets/:id', async (req, res) => {
     res.json(a);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
-router.post('/assets', async (req, res) => {
+router.post('/assets', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { assetCode, name, assetType, brandModel, serialNumber, locationId, customerId, purchaseDate, warrantyUntil, status, picId, picUserId, notes, photos } = req.body;
     if (!name) return res.status(400).json({ message: 'name wajib' });
@@ -793,7 +857,7 @@ router.post('/assets', async (req, res) => {
     res.status(201).json(asset);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.put('/assets/:id', async (req, res) => {
+router.put('/assets/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { name, assetType, brandModel, serialNumber, locationId, customerId, purchaseDate, warrantyUntil, status, notes, picId, picUserId, assetCode, photos } = req.body;
     const data = {};
@@ -820,7 +884,7 @@ router.put('/assets/:id', async (req, res) => {
     res.json(asset);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.delete('/assets/:id', async (req, res) => {
+router.delete('/assets/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     // prevent delete if has tickets
     const cnt = await prisma.itOslTicket.count({ where: { assetId: req.params.id } });
@@ -829,7 +893,7 @@ router.delete('/assets/:id', async (req, res) => {
     res.json({ ok:true });
   } catch(e){ res.status(400).json({ message:e.message }); }
 });
-router.post('/assets/import', async (req, res) => {
+router.post('/assets/import', requirePermission('MASTER_WRITE'), async (req, res) => {
   try {
     const { assets } = req.body; // array of {name, assetCode, assetType, brandModel, serialNumber, locationCode, ...}
     if (!Array.isArray(assets)) return res.status(400).json({ message: 'assets must be array' });
@@ -853,7 +917,7 @@ router.post('/assets/import', async (req, res) => {
 });
 
 // ── TICKETS ─────────────────────────────────────────────────────────────────
-router.get('/tickets', async (req, res) => {
+router.get('/tickets', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const { status, severity, categoryId, locationId, assetId, picId, assignedTo, search, ticketType, from, to, pending, sla, customerId } = req.query;
@@ -866,7 +930,17 @@ router.get('/tickets', async (req, res) => {
     if (picId) where.picId = String(picId);
     if (assignedTo) where.assignedTo = String(assignedTo);
     if (ticketType) where.ticketType = String(ticketType);
-    applyCustomerFilter(where, scope, customerId);
+    applyCustomerFilter(where, scope, customerId, { includeShared: false });
+
+    // PRD §2.2: Engineer/Staff hanya melihat tiket miliknya + antrean yang
+    // belum ditugaskan. Lead/Admin/Manager melihat seluruh tiket.
+    const actor = req.itOslActor || {};
+    if (isFieldRole(normalizeRole(actor.role)) && actor.id) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        { OR: [{ assignedTo: actor.id }, { createdBy: actor.id }, { assignedTo: null }] },
+      ];
+    }
 
     if (search) {
       const q = String(search).trim();
@@ -927,7 +1001,7 @@ router.get('/tickets', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-router.get('/tickets/:id', async (req, res) => {
+router.get('/tickets/:id', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const t = await prisma.itOslTicket.findUnique({
@@ -954,12 +1028,15 @@ router.get('/tickets/:id', async (req, res) => {
     if (!scope.isGlobal && (!t.customerId || !scope.allowedCustomerIds.includes(t.customerId))) {
       return res.status(403).json({ message: 'Anda tidak memiliki akses ke tiket customer ini' });
     }
+    if (!ticketVisibleToActor(req.itOslActor || {}, t)) {
+      return res.status(403).json({ message: 'Tiket ini ditugaskan ke teknisi lain' });
+    }
     res.json(t);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 // Quick-Log create (4 field wajib per PRD §4.2) + progressive disclosure
-router.post('/tickets', async (req, res) => {
+router.post('/tickets', requirePermission('TICKET_CREATE'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const {
@@ -980,20 +1057,29 @@ router.post('/tickets', async (req, res) => {
     const cat = await prisma.itOslCategory.findUnique({ where: { id: categoryId } });
     if (!cat) return res.status(400).json({ message: 'Kategori tidak ditemukan' });
 
-    // Resolve customerId if not explicitly passed: from asset or location
-    let finalCustomerId = customerId || null;
+    // Resolve customerId: lokasi adalah sumber kebenaran (mencegah tiket
+    // ditempel ke customer lain dengan mengirim customerId palsu).
+    let finalCustomerId = loc.customerId || customerId || null;
     if (!finalCustomerId && assetId) {
       const assetObj = await prisma.itOslAsset.findUnique({ where: { id: assetId }, select: { customerId: true } });
       if (assetObj?.customerId) finalCustomerId = assetObj.customerId;
     }
-    if (!finalCustomerId && loc.customerId) {
-      finalCustomerId = loc.customerId;
-    }
 
     if (!scope.isGlobal) {
-      if (!finalCustomerId || !scope.allowedCustomerIds.includes(finalCustomerId)) {
+      // `finalCustomerId` null = lokasi/data bersama (legacy), tetap boleh
+      // dipakai engineer. Customer milik orang lain tetap ditolak.
+      if (finalCustomerId && !scope.allowedCustomerIds.includes(finalCustomerId)) {
         return res.status(403).json({ message: 'Anda tidak memiliki hak akses untuk membuat tiket pada customer ini' });
       }
+    }
+
+    // Identitas pembuat selalu dari aktor terverifikasi, bukan body request.
+    const actor = req.itOslActor || {};
+    const createdByValue = actor.id || createdBy || null;
+    // Engineer tidak boleh menugaskan tiket ke orang lain saat membuat tiket.
+    let assignedToValue = assignedTo || createdByValue || null;
+    if (isFieldRole(normalizeRole(actor.role)) && actor.id) {
+      assignedToValue = actor.id;
     }
 
     // If picId provided, optionally lookup PIC name if reporterName is not provided
@@ -1030,15 +1116,15 @@ router.post('/tickets', async (req, res) => {
           categoryId,
           severity: sev,
           status: 'NEW',
-          assignedTo: assignedTo || createdBy || null,
-          createdBy: createdBy || null,
+          assignedTo: assignedToValue,
+          createdBy: createdByValue,
           reportedAt: reported,
           clientTime: clientTime ? new Date(clientTime) : null,
         },
         include: { location: true, category: true, asset: true, pic: true, customer: true },
       });
       await tx.itOslAuditLog.create({
-        data: { entityType: 'TICKET', entityId: t.id, action: 'CREATE', newValue: summary, actorUserId: createdBy || null, ticketId: t.id },
+        data: { entityType: 'TICKET', entityId: t.id, action: 'CREATE', newValue: summary, actorUserId: createdByValue, ticketId: t.id },
       });
       return t;
     });
@@ -1048,10 +1134,15 @@ router.post('/tickets', async (req, res) => {
 });
 
 // Generic status transition endpoint
-router.patch('/tickets/:id/status', async (req, res) => {
+router.patch('/tickets/:id/status', requirePermission('TICKET_EDIT'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
-    const { to, actorUserId, reason, notes, externalParty, expectedResumeAt, rootCause, correctiveAction, solutionCategory, assetCondition, isPreventable } = req.body;
+    const { to, actorUserId: bodyActorUserId, reason, notes, externalParty, expectedResumeAt, rootCause, correctiveAction, solutionCategory, assetCondition, isPreventable } = req.body;
+    const actor = req.itOslActor || {};
+    const actorRole = normalizeRole(actor.role);
+    const actorUserId = actor.id || null;
+    const isAdmin = isGlobalRole(actorRole);
+    const canManageAll = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(actorRole);
     const id = req.params.id;
     const ticket = await prisma.itOslTicket.findUnique({ where: { id }, include: { pendings: true } });
     if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
@@ -1064,33 +1155,44 @@ router.patch('/tickets/:id/status', async (req, res) => {
     if (!canTransition(from, target)) {
       return res.status(400).json({ message: `Transisi ${from} → ${target} tidak diizinkan per state machine` });
     }
-    // Role checks minimal: only assigned or creator or admin can move? We'll allow if actor matches assignedTo or is admin header
-    const actorRole = req.headers['x-user-role'];
-    const actorDept = req.headers['x-user-dept'];
-    const isAdmin = actorRole === 'ADMIN' || actorRole === 'SUPER_ADMIN';
-    // Permission matrix simplified per PRD §2.2
+    // ── Otorisasi aksi per PRD §2.2 ──────────────────────────────────────────
+    // Engineer/Staff hanya boleh memproses tiket miliknya / yang ditugaskan
+    // padanya. Lead/Admin/Manager boleh memproses semua tiket.
     if (target === 'DUPLICATE' || target === 'CANCELLED') {
       if (!isAdmin) return res.status(403).json({ message: 'Hanya Lead/Admin dapat membatalkan/menandai duplikat' });
     }
-    if (target === 'CLOSED') {
-      if (!isAdmin) {
-        // also allow auto-close after 2x24 jam? For now require admin
-        // Check if resolved >2 days ago: allow system/assignee
-        const age = Date.now() - new Date(ticket.resolvedAt || ticket.updatedAt).getTime();
-        const twoDays = 2 * 24 * 3600 * 1000;
-        if (!(age >= twoDays && ticket.assignedTo === actorUserId)) {
-          return res.status(403).json({ message: 'Hanya Lead/Admin dapat menutup tiket' });
-        }
+    if (target === 'CLOSED' && !canManageAll) {
+      // izin khusus: auto-close oleh pemegang tiket setelah 2x24 jam
+      const age = Date.now() - new Date(ticket.resolvedAt || ticket.updatedAt).getTime();
+      const twoDays = 2 * 24 * 3600 * 1000;
+      if (!(age >= twoDays && ticket.assignedTo === actorUserId)) {
+        return res.status(403).json({ message: 'Hanya Lead/Admin dapat menutup tiket' });
       }
     }
-    if (from === 'NEW' && target === 'IN_PROGRESS' && ticket.assignedTo && ticket.assignedTo !== actorUserId && !isAdmin) {
-      return res.status(403).json({ message: 'Hanya pemegang tiket dapat mulai mengerjakan' });
+    if (!canManageAll) {
+      const ownsTicket = !!actorUserId && (ticket.assignedTo === actorUserId || ticket.createdBy === actorUserId);
+      if (ticket.assignedTo) {
+        if (!ownsTicket) return res.status(403).json({ message: 'Tiket ini ditugaskan ke teknisi lain' });
+      } else if (!(from === 'NEW' && target === 'IN_PROGRESS')) {
+        return res.status(403).json({ message: 'Tiket belum ditugaskan kepada Anda' });
+      }
+    }
+    if (from === 'CLOSED' && target === 'REOPENED' && !canManageAll) {
+      const age = Date.now() - new Date(ticket.closedAt || ticket.updatedAt).getTime();
+      if (age > 24 * 3600 * 1000) {
+        return res.status(403).json({ message: 'Reopen oleh engineer dibatasi 24 jam; hubungi Lead/Admin' });
+      }
+      if (ticket.assignedTo !== actorUserId && ticket.createdBy !== actorUserId) {
+        return res.status(403).json({ message: 'Hanya pemilik tiket yang dapat reopen' });
+      }
     }
 
     const now = new Date();
     const data = { status: target, updatedAt: now };
     // timestamp mapping per §3.2
     if (target === 'IN_PROGRESS') {
+      // Klaim tiket yang belum ditugaskan oleh engineer yang mengerjakan
+      if (!ticket.assignedTo && actorUserId) data.assignedTo = actorUserId;
       if (!ticket.acknowledgedAt) data.acknowledgedAt = now;
       // if coming from PENDING, close pending cycle
       if (from === 'PENDING') {
@@ -1184,7 +1286,7 @@ router.patch('/tickets/:id/status', async (req, res) => {
 });
 
 // Update ticket details (limited fields before closed)
-router.put('/tickets/:id', async (req, res) => {
+router.put('/tickets/:id', requirePermission('TICKET_EDIT'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const t = await prisma.itOslTicket.findUnique({ where: { id: req.params.id } });
@@ -1193,21 +1295,30 @@ router.put('/tickets/:id', async (req, res) => {
       return res.status(403).json({ message: 'Anda tidak memiliki izin mengubah tiket customer ini' });
     }
     if (['CLOSED','CANCELLED','DUPLICATE'].includes(t.status)) return res.status(403).json({ message: 'Tiket terminal read-only' });
+    const actor = req.itOslActor || {};
+    const actorRole = normalizeRole(actor.role);
+    const canManageAll = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(actorRole);
+    if (!canManageAll) {
+      const ownsTicket = !!actor.id && (t.assignedTo === actor.id || t.createdBy === actor.id);
+      if (!ownsTicket) return res.status(403).json({ message: 'Hanya pemilik/pemegang tiket yang dapat mengubah detail' });
+    }
     const allowed = ['summary','severity','categoryId','locationId','assetId','picId','assignedTo','reporterName','reportChannel'];
     const data = {};
     for (const k of allowed) if (req.body[k] !== undefined) data[k] = req.body[k];
+    // Hanya Lead/Admin/Manager yang boleh memindahkan penanggung jawab tiket
+    if (!canManageAll) delete data.assignedTo;
     const updated = await prisma.itOslTicket.update({
       where: { id: req.params.id },
       data,
       include: { location: true, category: true, asset: true, pic: true, assignedUser: { select: { id: true, name: true, email: true } } }
     });
-    await auditLog({ entityType: 'TICKET', entityId: t.id, action: 'UPDATE', newValue: JSON.stringify(data), actorUserId: req.body.actorUserId || null, ticketId: t.id, req });
+    await auditLog({ entityType: 'TICKET', entityId: t.id, action: 'UPDATE', newValue: JSON.stringify(data), actorUserId: actor.id || null, ticketId: t.id, req });
     res.json(updated);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 // Delete ticket (admin only)
-router.delete('/tickets/:id', async (req, res) => {
+router.delete('/tickets/:id', requirePermission('TICKET_DELETE'), async (req, res) => {
   if(!requireAdmin(req,res)) return
   try{
     await prisma.itOslTicket.delete({ where:{ id: req.params.id }})
@@ -1216,7 +1327,7 @@ router.delete('/tickets/:id', async (req, res) => {
   }catch(e){ res.status(400).json({ message:e.message })}
 });
 // Bulk delete (admin) — body {ids: string[]} or ?all=true for trial wipe
-router.post('/tickets/bulk-delete', async (req,res)=>{
+router.post('/tickets/bulk-delete', requirePermission('TICKET_DELETE'), async (req,res)=>{
   if(!requireAdmin(req,res)) return
   try{
     const { ids, all } = req.body || {}
@@ -1233,57 +1344,72 @@ router.post('/tickets/bulk-delete', async (req,res)=>{
 });
 
 // Parts
-router.post('/tickets/:id/parts', async (req, res) => {
+router.post('/tickets/:id/parts', requirePermission('TICKET_EDIT'), async (req, res) => {
   try {
-    const part = await prisma.itOslTicketPart.create({ data: { ticketId: req.params.id, partName: req.body.partName, quantity: Number(req.body.quantity) || 1, unit: req.body.unit || 'pcs', notes: req.body.notes || null } });
+    const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
+    if (!ticket) return;
+    const part = await prisma.itOslTicketPart.create({ data: { ticketId: ticket.id, partName: req.body.partName, quantity: Number(req.body.quantity) || 1, unit: req.body.unit || 'pcs', notes: req.body.notes || null } });
     res.status(201).json(part);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.delete('/tickets/:ticketId/parts/:partId', async (req, res) => {
+router.delete('/tickets/:ticketId/parts/:partId', requirePermission('TICKET_EDIT'), async (req, res) => {
   if(!requireAdmin(req,res)) return
-  try { await prisma.itOslTicketPart.delete({ where: { id: req.params.partId } }); res.json({ ok: true }); }
+  try {
+    const part = await prisma.itOslTicketPart.findUnique({ where: { id: req.params.partId }, select: { ticketId: true } });
+    if (!part || part.ticketId !== req.params.ticketId) return res.status(404).json({ message: 'Part not found pada tiket ini' });
+    await prisma.itOslTicketPart.delete({ where: { id: req.params.partId } }); res.json({ ok: true });
+  }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 // Attachments (expects url already uploaded via /api/upload generic)
-router.post('/tickets/:id/attachments', async (req, res) => {
+router.post('/tickets/:id/attachments', requirePermission('TICKET_EDIT'), async (req, res) => {
   try {
+    const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
+    if (!ticket) return;
     const { url, fileName, mimeType, type } = req.body;
     if (!url) return res.status(400).json({ message: 'url wajib' });
-    const att = await prisma.itOslTicketAttachment.create({ data: { ticketId: req.params.id, url, fileName, mimeType, type: type || 'INITIAL' } });
+    const att = await prisma.itOslTicketAttachment.create({ data: { ticketId: ticket.id, url, fileName, mimeType, type: type || 'INITIAL' } });
     res.status(201).json(att);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 // Notes
-router.post('/tickets/:id/notes', async (req, res) => {
+router.post('/tickets/:id/notes', requirePermission('TICKET_EDIT'), async (req, res) => {
   try {
-    const note = await prisma.itOslTicketNote.create({ data: { ticketId: req.params.id, content: req.body.content, userId: req.body.userId || null } });
+    const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
+    if (!ticket) return;
+    const actor = req.itOslActor || {};
+    const note = await prisma.itOslTicketNote.create({ data: { ticketId: ticket.id, content: req.body.content, userId: actor.id || null } });
     res.status(201).json(note);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 // Reassign
-router.post('/tickets/:id/reassign', async (req, res) => {
+router.post('/tickets/:id/reassign', requirePermission('TICKET_ASSIGN'), async (req, res) => {
   try {
-    const { toUserId, reason, actorUserId } = req.body;
-    const t = await prisma.itOslTicket.update({ where: { id: req.params.id }, data: { assignedTo: toUserId } });
-    await auditLog({ entityType: 'TICKET', entityId: t.id, action: 'REASSIGN', oldValue: t.assignedTo, newValue: toUserId, actorUserId, ticketId: t.id, req });
-    if (reason) await prisma.itOslTicketNote.create({ data: { ticketId: t.id, content: `Dialihkan: ${reason}`, userId: actorUserId || null } });
+    const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
+    if (!ticket) return;
+    const { toUserId, reason } = req.body;
+    const actor = req.itOslActor || {};
+    const previousAssignee = ticket.assignedTo;
+    const t = await prisma.itOslTicket.update({ where: { id: ticket.id }, data: { assignedTo: toUserId } });
+    await auditLog({ entityType: 'TICKET', entityId: t.id, action: 'REASSIGN', oldValue: previousAssignee, newValue: toUserId, actorUserId: actor.id || null, ticketId: t.id, req });
+    if (reason) await prisma.itOslTicketNote.create({ data: { ticketId: t.id, content: `Dialihkan: ${reason}`, userId: actor.id || null } });
     res.json(t);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 // ── WORK ITEMS (Item Pekerjaan per Fase: ANALISA, PENGERJAAN, HASIL) ──────
 // 1 tiket bisa punya banyak item per fase, tiap item bisa lampirkan >1 foto
-router.post('/upload', uploadMem.single('file'), async (req, res) => {
+router.post('/upload', requirePermission('TICKET_CREATE'), uploadMem.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file' });
     const url = await processItOslImage(req.file);
     res.json({ url });
   } catch(e){ res.status(500).json({ message:e.message })}
 });
-router.post('/upload-multi', uploadMem.array('photos', 10), async (req, res) => {
+router.post('/upload-multi', requirePermission('TICKET_CREATE'), uploadMem.array('photos', 10), async (req, res) => {
   try {
     if (!req.files || req.files.length===0) return res.status(400).json({ message:'No files' });
     const urls = [];
@@ -1292,41 +1418,43 @@ router.post('/upload-multi', uploadMem.array('photos', 10), async (req, res) => 
   } catch(e){ res.status(500).json({ message:e.message })}
 });
 
-router.get('/tickets/:id/work-items', async (req,res)=>{
+router.get('/tickets/:id/work-items', requirePermission('VIEW'), async (req,res)=>{
   try{
+    const ticket = await loadTicketForActor(req, res, req.params.id);
+    if (!ticket) return;
     const { phase } = req.query;
-    const where = { ticketId: req.params.id };
+    const where = { ticketId: ticket.id };
     if(phase) where.phase = String(phase).toUpperCase();
     const items = await prisma.itOslTicketWorkItem.findMany({ where, include:{ attachments:true, creator:{ select:{ id:true, name:true }}}, orderBy:{ createdAt:'asc'}});
     res.json(items);
   }catch(e){ res.status(500).json({ message:e.message })}
 });
 
-router.post('/tickets/:id/work-items', async (req,res)=>{
+router.post('/tickets/:id/work-items', requirePermission('TICKET_EDIT'), async (req,res)=>{
   try{
-    const { phase, title, description, createdBy } = req.body;
+    const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
+    if (!ticket) return;
+    const { phase, title, description } = req.body;
     const p = String(phase||'ANALISA').toUpperCase();
     if(!['ANALISA','PENGERJAAN','HASIL'].includes(p)) return res.status(400).json({ message:'phase harus ANALISA/PENGERJAAN/HASIL' });
     if(!description || String(description).trim().length<5) return res.status(400).json({ message:'Uraian item minimal 5 karakter' });
-    const ticket = await prisma.itOslTicket.findUnique({ where:{ id:req.params.id }});
-    if(!ticket) return res.status(404).json({ message:'Ticket not found' });
     if(['CLOSED','CANCELLED','DUPLICATE'].includes(ticket.status)) return res.status(403).json({ message:'Tiket terminal read-only' });
-    let validCreator = null
-    if(createdBy){
-      const u = await prisma.user.findUnique({ where:{ id: String(createdBy) }}).catch(()=>null)
-      if(u) validCreator = String(createdBy)
-    }
+    const actor = req.itOslActor || {};
     const item = await prisma.itOslTicketWorkItem.create({
-      data:{ ticketId:req.params.id, phase:p, title: title||null, description: String(description).trim(), status:'OPEN', createdBy: validCreator },
+      data:{ ticketId: ticket.id, phase:p, title: title||null, description: String(description).trim(), status:'OPEN', createdBy: actor.id || null },
       include:{ attachments:true }
     });
-    await auditLog({ entityType:'TICKET', entityId:req.params.id, action:'WORKITEM_CREATE', fieldName:p, newValue: description, actorUserId: validCreator, ticketId:req.params.id, req });
+    await auditLog({ entityType:'TICKET', entityId: ticket.id, action:'WORKITEM_CREATE', fieldName:p, newValue: description, actorUserId: actor.id || null, ticketId: ticket.id, req });
     res.status(201).json(item);
   }catch(e){ res.status(400).json({ message:e.message })}
 });
 
-router.put('/tickets/:id/work-items/:workItemId', async (req,res)=>{
+router.put('/tickets/:id/work-items/:workItemId', requirePermission('TICKET_EDIT'), async (req,res)=>{
   try{
+    const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
+    if (!ticket) return;
+    const existing = await prisma.itOslTicketWorkItem.findUnique({ where:{ id:req.params.workItemId }, select:{ ticketId:true } });
+    if (!existing || existing.ticketId !== ticket.id) return res.status(404).json({ message:'Work item tidak ditemukan pada tiket ini' });
     const { title, description, status, phase } = req.body;
     const data = {};
     if(title!==undefined) data.title = title||null;
@@ -1338,17 +1466,25 @@ router.put('/tickets/:id/work-items/:workItemId', async (req,res)=>{
   }catch(e){ res.status(400).json({ message:e.message })}
 });
 
-router.delete('/tickets/:id/work-items/:workItemId', async (req,res)=>{
+router.delete('/tickets/:id/work-items/:workItemId', requirePermission('TICKET_EDIT'), async (req,res)=>{
   if(!requireAdmin(req,res)) return
   try{
+    const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
+    if (!ticket) return;
+    const existing = await prisma.itOslTicketWorkItem.findUnique({ where:{ id:req.params.workItemId }, select:{ ticketId:true } });
+    if (!existing || existing.ticketId !== ticket.id) return res.status(404).json({ message:'Work item tidak ditemukan pada tiket ini' });
     await prisma.itOslTicketWorkItem.delete({ where:{ id:req.params.workItemId }});
-    await prisma.itOslAuditLog.create({ data:{ entityType:'TICKET', entityId:req.params.id, action:'WORKITEM_DELETE', actorUserId: req.headers['x-user-id'] || null, ticketId: req.params.id }})
+    await prisma.itOslAuditLog.create({ data:{ entityType:'TICKET', entityId:ticket.id, action:'WORKITEM_DELETE', actorUserId: req.itOslActor?.id || null, ticketId: ticket.id }})
     res.json({ ok:true });
   }catch(e){ res.status(400).json({ message:e.message })}
 });
 
-router.post('/tickets/:id/work-items/:workItemId/attachments', async (req,res)=>{
+router.post('/tickets/:id/work-items/:workItemId/attachments', requirePermission('TICKET_EDIT'), async (req,res)=>{
   try{
+    const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
+    if (!ticket) return;
+    const existing = await prisma.itOslTicketWorkItem.findUnique({ where:{ id:req.params.workItemId }, select:{ ticketId:true } });
+    if (!existing || existing.ticketId !== ticket.id) return res.status(404).json({ message:'Work item tidak ditemukan pada tiket ini' });
     const { url, fileName, mimeType } = req.body;
     if(!url) return res.status(400).json({ message:'url wajib' });
     const att = await prisma.itOslTicketWorkItemAttachment.create({ data:{ workItemId: req.params.workItemId, url, fileName: fileName||null, mimeType: mimeType||null }});
@@ -1356,8 +1492,12 @@ router.post('/tickets/:id/work-items/:workItemId/attachments', async (req,res)=>
   }catch(e){ res.status(400).json({ message:e.message })}
 });
 
-router.post('/tickets/:id/work-items/:workItemId/photos', uploadMem.array('photos', 10), async (req,res)=>{
+router.post('/tickets/:id/work-items/:workItemId/photos', requirePermission('TICKET_EDIT'), uploadMem.array('photos', 10), async (req,res)=>{
   try{
+    const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
+    if (!ticket) return;
+    const existing = await prisma.itOslTicketWorkItem.findUnique({ where:{ id:req.params.workItemId }, select:{ ticketId:true } });
+    if (!existing || existing.ticketId !== ticket.id) return res.status(404).json({ message:'Work item tidak ditemukan pada tiket ini' });
     if(!req.files || req.files.length===0) return res.status(400).json({ message:'No files' });
     const created = [];
     for(const f of req.files){
@@ -1369,16 +1509,22 @@ router.post('/tickets/:id/work-items/:workItemId/photos', uploadMem.array('photo
   }catch(e){ res.status(500).json({ message:e.message })}
 });
 
-router.delete('/tickets/:id/work-items/:workItemId/attachments/:attachmentId', async (req,res)=>{
+router.delete('/tickets/:id/work-items/:workItemId/attachments/:attachmentId', requirePermission('TICKET_EDIT'), async (req,res)=>{
   if(!requireAdmin(req,res)) return
   try{
+    const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
+    if (!ticket) return;
+    const existing = await prisma.itOslTicketWorkItem.findUnique({ where:{ id:req.params.workItemId }, select:{ ticketId:true } });
+    if (!existing || existing.ticketId !== ticket.id) return res.status(404).json({ message:'Work item tidak ditemukan pada tiket ini' });
+    const att = await prisma.itOslTicketWorkItemAttachment.findUnique({ where:{ id:req.params.attachmentId }, select:{ workItemId:true } });
+    if (!att || att.workItemId !== req.params.workItemId) return res.status(404).json({ message:'Lampiran tidak ditemukan pada work item ini' });
     await prisma.itOslTicketWorkItemAttachment.delete({ where:{ id:req.params.attachmentId }});
     res.json({ ok:true });
   }catch(e){ res.status(400).json({ message:e.message })}
 });
 
 // ── DASHBOARD KPIs ───────────────────────────────────────────────────────────
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const { from, to, customerId } = req.query;
@@ -1386,16 +1532,16 @@ router.get('/dashboard', async (req, res) => {
     const end = to ? new Date(String(to)) : new Date();
     
     const whereRange = { createdAt: { gte: start, lte: end } };
-    applyCustomerFilter(whereRange, scope, customerId);
+    applyCustomerFilter(whereRange, scope, customerId, { includeShared: false });
 
     const wherePending = { status: 'PENDING' };
-    applyCustomerFilter(wherePending, scope, customerId);
+    applyCustomerFilter(wherePending, scope, customerId, { includeShared: false });
 
     const whereCritical = { severity: 'CRITICAL', status: { in: ['NEW','IN_PROGRESS','PENDING'] } };
-    applyCustomerFilter(whereCritical, scope, customerId);
+    applyCustomerFilter(whereCritical, scope, customerId, { includeShared: false });
 
     const whereResolved = { status: { in: ['RESOLVED','CLOSED'] }, resolvedAt: { not: null }, acknowledgedAt: { not: null }, ticketType: { not: 'REQUEST' } };
-    applyCustomerFilter(whereResolved, scope, customerId);
+    applyCustomerFilter(whereResolved, scope, customerId, { includeShared: false });
 
     const [total, byStatus, bySeverity, pendingOver, criticalBreach, recent] = await Promise.all([
       prisma.itOslTicket.count({ where: whereRange }),
@@ -1423,7 +1569,7 @@ router.get('/dashboard', async (req, res) => {
       avgMttrMin = Math.round(sum / resolved.length);
     }
     const whereActive = { status: { in: ['NEW','IN_PROGRESS','PENDING'] } };
-    applyCustomerFilter(whereActive, scope, customerId);
+    applyCustomerFilter(whereActive, scope, customerId, { includeShared: false });
     const active = await prisma.itOslTicket.count({ where: whereActive });
     res.json({
       total, active, pendingOver, avgMttrMin,
@@ -1438,7 +1584,7 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // ── REPORTS ──────────────────────────────────────────────────────────────────
-router.get('/reports/daily', async (req, res) => {
+router.get('/reports/daily', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const { date, customerId } = req.query;
@@ -1447,7 +1593,7 @@ router.get('/reports/daily', async (req, res) => {
     const next = new Date(d); next.setDate(d.getDate()+1);
     
     const where = { createdAt: { gte: d, lt: next } };
-    applyCustomerFilter(where, scope, customerId);
+    applyCustomerFilter(where, scope, customerId, { includeShared: false });
 
     const tickets = await prisma.itOslTicket.findMany({
       where,
@@ -1463,7 +1609,7 @@ router.get('/reports/daily', async (req, res) => {
     tickets.forEach(t => t.parts.forEach(p => { const k = p.partName; partsAgg[k] = (partsAgg[k]||0)+ p.quantity; }));
 
     const whereAsset = {};
-    applyCustomerFilter(whereAsset, scope, customerId);
+    applyCustomerFilter(whereAsset, scope, customerId, { includeShared: false });
     const recurring = await prisma.itOslAsset.findMany({ where: whereAsset, include: { tickets: { where: { createdAt: { gte: new Date(Date.now()-90*24*3600*1000) } }, select: { categoryId: true } } } });
     const recurringList = recurring.filter(a => {
       const m = {}; a.tickets.forEach(t=>{ m[t.categoryId]=(m[t.categoryId]||0)+1}); return Object.values(m).some(c=>c>=3);
@@ -1488,7 +1634,7 @@ router.get('/reports/daily', async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-router.get('/reports/monthly', async (req, res) => {
+router.get('/reports/monthly', requirePermission('REPORT_FULL'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const { ym: reqYm, customerId } = req.query;
@@ -1498,7 +1644,7 @@ router.get('/reports/monthly', async (req, res) => {
     const end = new Date(y, m, 1);
     
     const where = { createdAt: { gte: start, lt: end } };
-    applyCustomerFilter(where, scope, customerId);
+    applyCustomerFilter(where, scope, customerId, { includeShared: false });
 
     const tickets = await prisma.itOslTicket.findMany({ where, include: { category: true, location: true, customer: true, asset: true } });
     const byCategory = {};
@@ -1518,7 +1664,7 @@ router.get('/reports/monthly', async (req, res) => {
 });
 
 // ── PM SCHEDULES ─────────────────────────────────────────────────────────────
-router.get('/pm/schedules', async (req, res) => {
+router.get('/pm/schedules', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
     const { customerId } = req.query;
@@ -1533,14 +1679,15 @@ router.get('/pm/schedules', async (req, res) => {
     res.json(list);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
-router.post('/pm/schedules', async (req, res) => {
+router.post('/pm/schedules', requirePermission('PM_PLAN'), async (req, res) => {
   try {
-    const { title, description, frequency, locationId, assetId, customerId, checkItems, createdBy } = req.body;
+    const { title, description, frequency, locationId, assetId, customerId, checkItems } = req.body;
     if (!title) return res.status(400).json({ message: 'title wajib' });
+    const actor = req.itOslActor || {};
     const s = await prisma.itOslPmSchedule.create({
       data: {
         title, description: description || null, frequency: frequency || 'WEEKLY',
-        locationId: locationId || null, assetId: assetId || null, customerId: customerId || null, createdBy: createdBy || null,
+        locationId: locationId || null, assetId: assetId || null, customerId: customerId || null, createdBy: actor.id || null,
         checkItems: checkItems && Array.isArray(checkItems) ? { create: checkItems.map((n,i)=>({ name: String(n.name||n), order: i })) } : undefined,
       },
       include: { checkItems: true, customer: true },
@@ -1548,13 +1695,20 @@ router.post('/pm/schedules', async (req, res) => {
     res.status(201).json(s);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.post('/pm/schedules/:id/execute', async (req, res) => {
+router.post('/pm/schedules/:id/execute', requirePermission('PM_EXECUTE'), async (req, res) => {
   try {
-    const { executedBy, notes, items } = req.body; // items: [{checkItemId,name,result,notes}]
+    const schedule = await prisma.itOslPmSchedule.findUnique({ where: { id: req.params.id } });
+    if (!schedule) return res.status(404).json({ message: 'Jadwal PM tidak ditemukan' });
+    const scope = await getCustomerScope(req);
+    if (!ticketScopeAllowed(scope, { customerId: schedule.customerId })) {
+      return res.status(403).json({ message: 'Anda tidak memiliki akses ke jadwal PM customer ini' });
+    }
+    const actor = req.itOslActor || {};
+    const { notes, items } = req.body; // items: [{checkItemId,name,result,notes}]
     const exec = await prisma.itOslPmExecution.create({
       data: {
-        scheduleId: req.params.id,
-        executedBy: executedBy || null,
+        scheduleId: schedule.id,
+        executedBy: actor.id || null,
         notes: notes || null,
         status: (items||[]).some(i=> i.result==='ISSUE') ? 'ISSUE_FOUND' : 'COMPLETED',
         items: { create: (items||[]).map(it=> ({ checkItemId: it.checkItemId || null, name: it.name, result: it.result || 'NORMAL', notes: it.notes || null })) },
@@ -1564,43 +1718,58 @@ router.post('/pm/schedules/:id/execute', async (req, res) => {
     // auto-create incident tickets for ISSUE items
     const issues = (items||[]).filter(i=> i.result==='ISSUE');
     for (const iss of issues) {
-      const schedule = await prisma.itOslPmSchedule.findUnique({ where: { id: req.params.id } });
       const cat = await prisma.itOslCategory.findFirst({ where: { groupName: { contains: 'Infrastruktur', mode: 'insensitive' } } });
-      if (!schedule || !cat) continue;
+      if (!cat) continue;
+      const locationId = schedule.locationId || (schedule.customerId
+        ? (await prisma.itOslLocation.findFirst({ where: { customerId: schedule.customerId }, select: { id: true } }))?.id
+        : null);
+      if (!locationId) continue;
       const ticketNumber = await prisma.$transaction(async (tx)=> generateTicketNumber(tx));
       await prisma.itOslTicket.create({
         data: {
           ticketNumber,
           ticketType: 'PM',
           summary: `PM Temuan: ${iss.name} — ${schedule.title}`,
-          locationId: schedule.locationId || (await prisma.itOslLocation.findFirst()).id,
+          locationId,
           categoryId: cat.id,
+          customerId: schedule.customerId || null,
           severity: 'MEDIUM',
           status: 'NEW',
-          createdBy: executedBy || null,
+          createdBy: actor.id || null,
+          assignedTo: isFieldRole(normalizeRole(actor.role)) ? (actor.id || null) : null,
         },
       });
     }
     res.status(201).json(exec);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.get('/pm/executions', async (req, res) => {
+router.get('/pm/executions', requirePermission('VIEW'), async (req, res) => {
   try {
-    const list = await prisma.itOslPmExecution.findMany({ include: { schedule: true, executor: { select: { id:true, name:true } }, items: true }, orderBy: { executedAt: 'desc' }, take: 100 });
+    const scope = await getCustomerScope(req);
+    const where = {};
+    if (!scope.isGlobal) {
+      const or = [];
+      if (scope.allowedCustomerIds.length) or.push({ customerId: { in: scope.allowedCustomerIds } });
+      or.push({ customerId: null });
+      where.schedule = { OR: or };
+    }
+    const list = await prisma.itOslPmExecution.findMany({ where, include: { schedule: true, executor: { select: { id:true, name:true } }, items: true }, orderBy: { executedAt: 'desc' }, take: 100 });
     res.json(list);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 // ── HANDOVERS / SHIFT ───────────────────────────────────────────────────────
-router.get('/handovers', async (req, res) => {
+router.get('/handovers', requirePermission('HANDOVER'), async (req, res) => {
   try {
     const list = await prisma.itOslHandover.findMany({ include: { user: { select: { id:true, name:true, email:true } } }, orderBy: { date: 'desc' }, take: 100 });
     res.json(list);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
-router.post('/handovers/opening', async (req, res) => {
+router.post('/handovers/opening', requirePermission('HANDOVER'), async (req, res) => {
   try {
-    const { userId, notes } = req.body;
+    const { notes } = req.body;
+    // Identitas shift selalu dari aktor terverifikasi.
+    const userId = req.itOslActor?.id;
     if (!userId) return res.status(400).json({ message: 'userId wajib' });
     const today = new Date(); today.setHours(0,0,0,0);
     const existing = await prisma.itOslHandover.findFirst({ where: { userId, date: { gte: today } } });
@@ -1611,9 +1780,11 @@ router.post('/handovers/opening', async (req, res) => {
     res.status(201).json(handover);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.post('/handovers/closing', async (req, res) => {
+router.post('/handovers/closing', requirePermission('HANDOVER'), async (req, res) => {
   try {
-    const { userId, notes, handoverNotes } = req.body;
+    const { notes, handoverNotes } = req.body;
+    const userId = req.itOslActor?.id;
+    if (!userId) return res.status(400).json({ message: 'userId wajib' });
     const today = new Date(); today.setHours(0,0,0,0);
     const existing = await prisma.itOslHandover.findFirst({ where: { userId, date: { gte: today } }, orderBy: { date: 'desc' } });
     if (!existing) return res.status(400).json({ message: 'Belum opening' });
@@ -1623,7 +1794,7 @@ router.post('/handovers/closing', async (req, res) => {
 });
 
 // ── AUDIT LOGS ───────────────────────────────────────────────────────────────
-router.get('/audit-logs', async (req, res) => {
+router.get('/audit-logs', requirePermission('AUDIT_VIEW'), async (req, res) => {
   try {
     const { ticketId, entityType, limit } = req.query;
     const where = {};
@@ -1635,12 +1806,29 @@ router.get('/audit-logs', async (req, res) => {
 });
 
 // ── SEARCH ──────────────────────────────────────────────────────────────────
-router.get('/search', async (req, res) => {
+router.get('/search', requirePermission('VIEW'), async (req, res) => {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) return res.json([]);
+    const scope = await getCustomerScope(req);
+    const where = {
+      OR: [
+        { summary: { contains: q, mode: 'insensitive' } },
+        { rootCause: { contains: q, mode: 'insensitive' } },
+        { correctiveAction: { contains: q, mode: 'insensitive' } },
+        { ticketNumber: { contains: q, mode: 'insensitive' } },
+      ],
+    };
+    applyCustomerFilter(where, scope, undefined, { includeShared: false });
+    const actor = req.itOslActor || {};
+    if (isFieldRole(normalizeRole(actor.role)) && actor.id) {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        { OR: [{ assignedTo: actor.id }, { createdBy: actor.id }, { assignedTo: null }] },
+      ];
+    }
     const tickets = await prisma.itOslTicket.findMany({
-      where: { OR: [{ summary: { contains: q, mode: 'insensitive' } }, { rootCause: { contains: q, mode: 'insensitive' } }, { correctiveAction: { contains: q, mode: 'insensitive' } }, { ticketNumber: { contains: q, mode: 'insensitive' } }] },
+      where,
       include: { location: true, category: true, asset: true },
       take: 20,
       orderBy: { createdAt: 'desc' },
@@ -1650,7 +1838,7 @@ router.get('/search', async (req, res) => {
 });
 
 // Auto-close cron-friendly endpoint (called by frontend or cron)
-router.post('/cron/auto-close', async (req, res) => {
+router.post('/cron/auto-close', superAdminOnly, async (req, res) => {
   try {
     const cutoff = new Date(Date.now() - 2*24*3600*1000);
     const toClose = await prisma.itOslTicket.findMany({ where: { status: 'RESOLVED', resolvedAt: { lte: cutoff } } });

@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { Settings2, MapPin, Tag, Plus, Trash2, Loader2, Save, Pencil, X, Check } from "lucide-react"
+import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
@@ -9,6 +11,21 @@ type Loc = { id: string; code: string; name: string; address: string | null; isA
 type Cat = { id: string; name: string; groupName: string; parentId: string | null; order: number; isActive: boolean }
 
 export default function ItOslSettingsPage() {
+  return (
+    <ItOslAccessGuard action="master.write">
+      <ItOslSettingsContent />
+    </ItOslAccessGuard>
+  )
+}
+
+function ItOslSettingsContent() {
+  const { data: session } = useSession()
+  const currentUserId = (session?.user as { id?: string })?.id || ""
+  const getAuthHeaders = (): Record<string, string> => ({
+    "x-user-id": currentUserId,
+    "x-user-role": (session?.user as { role?: string })?.role || "",
+    "x-user-email": session?.user?.email || "",
+  })
   const [locs, setLocs] = useState<Loc[]>([])
   const [cats, setCats] = useState<Cat[]>([])
   const [newLoc, setNewLoc] = useState({ code: "", name: "", address: "" })
@@ -22,16 +39,16 @@ export default function ItOslSettingsPage() {
 
   const load = async () => {
     setLoading(true)
-    const [lRes, cRes] = await Promise.all([fetch(`${API}/api/it-osl/locations`), fetch(`${API}/api/it-osl/categories`)])
+    const [lRes, cRes] = await Promise.all([fetch(`${API}/api/it-osl/locations`, { headers: getAuthHeaders() }), fetch(`${API}/api/it-osl/categories`, { headers: getAuthHeaders() })])
     if (lRes.ok) setLocs(await lRes.json())
     if (cRes.ok) setCats(await cRes.json())
     setLoading(false)
   }
-  useEffect(()=>{ load() },[])
+  useEffect(()=>{ if (currentUserId) load() },[currentUserId])
 
   const addLoc = async () => {
     if (!newLoc.code || !newLoc.name) return alert("code & name wajib")
-    const res = await fetch(`${API}/api/it-osl/locations`, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(newLoc) })
+    const res = await fetch(`${API}/api/it-osl/locations`, { method:"POST", headers:{ "Content-Type":"application/json", ...getAuthHeaders() }, body: JSON.stringify(newLoc) })
     const d=await res.json()
     if(!res.ok) return alert(d.message)
     setNewLoc({ code:"", name:"", address:"" })
@@ -39,7 +56,7 @@ export default function ItOslSettingsPage() {
   }
   const delLoc = async (id:string) => {
     if(!confirm("Hapus lokasi? Tiket terpakai lokasi ini akan gagal dibuat — pastikan tidak dipakai")) return
-    const res = await fetch(`${API}/api/it-osl/locations/${id}`, { method:"DELETE" })
+    const res = await fetch(`${API}/api/it-osl/locations/${id}`, { method:"DELETE", headers: getAuthHeaders() })
     if(!res.ok){ const d=await res.json(); return alert(d.message)}
     load()
   }
@@ -51,7 +68,7 @@ export default function ItOslSettingsPage() {
     if(!editingLocId) return
     if(!editLoc.code || !editLoc.name) return alert("code & name wajib")
     setSaving(true)
-    const res = await fetch(`${API}/api/it-osl/locations/${editingLocId}`, { method:"PUT", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ code: editLoc.code, name: editLoc.name, address: editLoc.address }) })
+    const res = await fetch(`${API}/api/it-osl/locations/${editingLocId}`, { method:"PUT", headers:{ "Content-Type":"application/json", ...getAuthHeaders() }, body: JSON.stringify({ code: editLoc.code, name: editLoc.name, address: editLoc.address }) })
     const d=await res.json()
     setSaving(false)
     if(!res.ok) return alert(d.message)
@@ -60,19 +77,19 @@ export default function ItOslSettingsPage() {
   }
   const addCat = async () => {
     if(!newCat.name) return alert("nama wajib")
-    const res = await fetch(`${API}/api/it-osl/categories`, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(newCat) })
+    const res = await fetch(`${API}/api/it-osl/categories`, { method:"POST", headers:{ "Content-Type":"application/json", ...getAuthHeaders() }, body: JSON.stringify(newCat) })
     const d=await res.json()
     if(!res.ok) return alert(d.message)
     setNewCat({ groupName: newCat.groupName, name:"" })
     load()
   }
   const toggleCat = async (c: Cat) => {
-    await fetch(`${API}/api/it-osl/categories/${c.id}`, { method:"PUT", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ isActive: !c.isActive }) })
+    await fetch(`${API}/api/it-osl/categories/${c.id}`, { method:"PUT", headers:{ "Content-Type":"application/json", ...getAuthHeaders() }, body: JSON.stringify({ isActive: !c.isActive }) })
     load()
   }
   const delCat = async (id:string) => {
     if(!confirm("Hapus kategori? Tiket pakai kategori ini akan error")) return
-    const res = await fetch(`${API}/api/it-osl/categories/${id}`, { method:"DELETE" })
+    const res = await fetch(`${API}/api/it-osl/categories/${id}`, { method:"DELETE", headers: getAuthHeaders() })
     if(!res.ok){ const d=await res.json(); return alert(d.message)}
     load()
   }
@@ -84,7 +101,7 @@ export default function ItOslSettingsPage() {
     if(!editingCatId) return
     if(!editCat.name || !editCat.groupName) return alert("group & nama wajib")
     setSaving(true)
-    const res = await fetch(`${API}/api/it-osl/categories/${editingCatId}`, { method:"PUT", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ groupName: editCat.groupName, name: editCat.name }) })
+    const res = await fetch(`${API}/api/it-osl/categories/${editingCatId}`, { method:"PUT", headers:{ "Content-Type":"application/json", ...getAuthHeaders() }, body: JSON.stringify({ groupName: editCat.groupName, name: editCat.name }) })
     const d=await res.json()
     setSaving(false)
     if(!res.ok) return alert(d.message)

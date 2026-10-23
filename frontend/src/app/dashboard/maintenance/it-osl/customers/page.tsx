@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSession } from "next-auth/react"
+import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
 import { 
   Building2, Users, MapPin, Package, Wrench, Search, Plus, 
   Edit2, Trash2, Eye, X, Loader2, CheckCircle2, AlertTriangle, 
@@ -65,6 +66,14 @@ const COMPANY_TYPES = [
 ]
 
 export default function CustomersPage() {
+  return (
+    <ItOslAccessGuard action="master.write">
+      <CustomersContent />
+    </ItOslAccessGuard>
+  )
+}
+
+function CustomersContent() {
   const { data: session, status } = useSession()
   const currentUserId = (session?.user as { id?: string })?.id || ""
   const currentRole = (session?.user as { role?: string })?.role || ""

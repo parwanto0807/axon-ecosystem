@@ -10,6 +10,8 @@ import {
   SlidersHorizontal, ChevronDown, Sparkles, Building2
 } from "lucide-react"
 import { useSession } from "next-auth/react"
+import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
+import { canItOsl } from "@/lib/itOslPermissions"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
@@ -99,11 +101,22 @@ const PHASES = [
 ] as const
 
 export default function ItOslTicketsPage() {
+  return (
+    <ItOslAccessGuard>
+      <ItOslTicketsContent />
+    </ItOslAccessGuard>
+  )
+}
+
+function ItOslTicketsContent() {
   const { data: session } = useSession()
   const currentUserId = (session?.user as { id?:string })?.id || null
   const currentUserName = session?.user?.name || null
   const currentRole = (session?.user as { role?:string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
+  const canClose = canItOsl(currentRole, 'ticket.close')
+  const canAssign = canItOsl(currentRole, 'ticket.assign')
+  const canApproveCancel = canItOsl(currentRole, 'ticket.cancel')
 
   const getAuthHeaders = (): Record<string, string> => ({
     "x-user-id": currentUserId || "",
@@ -180,7 +193,7 @@ export default function ItOslTicketsPage() {
         fetch(`${API}/api/it-osl/categories`, { headers }),
         fetch(`${API}/api/it-osl/assets`, { headers }),
         fetch(`${API}/api/it-osl/pics`, { headers }),
-        fetch(`${API}/api/users`, { headers: { "x-user-role":"SUPER_ADMIN" } }).then(r=> r.ok? r.json().then((j: unknown)=> Array.isArray(j)? j : (j as { users?: UserOpt[] })?.users || []): []).catch(()=>[]),
+        fetch(`${API}/api/it-osl/assignable-users`, { headers }).then(r=> r.ok? r.json().then((j: unknown)=> Array.isArray(j)? j : (j as { users?: UserOpt[] })?.users || []): []).catch(()=>[]),
         fetch(`${API}/api/it-osl/customers`, { headers }),
       ])
       if (tRes.ok) {
@@ -606,7 +619,7 @@ export default function ItOslTicketsPage() {
       if(newFiles && newFiles.length>0){
         const fd = new FormData()
         Array.from(newFiles).forEach(f=> fd.append("photos", f))
-        const up = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${item.id}/photos`, { method:"POST", headers: { "x-user-id": currentUserId || "", "x-user-role": currentRole || "" }, body: fd })
+        const up = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${item.id}/photos`, { method:"POST", headers: getAuthHeaders(), body: fd })
         const upData = await up.json()
         if(!up.ok) alert("Item tersimpan, tapi foto gagal: "+(upData.message||""))
       }
@@ -638,7 +651,7 @@ export default function ItOslTicketsPage() {
     if(!files || files.length===0 || !detailId) return
     const fd = new FormData()
     Array.from(files).forEach(f=> fd.append("photos", f))
-    const res = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${wid}/photos`, { method:"POST", headers: { "x-user-id": currentUserId || "", "x-user-role": currentRole || "" }, body: fd })
+    const res = await fetch(`${API}/api/it-osl/tickets/${detailId}/work-items/${wid}/photos`, { method:"POST", headers: getAuthHeaders(), body: fd })
     if(!res.ok){ const d=await res.json(); alert(d.message) } else loadDetail(detailId)
   }
 
@@ -1827,14 +1840,20 @@ export default function ItOslTicketsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="text-[11px] font-bold text-slate-600 block mb-1">Petugas IT (Teknisi)</label>
-                    <select 
-                      value={quick.assignedTo} 
-                      onChange={(e)=>setQuick({...quick, assignedTo:e.target.value})} 
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option value="">— Pilih Teknisi IT —</option>
-                      {users.map(u=> <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
-                    </select>
+                    {canAssign ? (
+                      <select 
+                        value={quick.assignedTo} 
+                        onChange={(e)=>setQuick({...quick, assignedTo:e.target.value})} 
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      >
+                        <option value="">— Pilih Teknisi IT —</option>
+                        {users.map(u=> <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+                      </select>
+                    ) : (
+                      <div className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600">
+                        {currentUserName || "Saya sendiri"} (otomatis)
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-[11px] font-bold text-slate-600 block mb-1">Nama Pelapor</label>
@@ -2020,13 +2039,18 @@ export default function ItOslTicketsPage() {
                           Lanjutkan Pengerjaan
                         </button>
                       )}
-                      {detail.status==="RESOLVED" && (
+                      {detail.status==="RESOLVED" && canClose && (
                         <button 
                           onClick={()=>changeStatus(detail.id,"CLOSED")} 
                           className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
                         >
                           Tutup Tiket (Closed)
                         </button>
+                      )}
+                      {detail.status==="RESOLVED" && !canClose && (
+                        <p className="w-full text-center text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl py-2.5">
+                          Menunggu verifikasi Lead/Admin untuk menutup tiket.
+                        </p>
                       )}
                     </div>
 
@@ -2108,14 +2132,18 @@ export default function ItOslTicketsPage() {
                             <p className="text-[10px] text-slate-400 truncate mt-0.5">Penanggung jawab</p>
                           </div>
                         </div>
-                        <select 
-                          value={detail.assignedTo || ""} 
-                          onChange={(e)=> reassign(detail.id, e.target.value)} 
-                          className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs bg-white mt-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
-                        >
-                          <option value="">— Alihkan Teknisi —</option>
-                          {users.map(u=> <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
-                        </select>
+                        {canAssign ? (
+                          <select 
+                            value={detail.assignedTo || ""} 
+                            onChange={(e)=> reassign(detail.id, e.target.value)} 
+                            className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs bg-white mt-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
+                          >
+                            <option value="">— Alihkan Teknisi —</option>
+                            {users.map(u=> <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+                          </select>
+                        ) : (
+                          <p className="text-[10px] text-slate-400 mt-2">Hanya Lead/Admin yang dapat mengalihkan teknisi.</p>
+                        )}
                       </div>
                     </div>
                   </div>

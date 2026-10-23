@@ -14,6 +14,8 @@ import {
 } from "lucide-react"
 
 import { useSession } from "next-auth/react"
+import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
+import { canItOsl } from "@/lib/itOslPermissions"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
@@ -66,10 +68,19 @@ type PicDetail = Pic & {
 type Location = { id: string; code: string; name: string; customerId?: string | null }
 
 export default function ItOslPicsPage() {
+  return (
+    <ItOslAccessGuard>
+      <ItOslPicsContent />
+    </ItOslAccessGuard>
+  )
+}
+
+function ItOslPicsContent() {
   const { data: session } = useSession()
   const currentUserId = (session?.user as { id?:string })?.id || null
   const currentRole = (session?.user as { role?:string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
+  const canWrite = canItOsl(currentRole, 'master.write')
 
   const getAuthHeaders = (): Record<string, string> => ({
     "x-user-id": currentUserId || "",
@@ -128,7 +139,7 @@ export default function ItOslPicsPage() {
       }
       const res = await fetch(`${API}/api/it-osl/locations`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify(payload)
       })
       const d = await res.json()
@@ -349,6 +360,7 @@ export default function ItOslPicsPage() {
 
   // Form handlers
   const openCreate = (prefillCustomerId?: string | unknown) => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menambah PIC")
     const custId = typeof prefillCustomerId === "string" ? prefillCustomerId : undefined
     setEditing(null)
     setForm({
@@ -360,6 +372,7 @@ export default function ItOslPicsPage() {
   }
 
   const openEdit = (p: Pic) => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat mengubah PIC")
     setEditing(p)
     setForm({
       customerId: p.customerId || p.customer?.id || "",
@@ -395,7 +408,7 @@ export default function ItOslPicsPage() {
       const method = editing ? "PUT" : "POST"
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify(payload)
       })
       const d = await res.json()
@@ -412,9 +425,10 @@ export default function ItOslPicsPage() {
   }
 
   const deletePic = async (id: string, name: string) => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menghapus PIC")
     if (!confirm(`Hapus/Nonaktifkan PIC "${name}"? Jika PIC masih memiliki aset atau tiket terhubung, statusnya akan otomatis diubah menjadi Nonaktif.`)) return
     try {
-      const res = await fetch(`${API}/api/it-osl/pics/${id}`, { method: "DELETE" })
+      const res = await fetch(`${API}/api/it-osl/pics/${id}`, { method: "DELETE", headers: getAuthHeaders() })
       const d = await res.json()
       if (!res.ok) throw new Error(d.message || "Gagal menghapus PIC")
       if (d.message) alert(d.message)
@@ -470,6 +484,7 @@ export default function ItOslPicsPage() {
   }
 
   const importCsv = async (file: File) => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat mengimpor PIC")
     try {
       const text = await file.text()
       const lines = text.split(/\r?\n/).filter(Boolean)
@@ -500,7 +515,7 @@ export default function ItOslPicsPage() {
 
       const res = await fetch(`${API}/api/it-osl/pics/import`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ pics: picsArr })
       })
       const d = await res.json()
@@ -553,21 +568,23 @@ export default function ItOslPicsPage() {
             <span className="hidden sm:inline">Export</span> CSV
           </button>
 
-          <label className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer transition">
-            <Upload size={14} className="text-slate-500" />
-            <span className="hidden sm:inline">Import</span> CSV
-            <input
-              type="file"
-              accept=".csv"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files?.[0]) {
-                  importCsv(e.target.files[0])
-                  e.target.value = ""
-                }
-              }}
-            />
-          </label>
+          {canWrite && (
+            <label className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer transition">
+              <Upload size={14} className="text-slate-500" />
+              <span className="hidden sm:inline">Import</span> CSV
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    importCsv(e.target.files[0])
+                    e.target.value = ""
+                  }
+                }}
+              />
+            </label>
+          )}
 
           <button
             onClick={downloadTemplate}
@@ -577,13 +594,15 @@ export default function ItOslPicsPage() {
             <FileSpreadsheet size={16} />
           </button>
 
-          <button
-            onClick={openCreate}
-            className="hidden sm:flex px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black items-center gap-1.5 shadow-md shadow-indigo-600/25 transition"
-          >
-            <Plus size={16} strokeWidth={2.5} />
-            <span>Tambah PIC</span>
-          </button>
+          {canWrite && (
+            <button
+              onClick={openCreate}
+              className="hidden sm:flex px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black items-center gap-1.5 shadow-md shadow-indigo-600/25 transition"
+            >
+              <Plus size={16} strokeWidth={2.5} />
+              <span>Tambah PIC</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -846,6 +865,7 @@ export default function ItOslPicsPage() {
                   </div>
 
                   <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                    {canWrite && (
                     <button
                       onClick={() => openCreate(group.customerId)}
                       className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1 transition active:scale-95 border border-indigo-200"
@@ -853,6 +873,7 @@ export default function ItOslPicsPage() {
                       <Plus size={14} />
                       <span>Tambah PIC</span>
                     </button>
+                    )}
 
                     <button
                       onClick={() => toggleCollapse(group.customerId)}
@@ -1504,13 +1525,15 @@ export default function ItOslPicsPage() {
       )}
 
       {/* Mobile Floating Action Button (FAB) */}
-      <button 
-        onClick={openCreate} 
-        className="fixed bottom-20 right-4 sm:hidden w-12 h-12 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 flex items-center justify-center z-40 active:scale-90 transition-transform"
-        aria-label="Tambah PIC Baru"
-      >
-        <Plus size={22} strokeWidth={2.5} />
-      </button>
+      {canWrite && (
+        <button 
+          onClick={openCreate} 
+          className="fixed bottom-20 right-4 sm:hidden w-12 h-12 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 flex items-center justify-center z-40 active:scale-90 transition-transform"
+          aria-label="Tambah PIC Baru"
+        >
+          <Plus size={22} strokeWidth={2.5} />
+        </button>
+      )}
 
       {/* ── 7. PIC DETAIL DRAWER (Shows Assets Held & Ticket History) ──────────── */}
       <AnimatePresence>
@@ -1673,18 +1696,24 @@ export default function ItOslPicsPage() {
                   </div>
 
                   <div className="p-3.5 sm:p-4 border-t bg-slate-50 flex items-center justify-between gap-2.5 shrink-0 pb-6 sm:pb-4">
-                    <button
-                      onClick={() => deletePic(detail.id, detail.name)}
-                      className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold transition flex items-center gap-1"
-                    >
-                      <Trash2 size={13} /> Hapus
-                    </button>
-                    <button
-                      onClick={() => { setDetailId(null); openEdit(detail); }}
-                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md shadow-indigo-600/25 transition flex items-center gap-1.5"
-                    >
-                      <Edit2 size={13} /> Edit Data PIC
-                    </button>
+                    {canWrite ? (
+                      <>
+                        <button
+                          onClick={() => deletePic(detail.id, detail.name)}
+                          className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold transition flex items-center gap-1"
+                        >
+                          <Trash2 size={13} /> Hapus
+                        </button>
+                        <button
+                          onClick={() => { setDetailId(null); openEdit(detail); }}
+                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md shadow-indigo-600/25 transition flex items-center gap-1.5"
+                        >
+                          <Edit2 size={13} /> Edit Data PIC
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">Hanya Admin/SuperAdmin yang dapat mengubah data PIC.</p>
+                    )}
                   </div>
                 </>
               ) : null}

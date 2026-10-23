@@ -3,14 +3,25 @@
 import { useEffect, useState } from "react"
 import { FileText, Copy, Share2, Calendar, Loader2 } from "lucide-react"
 import { useSession } from "next-auth/react"
+import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
+import { canItOsl } from "@/lib/itOslPermissions"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
 export default function ItOslReportsPage() {
+  return (
+    <ItOslAccessGuard>
+      <ItOslReportsContent />
+    </ItOslAccessGuard>
+  )
+}
+
+function ItOslReportsContent() {
   const { data: session } = useSession()
   const currentUserId = (session?.user as { id?: string })?.id || ""
   const currentRole = (session?.user as { role?: string })?.role || ""
   const currentEmail = session?.user?.email || ""
+  const canMonthly = canItOsl(currentRole, "report.full")
 
   const getAuthHeaders = (): Record<string, string> => ({
     "x-user-id": currentUserId,
@@ -38,7 +49,7 @@ export default function ItOslReportsPage() {
     setLoadingMonthly(false)
   }
   useEffect(()=>{ if (session !== undefined) loadDaily() },[date, session?.user?.email, currentUserId, currentRole])
-  useEffect(()=>{ if (session !== undefined) loadMonthly() },[ym, session?.user?.email, currentUserId, currentRole])
+  useEffect(()=>{ if (session !== undefined && canMonthly) loadMonthly() },[ym, session?.user?.email, currentUserId, currentRole, canMonthly])
 
   const copyDaily = async () => {
     if (!daily?.text) return
@@ -84,6 +95,7 @@ export default function ItOslReportsPage() {
         )}
         </div>
 
+        {canMonthly ? (
         <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <h3 className="text-xs font-black uppercase tracking-widest">Bulanan (PDF/Excel Ready)</h3>
@@ -111,6 +123,12 @@ export default function ItOslReportsPage() {
             </>
           )}
         </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-slate-100 p-4 sm:p-5 space-y-2">
+            <h3 className="text-xs font-black uppercase tracking-widest">Laporan Bulanan</h3>
+            <p className="text-sm text-slate-500">Laporan bulanan hanya tersedia untuk Lead/Admin. Gunakan laporan harian untuk aktivitas Anda.</p>
+          </div>
+        )}
       </div>
     </div>
   )

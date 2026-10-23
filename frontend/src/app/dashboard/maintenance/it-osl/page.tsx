@@ -5,6 +5,7 @@ import { motion } from "framer-motion"
 import { Activity, AlertTriangle, CheckCircle2, Clock3, Layers, TrendingUp, Wrench, Search, MapPin } from "lucide-react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
+import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
@@ -22,6 +23,14 @@ type Dashboard = {
 }
 
 export default function ItOslDashboardPage() {
+  return (
+    <ItOslAccessGuard>
+      <ItOslDashboardContent />
+    </ItOslAccessGuard>
+  )
+}
+
+function ItOslDashboardContent() {
   const { data: session } = useSession()
   const currentUserId = (session?.user as { id?: string })?.id || ""
   const currentRole = (session?.user as { role?: string })?.role || ""

@@ -13,6 +13,8 @@ import {
   ExternalLink, Sparkles, UserPlus, Image as ImageIcon, Maximize2, Building2
 } from "lucide-react"
 import { useSession } from "next-auth/react"
+import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
+import { canItOsl } from "@/lib/itOslPermissions"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
@@ -96,10 +98,19 @@ const getAssetPhotos = (photosRaw?: string | string[] | null): string[] => {
 }
 
 export default function ItOslAssetsPage() {
+  return (
+    <ItOslAccessGuard>
+      <ItOslAssetsContent />
+    </ItOslAccessGuard>
+  )
+}
+
+function ItOslAssetsContent() {
   const { data: session } = useSession()
   const currentUserId = (session?.user as { id?:string })?.id || null
   const currentRole = (session?.user as { role?:string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
+  const canWrite = canItOsl(currentRole, 'master.write')
 
   const getAuthHeaders = (): Record<string, string> => ({
     "x-user-id": currentUserId || "",
@@ -170,6 +181,7 @@ export default function ItOslAssetsPage() {
 
       const res = await fetch(`${API}/api/it-osl/upload`, {
         method: "POST",
+        headers: getAuthHeaders(),
         body: fd
       });
       const d = await res.json();
@@ -203,6 +215,7 @@ export default function ItOslAssetsPage() {
   const [savingPic, setSavingPic] = useState(false)
 
   const submitQuickPic = async () => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menambah PIC")
     if (!picForm.name.trim()) return alert("Nama PIC wajib diisi")
     setSavingPic(true)
     try {
@@ -218,7 +231,7 @@ export default function ItOslAssetsPage() {
       }
       const res = await fetch(`${API}/api/it-osl/pics`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify(payload)
       })
       const d = await res.json()
@@ -245,6 +258,7 @@ export default function ItOslAssetsPage() {
   const [savingLocation, setSavingLocation] = useState(false)
 
   const submitQuickLocation = async () => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menambah lokasi")
     if (!locationForm.name.trim()) return alert("Nama lokasi wajib diisi")
     setSavingLocation(true)
     try {
@@ -260,7 +274,7 @@ export default function ItOslAssetsPage() {
       }
       const res = await fetch(`${API}/api/it-osl/locations`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify(payload)
       })
       const d = await res.json()
@@ -611,6 +625,7 @@ export default function ItOslAssetsPage() {
 
   // Form CRUD
   const openCreate = () => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menambah aset")
     setEditing(null)
     setForm({
       customerId: filterCustomer || (customers[0]?.id || ""),
@@ -631,6 +646,7 @@ export default function ItOslAssetsPage() {
   }
 
   const openEdit = (a: Asset) => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat mengubah aset")
     setEditing(a)
     setForm({
       customerId: a.customerId || a.customer?.id || "",
@@ -661,7 +677,7 @@ export default function ItOslAssetsPage() {
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({
           customerId: form.customerId || null,
           name: form.name.trim(),
@@ -694,9 +710,10 @@ export default function ItOslAssetsPage() {
   }
 
   const deleteAsset = async (id: string, name: string) => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menghapus aset")
     if (!confirm(`Hapus data aset "${name}"? Riwayat perbaikan yang terhubung akan dipertahankan.`)) return
     try {
-      const res = await fetch(`${API}/api/it-osl/assets/${id}`, { method: "DELETE" })
+      const res = await fetch(`${API}/api/it-osl/assets/${id}`, { method: "DELETE", headers: getAuthHeaders() })
       if (res.ok) {
         setDetailId(null)
         load()
@@ -763,6 +780,7 @@ export default function ItOslAssetsPage() {
 
   // Import CSV handler
   const importCsv = async (file: File) => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat mengimpor aset")
     try {
       const text = await file.text()
       const lines = text.split(/\r\n|\n/).map(l => l.trim()).filter(l => l.length > 0)
@@ -793,7 +811,7 @@ export default function ItOslAssetsPage() {
 
       const res = await fetch(`${API}/api/it-osl/assets/import`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ assets: assetsArr })
       })
       const d = await res.json()
@@ -845,13 +863,15 @@ export default function ItOslAssetsPage() {
           </button>
 
           {/* Add Asset Button */}
-          <button
-            onClick={openCreate}
-            className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/25 transition"
-          >
-            <Plus size={16} strokeWidth={2.5} />
-            <span>+ Aset Baru</span>
-          </button>
+          {canWrite && (
+            <button
+              onClick={openCreate}
+              className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/25 transition"
+            >
+              <Plus size={16} strokeWidth={2.5} />
+              <span>+ Aset Baru</span>
+            </button>
+          )}
 
           {/* Export / Import Dropdown on Desktop / Toolbar */}
           <div className="hidden sm:flex items-center gap-1.5 pl-1 border-l border-slate-200">
@@ -863,20 +883,22 @@ export default function ItOslAssetsPage() {
               <Download size={15} />
             </button>
 
-            <label className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-600 text-xs font-bold cursor-pointer transition" title="Impor CSV">
-              <Upload size={15} />
-              <input
-                type="file"
-                accept=".csv"
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    importCsv(e.target.files[0])
-                    e.target.value = ""
-                  }
-                }}
-              />
-            </label>
+            {canWrite && (
+              <label className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-600 text-xs font-bold cursor-pointer transition" title="Impor CSV">
+                <Upload size={15} />
+                <input
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) {
+                      importCsv(e.target.files[0])
+                      e.target.value = ""
+                    }
+                  }}
+                />
+              </label>
+            )}
 
             <button
               onClick={downloadCsvTemplate}
@@ -2126,12 +2148,18 @@ export default function ItOslAssetsPage() {
 
                   {/* Sticky Footer */}
                   <div className="p-3.5 sm:p-4 border-t bg-slate-50 flex items-center justify-between gap-2.5 shrink-0 pb-6 sm:pb-4">
-                    <button onClick={() => deleteAsset(detail.id, detail.name)} className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold transition flex items-center gap-1">
-                      <Trash2 size={13} /> Hapus
-                    </button>
-                    <button onClick={() => { setDetailId(null); openEdit(detail); }} className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md shadow-indigo-600/25 transition flex items-center gap-1.5">
-                      <Edit2 size={13} /> Edit Data
-                    </button>
+                    {canWrite ? (
+                      <>
+                        <button onClick={() => deleteAsset(detail.id, detail.name)} className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold transition flex items-center gap-1">
+                          <Trash2 size={13} /> Hapus
+                        </button>
+                        <button onClick={() => { setDetailId(null); openEdit(detail); }} className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md shadow-indigo-600/25 transition flex items-center gap-1.5">
+                          <Edit2 size={13} /> Edit Data
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-slate-400">Hanya Admin/SuperAdmin yang dapat mengubah data aset.</p>
+                    )}
                   </div>
                 </>
               ) : null}
@@ -2902,6 +2930,7 @@ export default function ItOslAssetsPage() {
       </AnimatePresence>
 
       {/* Mobile Floating Action Button (FAB) */}
+      {canWrite && (
       <button 
         onClick={openCreate} 
         className="fixed bottom-20 right-4 sm:hidden w-12 h-12 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 flex items-center justify-center z-40 active:scale-90 transition-transform"
@@ -2909,6 +2938,7 @@ export default function ItOslAssetsPage() {
       >
         <Plus size={22} strokeWidth={2.5} />
       </button>
+      )}
     </div>
   )
 }
