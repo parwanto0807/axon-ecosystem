@@ -280,7 +280,7 @@ function CustomersContent() {
     const now = new Date().getTime()
     const thirtyDays = 30 * 24 * 3600 * 1000
 
-    let total = customers.length
+    const total = customers.length
     let active = 0
     let expiringSoon = 0
     let totalAssets = 0

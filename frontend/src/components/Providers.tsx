@@ -30,33 +30,39 @@ function GlobalBlurWrapper({ children }: { children: React.ReactNode }) {
 
 function ActivityPulse() {
     const { data: session } = useSession()
-    
+    const userId = session?.user?.id
+
     useEffect(() => {
-        // Record activity once per browser session (tab open until closed)
+        if (!userId) return
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL
+        if (!apiUrl) return
+
+        const sessionPulseKey = `axon_pulse_${userId}`
+        if (sessionStorage.getItem(sessionPulseKey)) return
+
+        let cancelled = false
+
         const recordPulse = async () => {
-            if (session?.user?.id) {
-                const sessionPulseKey = `axon_pulse_${session.user.id}`;
-                const hasPulsed = sessionStorage.getItem(sessionPulseKey);
-                
-                if (!hasPulsed) {
-                    try {
-                        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/activity-pulse`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userId: (session.user as any).id })
-                        });
-                        sessionStorage.setItem(sessionPulseKey, 'true');
-                    } catch (e) {
-                        console.error("[Pulse] Failed", e);
-                    }
+            try {
+                const res = await fetch(`${apiUrl}/api/auth/activity-pulse`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId }),
+                })
+                if (res.ok && !cancelled) {
+                    sessionStorage.setItem(sessionPulseKey, 'true')
                 }
+            } catch {
+                // API unreachable (e.g. backend offline) — non-critical, ignore
             }
-        };
-        
-        recordPulse();
-    }, [session]);
-    
-    return null;
+        }
+
+        recordPulse()
+
+        return () => { cancelled = true }
+    }, [userId])
+
+    return null
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {

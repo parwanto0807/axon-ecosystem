@@ -201,7 +201,7 @@ export default function BusinessCategoriesPage() {
                         <SearchX size={48} />
                     </div>
                     <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">No Business Units Found</h2>
-                    <p className="text-slate-500 max-w-md mt-2 font-medium">We couldn't find any results matching your search criteria. Try adjusting your filters or creating a new unit.</p>
+                    <p className="text-slate-500 max-w-md mt-2 font-medium">We couldn&apos;t find any results matching your search criteria. Try adjusting your filters or creating a new unit.</p>
                 </div>
             )}
 

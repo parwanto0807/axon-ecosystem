@@ -222,7 +222,7 @@ export default function OpeningBalancePage() {
                                             <div className="flex flex-col items-center justify-center opacity-50">
                                                 <LayoutGrid size={48} className="text-slate-300 mb-4" />
                                                 <p className="text-slate-500 font-bold">No draft entries yet.</p>
-                                                <p className="text-xs text-slate-400 mt-1">Click "Add Entry" to build your opening balances.</p>
+                                                <p className="text-xs text-slate-400 mt-1">Click &quot;Add Entry&quot; to build your opening balances.</p>
                                             </div>
                                         </td>
                                     </tr>
@@ -264,7 +264,7 @@ export default function OpeningBalancePage() {
                             <div className="py-12 text-center opacity-50 bg-white rounded-3xl border border-slate-100 shadow-sm">
                                 <LayoutGrid size={32} className="text-slate-300 mx-auto mb-3" />
                                 <p className="text-slate-500 font-bold text-sm">No draft entries yet.</p>
-                                <p className="text-[10px] text-slate-400 mt-1">Click "Add Entry" to start.</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Click &quot;Add Entry&quot; to start.</p>
                             </div>
                         ) : draftEntries.map((b) => (
                             <div key={b.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col gap-3">

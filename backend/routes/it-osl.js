@@ -1144,6 +1144,8 @@ router.patch('/tickets/:id/status', requirePermission('TICKET_EDIT'), async (req
     const isAdmin = isGlobalRole(actorRole);
     const canManageAll = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(actorRole);
     const id = req.params.id;
+    let finalRootCause = rootCause;
+    let finalCorrectiveAction = correctiveAction;
     const ticket = await prisma.itOslTicket.findUnique({ where: { id }, include: { pendings: true } });
     if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
     if (!scope.isGlobal && (!ticket.customerId || !scope.allowedCustomerIds.includes(ticket.customerId))) {
@@ -1228,17 +1230,31 @@ router.patch('/tickets/:id/status', requirePermission('TICKET_EDIT'), async (req
       data.totalPendingSec = ticket.totalPendingSec || 0;
     }
     if (target === 'RESOLVED') {
-      if (!rootCause || String(rootCause).trim().length < 15) return res.status(400).json({ message: 'Akar Masalah minimal 15 karakter, jelaskan mengapa, contoh: Port RJ45 korosi akibat kelembapan' });
-      if (!correctiveAction || String(correctiveAction).trim().length < 15) return res.status(400).json({ message: 'Tindakan Perbaikan minimal 15 karakter' });
-      if (['error','rusak','sudah normal'].includes(String(rootCause).trim().toLowerCase())) return res.status(400).json({ message: 'Akar Masalah terlalu generik' });
+      if (!finalRootCause || !finalCorrectiveAction) {
+        const items = await prisma.itOslTicketWorkItem.findMany({
+          where: { ticketId: id },
+          orderBy: { createdAt: 'asc' },
+          select: { phase: true, title: true, description: true },
+        });
+        const fmt = (w) => (w.title ? `${w.title}: ${w.description}` : w.description);
+        if (!finalRootCause) {
+          finalRootCause = items.filter(w => w.phase === 'ANALISA').map(fmt).join('\n').trim();
+        }
+        if (!finalCorrectiveAction) {
+          finalCorrectiveAction = items.filter(w => w.phase === 'PENGERJAAN' || w.phase === 'HASIL').map(fmt).join('\n').trim();
+        }
+      }
+      if (!finalRootCause || String(finalRootCause).trim().length < 15) return res.status(400).json({ message: 'Catatan Analisa minimal 15 karakter sebelum tiket diselesaikan' });
+      if (!finalCorrectiveAction || String(finalCorrectiveAction).trim().length < 15) return res.status(400).json({ message: 'Catatan Pengerjaan/Hasil minimal 15 karakter sebelum tiket diselesaikan' });
+      if (['error','rusak','sudah normal'].includes(String(finalRootCause).trim().toLowerCase())) return res.status(400).json({ message: 'Akar Masalah terlalu generik' });
       if (!assetCondition) return res.status(400).json({ message: 'Status Akhir Aset wajib' });
       if (!solutionCategory) return res.status(400).json({ message: 'Kategori Solusi wajib' });
       if (ticket.severity === 'CRITICAL') {
         const attachCount = await prisma.itOslTicketAttachment.count({ where: { ticketId: id } });
         if (attachCount === 0) return res.status(400).json({ message: 'Bukti Dokumentasi wajib untuk Critical' });
       }
-      data.rootCause = rootCause;
-      data.correctiveAction = correctiveAction;
+      data.rootCause = finalRootCause;
+      data.correctiveAction = finalCorrectiveAction;
       data.solutionCategory = solutionCategory;
       data.assetCondition = assetCondition;
       data.isPreventable = isPreventable != null ? !!isPreventable : null;
@@ -1445,6 +1461,66 @@ router.post('/tickets/:id/work-items', requirePermission('TICKET_EDIT'), async (
       include:{ attachments:true }
     });
     await auditLog({ entityType:'TICKET', entityId: ticket.id, action:'WORKITEM_CREATE', fieldName:p, newValue: description, actorUserId: actor.id || null, ticketId: ticket.id, req });
+
+    // Auto-advance status berdasarkan progres catatan pekerjaan
+    try {
+      if (['NEW','IN_PROGRESS','PENDING','REOPENED'].includes(ticket.status)) {
+        const now = new Date();
+        let autoTarget = null;
+        let derivedRootCause = null;
+        let derivedCorrectiveAction = null;
+        if (p === 'HASIL') {
+          const items = await prisma.itOslTicketWorkItem.findMany({
+            where: { ticketId: ticket.id },
+            orderBy: { createdAt: 'asc' },
+            select: { phase: true, title: true, description: true },
+          });
+          const fmt = (w) => (w.title ? `${w.title}: ${w.description}` : w.description);
+          derivedRootCause = items.filter(w => w.phase === 'ANALISA').map(fmt).join('\n').trim();
+          derivedCorrectiveAction = items.filter(w => w.phase === 'PENGERJAAN' || w.phase === 'HASIL').map(fmt).join('\n').trim();
+          let canResolve = derivedRootCause.length >= 15 && derivedCorrectiveAction.length >= 15;
+          if (canResolve && ticket.severity === 'CRITICAL') {
+            const attachCount = await prisma.itOslTicketAttachment.count({ where: { ticketId: ticket.id } });
+            if (attachCount === 0) canResolve = false;
+          }
+          if (canResolve) autoTarget = 'RESOLVED';
+        }
+        if (!autoTarget && ticket.status !== 'IN_PROGRESS') autoTarget = 'IN_PROGRESS';
+
+        if (autoTarget === 'RESOLVED') {
+          await prisma.itOslTicket.update({
+            where: { id: ticket.id },
+            data: {
+              status: 'RESOLVED',
+              rootCause: derivedRootCause,
+              correctiveAction: derivedCorrectiveAction,
+              solutionCategory: 'Perbaikan',
+              assetCondition: 'NORMAL',
+              resolvedAt: now,
+              acknowledgedAt: ticket.acknowledgedAt || now,
+            },
+          });
+          await auditLog({ entityType:'TICKET', entityId: ticket.id, action:'STATUS_CHANGE', fieldName:'status', oldValue: ticket.status, newValue:'RESOLVED', actorUserId: actor.id || null, ticketId: ticket.id, req });
+        } else if (autoTarget === 'IN_PROGRESS') {
+          const data = {
+            status: 'IN_PROGRESS',
+            acknowledgedAt: ticket.acknowledgedAt || now,
+            ...(ticket.assignedTo || !actor.id ? {} : { assignedTo: actor.id }),
+          };
+          if (ticket.status === 'PENDING') {
+            const openPend = await prisma.itOslTicketPending.findFirst({ where: { ticketId: ticket.id, endedAt: null }, orderBy: { startedAt: 'desc' } });
+            if (openPend) {
+              const sec = Math.round((now.getTime() - new Date(openPend.startedAt).getTime()) / 1000);
+              await prisma.itOslTicketPending.update({ where: { id: openPend.id }, data: { endedAt: now } });
+              data.totalPendingSec = (ticket.totalPendingSec || 0) + sec;
+            }
+          }
+          await prisma.itOslTicket.update({ where: { id: ticket.id }, data });
+          await auditLog({ entityType:'TICKET', entityId: ticket.id, action:'STATUS_CHANGE', fieldName:'status', oldValue: ticket.status, newValue:'IN_PROGRESS', actorUserId: actor.id || null, ticketId: ticket.id, req });
+        }
+      }
+    } catch (e) { console.error('auto status sync failed', e.message); }
+
     res.status(201).json(item);
   }catch(e){ res.status(400).json({ message:e.message })}
 });

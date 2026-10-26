@@ -484,7 +484,7 @@ export default function ProductsPage() {
                                                 className="w-16 h-16 rounded-xl bg-slate-50 border border-slate-200 flex-shrink-0 overflow-hidden flex items-center justify-center p-1"
                                             >
                                                 {p.image ? (
-                                                    <img src={`${process.env.NEXT_PUBLIC_API_URL}${p.image}`} className="w-full h-full object-cover rounded-lg" />
+                                                    <img src={`${process.env.NEXT_PUBLIC_API_URL}${p.image}`} alt="" className="w-full h-full object-cover rounded-lg" />
                                                 ) : (
                                                     <Box size={24} className="text-slate-300" />
                                                 )}
@@ -1599,7 +1599,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                                                                 <div className={`w-2.5 h-2.5 rounded-full ${(sku as ProductSKU).isActive ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-slate-300'}`} />
                                                                 <div>
                                                                     <p className="text-sm font-bold uppercase tracking-widest text-slate-900">Variant Active Status</p>
-                                                                    <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wider mt-0.5">Toggle this SKU's visibility in sales & inventory</p>
+                                                                    <p className="text-[11px] text-slate-500 font-medium uppercase tracking-wider mt-0.5">Toggle this SKU&apos;s visibility in sales & inventory</p>
                                                                 </div>
                                                             </div>
                                                             <button
@@ -1620,7 +1620,7 @@ function ProductModal({ isOpen, onClose, product, onSuccess, onEnlargeImage }: {
                                             {(formData.skus || []).length === 0 && (
                                                 <div className="p-12 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center bg-slate-50/30">
                                                     <Package size={40} className="text-slate-300 mb-3" />
-                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Click "Add Variant" to add your first SKU</p>
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Click &quot;Add Variant&quot; to add your first SKU</p>
                                                 </div>
                                             )}
                                         </section>

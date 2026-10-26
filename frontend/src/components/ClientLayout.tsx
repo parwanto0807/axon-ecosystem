@@ -28,7 +28,6 @@ export function ClientLayout({
 
     useEffect(() => {
         setMounted(true)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     return (

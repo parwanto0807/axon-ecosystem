@@ -321,7 +321,7 @@ export default function AssetsPage() {
                         <CardContent className="flex flex-col items-center justify-center">
                             <Box size={80} className="text-muted-foreground mb-6 opacity-10 animate-pulse" />
                             <p className="text-2xl font-black text-foreground mb-2 tracking-tight uppercase">No Assets Found</p>
-                            <p className="text-muted-foreground font-medium mb-10 max-w-sm text-center">Manage your customer's hardware and units here for automated service scheduling.</p>
+                            <p className="text-muted-foreground font-medium mb-10 max-w-sm text-center">Manage your customer&apos;s hardware and units here for automated service scheduling.</p>
                             <Button
                                 onClick={handleCreate}
                                 className="rounded-2xl font-black bg-indigo-600 text-white px-10 py-6 text-lg shadow-xl shadow-indigo-600/20 hover:scale-105 transition-all"

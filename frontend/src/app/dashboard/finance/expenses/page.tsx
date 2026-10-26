@@ -624,7 +624,7 @@ export default function ExpenseReportsPage() {
                         <Receipt size={32} className="text-slate-200" />
                     </div>
                     <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">No Reports Found</h3>
-                    <p className="text-sm text-slate-400 font-medium max-w-[280px] mx-auto mt-2 italic">Try adjusting your search or filters to find what you're looking for.</p>
+                    <p className="text-sm text-slate-400 font-medium max-w-[280px] mx-auto mt-2 italic">Try adjusting your search or filters to find what you&apos;re looking for.</p>
                 </div>
             )}
 
