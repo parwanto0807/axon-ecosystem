@@ -21,6 +21,12 @@ const PERMISSIONS = Object.freeze({
 
   // Master data: customer, lokasi, kategori, PIC, aset, PM plan
   MASTER_WRITE: ['SUPER_ADMIN', 'ADMIN'],
+  // Registri aset: teknisi/engineer boleh menambah & mengubah data aset,
+  // tetapi tetap tidak boleh menghapus aset atau mengubah master data lain.
+  ASSET_WRITE: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATIONAL', 'STAFF'],
+  // Direktori PIC: teknisi/engineer boleh menambah & mengubah PIC.
+  // Hapus/nonaktifkan PIC tetap khusus admin.
+  PIC_WRITE: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATIONAL', 'STAFF'],
   PM_PLAN: ['SUPER_ADMIN', 'ADMIN'],
 
   // Tiket

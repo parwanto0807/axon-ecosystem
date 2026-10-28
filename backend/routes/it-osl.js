@@ -692,7 +692,7 @@ router.get('/pics/:id', requirePermission('VIEW'), async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-router.post('/pics', requirePermission('MASTER_WRITE'), async (req, res) => {
+router.post('/pics', requirePermission('PIC_WRITE'), async (req, res) => {
   try {
     const { name, position, department, phone, email, locationId, customerId, notes, isActive } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ message: 'Nama PIC wajib diisi' });
@@ -714,7 +714,7 @@ router.post('/pics', requirePermission('MASTER_WRITE'), async (req, res) => {
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-router.put('/pics/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
+router.put('/pics/:id', requirePermission('PIC_WRITE'), async (req, res) => {
   try {
     const { name, position, department, phone, email, locationId, customerId, notes, isActive } = req.body;
     const data = {};
@@ -750,7 +750,7 @@ router.delete('/pics/:id', requirePermission('MASTER_WRITE'), async (req, res) =
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-router.post('/pics/import', requirePermission('MASTER_WRITE'), async (req, res) => {
+router.post('/pics/import', requirePermission('PIC_WRITE'), async (req, res) => {
   try {
     const { pics } = req.body;
     if (!Array.isArray(pics)) return res.status(400).json({ message: 'pics must be array' });
@@ -832,7 +832,7 @@ router.get('/assets/:id', requirePermission('VIEW'), async (req, res) => {
     res.json(a);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
-router.post('/assets', requirePermission('MASTER_WRITE'), async (req, res) => {
+router.post('/assets', requirePermission('ASSET_WRITE'), async (req, res) => {
   try {
     const { assetCode, name, assetType, brandModel, serialNumber, locationId, customerId, purchaseDate, warrantyUntil, status, picId, picUserId, notes, photos } = req.body;
     if (!name) return res.status(400).json({ message: 'name wajib' });
@@ -857,7 +857,7 @@ router.post('/assets', requirePermission('MASTER_WRITE'), async (req, res) => {
     res.status(201).json(asset);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
-router.put('/assets/:id', requirePermission('MASTER_WRITE'), async (req, res) => {
+router.put('/assets/:id', requirePermission('ASSET_WRITE'), async (req, res) => {
   try {
     const { name, assetType, brandModel, serialNumber, locationId, customerId, purchaseDate, warrantyUntil, status, notes, picId, picUserId, assetCode, photos } = req.body;
     const data = {};
@@ -893,7 +893,7 @@ router.delete('/assets/:id', requirePermission('MASTER_WRITE'), async (req, res)
     res.json({ ok:true });
   } catch(e){ res.status(400).json({ message:e.message }); }
 });
-router.post('/assets/import', requirePermission('MASTER_WRITE'), async (req, res) => {
+router.post('/assets/import', requirePermission('ASSET_WRITE'), async (req, res) => {
   try {
     const { assets } = req.body; // array of {name, assetCode, assetType, brandModel, serialNumber, locationCode, ...}
     if (!Array.isArray(assets)) return res.status(400).json({ message: 'assets must be array' });

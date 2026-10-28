@@ -9,6 +9,8 @@
 export type ItOslAction =
   | "view"
   | "master.write"
+  | "asset.write"
+  | "pic.write"
   | "ticket.create"
   | "ticket.edit"
   | "ticket.assign"
@@ -32,6 +34,8 @@ export const IT_OSL_ROLES = [
 const MATRIX: Record<ItOslAction, readonly string[]> = {
   view: [...IT_OSL_ROLES],
   "master.write": ["SUPER_ADMIN", "ADMIN"],
+  "asset.write": [...IT_OSL_ROLES],
+  "pic.write": [...IT_OSL_ROLES],
   "ticket.create": [...IT_OSL_ROLES],
   "ticket.edit": [...IT_OSL_ROLES],
   "ticket.assign": ["SUPER_ADMIN", "ADMIN", "MANAGER"],

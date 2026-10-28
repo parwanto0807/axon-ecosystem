@@ -81,6 +81,7 @@ function ItOslPicsContent() {
   const currentRole = (session?.user as { role?:string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
   const canWrite = canItOsl(currentRole, 'master.write')
+  const canPicWrite = canItOsl(currentRole, 'pic.write')
 
   const getAuthHeaders = (): Record<string, string> => ({
     "x-user-id": currentUserId || "",
@@ -124,6 +125,7 @@ function ItOslPicsContent() {
   const [savingLocation, setSavingLocation] = useState(false)
 
   const submitQuickLocation = async () => {
+    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menambah lokasi")
     if (!locationForm.name.trim()) return alert("Nama lokasi wajib diisi")
     setSavingLocation(true)
     try {
@@ -360,7 +362,7 @@ function ItOslPicsContent() {
 
   // Form handlers
   const openCreate = (prefillCustomerId?: string | unknown) => {
-    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menambah PIC")
+    if (!canPicWrite) return alert("Role Anda tidak memiliki izin menambah PIC")
     const custId = typeof prefillCustomerId === "string" ? prefillCustomerId : undefined
     setEditing(null)
     setForm({
@@ -372,7 +374,7 @@ function ItOslPicsContent() {
   }
 
   const openEdit = (p: Pic) => {
-    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat mengubah PIC")
+    if (!canPicWrite) return alert("Role Anda tidak memiliki izin mengubah PIC")
     setEditing(p)
     setForm({
       customerId: p.customerId || p.customer?.id || "",
@@ -389,6 +391,7 @@ function ItOslPicsContent() {
   }
 
   const submitForm = async () => {
+    if (!canPicWrite) return alert("Role Anda tidak memiliki izin menyimpan PIC")
     if (!form.name.trim()) return alert("Nama PIC wajib diisi")
     setSaving(true)
     try {
@@ -484,7 +487,7 @@ function ItOslPicsContent() {
   }
 
   const importCsv = async (file: File) => {
-    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat mengimpor PIC")
+    if (!canPicWrite) return alert("Role Anda tidak memiliki izin mengimpor PIC")
     try {
       const text = await file.text()
       const lines = text.split(/\r?\n/).filter(Boolean)
@@ -568,7 +571,7 @@ function ItOslPicsContent() {
             <span className="hidden sm:inline">Export</span> CSV
           </button>
 
-          {canWrite && (
+          {canPicWrite && (
             <label className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer transition">
               <Upload size={14} className="text-slate-500" />
               <span className="hidden sm:inline">Import</span> CSV
@@ -594,7 +597,7 @@ function ItOslPicsContent() {
             <FileSpreadsheet size={16} />
           </button>
 
-          {canWrite && (
+          {canPicWrite && (
             <button
               onClick={openCreate}
               className="hidden sm:flex px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black items-center gap-1.5 shadow-md shadow-indigo-600/25 transition"
@@ -865,7 +868,7 @@ function ItOslPicsContent() {
                   </div>
 
                   <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                    {canWrite && (
+                    {canPicWrite && (
                     <button
                       onClick={() => openCreate(group.customerId)}
                       className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1 transition active:scale-95 border border-indigo-200"
@@ -1525,7 +1528,7 @@ function ItOslPicsContent() {
       )}
 
       {/* Mobile Floating Action Button (FAB) */}
-      {canWrite && (
+      {canPicWrite && (
         <button 
           onClick={openCreate} 
           className="fixed bottom-20 right-4 sm:hidden w-12 h-12 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 flex items-center justify-center z-40 active:scale-90 transition-transform"
@@ -1696,14 +1699,16 @@ function ItOslPicsContent() {
                   </div>
 
                   <div className="p-3.5 sm:p-4 border-t bg-slate-50 flex items-center justify-between gap-2.5 shrink-0 pb-6 sm:pb-4">
-                    {canWrite ? (
+                    {canPicWrite ? (
                       <>
-                        <button
-                          onClick={() => deletePic(detail.id, detail.name)}
-                          className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold transition flex items-center gap-1"
-                        >
-                          <Trash2 size={13} /> Hapus
-                        </button>
+                        {canWrite && (
+                          <button
+                            onClick={() => deletePic(detail.id, detail.name)}
+                            className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold transition flex items-center gap-1"
+                          >
+                            <Trash2 size={13} /> Hapus
+                          </button>
+                        )}
                         <button
                           onClick={() => { setDetailId(null); openEdit(detail); }}
                           className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md shadow-indigo-600/25 transition flex items-center gap-1.5"
@@ -1712,7 +1717,7 @@ function ItOslPicsContent() {
                         </button>
                       </>
                     ) : (
-                      <p className="text-[11px] text-slate-400">Hanya Admin/SuperAdmin yang dapat mengubah data PIC.</p>
+                      <p className="text-[11px] text-slate-400">Role Anda tidak memiliki izin mengubah data PIC.</p>
                     )}
                   </div>
                 </>
@@ -1837,17 +1842,19 @@ function ItOslPicsContent() {
                   <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
                     <div className="flex items-center justify-between mb-1 h-5">
                       <label className="font-bold text-slate-700">Lokasi Kerja Fisik</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLocationForm({ code: "", name: "", address: "" });
-                          setShowAddLocationModal(true);
-                        }}
-                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 active:scale-95 transition"
-                      >
-                        <Plus size={12} strokeWidth={2.5} />
-                        <span>Tambah Lokasi</span>
-                      </button>
+                      {canWrite && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLocationForm({ code: "", name: "", address: "" });
+                            setShowAddLocationModal(true);
+                          }}
+                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 active:scale-95 transition"
+                        >
+                          <Plus size={12} strokeWidth={2.5} />
+                          <span>Tambah Lokasi</span>
+                        </button>
+                      )}
                     </div>
                     <select
                       value={form.locationId}
@@ -1861,7 +1868,7 @@ function ItOslPicsContent() {
                     </select>
                     {locations.length === 0 && (
                       <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
-                        <AlertCircle size={11} /> Belum ada lokasi. Klik <b>Tambah Lokasi</b> untuk membuat baru.
+                        <AlertCircle size={11} /> {canWrite ? 'Belum ada lokasi. Klik Tambah Lokasi untuk membuat baru.' : 'Belum ada lokasi. Hubungi admin untuk menambahkan lokasi.'}
                       </p>
                     )}
                   </div>

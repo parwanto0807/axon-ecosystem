@@ -111,6 +111,7 @@ function ItOslAssetsContent() {
   const currentRole = (session?.user as { role?:string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
   const canWrite = canItOsl(currentRole, 'master.write')
+  const canAssetWrite = canItOsl(currentRole, 'asset.write')
 
   const getAuthHeaders = (): Record<string, string> => ({
     "x-user-id": currentUserId || "",
@@ -625,7 +626,7 @@ function ItOslAssetsContent() {
 
   // Form CRUD
   const openCreate = () => {
-    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menambah aset")
+    if (!canAssetWrite) return alert("Role Anda tidak memiliki izin menambah aset")
     setEditing(null)
     setForm({
       customerId: filterCustomer || (customers[0]?.id || ""),
@@ -646,7 +647,7 @@ function ItOslAssetsContent() {
   }
 
   const openEdit = (a: Asset) => {
-    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat mengubah aset")
+    if (!canAssetWrite) return alert("Role Anda tidak memiliki izin mengubah aset")
     setEditing(a)
     setForm({
       customerId: a.customerId || a.customer?.id || "",
@@ -667,6 +668,7 @@ function ItOslAssetsContent() {
   }
 
   const submitForm = async () => {
+    if (!canAssetWrite) return alert("Role Anda tidak memiliki izin menyimpan aset")
     if (!form.name.trim()) return alert("Nama perangkat wajib diisi")
     if (!form.locationId) return alert("Pilih lokasi penempatan aset")
 
@@ -780,7 +782,7 @@ function ItOslAssetsContent() {
 
   // Import CSV handler
   const importCsv = async (file: File) => {
-    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat mengimpor aset")
+    if (!canAssetWrite) return alert("Role Anda tidak memiliki izin mengimpor aset")
     try {
       const text = await file.text()
       const lines = text.split(/\r\n|\n/).map(l => l.trim()).filter(l => l.length > 0)
@@ -863,7 +865,7 @@ function ItOslAssetsContent() {
           </button>
 
           {/* Add Asset Button */}
-          {canWrite && (
+          {canAssetWrite && (
             <button
               onClick={openCreate}
               className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/25 transition"
@@ -883,7 +885,7 @@ function ItOslAssetsContent() {
               <Download size={15} />
             </button>
 
-            {canWrite && (
+            {canAssetWrite && (
               <label className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-600 text-xs font-bold cursor-pointer transition" title="Impor CSV">
                 <Upload size={15} />
                 <input
@@ -2148,17 +2150,19 @@ function ItOslAssetsContent() {
 
                   {/* Sticky Footer */}
                   <div className="p-3.5 sm:p-4 border-t bg-slate-50 flex items-center justify-between gap-2.5 shrink-0 pb-6 sm:pb-4">
-                    {canWrite ? (
+                    {canAssetWrite ? (
                       <>
-                        <button onClick={() => deleteAsset(detail.id, detail.name)} className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold transition flex items-center gap-1">
-                          <Trash2 size={13} /> Hapus
-                        </button>
+                        {canWrite && (
+                          <button onClick={() => deleteAsset(detail.id, detail.name)} className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold transition flex items-center gap-1">
+                            <Trash2 size={13} /> Hapus
+                          </button>
+                        )}
                         <button onClick={() => { setDetailId(null); openEdit(detail); }} className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md shadow-indigo-600/25 transition flex items-center gap-1.5">
                           <Edit2 size={13} /> Edit Data
                         </button>
                       </>
                     ) : (
-                      <p className="text-[11px] text-slate-400">Hanya Admin/SuperAdmin yang dapat mengubah data aset.</p>
+                      <p className="text-[11px] text-slate-400">Role Anda tidak memiliki izin mengubah data aset.</p>
                     )}
                   </div>
                 </>
@@ -2930,7 +2934,7 @@ function ItOslAssetsContent() {
       </AnimatePresence>
 
       {/* Mobile Floating Action Button (FAB) */}
-      {canWrite && (
+      {canAssetWrite && (
       <button 
         onClick={openCreate} 
         className="fixed bottom-20 right-4 sm:hidden w-12 h-12 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 flex items-center justify-center z-40 active:scale-90 transition-transform"
