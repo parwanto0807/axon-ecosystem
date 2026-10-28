@@ -1,78 +1,81 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ============================================
-   AXON ECOSYSTEM — PREMIUM DESIGN SYSTEM
-   Electric Teal + Obsidian Dark Theme
-   ============================================ */
+/* ==========================================================================
+   AXON ECOSYSTEM — PROFESSIONAL ENGINEERING DESIGN SYSTEM (v3.0)
+   Precision Systems Architecture • Mission-Control Telemetry • High Density
+   ========================================================================== */
 
 :root {
-  /* === LIGHT MODE === */
-  --background: 210 20% 97%;
-  --foreground: 220 35% 10%;
-  --card: 0 0% 100%;
-  --card-foreground: 220 35% 10%;
+  /* === LIGHT MODE — Technical Slate === */
+  --background: 210 40% 98%;          /* #f8fafc slate-50 */
+  --foreground: 222 47% 11%;          /* #0f172a slate-900 */
+  --card: 0 0% 100%;                  /* #ffffff */
+  --card-foreground: 222 47% 11%;     /* #0f172a */
   --popover: 0 0% 100%;
-  --popover-foreground: 220 35% 10%;
+  --popover-foreground: 222 47% 11%;
 
-  /* PRIMARY: Electric Teal — distinctive, not overused */
-  --primary: 168 100% 39%;          /* #00C9A7 */
+  /* PRIMARY: Professional High-Precision Engineering Blue */
+  --primary: 221 83% 53%;             /* #2563eb blue-600 */
   --primary-foreground: 0 0% 100%;
-  --primary-dark: 168 100% 28%;     /* #008F78 hover */
-  --primary-glow: 168 100% 39%;
+  --primary-dark: 224 76% 48%;        /* #1d4ed8 blue-700 */
+  --primary-glow: 221 83% 53%;
 
-  --secondary: 210 18% 93%;
-  --secondary-foreground: 220 35% 15%;
-  --muted: 210 15% 94%;
-  --muted-foreground: 215 15% 50%;
-  --accent: 168 80% 94%;
-  --accent-foreground: 168 100% 28%;
-  --destructive: 0 72% 51%;
+  --secondary: 210 40% 96%;           /* #f1f5f9 slate-100 */
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;               /* #f1f5f9 */
+  --muted-foreground: 215 16% 47%;    /* #64748b slate-500 */
+  --accent: 210 40% 93%;              /* #e2e8f0 slate-200 */
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;           /* #ef4444 red-500 */
   --destructive-foreground: 0 0% 100%;
-  --border: 215 20% 88%;
-  --input: 215 20% 88%;
-  --ring: 168 100% 39%;
-  --radius: 0.75rem;
-  --sidebar-width: 280px;
+  --border: 214 32% 91%;              /* #e2e8f0 slate-200 */
+  --input: 214 32% 91%;
+  --ring: 221 83% 53%;
+  --radius: 0.375rem;                 /* 6px — sharp, crisp engineering standard */
+  --sidebar-width: 228px;
 
-  /* === SIDEBAR (always dark) === */
-  --sidebar-bg: 222 20% 7%;         /* #0D1117 obsidian */
-  --sidebar-fg: 210 15% 70%;        /* muted text */
-  --sidebar-fg-active: 0 0% 100%;
-  --sidebar-item-hover: 222 20% 12%;
-  --sidebar-item-active: 222 20% 14%;
-  --sidebar-border: 222 20% 14%;
-  --sidebar-header: 210 12% 42%;
+  /* === SIDEBAR (Technical Dark Slate) === */
+  --sidebar-bg: 224 71% 4%;           /* #06090e deep console black */
+  --sidebar-surface: 222 47% 7%;      /* #0b0f17 */
+  --sidebar-fg: 215 20% 65%;          /* #94a3b8 */
+  --sidebar-fg-active: 210 40% 98%;   /* #f8fafc */
+  --sidebar-item-hover: 222 47% 11%;  /* #0f172a */
+  --sidebar-item-active: 221 83% 53%;
+  --sidebar-border: 217 33% 13%;      /* #161f2e */
+  --sidebar-header: 215 16% 47%;
 
-  /* === BRAND EXTRAS === */
-  --teal: 168 100% 39%;
-  --teal-glow: rgba(0, 201, 167, 0.15);
-  --teal-border: rgba(0, 201, 167, 0.3);
-  --obsidian: #0D1117;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
-  --card-shadow-hover: 0 4px 20px rgba(0,201,167,0.12), 0 1px 4px rgba(0,0,0,0.08);
+  /* === TELEMETRY SEMANTIC CODES === */
+  --status-nominal: #10b981;          /* Emerald */
+  --status-warning: #f59e0b;          /* Amber */
+  --status-critical: #ef4444;         /* Rose / Red */
+  --status-info: #0284c7;             /* Sky */
+  --card-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --card-shadow-hover: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
 }
 
 .dark {
-  --background: 222 20% 7%;
-  --foreground: 0 0% 94%;
-  --card: 222 20% 10%;
-  --card-foreground: 0 0% 94%;
-  --popover: 222 20% 10%;
-  --popover-foreground: 0 0% 94%;
-  --primary: 168 100% 42%;
+  /* === DARK MODE — High-Tech Command Console === */
+  --background: 224 71% 4%;           /* #06090e */
+  --foreground: 210 40% 98%;          /* #f8fafc */
+  --card: 222 47% 7%;                 /* #0b0f17 */
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 7%;
+  --popover-foreground: 210 40% 98%;
+
+  --primary: 217 91% 60%;             /* #3b82f6 */
   --primary-foreground: 0 0% 100%;
-  --secondary: 222 20% 14%;
-  --secondary-foreground: 0 0% 94%;
-  --muted: 222 20% 14%;
-  --muted-foreground: 215 12% 55%;
-  --accent: 168 60% 15%;
-  --accent-foreground: 168 100% 60%;
-  --destructive: 0 62% 50%;
+  --secondary: 217 33% 12%;           /* #141c2b */
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 12%;
+  --muted-foreground: 215 20% 65%;    /* #94a3b8 */
+  --accent: 217 33% 15%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --border: 222 20% 17%;
-  --input: 222 20% 17%;
-  --ring: 168 100% 42%;
+  --border: 217 33% 14%;              /* #182234 */
+  --input: 217 33% 14%;
+  --ring: 217 91% 60%;
 }
 
 @theme inline {
@@ -103,9 +106,21 @@
   --dark: selector(.dark);
 }
 
-/* ============================================
-   BASE STYLES
-   ============================================ */
+/* ==========================================================================
+   BASE & RESET
+   ========================================================================== */
+html {
+  font-size: 13.5px;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+@media (min-width: 1536px) {
+  html {
+    font-size: 14px;
+  }
+}
+
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
@@ -115,174 +130,51 @@ body {
 }
 
 ::selection {
-  background-color: hsl(var(--primary) / 0.18);
+  background-color: hsl(var(--primary) / 0.16);
   color: hsl(var(--primary));
 }
 
-/* ============================================
-   PREMIUM UTILITY CLASSES
-   ============================================ */
+/* ==========================================================================
+   PRECISION ENGINEERING UTILITIES
+   ========================================================================== */
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
 
-  /* Dot pattern background */
-  .section-dot {
-    background-image: radial-gradient(circle, hsl(var(--border)) 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
-
-  /* ── Hero Light: base + soft gradient blobs ── */
-  .hero-mesh {
-    --mesh-color: rgba(16, 185, 129, 0.04);
-    background:
-      radial-gradient(ellipse 80% 65% at 82% 12%, rgba(167,243,208,0.30) 0%, rgba(167,243,208,0.10) 35%, transparent 60%),
-      radial-gradient(ellipse 45% 55% at 95% 55%, rgba(16,185,129,0.06) 0%, transparent 50%),
-      radial-gradient(ellipse 40% 40% at 8% 85%, rgba(167,243,208,0.08) 0%, transparent 50%)
-    ;
-    background-color: #F2FAF7;
-    position: relative;
-  }
-  .dark .hero-mesh {
-    background-color: hsl(222 20% 7%);
-    background-image:
-      radial-gradient(ellipse 80% 65% at 82% 12%, rgba(0,201,167,0.10) 0%, rgba(0,201,167,0.03) 35%, transparent 60%),
-      radial-gradient(ellipse 45% 55% at 95% 55%, rgba(0,201,167,0.05) 0%, transparent 50%),
-      radial-gradient(ellipse 40% 40% at 8% 85%, rgba(0,201,167,0.04) 0%, transparent 50%)
-    ;
-  }
-
-  /* ── Section backgrounds: light ── */
-  .section-bg-pain     { background-color: hsl(210,15%,94%); background-image: radial-gradient(ellipse 70% 50% at 5% 20%, rgba(167,243,208,0.12) 0%, transparent 55%); }
-  .section-bg-dual     { background-color: hsl(210,20%,97%); background-image: radial-gradient(ellipse 60% 40% at 90% 10%, rgba(167,243,208,0.15) 0%, transparent 50%), radial-gradient(ellipse 50% 35% at 5% 90%, rgba(16,185,129,0.06) 0%, transparent 50%); }
-  .section-bg-solutions{ background-color: hsl(210,15%,94%); background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(167,243,208,0.10) 0%, transparent 50%), radial-gradient(ellipse 50% 45% at 50% 100%, rgba(16,185,129,0.05) 0%, transparent 50%); }
-  .section-bg-spectrum { background-color: hsl(210,20%,97%); background-image: radial-gradient(ellipse 50% 40% at 10% 50%, rgba(167,243,208,0.08) 0%, transparent 50%), radial-gradient(ellipse 50% 40% at 90% 50%, rgba(16,185,129,0.05) 0%, transparent 50%); }
-  .section-bg-matrix   { background-color: hsl(210,15%,94%); background-image: radial-gradient(ellipse 60% 45% at 85% 20%, rgba(167,243,208,0.10) 0%, transparent 50%), radial-gradient(ellipse 40% 35% at 5% 80%, rgba(16,185,129,0.04) 0%, transparent 50%); }
-  .section-bg-pricing  { background-color: hsl(210,20%,97%); background-image: radial-gradient(ellipse 70% 60% at 5% 50%, rgba(167,243,208,0.10) 0%, transparent 50%), radial-gradient(ellipse 50% 40% at 95% 50%, rgba(16,185,129,0.05) 0%, transparent 50%); }
-  .section-bg-cta      { background-color: hsl(210,20%,97%); background-image: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(167,243,208,0.12) 0%, transparent 55%); }
-  .section-bg-faq      { background-color: hsl(210,20%,97%); background-image: radial-gradient(ellipse 60% 40% at 50% 100%, rgba(167,243,208,0.08) 0%, transparent 50%); }
-
-  /* ── Section backgrounds: dark ── */
-  .dark .section-bg-pain     { background-color: hsl(222,15%,10%); background-image: radial-gradient(ellipse 70% 50% at 5% 20%, rgba(0,201,167,0.08) 0%, transparent 55%); }
-  .dark .section-bg-dual     { background-color: hsl(222,20%,7%);  background-image: radial-gradient(ellipse 60% 40% at 90% 10%, rgba(0,201,167,0.10) 0%, transparent 50%), radial-gradient(ellipse 50% 35% at 5% 90%, rgba(0,201,167,0.04) 0%, transparent 50%); }
-  .dark .section-bg-solutions{ background-color: hsl(222,15%,10%); background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,201,167,0.07) 0%, transparent 50%), radial-gradient(ellipse 50% 45% at 50% 100%, rgba(0,201,167,0.04) 0%, transparent 50%); }
-  .dark .section-bg-spectrum { background-color: hsl(222,20%,7%);  background-image: radial-gradient(ellipse 50% 40% at 10% 50%, rgba(0,201,167,0.05) 0%, transparent 50%), radial-gradient(ellipse 50% 40% at 90% 50%, rgba(0,201,167,0.03) 0%, transparent 50%); }
-  .dark .section-bg-matrix   { background-color: hsl(222,15%,10%); background-image: radial-gradient(ellipse 60% 45% at 85% 20%, rgba(0,201,167,0.07) 0%, transparent 50%), radial-gradient(ellipse 40% 35% at 5% 80%, rgba(0,201,167,0.03) 0%, transparent 50%); }
-  .dark .section-bg-pricing  { background-color: hsl(222,20%,7%);  background-image: radial-gradient(ellipse 70% 60% at 5% 50%, rgba(0,201,167,0.07) 0%, transparent 50%), radial-gradient(ellipse 50% 40% at 95% 50%, rgba(0,201,167,0.04) 0%, transparent 50%); }
-  .dark .section-bg-cta      { background-color: hsl(222,20%,7%);  background-image: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,201,167,0.08) 0%, transparent 55%); }
-  .dark .section-bg-faq      { background-color: hsl(222,20%,7%);  background-image: radial-gradient(ellipse 60% 40% at 50% 100%, rgba(0,201,167,0.05) 0%, transparent 50%); }
-
-  /* ── Section Ornaments ── */
-  .ornament-dots {
-    background-image:
-      radial-gradient(circle, hsl(var(--primary) / 0.10) 0.8px, transparent 0.8px),
-      radial-gradient(circle, hsl(var(--primary) / 0.06) 1.5px, transparent 1.5px);
-    background-size: 36px 36px, 72px 72px;
-    background-position: 0 0, 18px 18px;
-  }
-  .ornament-cross {
-    background-image:
-      linear-gradient(45deg, hsl(var(--border) / 0.4) 0.5px, transparent 0.5px),
-      linear-gradient(-45deg, hsl(var(--border) / 0.4) 0.5px, transparent 0.5px);
-    background-size: 50px 50px;
-  }
-  .ornament-diagonal {
-    background-image: repeating-linear-gradient(
-      135deg,
-      transparent,
-      transparent 18px,
-      hsl(var(--primary) / 0.04) 18px,
-      hsl(var(--primary) / 0.04) 18.5px
-    );
-  }
-  .ornament-circles {
-    background-image:
-      radial-gradient(ellipse at 15% 25%, hsl(var(--primary) / 0.07) 0%, transparent 35%),
-      radial-gradient(ellipse at 85% 75%, hsl(var(--primary) / 0.05) 0%, transparent 35%),
-      radial-gradient(ellipse at 50% 50%, hsl(var(--primary) / 0.03) 0%, transparent 50%);
-  }
-  .ornament-grid-light {
-    background-image:
-      linear-gradient(hsl(var(--border) / 0.15) 0.5px, transparent 0.5px),
-      linear-gradient(90deg, hsl(var(--border) / 0.15) 0.5px, transparent 0.5px);
-    background-size: 48px 48px;
-  }
-
-  /* Teal mesh pattern for dark panels */
-  .mesh-pattern {
-    background-image:
-      radial-gradient(ellipse at 20% 50%, rgba(0, 201, 167, 0.08) 0%, transparent 60%),
-      radial-gradient(ellipse at 80% 20%, rgba(0, 201, 167, 0.05) 0%, transparent 50%),
-      radial-gradient(ellipse at 60% 80%, rgba(0, 145, 255, 0.05) 0%, transparent 50%);
-  }
-
-  /* Grid overlay for dark panels */
-  .grid-pattern {
-    background-image:
-      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-    background-size: 40px 40px;
-  }
-
-  /* Glass card — light */
-  .glass {
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-  }
-
-  /* Glass card — dark */
-  .glass-dark {
-    background: rgba(13, 17, 23, 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-  }
-
-  /* Teal glow border */
-  .neon-border {
-    border: 1px solid var(--teal-border);
-    box-shadow: 0 0 0 1px var(--teal-border), inset 0 0 20px rgba(0, 201, 167, 0.03);
-  }
-
-  /* Premium card shadow */
-  .card-premium {
-    box-shadow: var(--card-shadow);
-    transition: box-shadow 0.3s ease, transform 0.2s ease;
-  }
-  .card-premium:hover {
-    box-shadow: var(--card-shadow-hover);
-    transform: translateY(-1px);
-  }
-
-  /* Teal gradient text */
-  .text-gradient-teal {
-    background: linear-gradient(135deg, #00C9A7 0%, #00E5C9 50%, #00B8D9 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Gradient text white-to-teal for dark backgrounds */
-  .text-gradient-white {
-    background: linear-gradient(135deg, #ffffff 0%, #a8ffed 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Active sidebar item with teal left border */
-  .sidebar-item-active {
-    background: var(--teal-glow);
-    border-left: 2px solid #00C9A7;
-    color: #00C9A7 !important;
-  }
-
-  /* Monospace for financial numbers */
-  .font-financial {
-    font-family: var(--font-mono);
+  /* Monospace for financial numbers and IDs */
+  .font-financial,
+  .font-tabular {
+    font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
+  }
+
+  /* Subtle engineering grid background */
+  .engineering-grid {
+    background-size: 24px 24px;
+    background-image: 
+      linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  }
+
+  .dark .engineering-grid {
+    background-image: 
+      linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  }
+
+  /* Engineering card */
+  .card-engine {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .card-engine:hover {
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.06);
   }
 
   /* Hide scrollbar utility */
@@ -295,128 +187,16 @@ body {
   }
 }
 
-/* ============================================
-   PREMIUM ANIMATIONS
-   ============================================ */
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(0, 201, 167, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(0, 201, 167, 0);
-  }
-}
-
-@keyframes float-subtle {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-6px); }
-}
-
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes counter-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slide-in-left {
-  from { opacity: 0; transform: translateX(-16px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes teal-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@keyframes border-glow {
-  0%, 100% { border-color: rgba(0,201,167,0.3); }
-  50% { border-color: rgba(0,201,167,0.7); }
-}
-
-/* Custom padding utilities */
-.py-4\.5 {
-  padding-top: 0.875rem;
-  padding-bottom: 0.875rem;
-}
-
-@media (min-width: 640px) {
-  .py-4\.5 {
-    padding-top: 1.125rem;
-    padding-bottom: 1.125rem;
-  }
-}
-
-/* ---------------------------------------------------------------
-   PDF A4 preview
-   Layout cetak tetap 794px, tapi di layar kecil di-zoom agar muat.
-   Pakai @media screen supaya tidak memengaruhi hasil print.
----------------------------------------------------------------- */
+/* --------------------------------------------------------------------------
+   PDF A4 Preview zoom helpers
+   -------------------------------------------------------------------------- */
 .pdf-a4-fit {
   width: 794px;
   max-width: 794px;
 }
-
 @media screen and (max-width: 1024px) { .pdf-a4-fit { zoom: 0.95; } }
 @media screen and (max-width: 860px)  { .pdf-a4-fit { zoom: 0.80; } }
 @media screen and (max-width: 700px)  { .pdf-a4-fit { zoom: 0.66; } }
 @media screen and (max-width: 560px)  { .pdf-a4-fit { zoom: 0.52; } }
 @media screen and (max-width: 430px)  { .pdf-a4-fit { zoom: 0.42; } }
 @media screen and (max-width: 360px)  { .pdf-a4-fit { zoom: 0.38; } }
-
-/* ---------------------------------------------------------------
-   Brand alignment
-   Semua aksen "indigo" diselaraskan ke Electric Teal (#00C9A7)
-   supaya konsisten dengan landing page & login.
----------------------------------------------------------------- */
-:root {
-  --color-indigo-50:  #ecfdf8;
-  --color-indigo-100: #d0faf0;
-  --color-indigo-200: #a5f3e2;
-  --color-indigo-300: #6ee7d2;
-  --color-indigo-400: #34d3b8;
-  --color-indigo-500: #12b8a0;
-  --color-indigo-600: #00a589;
-  --color-indigo-700: #008f78;
-  --color-indigo-800: #0f766e;
-  --color-indigo-900: #115e56;
-  --color-indigo-950: #042f2c;
-}
-
-/* Violet/purple accents → teal (konsistensi modul) */
-:root {
-  --color-violet-50:  #ecfdf8;
-  --color-violet-100: #d0faf0;
-  --color-violet-200: #a5f3e2;
-  --color-violet-300: #6ee7d2;
-  --color-violet-400: #34d3b8;
-  --color-violet-500: #12b8a0;
-  --color-violet-600: #00a589;
-  --color-violet-700: #008f78;
-  --color-violet-800: #0f766e;
-  --color-violet-900: #115e56;
-  --color-purple-50:  #ecfdf8;
-  --color-purple-100: #d0faf0;
-  --color-purple-200: #a5f3e2;
-  --color-purple-300: #6ee7d2;
-  --color-purple-400: #34d3b8;
-  --color-purple-500: #12b8a0;
-  --color-purple-600: #00a589;
-  --color-purple-700: #008f78;
-  --color-purple-800: #0f766e;
-  --color-purple-900: #115e56;
-}

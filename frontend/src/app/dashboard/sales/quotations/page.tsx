@@ -30,11 +30,11 @@ export interface Quotation {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-    DRAFT: { label: 'Draft', color: 'bg-slate-100 text-slate-600 border-slate-200', icon: Clock },
-    SENT: { label: 'Sent', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: Send },
-    ACCEPTED: { label: 'Accepted', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: Check },
-    REJECTED: { label: 'Rejected', color: 'bg-rose-50 text-rose-700 border-rose-200', icon: Ban },
-    EXPIRED: { label: 'Expired', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
+    DRAFT: { label: 'Draft', color: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700', icon: Clock },
+    SENT: { label: 'Sent', color: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900', icon: Send },
+    ACCEPTED: { label: 'Accepted', color: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900', icon: Check },
+    REJECTED: { label: 'Rejected', color: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900', icon: Ban },
+    EXPIRED: { label: 'Expired', color: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900', icon: Clock },
 }
 const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -122,269 +122,331 @@ export default function QuotationsPage() {
         total: quotations.length,
         draft: quotations.filter(q => q.status === 'DRAFT').length,
         sent: quotations.filter(q => q.status === 'SENT').length,
+        accepted: quotations.filter(q => q.status === 'ACCEPTED').length,
+        rejected: quotations.filter(q => q.status === 'REJECTED').length,
+        expired: quotations.filter(q => q.status === 'EXPIRED').length,
         acceptedValue: quotations.filter(q => q.status === 'ACCEPTED').reduce((s, q) => s + q.grandTotal, 0)
     }
 
+    const counts: Record<string, number> = {
+        ALL: stats.total,
+        DRAFT: stats.draft,
+        SENT: stats.sent,
+        ACCEPTED: stats.accepted,
+        REJECTED: stats.rejected,
+        EXPIRED: stats.expired,
+    }
+
     return (
-        <div className="px-4 py-6 space-y-6 w-full">
+        <div className="p-3 lg:p-4 space-y-2.5 w-full">
             {/* Toast */}
             <AnimatePresence>
                 {toast && (
                     <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        className={`fixed top-6 right-6 z-[300] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl text-sm font-semibold border ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-                        {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />} {toast.msg}
+                        className={`fixed top-4 right-4 z-[300] flex items-center gap-2 px-3 py-2 rounded shadow-lg text-xs font-mono font-medium border ${toast.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-950/90 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-950/90 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800'}`}>
+                        {toast.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />} {toast.msg}
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Header */}
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20">
-                        <FileText size={20} className="text-white" />
+            {/* Compact Header */}
+            <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-2xs">
+                        <FileText size={13} />
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Penawaran Harga</h1>
-                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Sales Quotation Management</p>
+                    <div className="flex items-center gap-2">
+                        <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
+                            // SALES
+                        </span>
+                        <h1 className="text-sm lg:text-base font-bold text-slate-900 dark:text-white tracking-tight">Penawaran Harga</h1>
+                        <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">[{quotations.length} RECORDS]</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <Button variant="outline" onClick={load} className="flex-1 md:flex-none rounded-xl border-slate-200 text-slate-600 h-10 px-4 text-xs font-bold uppercase tracking-wider">
-                        <RefreshCw size={13} className="mr-2" /> Reload
+
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 text-[11px] font-mono">
+                        <span className="text-slate-500 dark:text-slate-400 text-[9.5px] uppercase">ACCEPTED VALUE:</span>
+                        <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{fmt(stats.acceptedValue)}</strong>
+                    </div>
+
+                    <Button variant="outline" onClick={load} className="rounded border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 h-7 px-2.5 text-[11px] font-mono hover:bg-slate-100 dark:hover:bg-slate-800 shadow-2xs">
+                        <RefreshCw size={11} className="mr-1" /> RELOAD
                     </Button>
                     <Button onClick={() => { setEditing(null); setModalOpen(true) }}
-                        className="flex-1 md:flex-none rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-10 px-6 text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20">
-                        <Plus size={15} className="mr-2" /> New
+                        className="rounded bg-blue-600 hover:bg-blue-700 text-white font-mono h-7 px-3 text-[11px] shadow-2xs">
+                        <Plus size={12} className="mr-1" /> NEW QUOTE
                     </Button>
                 </div>
             </header>
 
-            {/* Project Highlight Title */}
+            {/* Active Project Highlight Pill */}
             {filterProject !== 'ALL' && (
-                <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                    className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-3xl p-6 md:p-8 text-white shadow-2xl shadow-indigo-600/20 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                        <Briefcase size={120} />
+                <div className="bg-slate-900 rounded p-2 text-white border border-slate-800 flex items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                        <span className="px-1 py-0.2 bg-blue-950 text-blue-300 border border-blue-800 rounded font-mono text-[9px] font-bold uppercase">Active Project</span>
+                        <span className="font-mono text-slate-400 font-bold">#{projects.find(p => p.id === filterProject)?.number}</span>
+                        <span className="font-semibold text-slate-200">{projects.find(p => p.id === filterProject)?.name}</span>
+                        <span className="text-slate-500">•</span>
+                        <span className="text-slate-400 font-mono text-[11px]">Customer: <strong className="text-slate-200">{projects.find(p => p.id === filterProject)?.customer?.name}</strong></span>
+                        <span className="text-slate-500">•</span>
+                        <span className="text-emerald-400 font-mono font-bold text-[11px]">{fmt(filtered.reduce((s, q) => s + q.grandTotal, 0))}</span>
                     </div>
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="px-2 py-0.5 bg-white/20 rounded text-[10px] font-black uppercase tracking-widest">Active Project</span>
-                            <span className="text-indigo-200 text-[10px] font-bold uppercase tracking-widest"># {projects.find(p => p.id === filterProject)?.number}</span>
-                        </div>
-                        <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-2 drop-shadow-sm pr-10 md:pr-0 break-words whitespace-normal">
-                            {projects.find(p => p.id === filterProject)?.name}
-                        </h2>
-                        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 mt-4">
-                            <div className="flex flex-col">
-                                <span className="text-indigo-200 text-[9px] font-bold uppercase tracking-widest">Customer</span>
-                                <span className="text-sm font-bold">{projects.find(p => p.id === filterProject)?.customer?.name}</span>
-                            </div>
-                            <div className="hidden md:block w-px h-8 bg-white/10" />
-                            <div className="flex flex-col">
-                                <span className="text-indigo-200 text-[9px] font-bold uppercase tracking-widest">Project Value</span>
-                                <span className="text-sm font-bold">{fmt(filtered.reduce((s, q) => s + q.grandTotal, 0))}</span>
-                            </div>
-                            <button onClick={() => setFilterProject('ALL')} className="absolute top-0 right-0 md:static md:top-auto md:right-auto md:ml-auto bg-white/10 hover:bg-white/20 p-2 md:p-2 rounded-xl transition-colors">
-                                <X size={16} />
-                            </button>
-                        </div>
-                    </div>
-                </motion.div>
+                    <button onClick={() => setFilterProject('ALL')} className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
+                        <X size={13} />
+                    </button>
+                </div>
             )}
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                {[
-                    { label: 'Total Quotations', value: stats.total },
-                    { label: 'Draft', value: stats.draft },
-                    { label: 'Sent', value: stats.sent },
-                    { label: 'Accepted Value', value: fmt(stats.acceptedValue), big: true },
-                ].map(s => (
-                    <div key={s.label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 md:p-5">
-                        <p className="text-[9px] md:text-[10px] font-bold uppercase tracking-widest text-slate-400 truncate">{s.label}</p>
-                        <p className={`font-extrabold mt-1 ${s.big ? 'text-sm md:text-base' : 'text-2xl md:text-3xl'} text-slate-900 truncate`}>{s.value}</p>
-                    </div>
-                ))}
-            </div>
+            {/* Segmented Toolbar: Integrated Status Tabs & Clean Search */}
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 dark:bg-[#0b0f17] p-1.5 rounded-md border border-slate-200 dark:border-slate-800">
+                {/* Left: Filter Tabs with counts */}
+                <div className="flex flex-wrap items-center gap-1">
+                    {['ALL', ...Object.keys(STATUS_CONFIG)].map(s => {
+                        const count = counts[s] || 0
+                        const active = filterStatus === s
+                        return (
+                            <button
+                                key={s}
+                                onClick={() => setFilterStatus(s)}
+                                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-[11px] font-mono transition-colors ${
+                                    active
+                                        ? 'bg-blue-600 text-white shadow-2xs font-semibold'
+                                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:text-slate-900 dark:hover:text-white'
+                                }`}
+                            >
+                                <span>{s === 'ALL' ? 'All' : STATUS_CONFIG[s].label}</span>
+                                <span className={`text-[9.5px] px-1 py-0.2 rounded font-mono ${active ? 'bg-blue-700 text-blue-100' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                                    {count}
+                                </span>
+                            </button>
+                        )
+                    })}
+                </div>
 
-            {/* Filters */}
-            <div className="flex flex-col md:flex-row md:items-center gap-3">
-                <div className="relative w-full md:w-auto flex-1 min-w-0">
-                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search number, customer, subject..."
-                        className="pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white w-full md:w-72 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm placeholder:text-slate-300" />
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 w-full md:w-auto">
-                    {['ALL', ...Object.keys(STATUS_CONFIG)].map(s => (
-                        <button key={s} onClick={() => setFilterStatus(s)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] whitespace-nowrap font-bold uppercase tracking-wider transition-all ${filterStatus === s ? 'bg-indigo-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
-                            {s === 'ALL' ? 'All' : STATUS_CONFIG[s].label}
-                        </button>
-                    ))}
-                </div>
-                <div className="md:ml-auto w-full md:w-auto flex items-center gap-2">
-                    <select value={filterProject} onChange={e => setFilterProject(e.target.value)}
-                        className="w-full md:w-auto bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none">
+                {/* Right: Search and Project Filter */}
+                <div className="flex items-center gap-1.5">
+                    <div className="relative">
+                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Search number, customer, subject..."
+                            className="w-48 lg:w-64 h-7 pl-7 pr-2.5 text-xs font-mono rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-600 shadow-2xs"
+                        />
+                    </div>
+                    <select
+                        value={filterProject}
+                        onChange={e => setFilterProject(e.target.value)}
+                        className="h-7 text-xs font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded px-2 text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-600"
+                    >
                         <option value="ALL">All Projects</option>
-                        {(Array.isArray(projects) ? projects : []).map(p => <option key={p.id} value={p.id}>{p.number} - {p.name}</option>)}
+                        {(Array.isArray(projects) ? projects : []).map(p => (
+                            <option key={p.id} value={p.id}>{p.number} - {p.name}</option>
+                        ))}
                     </select>
                 </div>
             </div>
 
-            {/* Table */}
+            {/* High-Density Data Table */}
             {loading ? (
-                <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>
+                <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" /></div>
             ) : filtered.length === 0 ? (
-                <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl py-24 flex flex-col items-center">
-                    <FileText size={64} className="text-slate-200 mb-4" />
-                    <p className="font-bold text-slate-400 uppercase tracking-wider text-sm">No quotations found</p>
+                <div className="bg-white dark:bg-[#0b0f17] border border-dashed border-slate-200 dark:border-slate-800 rounded-md py-12 flex flex-col items-center">
+                    <FileText size={32} className="text-slate-300 dark:text-slate-600 mb-1.5" />
+                    <p className="font-mono text-xs text-slate-400 uppercase tracking-wider">No quotations found</p>
                 </div>
             ) : (
                 <>
-                {/* Desktop View */}
-                <div className="hidden md:block overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
-                    <table className="w-full text-left border-collapse">
+                {/* Desktop High-Density Linear Table */}
+                <div className="hidden md:block overflow-x-auto rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f17] shadow-2xs">
+                    <table className="w-full text-left border-collapse font-sans text-xs">
                         <thead>
-                            <tr className="text-[9px] font-bold uppercase tracking-[0.15em] text-slate-400 border-b border-slate-100 bg-slate-50/80">
-                                <th className="px-6 py-4">Number</th>
-                                <th className="px-6 py-4">Customer</th>
-                                <th className="px-6 py-4">Subject</th>
-                                <th className="px-6 py-4">Date</th>
-                                <th className="px-6 py-4">Valid Until</th>
-                                <th className="px-6 py-4 text-right">Grand Total</th>
-                                <th className="px-6 py-4 text-right">Total HPP</th>
-                                <th className="px-6 py-4 text-right">Margin</th>
-                                <th className="px-6 py-4 text-center">Status</th>
-                                <th className="px-6 py-4 text-right">Actions</th>
+                            <tr className="text-[9px] font-mono uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80">
+                                <th className="py-2 px-3 font-semibold">Number</th>
+                                <th className="py-2 px-3 font-semibold">Customer</th>
+                                <th className="py-2 px-3 font-semibold">Subject</th>
+                                <th className="py-2 px-3 font-semibold">Date</th>
+                                <th className="py-2 px-3 font-semibold">Valid Until</th>
+                                <th className="py-2 px-3 font-semibold text-right">Grand Total</th>
+                                <th className="py-2 px-3 font-semibold text-right">HPP</th>
+                                <th className="py-2 px-3 font-semibold text-right">Margin</th>
+                                <th className="py-2 px-3 font-semibold text-center">Status</th>
+                                <th className="py-2 px-3 font-semibold text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {filtered.map((q, idx) => {
-                                    const sc = STATUS_CONFIG[q.status] || STATUS_CONFIG.DRAFT
-                                    const Icon = sc.icon
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                            {filtered.map((q) => {
+                                const sc = STATUS_CONFIG[q.status] || STATUS_CONFIG.DRAFT
+                                const Icon = sc.icon
+                                const totalCost = q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0
+                                const margin = q.subtotal - (q.discountAmt || 0) - totalCost
 
-                                    return (
-                                            <motion.tr key={q.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * .03 }}
-                                                className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
-                                                <td className="px-6 py-4">
-                                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{q.number}</p>
-                                                    {q.project && <p className="text-[9px] font-semibold text-slate-400 mt-0.5 truncate max-w-[160px]">{q.project.number}</p>}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className="font-bold text-slate-800 text-sm">{q.customer?.name}</p>
-                                                    <p className="text-[10px] text-slate-400">{q.customer?.code}</p>
-                                                </td>
-                                                <td className="px-6 py-4 max-w-[200px]"><p className="text-sm text-slate-700 truncate font-medium">{q.subject}</p></td>
-                                                <td className="px-6 py-4 text-[11px] text-slate-500 font-medium">{fmtDate(q.date)}</td>
-                                                <td className="px-6 py-4 text-[11px] text-slate-500 font-medium">{fmtDate(q.validUntil)}</td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <p className="text-[10px] text-slate-500">Sblm Disc: {fmt(q.subtotal)}</p>
-                                                    {q.discountAmt > 0 && <p className="text-[10px] text-rose-500">Disc: -{fmt(q.discountAmt)}</p>}
-                                                    <p className="font-bold text-slate-900 text-sm mt-0.5">{fmt(q.grandTotal)}</p>
-                                                    <p className="text-[9px] text-slate-400">{q.items?.length || 0} items</p>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <p className="font-semibold text-amber-700 text-sm">{fmt(q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0)}</p>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {(() => {
-                                                        const totalCost = q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0;
-                                                        const margin = q.subtotal - (q.discountAmt || 0) - totalCost;
-                                                        return (
-                                                            <p className={`font-bold text-sm ${margin >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                                                                {fmt(margin)}
-                                                            </p>
-                                                        )
-                                                    })()}
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <div className="relative status-dropdown inline-block">
-                                                        <span onClick={() => setOpenStatusId(openStatusId === q.id ? null : q.id)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border cursor-pointer ${sc.color}`}>
-                                                            <Icon size={9} /> {sc.label}
-                                                        </span>
-                                                        {openStatusId === q.id && (
-                                                            <div className="absolute z-50 top-full mt-1 left-1/2 -translate-x-1/2 bg-white shadow-xl rounded-xl border border-slate-100 p-1 min-w-[120px]">
-                                                                {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                                                                    <button key={k} onClick={() => { handleStatus(q.id, k); setOpenStatusId(null); }}
-                                                                        className={`w-full text-left px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-50 transition-colors ${q.status === k ? 'text-indigo-600' : 'text-slate-600'}`}>
-                                                                        {v.label}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        )}
+                                return (
+                                    <tr key={q.id} className="group hover:bg-blue-50/40 dark:hover:bg-slate-900/60 transition-colors">
+                                        {/* Number */}
+                                        <td className="py-2 px-3 whitespace-nowrap">
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    onClick={() => setViewModal(q)}
+                                                    className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                                                >
+                                                    {q.number}
+                                                </button>
+                                                {q.project && (
+                                                    <span className="font-mono text-[9px] text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded" title={q.project.name}>
+                                                        {q.project.number}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+
+                                        {/* Customer */}
+                                        <td className="py-2 px-3 max-w-[170px] truncate">
+                                            <span className="font-semibold text-xs text-slate-800 dark:text-slate-200 truncate block" title={`${q.customer?.name} (${q.customer?.code})`}>
+                                                {q.customer?.name}
+                                            </span>
+                                        </td>
+
+                                        {/* Subject */}
+                                        <td className="py-2 px-3 max-w-[220px] truncate">
+                                            <span className="text-xs text-slate-600 dark:text-slate-400 truncate block" title={q.subject}>
+                                                {q.subject}
+                                            </span>
+                                        </td>
+
+                                        {/* Date */}
+                                        <td className="py-2 px-3 whitespace-nowrap font-mono text-[11px] text-slate-500">
+                                            {fmtDate(q.date)}
+                                        </td>
+
+                                        {/* Valid Until */}
+                                        <td className="py-2 px-3 whitespace-nowrap font-mono text-[11px] text-slate-500">
+                                            {fmtDate(q.validUntil)}
+                                        </td>
+
+                                        {/* Grand Total */}
+                                        <td className="py-2 px-3 whitespace-nowrap text-right">
+                                            <div className="flex items-center justify-end gap-1.5 font-mono">
+                                                <span className="font-bold text-xs text-slate-900 dark:text-slate-100 font-tabular">
+                                                    {fmt(q.grandTotal)}
+                                                </span>
+                                                {q.discountAmt > 0 && (
+                                                    <span className="text-[9px] text-rose-500 font-mono" title={`Discount: ${fmt(q.discountAmt)}`}>
+                                                        (-{fmt(q.discountAmt)})
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+
+                                        {/* Total HPP */}
+                                        <td className="py-2 px-3 whitespace-nowrap text-right">
+                                            <span className="font-mono text-xs text-slate-500 dark:text-slate-400 font-tabular">
+                                                {fmt(totalCost)}
+                                            </span>
+                                        </td>
+
+                                        {/* Margin */}
+                                        <td className="py-2 px-3 whitespace-nowrap text-right">
+                                            <span className={`font-mono font-bold text-xs font-tabular ${margin >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500'}`}>
+                                                {fmt(margin)}
+                                            </span>
+                                        </td>
+
+                                        {/* Status */}
+                                        <td className="py-2 px-3 text-center whitespace-nowrap">
+                                            <div className="relative status-dropdown inline-block">
+                                                <button
+                                                    onClick={() => setOpenStatusId(openStatusId === q.id ? null : q.id)}
+                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9.5px] font-mono font-semibold uppercase tracking-wider border cursor-pointer ${sc.color}`}
+                                                >
+                                                    <Icon size={9} /> {sc.label}
+                                                </button>
+                                                {openStatusId === q.id && (
+                                                    <div className="absolute z-50 top-full mt-1 right-0 bg-white dark:bg-slate-900 shadow-xl rounded border border-slate-200 dark:border-slate-800 p-1 min-w-[120px]">
+                                                        {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                                                            <button
+                                                                key={k}
+                                                                onClick={() => { handleStatus(q.id, k); setOpenStatusId(null); }}
+                                                                className={`w-full text-left px-2 py-1 rounded text-[10px] font-mono font-semibold uppercase tracking-wider hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${q.status === k ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-600 dark:text-slate-400'}`}
+                                                            >
+                                                                {v.label}
+                                                            </button>
+                                                        ))}
                                                     </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                                                        <button onClick={() => setViewModal(q)} title="Preview / Download PDF"
-                                                            className="w-7 h-7 rounded-lg text-emerald-600 hover:bg-emerald-50 flex items-center justify-center transition-colors"><Eye size={14} /></button>
-                                                        <button onClick={() => { setEditing(q); setModalOpen(true) }} title="Edit"
-                                                            className="w-7 h-7 rounded-lg text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors"><Edit size={14} /></button>
-                                                        <button onClick={() => handleDelete(q.id)} title="Delete"
-                                                            className="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"><Trash2 size={14} /></button>
-                                                    </div>
-                                                </td>
-                                                </motion.tr>
-                                    )
-                                })}
+                                                )}
+                                            </div>
+                                        </td>
+
+                                        {/* Actions */}
+                                        <td className="py-2 px-3 text-right whitespace-nowrap">
+                                            <div className="flex items-center justify-end gap-1">
+                                                <button
+                                                    onClick={() => setViewModal(q)}
+                                                    title="Preview PDF"
+                                                    className="w-6 h-6 rounded text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center justify-center transition-colors"
+                                                >
+                                                    <Eye size={12} />
+                                                </button>
+                                                <button
+                                                    onClick={() => { setEditing(q); setModalOpen(true) }}
+                                                    title="Edit"
+                                                    className="w-6 h-6 rounded text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center justify-center transition-colors"
+                                                >
+                                                    <Edit size={12} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(q.id)}
+                                                    title="Delete"
+                                                    className="w-6 h-6 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center justify-center transition-colors"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
                         </tbody>
                     </table>
                 </div>
 
-                {/* Mobile Cards */}
-                <div className="md:hidden space-y-4">
-                    {filtered.map((q, idx) => {
-                            const sc = STATUS_CONFIG[q.status] || STATUS_CONFIG.DRAFT;
-                            const Icon = sc.icon;
+                {/* Mobile View: High Density Cards */}
+                <div className="md:hidden space-y-2">
+                    {filtered.map((q) => {
+                        const sc = STATUS_CONFIG[q.status] || STATUS_CONFIG.DRAFT
+                        const Icon = sc.icon
+                        const totalCost = q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0
+                        const margin = q.subtotal - (q.discountAmt || 0) - totalCost
 
-                            return (
-                                        <motion.div key={q.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
-                                        className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3 relative">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <div>
-                                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">{q.number}</p>
-                                                {q.project && <p className="text-[9px] font-semibold text-slate-400 mb-1">{q.project.number}</p>}
-                                                <h3 className="font-bold text-slate-800 text-sm leading-tight">{q.customer?.name}</h3>
-                                                <p className="text-[11px] text-slate-500 line-clamp-1">{q.subject}</p>
-                                            </div>
-                                            <select value={q.status} onChange={(e) => handleStatus(q.id, e.target.value)}
-                                                className={`appearance-none bg-transparent outline-none cursor-pointer pl-2 pr-4 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border text-center ${sc.color}`}>
-                                                {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                                                    <option key={k} value={k} className="text-slate-800 bg-white">{v.label}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 mt-2">
-                                            <div className="bg-slate-50 p-2 rounded-xl">
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Valid Until</p>
-                                                <p className="text-xs font-semibold text-slate-700">{fmtDate(q.validUntil)}</p>
-                                            </div>
-                                            <div className="bg-indigo-50/50 p-2 rounded-xl">
-                                                <p className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest mb-0.5">Grand Total</p>
-                                                <p className="text-xs font-bold text-indigo-700">{fmt(q.grandTotal)}</p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="bg-amber-50 p-2 rounded-xl">
-                                                <p className="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-0.5">Total HPP</p>
-                                                <p className="text-xs font-bold text-amber-700">{fmt(q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0)}</p>
-                                            </div>
-                                            <div className="bg-emerald-50 p-2 rounded-xl">
-                                                <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-0.5">Margin</p>
-                                                <p className="text-xs font-bold text-emerald-700">{fmt(q.subtotal - (q.items?.reduce((s, i) => s + (i.costPrice || 0) * i.qty, 0) || 0))}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-1">
-                                            <span className="text-[10px] text-slate-400 font-medium">{q.items?.length || 0} items included</span>
-                                            <div className="flex items-center gap-1">
-                                                <button onClick={() => setViewModal(q)} className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center"><Eye size={14} /></button>
-                                                <button onClick={() => { setEditing(q); setModalOpen(true) }} className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center"><Edit size={14} /></button>
-                                                <button onClick={() => handleDelete(q.id)} className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center"><Trash2 size={14} /></button>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                            );
-                        })}
+                        return (
+                            <div key={q.id} className="bg-white dark:bg-[#0b0f17] p-2.5 rounded border border-slate-200 dark:border-slate-800 shadow-2xs space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <button onClick={() => setViewModal(q)} className="font-mono font-bold text-xs text-blue-600 dark:text-blue-400">
+                                            {q.number}
+                                        </button>
+                                        {q.project && <span className="font-mono text-[9px] text-slate-400">#{q.project.number}</span>}
+                                    </div>
+                                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold uppercase border ${sc.color}`}>
+                                        <Icon size={8} /> {sc.label}
+                                    </span>
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-xs text-slate-800 dark:text-slate-200 leading-tight">{q.customer?.name}</p>
+                                    <p className="text-[11px] text-slate-500 truncate">{q.subject}</p>
+                                </div>
+                                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/60 font-mono text-xs">
+                                    <span className="font-bold text-slate-900 dark:text-slate-100">{fmt(q.grandTotal)}</span>
+                                    <div className="flex items-center gap-1">
+                                        <button onClick={() => setViewModal(q)} className="p-1 text-slate-500 hover:text-emerald-600"><Eye size={12} /></button>
+                                        <button onClick={() => { setEditing(q); setModalOpen(true) }} className="p-1 text-slate-500 hover:text-blue-600"><Edit size={12} /></button>
+                                        <button onClick={() => handleDelete(q.id)} className="p-1 text-slate-400 hover:text-rose-600"><Trash2 size={12} /></button>
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })}
                 </div>
                 </>
             )}

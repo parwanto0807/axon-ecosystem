@@ -272,84 +272,39 @@ function useAnimatedCounter(targetValue: number, duration = 1500) {
   return value
 }
 
-const cardAccents: Record<string, { border: string; icon: string; badge: string; glow: string }> = {
-  "bg-teal-500":    { border: "#00C9A7", icon: "rgba(0,201,167,0.12)",  badge: "rgba(0,201,167,0.1)",  glow: "rgba(0,201,167,0.08)" },
-  "bg-red-500":     { border: "#ef4444", icon: "rgba(239,68,68,0.10)",   badge: "rgba(239,68,68,0.08)",   glow: "rgba(239,68,68,0.05)" },
-  "bg-emerald-500": { border: "#10b981", icon: "rgba(16,185,129,0.12)",  badge: "rgba(16,185,129,0.1)",  glow: "rgba(16,185,129,0.06)" },
-  "bg-amber-500":   { border: "#f59e0b", icon: "rgba(245,158,11,0.12)",  badge: "rgba(245,158,11,0.1)",  glow: "rgba(245,158,11,0.06)" },
-  "bg-indigo-500":  { border: "#00C9A7", icon: "rgba(0,201,167,0.12)",  badge: "rgba(0,201,167,0.1)",  glow: "rgba(0,201,167,0.06)" },
-}
-
 const DashboardCard = ({ title, value, icon: Icon, description, trend, trendType, colorClass }: DashboardCardProps) => {
-  const accent = cardAccents[colorClass] || cardAccents["bg-teal-500"]
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4, scale: 1.01 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
-      className="relative"
-    >
-      {/* Gradient border effect */}
-      <div
-        className="absolute inset-0 rounded-2xl opacity-60"
-        style={{ background: `linear-gradient(135deg, ${accent.border}20, transparent 60%)` }}
-      />
+    <div className="card-engine rounded-md p-3 bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-mono text-[9px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+          // {title}
+        </span>
+        <div className="w-6 h-6 rounded bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-slate-600 dark:text-slate-300">
+          <Icon className="h-3 w-3" strokeWidth={2} />
+        </div>
+      </div>
 
-      <Card
-        className="relative overflow-hidden rounded-2xl border bg-white"
-        style={{
-          borderColor: `${accent.border}25`,
-          boxShadow: `0 1px 3px rgba(0,0,0,0.06), 0 4px 16px ${accent.glow}`
-        }}
-      >
-        {/* Top accent line */}
-        <div
-          className="absolute top-0 left-0 right-0 h-0.5 rounded-t-2xl"
-          style={{ background: `linear-gradient(90deg, ${accent.border}, ${accent.border}40)` }}
-        />
-
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between mb-4">
-            <div
-              className="p-2.5 rounded-xl flex-shrink-0"
-              style={{ background: accent.icon }}
+      <div>
+        <div className="text-lg lg:text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 font-tabular mb-1 leading-tight">
+          {value}
+        </div>
+        <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/60 text-[10px]">
+          <span className="text-slate-500 dark:text-slate-400 font-mono text-[9px] truncate max-w-[130px]">{description}</span>
+          {trend && (
+            <span
+              className={`inline-flex items-center gap-0.5 px-1 py-0.2 rounded font-mono text-[9px] font-semibold shrink-0 ${
+                trendType === 'up' 
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900' 
+                  : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900'
+              }`}
             >
-              <Icon className="h-4 w-4" style={{ color: accent.border }} strokeWidth={2.5} />
-            </div>
-            {trend && (
-              <div
-                className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black"
-                style={{
-                  background: trendType === 'up' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.08)',
-                  color: trendType === 'up' ? '#10b981' : '#ef4444'
-                }}
-              >
-                {trendType === 'up' ? <ArrowUpRight size={11} className="flex-shrink-0" /> : <ArrowDownRight size={11} className="flex-shrink-0" />}
-                {trend}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <p
-              className="text-[10px] font-black uppercase tracking-[0.18em] mb-1.5"
-              style={{ color: accent.border }}
-            >
-              {title}
-            </p>
-            <div
-              className="text-xl font-black tracking-tight leading-tight font-financial"
-              style={{ color: "#0D1117" }}
-            >
-              {value}
-            </div>
-            <p className="text-[11px] font-medium mt-1.5" style={{ color: "#94a3b8" }}>{description}</p>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+              {trendType === 'up' ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}
+              {trend}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
   )
 };
 
@@ -461,22 +416,22 @@ export default function DashboardPage() {
         type: 'line' as const,
         label: t.revenue,
         data: salesData?.monthlySales || [],
-        borderColor: '#00C9A7',
-        borderWidth: 3,
-        pointRadius: 5,
-        pointHoverRadius: 8,
+        borderColor: '#2563eb',
+        borderWidth: 2.5,
+        pointRadius: 4,
+        pointHoverRadius: 6,
         pointBackgroundColor: '#fff',
-        pointBorderColor: '#00C9A7',
-        pointBorderWidth: 2.5,
-        tension: 0.4,
+        pointBorderColor: '#2563eb',
+        pointBorderWidth: 2,
+        tension: 0.3,
         fill: true,
         backgroundColor: (context: any) => {
           const chart = context.chart;
           const { ctx, chartArea } = chart;
           if (!chartArea) return null;
           const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          gradient.addColorStop(0, 'rgba(0, 201, 167, 0.15)');
-          gradient.addColorStop(1, 'rgba(0, 201, 167, 0)');
+          gradient.addColorStop(0, 'rgba(37, 99, 235, 0.14)');
+          gradient.addColorStop(1, 'rgba(37, 99, 235, 0.01)');
           return gradient;
         },
         order: 1,
@@ -485,19 +440,12 @@ export default function DashboardPage() {
         type: 'bar' as const,
         label: 'Volume',
         data: salesData?.monthlySales || [],
-        backgroundColor: (context: any) => {
-          const chart = context.chart;
-          const { ctx, chartArea } = chart;
-          if (!chartArea) return null;
-          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          gradient.addColorStop(0, 'rgba(0, 201, 167, 0.35)');
-          gradient.addColorStop(1, 'rgba(0, 201, 167, 0.05)');
-          return gradient;
-        },
-        borderRadius: 12,
+        backgroundColor: 'rgba(148, 163, 184, 0.25)',
+        hoverBackgroundColor: 'rgba(148, 163, 184, 0.45)',
+        borderRadius: 4,
         borderWidth: 0,
-        barThickness: 32,
-        maxBarThickness: 45,
+        barThickness: 24,
+        maxBarThickness: 36,
         order: 2,
       },
     ],
@@ -629,105 +577,97 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen p-4 lg:p-8 space-y-6 lg:space-y-8" style={{ background: "hsl(210, 20%, 97%)" }}>
-      {/* Header Section */}
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col lg:flex-row lg:items-center justify-between gap-6"
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "linear-gradient(135deg, #00C9A7, #00A589)", boxShadow: "0 0 20px rgba(0,201,167,0.35)" }}
-          >
-            <TrendingUp size={20} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl lg:text-2xl font-black tracking-tight leading-tight" style={{ color: "#0D1117" }}>
-              {t.enterprise} <span style={{ color: "#00C9A7" }}>{t.enterpriseDashboard}</span>
+    <div className="min-h-screen p-3 lg:p-4 space-y-3 bg-slate-50 dark:bg-[#06090e]">
+      {/* Header Section — Technical Operations Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
+              SYS-EXEC
+            </span>
+            <h1 className="text-base lg:text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-tight">
+              Executive Telemetry Console
             </h1>
-            <p className="text-xs font-semibold" style={{ color: "#94a3b8" }}>{t.analyticsSubtitle}</p>
           </div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">
+            Real-time multi-department operational & financial health telemetry
+          </p>
         </div>
 
-        <div className="flex items-center gap-2 lg:gap-3">
+        <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>FEED: ACTIVE</span>
+          </div>
+
           <Button
             onClick={handleRefresh}
             variant="outline"
-            className="flex-1 lg:flex-none rounded-xl border bg-white shadow-sm transition-all font-black text-[10px] uppercase tracking-widest px-3 lg:px-5 h-10"
-            style={{ borderColor: "#e2e8f0", color: "#64748b" }}
+            className="rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-mono text-[11px] px-2.5 h-7 shadow-2xs"
           >
-            <RefreshCcw size={14} className={`mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
-            {t.syncDashboard}
+            <RefreshCcw size={12} className={`mr-1.5 ${isLoading ? 'animate-spin text-blue-500' : ''}`} />
+            REFRESH
           </Button>
-          <Button
-            className="flex-1 lg:flex-none rounded-xl text-white font-black text-[10px] uppercase tracking-widest px-3 lg:px-7 h-10 transition-all active:scale-95"
-            style={{ background: "linear-gradient(135deg, #00C9A7, #00A589)", boxShadow: "0 8px 20px rgba(0,201,167,0.35)" }}
-          >
-            {t.intelligenceReport}
-          </Button>
-        </div>
-      </motion.header>
 
-      {/* Planned Surveys Highlight */}
-      <motion.div
-        initial={{ opacity: 0, y: -12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl overflow-hidden relative"
-        style={{ background: "linear-gradient(120deg, #0f766e, #042f2c)", boxShadow: "0 12px 32px rgba(15,118,110,0.25)" }}
-      >
-        <div className="absolute top-0 right-0 w-56 h-56 bg-indigo-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-        <div className="relative p-5 lg:p-6 flex flex-col lg:flex-row lg:items-center gap-4">
-          <div className="flex items-center gap-3 lg:w-56 lg:shrink-0">
-            <div className="w-11 h-11 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center shrink-0">
-              <MapPin size={18} className="text-indigo-300" />
+          <Link href="/dashboard/finance/reports">
+            <Button
+              className="rounded bg-blue-600 hover:bg-blue-700 text-white font-mono text-[11px] px-3 h-7 shadow-2xs"
+            >
+              FINANCIAL LEDGER
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* Planned Surveys Tactical Alert Strip */}
+      <div className="rounded-md bg-slate-900 border border-slate-800/80 p-2.5 text-white">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="w-7 h-7 rounded bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 text-blue-400">
+              <MapPin size={14} />
             </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300 leading-none mb-1.5">{t.plannedSurveys}</p>
-              <p className="text-lg font-black text-white leading-none tracking-tight">{plannedSurveys?.length || 0}</p>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-slate-400">{t.plannedSurveys}</span>
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-blue-900/60 text-blue-300 border border-blue-800">
+                  {plannedSurveys?.length || 0} DISPATCHED
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-mono">Field surveys scheduled for operational verification</p>
             </div>
           </div>
-          <div className="flex-1 flex flex-wrap gap-2 lg:pl-6 lg:border-l border-white/10">
+
+          <div className="flex-1 flex flex-wrap items-center gap-1.5 lg:justify-end">
             {isLoadingSurveys ? (
-              <RefreshCcw className="animate-spin h-5 w-5 text-indigo-300" />
+              <RefreshCcw className="animate-spin h-3.5 w-3.5 text-slate-400" />
             ) : plannedSurveys?.length > 0 ? (
-              plannedSurveys.slice(0, 5).map((s: any) => (
-                <Link key={s.id} href="/dashboard/sales/surveys"
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.07] border border-white/10 text-white hover:bg-white/[0.14] transition-all min-w-0">
-                  <span className="text-[9px] font-black text-indigo-300 uppercase whitespace-nowrap">{format(new Date(s.date), 'd MMM')}</span>
-                  <span className="w-1 h-1 rounded-full bg-indigo-400 shrink-0" />
-                  <span className="text-xs font-bold text-white truncate max-w-[140px]">{s.customer?.name || s.location}</span>
+              plannedSurveys.slice(0, 4).map((s: any) => (
+                <Link 
+                  key={s.id} 
+                  href="/dashboard/sales/surveys"
+                  className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-[11px] font-mono transition-colors"
+                >
+                  <span className="text-blue-400 font-bold">{format(new Date(s.date), 'dd/MM')}</span>
+                  <span className="text-slate-600">•</span>
+                  <span className="text-slate-300 truncate max-w-[140px]">{s.customer?.name || s.location}</span>
                 </Link>
               ))
             ) : (
-              <p className="text-xs font-bold text-indigo-200/70 uppercase tracking-widest py-2">{t.noPlannedSurveys}</p>
+              <span className="text-[11px] text-slate-500 font-mono">{t.noPlannedSurveys}</span>
             )}
-            <Link href="/dashboard/sales/surveys"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-indigo-900 hover:bg-indigo-50 transition-all text-[10px] font-black uppercase tracking-widest">
-              {t.viewAll} <ArrowRight size={12} />
+
+            <Link 
+              href="/dashboard/sales/surveys"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono font-semibold text-slate-200 transition-colors border border-slate-700"
+            >
+              DISPATCH VIEW <ArrowRight size={10} />
             </Link>
           </div>
-          {(() => {
-            const ms = (plannedSurveys || []).find((s: any) => s.latitude && s.longitude)
-            if (!ms) return null
-            return (
-              <div className="hidden lg:block w-56 h-20 rounded-xl overflow-hidden shrink-0 border border-white/15 bg-white/10">
-                <iframe
-                  key={`${ms.latitude}-${ms.longitude}`}
-                  src={`https://maps.google.com/maps?ll=${ms.latitude},${ms.longitude}&q=${ms.latitude},${ms.longitude}&hl=id&t=&z=15&ie=UTF8&iwloc=&output=embed`}
-                  title="Peta Survey"
-                  className="w-full h-full"
-                  loading="lazy"
-                />
-              </div>
-            )
-          })()}
         </div>
-      </motion.div>
+      </div>
 
       {/* Main Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-3">
         <DashboardCard
           title={t.totalRevenue}
           value={isLoadingSales ? getLoadingSpinner() : `Rp ${((salesData?.rawData as any[]) || []).reduce((sum: number, inv: any) => sum + (inv.totalAmount || 0), 0).toLocaleString()}`}
@@ -766,48 +706,53 @@ export default function DashboardPage() {
 
 
 
-      {/* Analytics & Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Analytics & Telemetry Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-2.5 lg:gap-3">
         {/* Sales Performance Chart */}
-        <Card className="lg:col-span-2 border shadow-lg rounded-2xl bg-white overflow-hidden" style={{ borderColor: "rgba(0,201,167,0.12)" }}>
-          <CardHeader className="p-4 lg:p-6 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="lg:col-span-2 rounded-md bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 mb-1.5 border-b border-slate-100 dark:border-slate-800/80">
             <div>
-              <CardTitle className="text-lg font-black tracking-tight" style={{ color: "#0D1117" }}>{t.salesPerformance}</CardTitle>
-              <p className="text-[10px] font-bold mt-1 uppercase tracking-[0.2em]" style={{ color: "#94a3b8" }}>{t.revenueGrowthDesc}</p>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[9px] font-bold text-slate-400 dark:text-slate-500">// METRIC-01</span>
+                <h3 className="text-xs font-bold tracking-tight text-slate-900 dark:text-white uppercase font-mono">
+                  {t.salesPerformance}
+                </h3>
+              </div>
+              <p className="text-[10px] text-slate-500 font-mono mt-0.5">{t.revenueGrowthDesc}</p>
             </div>
-            <div className="flex">
-              <span
-                className="flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-full"
-                style={{ color: "#00C9A7", background: "rgba(0,201,167,0.1)" }}
-              >
-                <Activity size={13} /> {t.live}
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4 lg:p-6 pt-3">
-            <div className="h-[250px] lg:h-[320px] w-full">
-              <Chart type="bar" data={salesChartData as any} options={{
-                ...commonOptions,
-                plugins: {
-                  ...commonOptions.plugins,
-                  legend: {
-                    ...commonOptions.plugins.legend,
-                    display: typeof window !== 'undefined' && window.innerWidth > 640
-                  }
-                }
-              } as any} />
-            </div>
-          </CardContent>
-        </Card>
+            <span className="inline-flex items-center gap-1 text-[9px] font-mono font-semibold px-1.5 py-0.2 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900 w-fit">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" /> {t.live}
+            </span>
+          </div>
 
-        {/* Expenses Breakdown */}
-        <Card className="border-none shadow-xl rounded-2xl bg-white">
-          <CardHeader className="p-4 lg:p-6 pb-3">
-            <CardTitle className="text-lg font-black text-slate-900 tracking-tight">{t.expenseAllocation}</CardTitle>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em]">{t.operationalCategoriesDesc}</p>
-          </CardHeader>
-          <CardContent className="p-6 lg:p-8 pt-4 flex flex-col items-center justify-center">
-            <div className="h-[210px] w-full relative">
+          <div className="h-[200px] lg:h-[220px] w-full pt-1">
+            <Chart type="bar" data={salesChartData as any} options={{
+              ...commonOptions,
+              plugins: {
+                ...commonOptions.plugins,
+                legend: {
+                  ...commonOptions.plugins.legend,
+                  display: typeof window !== 'undefined' && window.innerWidth > 640
+                }
+              }
+            } as any} />
+          </div>
+        </div>
+
+        {/* Expenses Allocation */}
+        <div className="rounded-md bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
+          <div className="pb-2 mb-1.5 border-b border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-[9px] font-bold text-slate-400 dark:text-slate-500">// ALLOC-01</span>
+              <h3 className="text-xs font-bold tracking-tight text-slate-900 dark:text-white uppercase font-mono">
+                {t.expenseAllocation}
+              </h3>
+            </div>
+            <p className="text-[10px] text-slate-500 font-mono mt-0.5">{t.operationalCategoriesDesc}</p>
+          </div>
+
+          <div className="flex flex-col items-center justify-center py-1">
+            <div className="h-[135px] w-full relative">
               <Doughnut
                 data={expensePieData}
                 options={{
@@ -817,37 +762,44 @@ export default function DashboardPage() {
                   scales: { x: { display: false }, y: { display: false } }
                 }}
               />
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-4">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">{t.total}</p>
-                <p className="text-sm font-black text-slate-900 truncate w-full">
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-2">
+                <span className="text-[8.5px] font-mono uppercase tracking-widest text-slate-400">{t.total}</span>
+                <span className="text-xs font-bold font-tabular text-slate-900 dark:text-slate-100">
                   Rp {((expensesData?.amounts || []).reduce((a: number, b: number) => a + (Number(b) || 0), 0) / 1000000).toFixed(1)}M
-                </p>
+                </span>
               </div>
             </div>
-            <div className="mt-6 w-full space-y-2">
+
+            <div className="mt-2.5 w-full space-y-1 border-t border-slate-100 dark:border-slate-800/60 pt-2">
               {(expensesData?.categories || []).slice(0, 3).map((cat: string, i: number) => (
-                <div key={cat} className="flex items-center justify-between text-[10px] font-black">
-                  <span className="flex items-center gap-2 text-slate-500 truncate pr-2">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: expensePieData.datasets[0].backgroundColor[i] }} />
+                <div key={cat} className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 truncate pr-2">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: expensePieData.datasets[0].backgroundColor[i] }} />
                     <span className="truncate">{cat}</span>
                   </span>
-                  <span className="text-slate-900 font-black whitespace-nowrap">
+                  <span className="font-bold text-slate-900 dark:text-slate-200 tabular-nums">
                     Rp {((expensesData?.amounts?.[i] || 0) / 1000000).toFixed(1)}M
                   </span>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* Sales by Category Breakdown */}
-        <Card className="border-none shadow-xl rounded-2xl bg-indigo-600 text-white">
-          <CardHeader className="p-4 lg:p-6 pb-3">
-            <CardTitle className="text-lg font-black tracking-tight">{t.salesByCategory}</CardTitle>
-            <p className="text-[10px] font-bold text-indigo-200 mt-1 uppercase tracking-[0.2em]">{t.salesByCategoriesDesc}</p>
-          </CardHeader>
-          <CardContent className="p-4 lg:p-6 pt-3 flex flex-col items-center justify-center">
-            <div className="h-[180px] w-full relative">
+        <div className="rounded-md bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
+          <div className="pb-2 mb-1.5 border-b border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono text-[9px] font-bold text-slate-400 dark:text-slate-500">// REVENUE-02</span>
+              <h3 className="text-xs font-bold tracking-tight text-slate-900 dark:text-white uppercase font-mono">
+                {t.salesByCategory}
+              </h3>
+            </div>
+            <p className="text-[10px] text-slate-500 font-mono mt-0.5">{t.salesByCategoriesDesc}</p>
+          </div>
+
+          <div className="flex flex-col items-center justify-center py-1">
+            <div className="h-[135px] w-full relative">
               <Doughnut
                 data={categorySalesPieData}
                 options={{
@@ -858,252 +810,252 @@ export default function DashboardPage() {
                     legend: { display: false },
                     tooltip: {
                       ...commonOptions.plugins.tooltip,
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                      titleColor: '#1e293b',
-                      bodyColor: '#475569',
+                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                      titleColor: '#f8fafc',
+                      bodyColor: '#cbd5e1',
                     }
                   },
                   scales: { x: { display: false }, y: { display: false } }
                 }}
               />
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-4">
-                <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest leading-none mb-1">{t.total}</p>
-                <p className="text-sm font-black text-white truncate w-full">
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center p-2">
+                <span className="text-[8.5px] font-mono uppercase tracking-widest text-slate-400">{t.total}</span>
+                <span className="text-xs font-bold font-tabular text-slate-900 dark:text-slate-100">
                   Rp {(((categorySales || []).reduce((a, b) => a + b.amount, 0)) / 1000000).toFixed(1)}M
-                </p>
+                </span>
               </div>
             </div>
-            <div className="mt-6 w-full space-y-2">
+
+            <div className="mt-2.5 w-full space-y-1 border-t border-slate-100 dark:border-slate-800/60 pt-2">
               {(categorySales || []).slice(0, 3).map((item, i) => (
-                <div key={item.category} className="flex items-center justify-between text-[10px] font-black">
-                  <span className="flex items-center gap-2 text-indigo-200 truncate pr-2">
-                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: categorySalesPieData.datasets[0].backgroundColor[i] }} />
+                <div key={item.category} className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 truncate pr-2">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: categorySalesPieData.datasets[0].backgroundColor[i] }} />
                     <span className="truncate">{item.category}</span>
                   </span>
-                  <span className="text-white font-black whitespace-nowrap">Rp {(item.amount / 1000000).toFixed(1)}M</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-200 tabular-nums">
+                    Rp {(item.amount / 1000000).toFixed(1)}M
+                  </span>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      {/* Bottom Section: Reports & Inventory */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Financial Telemetry & Stock Watchlist */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 lg:gap-3">
         {/* Financial Summary */}
-        <Card className="border-none shadow-xl rounded-2xl bg-slate-900 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <CardHeader className="p-4 lg:p-6 pb-3">
-            <CardTitle className="text-lg font-black tracking-tight text-white flex items-center gap-2">
-              <Layers size={20} className="text-indigo-400" />
-              {t.financialHealthSummary}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 lg:p-6 pt-0 flex flex-col md:flex-row gap-8 lg:gap-10">
-            <div className="flex-1 space-y-6">
-              <div className="p-6 rounded-[2rem] bg-white/5 border border-white/10 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity">
-                  <TrendingUp className="text-indigo-400" size={40} />
-                </div>
-                <p className="text-[10px] font-black text-indigo-400 uppercase mb-4 tracking-[0.2em]">{t.netProfitMargin}</p>
-                <div className="flex items-end justify-between relative z-10">
-                  <h3 className="text-2xl lg:text-4xl font-black tracking-tighter text-white">
-                    Rp {safeNetProfit.toLocaleString()}
-                  </h3>
-                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-black ${safeNetProfit >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                    {safeNetProfit >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-                    {profitMargin.toFixed(1)}%
-                  </div>
-                </div>
+        <div className="rounded-md bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 p-3.5 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+              <div className="flex items-center gap-1.5">
+                <Layers size={14} className="text-blue-500" />
+                <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase font-mono tracking-tight">
+                  {t.financialHealthSummary}
+                </h3>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t.revenue}</p>
-                  <p className="text-base lg:text-lg font-black text-white">Rp {safeTotalRevenue.toLocaleString()}</p>
-                </div>
-                <div className="space-y-1 text-right">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{t.expensesCOGS}</p>
-                  <p className="text-base lg:text-lg font-black text-red-400">Rp {safeTotalCOGS.toLocaleString()}</p>
-                </div>
-              </div>
+              <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
+                {t.positive}
+              </span>
             </div>
 
-            <div className="flex-1 flex flex-col justify-between">
-              <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5">
+              <div className="p-2.5 rounded bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+                <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500">{t.netProfitMargin}</span>
+                <div className="text-base lg:text-lg font-bold font-tabular text-slate-900 dark:text-white mt-0.5 leading-tight">
+                  Rp {safeNetProfit.toLocaleString()}
+                </div>
+                <div className="flex items-center gap-1 text-[10px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                  <ArrowUpRight size={10} />
+                  <span>{profitMargin.toFixed(1)}% margin</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t.cashFlowHealth}</p>
-                    <span className="text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg">{t.positive}</span>
+                  <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500">{t.revenue} vs {t.expensesCOGS}</span>
+                  <div className="flex items-center justify-between text-[11px] font-mono mt-1">
+                    <span className="text-slate-500">Gross Rev:</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">Rp {safeTotalRevenue.toLocaleString()}</span>
                   </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-black text-slate-400 uppercase">{t.operatingActivities}</span>
-                      <span className="text-sm font-black text-white">
-                        Rp {cashFlowReport?.operating?.total?.toLocaleString() ?? '0'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-black text-slate-400 uppercase">{t.netCashChange}</span>
-                      <span className="text-sm font-black text-indigo-400">
-                        Rp {((cashFlowReport?.operating?.total || 0) + (cashFlowReport?.investing?.total || 0) + (cashFlowReport?.financing?.total || 0)).toLocaleString()}
-                      </span>
-                    </div>
+                  <div className="flex items-center justify-between text-[11px] font-mono mt-0.5">
+                    <span className="text-slate-500">COGS Burn:</span>
+                    <span className="font-bold text-rose-600 dark:text-rose-400">Rp {safeTotalCOGS.toLocaleString()}</span>
                   </div>
                 </div>
+                <div className="text-[9px] font-mono text-slate-400 pt-1 border-t border-slate-200 dark:border-slate-800 mt-1">
+                  COGS Ratio: {cogsRatio.toFixed(1)}%
+                </div>
               </div>
-
-              <Link href="/dashboard/finance/reports" className="flex items-center justify-center gap-3 w-full py-4 mt-8 rounded-2xl bg-white text-slate-900 font-black text-[10px] uppercase tracking-widest hover:bg-slate-100 transition-all active:scale-95 shadow-xl shadow-white/5">
-                {t.downloadFullReport} <ArrowRight size={16} />
-              </Link>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="space-y-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+              <div className="flex items-center justify-between text-[11px] font-mono">
+                <span className="text-slate-500">{t.operatingActivities}:</span>
+                <span className="font-bold text-slate-900 dark:text-slate-100">
+                  Rp {cashFlowReport?.operating?.total?.toLocaleString() ?? '0'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px] font-mono">
+                <span className="text-slate-500">{t.netCashChange}:</span>
+                <span className="font-bold text-blue-600 dark:text-blue-400">
+                  Rp {((cashFlowReport?.operating?.total || 0) + (cashFlowReport?.investing?.total || 0) + (cashFlowReport?.financing?.total || 0)).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <Link href="/dashboard/finance/reports" className="mt-3 flex items-center justify-center gap-1.5 w-full py-1.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-mono text-[11px] font-semibold transition-colors">
+            {t.downloadFullReport} <ArrowRight size={11} />
+          </Link>
+        </div>
 
         {/* Low Stock Watchlist */}
-        <Card className="border-none shadow-xl rounded-2xl bg-white">
-          <CardHeader className="p-6 pb-3 flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg font-black text-slate-900 tracking-tight">{t.stockWatchlist}</CardTitle>
-              <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em]">{t.immediateAttentionDesc}</p>
+        <div className="rounded-md bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 p-3.5 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+              <div>
+                <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase font-mono tracking-tight">
+                  {t.stockWatchlist}
+                </h3>
+                <p className="text-[10px] text-slate-500 font-mono">{t.immediateAttentionDesc}</p>
+              </div>
+              <Link href="/dashboard/inventory" className="text-[11px] font-mono font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                {t.viewAll}
+              </Link>
             </div>
-            <Link href="/dashboard/inventory" className="text-[10px] font-black text-indigo-600 hover:underline uppercase tracking-widest">
-              {t.viewAll}
-            </Link>
-          </CardHeader>
-          <CardContent className="p-6 pt-0 pb-6">
+
             {isLoadingLowStock ? getLoadingSpinner() : (
-              <div className="space-y-3">
+              <div className="space-y-1.5">
                 {lowStockItems?.length > 0 ? (
                   lowStockItems.slice(0, 4).map((item: any) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 transition-all">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-black text-xs text-slate-400 uppercase">
+                    <div key={item.id} className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 rounded bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-mono font-bold text-[10px] text-slate-700 dark:text-slate-300 shrink-0">
                           {(item.name || item.product?.name || 'P').charAt(0)}
                         </div>
-                        <div>
-                          <p className="text-xs font-black text-slate-900 leading-none mb-1">{item.name || item.product?.name || 'Unknown Item'}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{item.code || 'N/A'}</p>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold text-slate-900 dark:text-slate-100 truncate leading-tight">{item.name || item.product?.name || 'Unknown Item'}</p>
+                          <span className="font-mono text-[9px] text-slate-400">{item.code || 'SKU-N/A'}</span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs font-black text-red-500">{item.totalQty || item.stock || 0} {t.left}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{t.min}: {item.minStock || 0}</p>
+                      <div className="text-right shrink-0">
+                        <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900">
+                          {item.totalQty || item.stock || 0} {t.left}
+                        </span>
+                        <p className="text-[9px] font-mono text-slate-400 mt-0.5">{t.min}: {item.minStock || 0}</p>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
-                      <ShieldAlert size={32} />
-                    </div>
-                    <h4 className="text-lg font-black text-slate-900 uppercase tracking-tighter">{t.allStable}</h4>
-                    <p className="text-xs text-slate-500 font-medium">{t.inventorySafeDesc}</p>
+                  <div className="py-6 text-center">
+                    <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{t.allStable}</span>
+                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">{t.inventorySafeDesc}</p>
                   </div>
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+
+          <Link href="/dashboard/inventory" className="mt-3 flex items-center justify-center gap-1.5 w-full py-1.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-mono text-[11px] font-semibold transition-colors">
+            INVENTORY MANAGER <ArrowRight size={11} />
+          </Link>
+        </div>
       </div>
 
-      {/* Last Row: Activity & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Activity Stream & Quick Commands */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 lg:gap-3">
         {/* Recent Activity Feed */}
-        <Card className="lg:col-span-2 border-none shadow-xl rounded-2xl bg-white overflow-hidden">
-          <CardHeader className="p-6 pb-3">
-            <CardTitle className="text-lg font-black text-slate-900 tracking-tight">{t.recentActivity}</CardTitle>
-            <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-[0.2em] font-mono">{t.latestUpdatesDesc}</p>
-          </CardHeader>
-          <CardContent className="p-6 pt-3">
-            {isLoadingActivity ? getLoadingSpinner() : (
-              <div className="space-y-4 lg:space-y-6">
-                {recentActivity && recentActivity.length > 0 ? (
-                  (recentActivity as ActivityItem[]).map((activity, idx) => (
-                    <motion.div
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      key={`${activity.type}-${activity.id}`}
-                      className="flex items-start gap-4 p-2 group hover:bg-slate-50 rounded-2xl transition-all"
-                    >
-                      <div className={`p-3 rounded-2xl flex-shrink-0 ${activity.type === 'INVOICE' ? 'bg-indigo-50 text-indigo-600' :
-                        activity.type === 'QUOTATION' ? 'bg-emerald-50 text-emerald-600' :
-                          activity.type === 'WORK_ORDER' ? 'bg-amber-50 text-amber-600' :
-                            activity.type === 'SALES_ORDER' ? 'bg-blue-50 text-blue-600' :
-                              'bg-slate-50 text-slate-600'
-                        }`}>
-                        {activity.type === 'INVOICE' && <DollarSign size={18} />}
-                        {activity.type === 'QUOTATION' && <ArrowUpRight size={18} />}
-                        {activity.type === 'WORK_ORDER' && <Activity size={18} />}
-                        {activity.type === 'PROPOSAL' && <Layers size={18} />}
-                        {activity.type === 'SALES_ORDER' && <ShoppingCart size={18} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <p className="text-sm font-black text-slate-900 truncate pr-2">{activity.title}</p>
-                          <span className="text-[9px] font-black text-slate-400 uppercase whitespace-nowrap">{format(activity.date, 'HH:mm • MMM d')}</span>
-                        </div>
-                        <p className="text-[11px] font-semibold text-slate-500 truncate">{activity.subtitle}</p>
-                        {activity.amount && (
-                          <p className="text-xs font-black text-indigo-600 mt-1.5">Rp {activity.amount.toLocaleString()}</p>
-                        )}
-                      </div>
-                      <div className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-tight whitespace-nowrap ${['PAID', 'COMPLETED', 'APPROVED', 'ACTIVE'].includes(activity.status) ? 'bg-emerald-100 text-emerald-700' :
-                        ['DRAFT', 'PENDING'].includes(activity.status) ? 'bg-slate-100 text-slate-600' :
-                          'bg-amber-100 text-amber-700'
-                        }`}>
-                        {activity.status}
-                      </div>
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-slate-50 flex items-center justify-center mb-4">
-                      <Activity size={24} className="text-slate-200" />
-                    </div>
-                    <p className="text-sm font-black text-slate-300 uppercase tracking-widest">{t.noRecentActivity}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-2 rounded-md bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 p-3.5 shadow-2xs">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80">
+            <div>
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase font-mono tracking-tight">{t.recentActivity}</h3>
+              <p className="text-[10px] text-slate-500 font-mono">{t.latestTransactionsDesc}</p>
+            </div>
+            <span className="font-mono text-[9px] text-slate-400 uppercase">STREAM: REALTIME</span>
+          </div>
 
-        {/* Quick Actions Panel */}
-        <Card className="border-none shadow-xl rounded-2xl bg-slate-900 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
-          <CardHeader className="p-6 pb-3">
-            <CardTitle className="text-lg font-black tracking-tight text-white flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
-              {t.controlPanel}
-            </CardTitle>
-            <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-[0.2em]">{t.executeFrequentActions}</p>
-          </CardHeader>
-          <CardContent className="p-6 pt-4 pb-10">
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                { label: t.invoice, icon: DollarSign, color: 'bg-white/5', hoverColor: 'hover:bg-indigo-600/30', iconColor: 'text-indigo-400', href: '/dashboard/finance/invoices' },
-                { label: t.quote, icon: ArrowUpRight, color: 'bg-indigo-600/20', hoverColor: 'hover:bg-indigo-600/40', iconColor: 'text-indigo-300', href: '/dashboard/sales/quotations' },
-                { label: t.work, icon: Activity, color: 'bg-white/5', hoverColor: 'hover:bg-indigo-600/30', iconColor: 'text-indigo-400', href: '/dashboard/operations/work-orders' },
-                { label: t.stock, icon: Package, color: 'bg-white/5', hoverColor: 'hover:bg-indigo-600/30', iconColor: 'text-indigo-400', href: '/dashboard/inventory' },
-              ].map((action) => (
-                <Link key={action.label} href={action.href} className="h-full">
-                  <motion.div
-                    whileHover={{ y: -4, scale: 1.02 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`${action.color} ${action.hoverColor} backdrop-blur-md p-4 rounded-2xl flex flex-col items-center justify-center gap-2 border border-white/5 transition-all text-center h-full group pointer-events-auto`}
+          {isLoadingActivity ? getLoadingSpinner() : (
+            <div className="space-y-1.5">
+              {recentActivity && recentActivity.length > 0 ? (
+                (recentActivity as ActivityItem[]).slice(0, 5).map((activity) => (
+                  <div
+                    key={`${activity.type}-${activity.id}`}
+                    className="flex items-center justify-between p-1.5 px-2 rounded hover:bg-slate-50 dark:hover:bg-slate-900/60 border border-transparent hover:border-slate-200 dark:hover:border-slate-800 transition-colors"
                   >
-                    <div className="p-3 rounded-xl bg-slate-800/50 group-hover:bg-indigo-500 transition-all duration-300 shadow-lg group-hover:shadow-indigo-500/20">
-                      <action.icon size={20} className={`${action.iconColor} group-hover:text-white transition-colors`} />
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="font-mono text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shrink-0">
+                        {activity.type === 'INVOICE' ? 'INV' : activity.type === 'QUOTATION' ? 'QUO' : activity.type === 'SALES_ORDER' ? 'SO' : activity.type === 'WORK_ORDER' ? 'WO' : 'DOC'}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-slate-900 dark:text-slate-100 truncate leading-tight">{activity.title}</p>
+                        <p className="text-[9px] text-slate-400 font-mono truncate">{activity.subtitle}</p>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-300 group-hover:text-white transition-colors">{action.label}</span>
-                  </motion.div>
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      {activity.amount && (
+                        <span className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200 tabular-nums">
+                          Rp {activity.amount.toLocaleString()}
+                        </span>
+                      )}
+                      <span className="font-mono text-[9.5px] text-slate-400 hidden sm:inline">
+                        {format(new Date(activity.date), 'HH:mm')}
+                      </span>
+                      <span className={`px-1.5 py-0.2 rounded text-[8.5px] font-mono font-bold uppercase ${
+                        ['PAID', 'COMPLETED', 'APPROVED', 'ACTIVE'].includes(activity.status)
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900'
+                          : ['DRAFT', 'PENDING'].includes(activity.status)
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
+                          : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900'
+                      }`}>
+                        {activity.status}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-6 text-center">
+                  <span className="text-[11px] font-mono text-slate-400">{t.noRecentActivity}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Tactical Quick Actions */}
+        <div className="rounded-md bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 p-3.5 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase font-mono tracking-tight">{t.controlPanel}</h3>
+              <p className="text-[10px] text-slate-500 font-mono">{t.executeFrequentActions}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+              {[
+                { label: t.invoice, icon: DollarSign, href: '/dashboard/finance/invoices' },
+                { label: t.quote, icon: ArrowUpRight, href: '/dashboard/sales/quotations' },
+                { label: t.work, icon: Activity, href: '/dashboard/operations/work-orders' },
+                { label: t.stock, icon: Package, href: '/dashboard/inventory' },
+              ].map((action) => (
+                <Link 
+                  key={action.label} 
+                  href={action.href}
+                  className="flex flex-col items-center justify-center p-2 rounded bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 transition-colors text-center group"
+                >
+                  <action.icon size={15} className="text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-1" />
+                  <span className="text-[11px] font-mono font-medium text-slate-700 dark:text-slate-300">{action.label}</span>
                 </Link>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          <div className="mt-3 p-2 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 font-mono text-[9px] text-slate-500 flex items-center justify-between">
+            <span>SHORTCUTS:</span>
+            <kbd className="px-1 py-0.2 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold">CTRL + K</kbd>
+          </div>
+        </div>
       </div>
     </div>
   );
