@@ -6,6 +6,7 @@ import {
     BookOpen, Search, Filter, Calendar,
     ArrowRight, Printer, Download, RefreshCw
 } from "lucide-react"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 
 interface LedgerItem {
     id: string
@@ -119,26 +120,14 @@ export default function LedgerPage() {
     const displayItems = [...itemsWithBalance].reverse();
 
     return (
-        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-4 md:space-y-6 font-inter max-w-full mx-auto pb-24 md:pb-8">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 shrink-0">
-                        <BookOpen size={20} className="text-white md:w-6 md:h-6" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">Buku Besar</h1>
-                        <p className="text-[9px] md:text-[11px] font-semibold text-slate-400 uppercase tracking-widest leading-none mt-0.5 md:mt-1">General Ledger Detail</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
-                    <button onClick={() => window.print()} className="flex-1 md:flex-none flex justify-center items-center h-11 md:h-auto md:p-2.5 text-slate-400 bg-slate-50 md:bg-transparent hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition-all border border-slate-100 md:border-transparent">
-                        <Printer size={18} />
-                    </button>
-                    <button className="flex-auto md:flex-none flex items-center justify-center gap-2 px-4 h-11 md:h-auto md:py-2.5 bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20">
-                        <Download size={16} /> Export
-                    </button>
-                </div>
-            </header>
+        <FinancePageShell>
+            <FinancePageHeader
+                title="Buku Besar"
+                description="General Ledger"
+                icon={<BookOpen className="h-5 w-5" />}
+            />
+
+            {/* filter + table tetap di bawah */}
 
             {/* Filter Bar */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 md:p-6 rounded-[2rem] md:rounded-3xl border border-slate-100 shadow-sm">
@@ -289,6 +278,6 @@ export default function LedgerPage() {
                     })
                 )}
             </div>
-        </div>
+        </FinancePageShell>
     )
 }
