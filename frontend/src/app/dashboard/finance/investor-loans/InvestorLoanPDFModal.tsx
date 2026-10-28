@@ -698,7 +698,7 @@ export default function InvestorLoanPDFModal({
                             </div>
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">{loan.number}</h3>
+                                    <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">{loan.number}</h3>
                                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-700 uppercase tracking-wider">
                                         Legal Contract
                                     </span>
@@ -880,7 +880,7 @@ export default function InvestorLoanPDFModal({
                                         alt="Logo"
                                     />
                                 ) : (
-                                    <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center text-white font-black text-lg">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center text-white font-bold text-lg">
                                         AX
                                     </div>
                                 )}
@@ -910,7 +910,7 @@ export default function InvestorLoanPDFModal({
 
                         {/* Title */}
                         <div className="text-center my-6">
-                            <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 uppercase">
+                            <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 uppercase">
                                 SURAT PERJANJIAN PINJAMAN MODAL INVESTOR
                             </h1>
                             <p className="text-xs font-semibold text-slate-500 mt-1 italic">

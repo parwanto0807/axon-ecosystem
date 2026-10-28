@@ -144,7 +144,7 @@ export default function ExecutiveSummaryPage() {
                             </span>
                         )}
                     </div>
-                    <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mt-1">
+                    <h1 className="text-2xl md:text-2xl font-bold text-slate-900 tracking-tight mt-1">
                         Executive Summary Laporan Keuangan
                     </h1>
                     <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
@@ -196,7 +196,7 @@ export default function ExecutiveSummaryPage() {
 
             {/* PRINT-ONLY HEADER */}
             <div className="hidden print:block mb-6 border-b pb-4">
-                <h1 className="text-2xl font-black text-slate-900">EXECUTIVE SUMMARY FINANCIAL REPORT</h1>
+                <h1 className="text-2xl font-bold text-slate-900">EXECUTIVE SUMMARY FINANCIAL REPORT</h1>
                 <p className="text-xs text-slate-500">Axon Ecosystem • Per Tanggal: {new Date(data?.endDate || Date.now()).toLocaleDateString('id-ID')}</p>
             </div>
 
@@ -223,7 +223,7 @@ export default function ExecutiveSummaryPage() {
                             <DollarSign size={16} />
                         </div>
                     </div>
-                    <p className="text-lg md:text-2xl font-black text-slate-900 mt-2">{fmt(h.revenue?.value)}</p>
+                    <p className="text-lg md:text-2xl font-bold text-slate-900 mt-2">{fmt(h.revenue?.value)}</p>
                     <div className="flex items-center gap-1 mt-2 text-xs font-bold">
                         {h.revenue?.growth >= 0 ? (
                             <span className="text-emerald-600 flex items-center"><ArrowUpRight size={14} /> +{h.revenue?.growth?.toFixed(1)}%</span>
@@ -242,7 +242,7 @@ export default function ExecutiveSummaryPage() {
                             <TrendingUp size={16} />
                         </div>
                     </div>
-                    <p className="text-lg md:text-2xl font-black text-slate-900 mt-2">{fmt(h.netProfit?.value)}</p>
+                    <p className="text-lg md:text-2xl font-bold text-slate-900 mt-2">{fmt(h.netProfit?.value)}</p>
                     <div className="flex items-center gap-1 mt-2 text-xs font-bold">
                         {h.netProfit?.growth >= 0 ? (
                             <span className="text-emerald-600 flex items-center"><ArrowUpRight size={14} /> +{h.netProfit?.growth?.toFixed(1)}%</span>
@@ -261,7 +261,7 @@ export default function ExecutiveSummaryPage() {
                             <Wallet size={16} />
                         </div>
                     </div>
-                    <p className="text-lg md:text-2xl font-black text-slate-900 mt-2">{fmt(h.cashAndEquivalents?.value)}</p>
+                    <p className="text-lg md:text-2xl font-bold text-slate-900 mt-2">{fmt(h.cashAndEquivalents?.value)}</p>
                     <p className="text-xs font-medium text-slate-400 mt-2">Saldo likuid siap pakai</p>
                 </div>
 
@@ -273,7 +273,7 @@ export default function ExecutiveSummaryPage() {
                             <BarChart3 size={16} />
                         </div>
                     </div>
-                    <p className={`text-lg md:text-2xl font-black mt-2 ${h.netOperatingCashFlow?.value >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
+                    <p className={`text-lg md:text-2xl font-bold mt-2 ${h.netOperatingCashFlow?.value >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
                         {fmt(h.netOperatingCashFlow?.value)}
                     </p>
                     <p className="text-xs font-medium text-slate-400 mt-2">Kas riil dari bisnis utama</p>
@@ -287,7 +287,7 @@ export default function ExecutiveSummaryPage() {
                             <PieChart size={16} />
                         </div>
                     </div>
-                    <p className="text-lg md:text-2xl font-black text-slate-900 mt-2">{fmt(h.totalAssets?.value)}</p>
+                    <p className="text-lg md:text-2xl font-bold text-slate-900 mt-2">{fmt(h.totalAssets?.value)}</p>
                     <div className="flex items-center gap-1 mt-2 text-xs font-bold text-slate-500">
                         <span>Modal Kerja:</span>
                         <span className="text-indigo-600 font-extrabold">{fmt(bs.workingCapital)}</span>
@@ -302,7 +302,7 @@ export default function ExecutiveSummaryPage() {
                             <ShieldAlert size={16} />
                         </div>
                     </div>
-                    <p className="text-lg md:text-2xl font-black text-slate-900 mt-2">{fmt(h.totalLiabilities?.value)}</p>
+                    <p className="text-lg md:text-2xl font-bold text-slate-900 mt-2">{fmt(h.totalLiabilities?.value)}</p>
                     <div className="flex items-center gap-1 mt-2 text-xs font-medium text-slate-400">
                         <span>Ekuitas: {fmt(bs.totalEquity)}</span>
                     </div>
@@ -371,19 +371,19 @@ export default function ExecutiveSummaryPage() {
                     <div className="mt-6 pt-4 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-3">
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                             <span className="text-[10px] font-bold uppercase text-slate-400">Margin Laba Kotor</span>
-                            <p className="text-base font-black text-slate-900 mt-1">{isSum.grossProfitMargin || 0}%</p>
+                            <p className="text-base font-bold text-slate-900 mt-1">{isSum.grossProfitMargin || 0}%</p>
                         </div>
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                             <span className="text-[10px] font-bold uppercase text-slate-400">Margin Laba Bersih</span>
-                            <p className="text-base font-black text-slate-900 mt-1">{isSum.netProfitMargin || 0}%</p>
+                            <p className="text-base font-bold text-slate-900 mt-1">{isSum.netProfitMargin || 0}%</p>
                         </div>
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                             <span className="text-[10px] font-bold uppercase text-slate-400">Total HPP</span>
-                            <p className="text-base font-black text-slate-900 mt-1">{fmt(isSum.totalCOGS)}</p>
+                            <p className="text-base font-bold text-slate-900 mt-1">{fmt(isSum.totalCOGS)}</p>
                         </div>
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
                             <span className="text-[10px] font-bold uppercase text-slate-400">Beban Operasional</span>
-                            <p className="text-base font-black text-slate-900 mt-1">{fmt(isSum.totalExpenses)}</p>
+                            <p className="text-base font-bold text-slate-900 mt-1">{fmt(isSum.totalExpenses)}</p>
                         </div>
                     </div>
                 </div>
@@ -451,11 +451,11 @@ export default function ExecutiveSummaryPage() {
                                     <td className="p-3 font-bold text-slate-900">{r.name}</td>
                                     <td className="p-3 text-slate-500 font-medium">{r.category}</td>
                                     <td className="p-3 text-slate-400 font-mono text-[11px]">{r.formula}</td>
-                                    <td className="p-3 text-right font-black text-slate-900">
+                                    <td className="p-3 text-right font-bold text-slate-900">
                                         {r.value} {r.isPercent ? '%' : ''}
                                     </td>
                                     <td className="p-3 text-center">
-                                        <span className={`px-2.5 py-1 text-[10px] font-black rounded-lg uppercase tracking-wider ${
+                                        <span className={`px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wider ${
                                             r.status === 'HEALTHY'
                                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                                 : r.status === 'WARNING'

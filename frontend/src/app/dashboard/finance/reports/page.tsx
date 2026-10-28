@@ -68,7 +68,7 @@ export default function ReportsDirectoryPage() {
                         <BarChart3 size={20} className="text-white md:w-6 md:h-6" />
                     </div>
                     <div>
-                        <h1 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight">Laporan Keuangan</h1>
+                        <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Laporan Keuangan</h1>
                         <p className="text-[10px] md:text-sm font-medium text-slate-400 mt-0.5 md:mt-1">Pusat pelaporan akuntansi dan keuangan perusahaan</p>
                     </div>
                 </div>
@@ -87,12 +87,12 @@ export default function ReportsDirectoryPage() {
                                 <report.icon size={24} className="md:w-7 md:h-7" />
                             </div>
 
-                            <h2 className="text-lg md:text-xl font-black text-slate-900 mb-1.5 md:mb-2">{report.title}</h2>
+                            <h2 className="text-lg md:text-xl font-bold text-slate-900 mb-1.5 md:mb-2">{report.title}</h2>
                             <p className="text-xs md:text-sm text-slate-400 font-medium leading-relaxed mb-6 md:mb-8 flex-1">
                                 {report.description}
                             </p>
 
-                            <div className="flex items-center gap-2 text-indigo-600 font-black text-xs uppercase tracking-widest mt-auto">
+                            <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-widest mt-auto">
                                 View Report <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                             </div>
 
@@ -109,15 +109,15 @@ export default function ReportsDirectoryPage() {
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
                 <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 md:gap-8">
                     <div>
-                        <h2 className="text-xl md:text-2xl font-black mb-1.5 md:mb-2 tracking-tight">Sistem Akuntansi Otomatis</h2>
+                        <h2 className="text-xl md:text-2xl font-bold mb-1.5 md:mb-2 tracking-tight">Sistem Akuntansi Otomatis</h2>
                         <p className="text-slate-400 text-[10px] md:text-sm max-w-xl leading-relaxed">
                             Setiap transaksi modul (Invoice, Expense, Stock) dalam ekosistem Axon secara otomatis menghasilkan jurnal akuntansi yang masuk ke laporan ini secara real-time.
                         </p>
                     </div>
                     <div className="flex w-full md:w-auto">
                         <div className="w-full md:w-auto px-4 md:px-6 py-3 md:py-4 bg-white/5 rounded-[1.5rem] md:rounded-3xl border border-white/10 text-center">
-                            <p className="text-[9px] md:text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-0.5 md:mb-1">Status Engine</p>
-                            <p className="text-lg md:text-xl font-black tracking-tight">ACTIVE</p>
+                            <p className="text-[9px] md:text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-0.5 md:mb-1">Status Engine</p>
+                            <p className="text-lg md:text-xl font-bold tracking-tight">ACTIVE</p>
                         </div>
                     </div>
                 </div>

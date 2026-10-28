@@ -168,18 +168,18 @@ export default function OpeningBalancePage() {
 
                     {/* Draft Table Header Actions */}
                     <div className="flex flex-col md:flex-row justify-between md:items-center bg-white p-4 md:px-6 md:py-4 rounded-[2rem] border border-slate-100 shadow-sm gap-4">
-                        <h2 className="text-sm font-black uppercase tracking-widest text-slate-700">Draft Entries</h2>
+                        <h2 className="text-sm font-bold uppercase tracking-widest text-slate-700">Draft Entries</h2>
                         <div className="flex flex-row w-full md:w-auto gap-2 md:gap-3">
                             <button
                                 onClick={() => openModal()}
-                                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 text-xs font-black uppercase tracking-widest rounded-xl hover:bg-indigo-100 transition-all h-11 md:h-9"
+                                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-indigo-100 transition-all h-11 md:h-9"
                             >
                                 <Plus size={14} /> Add Entry
                             </button>
                             <button
                                 onClick={handlePost}
                                 disabled={posting || draftEntries.length === 0}
-                                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2 bg-emerald-600 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 h-11 md:h-9"
+                                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2 bg-emerald-600 text-white text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 h-11 md:h-9"
                             >
                                 {posting ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
                                 Posting
@@ -192,10 +192,10 @@ export default function OpeningBalancePage() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-slate-50/50 border-b border-slate-100">
-                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Account</th>
-                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">Debit</th>
-                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">Credit</th>
-                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Actions</th>
+                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Account</th>
+                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest w-32">Debit</th>
+                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest w-32">Credit</th>
+                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest w-24">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -216,7 +216,7 @@ export default function OpeningBalancePage() {
                                         <td className="px-4 sm:px-6 lg:px-8 py-4">
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-bold text-indigo-500 font-mono mb-0.5">{b.code}</span>
-                                                <span className="font-black text-slate-900">{b.name}</span>
+                                                <span className="font-bold text-slate-900">{b.name}</span>
                                             </div>
                                         </td>
                                         <td className="px-4 sm:px-6 lg:px-8 py-4 text-right">
@@ -256,7 +256,7 @@ export default function OpeningBalancePage() {
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <span className="text-[10px] font-bold text-indigo-500 font-mono mb-0.5 block">{b.code}</span>
-                                        <span className="font-black text-slate-900">{b.name}</span>
+                                        <span className="font-bold text-slate-900">{b.name}</span>
                                     </div>
                                     <div className="flex gap-1.5">
                                         <button onClick={() => openModal(b)} className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 rounded-xl transition-colors">
@@ -269,11 +269,11 @@ export default function OpeningBalancePage() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-3 mt-1">
                                     <div className="bg-slate-50/50 p-2.5 rounded-xl text-left border border-slate-100/50">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Debit</p>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Debit</p>
                                         <p className="font-mono font-bold text-slate-700 text-sm tracking-tight">{b.debit ? b.debit.toLocaleString('id-ID') : '-'}</p>
                                     </div>
                                     <div className="bg-slate-50/50 p-2.5 rounded-xl text-right border border-slate-100/50">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Credit</p>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Credit</p>
                                         <p className="font-mono font-bold text-slate-700 text-sm tracking-tight">{b.credit ? b.credit.toLocaleString('id-ID') : '-'}</p>
                                     </div>
                                 </div>
@@ -284,29 +284,29 @@ export default function OpeningBalancePage() {
 
                 <div className="space-y-6">
                     <div className="bg-slate-900 rounded-[2.5rem] p-4 sm:p-6 lg:p-8 text-white shadow-2xl sticky top-8">
-                        <h2 className="text-xl font-black mb-6 flex items-center gap-2">
+                        <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
                             Draft Summary
                         </h2>
 
                         <div className="space-y-6">
                             <div className="flex justify-between items-end border-b border-white/10 pb-4">
                                 <div>
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Debit</p>
-                                    <p className="text-2xl font-black">{totalDebit.toLocaleString('id-ID')}</p>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Debit</p>
+                                    <p className="text-2xl font-bold">{totalDebit.toLocaleString('id-ID')}</p>
                                 </div>
                             </div>
 
                             <div className="flex justify-between items-end border-b border-white/10 pb-4">
                                 <div>
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Credit</p>
-                                    <p className="text-2xl font-black">{totalCredit.toLocaleString('id-ID')}</p>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Credit</p>
+                                    <p className="text-2xl font-bold">{totalCredit.toLocaleString('id-ID')}</p>
                                 </div>
                             </div>
 
                             <div className={`p-6 rounded-3xl border ${Math.abs(diff) < 1 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Offset (Equity Adjustment)</p>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Offset (Equity Adjustment)</p>
                                 <div className="flex items-center justify-between">
-                                    <p className={`text-xl font-black ${Math.abs(diff) < 1 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                    <p className={`text-xl font-bold ${Math.abs(diff) < 1 ? 'text-emerald-400' : 'text-amber-400'}`}>
                                         {Math.abs(diff).toLocaleString('id-ID')}
                                     </p>
                                     <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 bg-white/5 rounded-lg">
@@ -351,11 +351,11 @@ export default function OpeningBalancePage() {
                                 <X size={18} />
                             </button>
 
-                            <h2 className="text-xl font-black text-slate-900 mb-6">{editingItem ? 'Edit Balance' : 'Add Balance Entry'}</h2>
+                            <h2 className="text-xl font-bold text-slate-900 mb-6">{editingItem ? 'Edit Balance' : 'Add Balance Entry'}</h2>
 
                             <div className="space-y-5">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account</label>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Account</label>
                                     <select
                                         value={modalForm.accountId}
                                         onChange={e => setModalForm(prev => ({ ...prev, accountId: e.target.value }))}
@@ -370,7 +370,7 @@ export default function OpeningBalancePage() {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Debit Balance</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Debit Balance</label>
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm select-none">Rp</span>
                                             <input
@@ -383,7 +383,7 @@ export default function OpeningBalancePage() {
                                         </div>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Credit Balance</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Credit Balance</label>
                                         <div className="relative">
                                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm select-none">Rp</span>
                                             <input
@@ -404,7 +404,7 @@ export default function OpeningBalancePage() {
                             <button
                                 onClick={saveModalEntry}
                                 disabled={!modalForm.accountId || (!modalForm.debit && !modalForm.credit)}
-                                className="w-full mt-8 py-3.5 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50 disabled:shadow-none"
+                                className="w-full mt-8 py-3.5 bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 disabled:opacity-50 disabled:shadow-none"
                             >
                                 {editingItem ? 'Update Draft Entry' : 'Add to Draft'}
                             </button>

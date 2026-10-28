@@ -375,7 +375,7 @@ export default function InvoicesPage() {
                             </div>
                             <p className="md:mt-4 text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest">{s.label}</p>
                         </div>
-                        <span className="text-lg md:text-xl font-black tracking-tight">{s.val}</span>
+                        <span className="text-lg md:text-xl font-bold tracking-tight">{s.val}</span>
                     </motion.div>
                 ))}
             </div>
@@ -397,12 +397,12 @@ export default function InvoicesPage() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50">
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground w-12 text-center">No</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Invoice Info</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Customer & Kontrak</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground text-right">Total Tagihan</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Status</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground text-right">Aksi</th>
+                                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground w-12 text-center">No</th>
+                                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Invoice Info</th>
+                                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Customer & Kontrak</th>
+                                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground text-right">Total Tagihan</th>
+                                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Status</th>
+                                <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
@@ -413,14 +413,14 @@ export default function InvoicesPage() {
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
                                                     <Calendar size={14} className="text-emerald-600" />
-                                                    <span className="text-[11px] font-black uppercase tracking-widest text-slate-900">{month}</span>
+                                                    <span className="text-[11px] font-bold uppercase tracking-widest text-slate-900">{month}</span>
                                                     <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-lg border border-slate-100 ml-2">
                                                         {data.invoices.length} Invoices
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Period:</span>
-                                                    <span className="text-xs font-black text-emerald-700">{fmt(data.total)}</span>
+                                                    <span className="text-xs font-bold text-emerald-700">{fmt(data.total)}</span>
                                                 </div>
                                             </div>
                                         </td>
@@ -431,35 +431,35 @@ export default function InvoicesPage() {
                                                 {filtered.indexOf(inv) + 1}
                                             </td>
                                             <td className="px-6 py-5">
-                                                <p className="font-black text-foreground group-hover:text-emerald-600 transition-colors tracking-tight">{inv.number}</p>
+                                                <p className="font-bold text-foreground group-hover:text-emerald-600 transition-colors tracking-tight">{inv.number}</p>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">{fmtDate(inv.date)}</p>
+                                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">{fmtDate(inv.date)}</p>
                                                     <span className="w-1 h-1 rounded-full bg-slate-300" />
-                                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Due: {fmtDate(inv.dueDate)}</p>
+                                                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">Due: {fmtDate(inv.dueDate)}</p>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-5">
                                                 <p className="font-bold text-sm tracking-tight">{inv.customer.name}</p>
                                                 <div className="flex items-center gap-1.5 mt-1">
                                                     {inv.contract ? (
-                                                        <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 uppercase tracking-tighter shadow-sm">
+                                                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 uppercase tracking-tight shadow-sm">
                                                             Contract {inv.contract.number}
                                                         </span>
                                                     ) : (
-                                                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter border-l-2 border-slate-200 pl-2">Tanpa Kontrak</span>
+                                                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight border-l-2 border-slate-200 pl-2">Tanpa Kontrak</span>
                                                     )}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-5 text-right">
-                                                <p className="font-black text-foreground">{fmt(inv.grandTotal)}</p>
+                                                <p className="font-bold text-foreground">{fmt(inv.grandTotal)}</p>
                                                 {inv.payments && inv.payments.length > 0 && inv.status !== 'PAID' && (
-                                                    <p className="text-[10px] font-black text-rose-500 uppercase tracking-tighter mt-1">
+                                                    <p className="text-[10px] font-bold text-rose-500 uppercase tracking-tight mt-1">
                                                         Sisa: {fmt(inv.grandTotal - inv.payments.reduce((s, p) => s + p.amount, 0))}
                                                     </p>
                                                 )}
                                             </td>
                                             <td className="px-6 py-5">
-                                                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wider ${INV_STATUS[inv.status]?.color || ''}`}>
+                                                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider ${INV_STATUS[inv.status]?.color || ''}`}>
                                                     {inv.status}
                                                 </div>
                                             </td>
@@ -540,17 +540,17 @@ export default function InvoicesPage() {
                     {Object.entries(groupedInvoices).map(([month, data]) => (
                         <div key={month} className="space-y-4">
                             <div className="flex items-center justify-between pb-1 border-b border-slate-200 mx-1">
-                                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">{month}</h3>
-                                <span className="text-[10px] font-black text-emerald-600">{fmt(data.total)}</span>
+                                <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{month}</h3>
+                                <span className="text-[10px] font-bold text-emerald-600">{fmt(data.total)}</span>
                             </div>
                             {data.invoices.map((inv) => (
                                 <div key={inv.id} className="bg-white rounded-[2rem] p-5 border border-slate-100 shadow-sm flex flex-col gap-4">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="font-black text-slate-800 tracking-tight">{inv.number}</p>
-                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter mt-0.5">{fmtDate(inv.date)}</p>
+                                            <p className="font-bold text-slate-800 tracking-tight">{inv.number}</p>
+                                            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight mt-0.5">{fmtDate(inv.date)}</p>
                                         </div>
-                                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[9px] font-black uppercase tracking-wider ${INV_STATUS[inv.status]?.color || ''}`}>
+                                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[9px] font-bold uppercase tracking-wider ${INV_STATUS[inv.status]?.color || ''}`}>
                                             {inv.status}
                                         </div>
                                     </div>
@@ -559,11 +559,11 @@ export default function InvoicesPage() {
                                         <p className="font-bold text-sm text-slate-800 tracking-tight">{inv.customer.name}</p>
                                         <div className="flex items-center gap-1.5 mt-1">
                                             {inv.contract ? (
-                                                <span className="text-[9px] font-black text-indigo-600 uppercase tracking-tighter shadow-sm bg-indigo-50 px-2 rounded-md">
+                                                <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-tight shadow-sm bg-indigo-50 px-2 rounded-md">
                                                     Contract {inv.contract.number}
                                                 </span>
                                             ) : (
-                                                <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter border-l-2 border-slate-200 pl-2">Tanpa Kontrak</span>
+                                                <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-tight border-l-2 border-slate-200 pl-2">Tanpa Kontrak</span>
                                             )}
                                         </div>
                                     </div>
@@ -571,9 +571,9 @@ export default function InvoicesPage() {
                                     <div className="flex justify-between items-end border-t border-slate-50 pt-3">
                                         <div className="space-y-1">
                                             <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Total Tagihan</p>
-                                            <p className="font-black text-slate-900">{fmt(inv.grandTotal)}</p>
+                                            <p className="font-bold text-slate-900">{fmt(inv.grandTotal)}</p>
                                             {inv.payments && inv.payments.length > 0 && inv.status !== 'PAID' && (
-                                                <p className="text-[10px] font-black text-rose-500 uppercase tracking-tighter mt-1">
+                                                <p className="text-[10px] font-bold text-rose-500 uppercase tracking-tight mt-1">
                                                     Sisa: {fmt(inv.grandTotal - inv.payments.reduce((s, p) => s + p.amount, 0))}
                                                 </p>
                                             )}
@@ -688,7 +688,7 @@ export default function InvoicesPage() {
                             {isMobile && <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 shrink-0" />}
                             <div className="p-4 md:p-4 sm:p-6 lg:p-8 border-b border-border/50 flex items-center justify-between bg-slate-50/50">
                                 <div>
-                                    <h2 className="text-2xl font-black tracking-tighter text-foreground uppercase">
+                                    <h2 className="text-2xl font-bold tracking-tight text-foreground uppercase">
                                         {editMode ? 'Edit Invoice' : 'Buat Invoice Baru'}
                                     </h2>
                                     <p className="text-sm font-medium text-muted-foreground">Detail penagihan piutang dan termin pembayaran</p>
@@ -705,7 +705,7 @@ export default function InvoicesPage() {
                                             <Tag size={20} />
                                         </div>
                                         <div>
-                                            <p className="text-xs font-black uppercase text-emerald-700 tracking-wider">Tarik Data dari SO / Penagihan Termin</p>
+                                            <p className="text-xs font-bold uppercase text-emerald-700 tracking-wider">Tarik Data dari SO / Penagihan Termin</p>
                                             <p className="text-[10px] font-medium text-emerald-600/80">Otomatis isi item dan nominal berdasarkan jenis tagihan</p>
                                         </div>
                                     </div>
@@ -767,7 +767,7 @@ export default function InvoicesPage() {
                                                     {form.terminType === 'PERCENT' ? (
                                                         <Percent size={14} className="absolute left-3 top-3.5 text-slate-400" />
                                                     ) : (
-                                                        <span className="absolute left-3 top-3 text-xs font-black text-slate-400">Rp</span>
+                                                        <span className="absolute left-3 top-3 text-xs font-bold text-slate-400">Rp</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -788,7 +788,7 @@ export default function InvoicesPage() {
                                     {/* Left Column: parties & payment info */}
                                     <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Customer <span className="text-rose-500">*</span></label>
+                                            <label className="text-[10px] font-bold uppercase p-1 tracking-widest text-muted-foreground ml-1">Customer <span className="text-rose-500">*</span></label>
                                             <select
                                                 value={form.customerId} onChange={e => setForm({ ...form, customerId: e.target.value })}
                                                 className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 px-4"
@@ -799,9 +799,9 @@ export default function InvoicesPage() {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1 flex justify-between items-center px-1">
+                                            <label className="text-[10px] font-bold uppercase p-1 tracking-widest text-muted-foreground ml-1 flex justify-between items-center px-1">
                                                 <span>Rekening Bank Pembayaran</span>
-                                                <button type="button" onClick={() => setShowBankForm(true)} className="text-emerald-600 hover:underline text-[9px] font-black uppercase tracking-widest"> + Tambah Bank</button>
+                                                <button type="button" onClick={() => setShowBankForm(true)} className="text-emerald-600 hover:underline text-[9px] font-bold uppercase tracking-widest"> + Tambah Bank</button>
                                             </label>
                                             <select
                                                 value={form.bankAccountId} onChange={e => setForm({ ...form, bankAccountId: e.target.value })}
@@ -814,7 +814,7 @@ export default function InvoicesPage() {
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Penandatangan (Nama)</label>
+                                                <label className="text-[10px] font-bold uppercase p-1 tracking-widest text-muted-foreground ml-1">Penandatangan (Nama)</label>
                                                 <input
                                                     placeholder="Nama Jelas..."
                                                     value={form.signerName} onChange={e => setForm({ ...form, signerName: e.target.value })}
@@ -822,7 +822,7 @@ export default function InvoicesPage() {
                                                 />
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Jabatan</label>
+                                                <label className="text-[10px] font-bold uppercase p-1 tracking-widest text-muted-foreground ml-1">Jabatan</label>
                                                 <input
                                                     placeholder="Contoh: Finance Manager"
                                                     value={form.signerPosition} onChange={e => setForm({ ...form, signerPosition: e.target.value })}
@@ -835,7 +835,7 @@ export default function InvoicesPage() {
                                     {/* Right Column: dates & references */}
                                     <div className="space-y-4">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase p-1 tracking-widest text-indigo-600 ml-1">Kaitkan Kontrak (Opsional)</label>
+                                            <label className="text-[10px] font-bold uppercase p-1 tracking-widest text-indigo-600 ml-1">Kaitkan Kontrak (Opsional)</label>
                                             <select
                                                 value={form.contractId} onChange={e => setForm({ ...form, contractId: e.target.value })}
                                                 className="w-full h-12 rounded-2xl bg-indigo-50/50 border-2 border-indigo-600/10 font-bold text-sm focus:ring-2 focus:ring-indigo-600/20 px-4 text-indigo-900"
@@ -846,7 +846,7 @@ export default function InvoicesPage() {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase p-1 tracking-widest text-emerald-600 ml-1">Judul Project</label>
+                                            <label className="text-[10px] font-bold uppercase p-1 tracking-widest text-emerald-600 ml-1">Judul Project</label>
                                             <select
                                                 value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })}
                                                 className="w-full h-12 rounded-2xl bg-emerald-50/50 border-2 border-emerald-600/10 font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 px-4 text-emerald-900"
@@ -858,7 +858,7 @@ export default function InvoicesPage() {
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Terbitkan Dari BAST</label>
+                                                <label className="text-[10px] font-bold uppercase p-1 tracking-widest text-muted-foreground ml-1">Terbitkan Dari BAST</label>
                                                 <select
                                                     value={form.deliveryOrderId} onChange={e => setForm({ ...form, deliveryOrderId: e.target.value })}
                                                     className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 px-4"
@@ -868,7 +868,7 @@ export default function InvoicesPage() {
                                                 </select>
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Jatuh Tempo</label>
+                                                <label className="text-[10px] font-bold uppercase p-1 tracking-widest text-muted-foreground ml-1">Jatuh Tempo</label>
                                                 <input
                                                     type="date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })}
                                                     className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold tracking-tight focus:ring-2 focus:ring-emerald-600/20 px-4"
@@ -877,7 +877,7 @@ export default function InvoicesPage() {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Tanggal Invoice</label>
+                                            <label className="text-[10px] font-bold uppercase p-1 tracking-widest text-muted-foreground ml-1">Tanggal Invoice</label>
                                             <input
                                                 type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
                                                 className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold tracking-tight focus:ring-2 focus:ring-emerald-600/20 px-4"
@@ -889,7 +889,7 @@ export default function InvoicesPage() {
                                 {/* Items Section */}
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between px-1">
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-emerald-600 flex items-center gap-2">
+                                        <h3 className="text-xs font-bold uppercase tracking-widest text-emerald-600 flex items-center gap-2">
                                             <Receipt size={14} /> Daftar Tagihan (Items)
                                         </h3>
                                         <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-9 rounded-xl border-emerald-600/20 text-emerald-600 hover:bg-emerald-50 font-bold">
@@ -900,11 +900,11 @@ export default function InvoicesPage() {
                                         <table className="w-full text-left border-collapse min-w-[800px]">
                                             <thead className="bg-slate-50">
                                                 <tr className="border-b border-slate-100">
-                                                    <th className="px-4 py-3 text-[10px] font-black uppercase text-muted-foreground transition-all">Deskripsi</th>
-                                                    <th className="px-4 py-3 text-[10px] font-black uppercase text-muted-foreground w-16 text-center">Qty</th>
-                                                    <th className="px-4 py-3 text-[10px] font-black uppercase text-muted-foreground w-32">Harga</th>
-                                                    <th className="px-4 py-3 text-[10px] font-black uppercase text-muted-foreground w-16 text-center">Disc%</th>
-                                                    <th className="px-4 py-3 text-[10px] font-black uppercase text-muted-foreground w-40 text-right pr-6">Total</th>
+                                                    <th className="px-4 py-3 text-[10px] font-bold uppercase text-muted-foreground transition-all">Deskripsi</th>
+                                                    <th className="px-4 py-3 text-[10px] font-bold uppercase text-muted-foreground w-16 text-center">Qty</th>
+                                                    <th className="px-4 py-3 text-[10px] font-bold uppercase text-muted-foreground w-32">Harga</th>
+                                                    <th className="px-4 py-3 text-[10px] font-bold uppercase text-muted-foreground w-16 text-center">Disc%</th>
+                                                    <th className="px-4 py-3 text-[10px] font-bold uppercase text-muted-foreground w-40 text-right pr-6">Total</th>
                                                     <th className="px-4 py-3 w-12"></th>
                                                 </tr>
                                             </thead>
@@ -936,7 +936,7 @@ export default function InvoicesPage() {
                                                                 className="w-full bg-transparent border-none font-bold text-sm text-center focus:ring-0 text-rose-600"
                                                             />
                                                         </td>
-                                                        <td className="px-4 py-3 text-right font-black text-sm pr-6">
+                                                        <td className="px-4 py-3 text-right font-bold text-sm pr-6">
                                                             {fmt(it.amount)}
                                                         </td>
                                                         <td className="px-2 py-3 text-center">
@@ -961,7 +961,7 @@ export default function InvoicesPage() {
                                         />
                                     </div>
                                     <div className="w-full md:w-80 space-y-3">
-                                        <div className="flex justify-between text-sm font-bold text-muted-foreground px-1 uppercase tracking-tighter">
+                                        <div className="flex justify-between text-sm font-bold text-muted-foreground px-1 uppercase tracking-tight">
                                             <span>Subtotal</span>
                                             <span>{fmt(form.subtotal)}</span>
                                         </div>
@@ -975,7 +975,7 @@ export default function InvoicesPage() {
                                                         const totals = calculateTotals(form.items, form.tax, 0, dt);
                                                         setForm({ ...form, discountType: dt, discount: 0, ...totals });
                                                     }}
-                                                    className="h-6 px-1 rounded-md bg-slate-100 border-none text-[10px] font-black focus:ring-0 text-emerald-700 cursor-pointer"
+                                                    className="h-6 px-1 rounded-md bg-slate-100 border-none text-[10px] font-bold focus:ring-0 text-emerald-700 cursor-pointer"
                                                     title="Tipe diskon: persen atau nominal rupiah"
                                                 >
                                                     <option value="PERCENTAGE">%</option>
@@ -983,7 +983,7 @@ export default function InvoicesPage() {
                                                 </select>
                                                 {(form as any).discountType === 'AMOUNT' ? (
                                                     <div className="relative">
-                                                        <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400">Rp</span>
+                                                        <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">Rp</span>
                                                         <input
                                                             type="number" min="0" value={form.discount || ''}
                                                             placeholder="0"
@@ -992,7 +992,7 @@ export default function InvoicesPage() {
                                                                 const totals = calculateTotals(form.items, form.tax, disc, 'AMOUNT');
                                                                 setForm({ ...form, discount: disc, ...totals });
                                                             }}
-                                                            className="w-28 h-6 pl-7 pr-1 rounded-md bg-slate-100 border-none text-[10px] font-black text-right focus:ring-0"
+                                                            className="w-28 h-6 pl-7 pr-1 rounded-md bg-slate-100 border-none text-[10px] font-bold text-right focus:ring-0"
                                                         />
                                                     </div>
                                                 ) : (
@@ -1004,7 +1004,7 @@ export default function InvoicesPage() {
                                                                 const totals = calculateTotals(form.items, form.tax, disc, 'PERCENTAGE');
                                                                 setForm({ ...form, discount: disc, ...totals });
                                                             }}
-                                                            className="w-12 h-6 px-1 rounded-md bg-slate-100 border-none text-[10px] font-black text-center focus:ring-0"
+                                                            className="w-12 h-6 px-1 rounded-md bg-slate-100 border-none text-[10px] font-bold text-center focus:ring-0"
                                                         />
                                                         <Percent size={10} />
                                                     </div>
@@ -1022,15 +1022,15 @@ export default function InvoicesPage() {
                                                         const totals = calculateTotals(form.items, tx, form.discount, (form as any).discountType);
                                                         setForm({ ...form, tax: tx, ...totals });
                                                     }}
-                                                    className="w-12 h-6 px-1 rounded-md bg-slate-100 border-none text-[10px] font-black text-center focus:ring-0"
+                                                    className="w-12 h-6 px-1 rounded-md bg-slate-100 border-none text-[10px] font-bold text-center focus:ring-0"
                                                 />
                                                 <Percent size={10} />
                                             </div>
                                             <span>+ {fmt(form.taxAmt)}</span>
                                         </div>
                                         <div className="flex justify-between items-center py-2 px-1">
-                                            <span className="text-sm font-black uppercase tracking-widest text-foreground">Grand Total</span>
-                                            <span className="text-xl font-black text-emerald-600 tracking-tighter">{fmt(form.grandTotal)}</span>
+                                            <span className="text-sm font-bold uppercase tracking-widest text-foreground">Grand Total</span>
+                                            <span className="text-xl font-bold text-emerald-600 tracking-tight">{fmt(form.grandTotal)}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1041,7 +1041,7 @@ export default function InvoicesPage() {
                                 <Button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="h-12 rounded-2xl px-12 bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20 font-black tracking-tighter uppercase disabled:opacity-50"
+                                    className="h-12 rounded-2xl px-12 bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20 font-bold tracking-tight uppercase disabled:opacity-50"
                                 >
                                     {saving ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                                     Simpan Invoice
@@ -1101,26 +1101,26 @@ export default function InvoicesPage() {
                         >
                             {isMobile && <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-2 shrink-0" />}
                             <div className={`${isMobile ? 'p-6 pb-8 overflow-y-auto' : ''}`}>
-                                <h3 className="text-xl font-black mb-6 uppercase tracking-tighter">Tambah Rekening Bank</h3>
+                                <h3 className="text-xl font-bold mb-6 uppercase tracking-tight">Tambah Rekening Bank</h3>
                                 <div className="space-y-4">
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Nama Bank</label>
+                                        <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Nama Bank</label>
                                         <input value={bankForm.bankName} onChange={e => setBankForm({ ...bankForm, bankName: e.target.value })} placeholder="Contoh: Bank Central Asia (BCA)" className="w-full h-11 px-4 rounded-xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Nomor Rekening</label>
+                                        <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Nomor Rekening</label>
                                         <input value={bankForm.accountNumber} onChange={e => setBankForm({ ...bankForm, accountNumber: e.target.value })} placeholder="000-000-0000" className="w-full h-11 px-4 rounded-xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Atas Nama</label>
+                                        <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Atas Nama</label>
                                         <input value={bankForm.accountHolder} onChange={e => setBankForm({ ...bankForm, accountHolder: e.target.value })} placeholder="PT. Axon Ecosystem" className="w-full h-11 px-4 rounded-xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Cabang (Opsional)</label>
+                                        <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Cabang (Opsional)</label>
                                         <input value={bankForm.branch} onChange={e => setBankForm({ ...bankForm, branch: e.target.value })} placeholder="Pekayon, Bekasi" className="w-full h-11 px-4 rounded-xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Hubungkan ke Akun Buku Besar (COA) <span className="text-rose-500">*</span></label>
+                                        <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Hubungkan ke Akun Buku Besar (COA) <span className="text-rose-500">*</span></label>
                                         <select
                                             value={bankForm.coaId}
                                             onChange={e => setBankForm({ ...bankForm, coaId: e.target.value })}
@@ -1176,14 +1176,14 @@ export default function InvoicesPage() {
                                     <AlertCircle size={24} />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-black uppercase tracking-tighter">Konfirmasi Posting</h3>
+                                    <h3 className="text-xl font-bold uppercase tracking-tight">Konfirmasi Posting</h3>
                                     <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Invoice {postingInvoice.number}</p>
                                 </div>
                             </div>
 
                             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 mb-6">
                                 <p className="text-sm font-bold text-amber-800 leading-relaxed">
-                                    <span className="block mb-1 font-black">⚠️ PERINGATAN!</span>
+                                    <span className="block mb-1 font-bold">⚠️ PERINGATAN!</span>
                                     Posting invoice akan secara otomatis mencatat transaksi ke dalam **Buku Besar (General Ledger)**. Tindakan ini tidak dapat dibatalkan. Pastikan semua data sudah benar.
                                 </p>
                             </div>
@@ -1222,21 +1222,21 @@ export default function InvoicesPage() {
                                     <DollarSign size={24} />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-black uppercase tracking-tighter">Konfirmasi Pembayaran</h3>
+                                    <h3 className="text-xl font-bold uppercase tracking-tight">Konfirmasi Pembayaran</h3>
                                     <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Invoice {paymentConfirm.invoice.number}</p>
                                 </div>
                             </div>
 
                             <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 mb-6">
                                 <p className="text-sm font-bold text-amber-800 leading-relaxed">
-                                    <span className="block mb-1 font-black">⚠️ INFO PEMBAYARAN</span>
+                                    <span className="block mb-1 font-bold">⚠️ INFO PEMBAYARAN</span>
                                     Konfirmasi pembayaran akan mencatat penerimaan uang ke kas/bank dan mengurangi piutang. Anda dapat mengedit nominal jika pelanggan membayar cicilan.
                                 </p>
                             </div>
 
                             <div className="space-y-4 mb-6">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Pilih Rekening Penerima <span className="text-rose-500">*</span></label>
+                                    <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Pilih Rekening Penerima <span className="text-rose-500">*</span></label>
                                     <select
                                         className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 px-4"
                                         value={paymentConfirm.bankAccountId}
@@ -1247,7 +1247,7 @@ export default function InvoicesPage() {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Nominal Pembayaran <span className="text-rose-500">*</span></label>
+                                    <label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Nominal Pembayaran <span className="text-rose-500">*</span></label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                             <span className="text-slate-500 font-bold">Rp</span>

@@ -292,11 +292,11 @@ export default function OperationalExpensesPage() {
                         <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
                             <TrendingUp size={18} />
                         </div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase md:hidden">Total Unpaid</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase md:hidden">Total Unpaid</span>
                     </div>
                     <div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase hidden md:inline-block mb-1">Total Unpaid</span>
-                        <p className="text-base md:text-lg font-black text-slate-800 text-right md:text-left">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase hidden md:inline-block mb-1">Total Unpaid</span>
+                        <p className="text-base md:text-lg font-bold text-slate-800 text-right md:text-left">
                             Rp {Array.isArray(expenses) ? expenses.filter(e => e?.status !== 'PAID').reduce((sum, e) => sum + (e?.amount || 0), 0).toLocaleString() : '0'}
                         </p>
                     </div>
@@ -306,11 +306,11 @@ export default function OperationalExpensesPage() {
                         <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
                             <CheckCircle2 size={18} />
                         </div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase md:hidden">Paid this month</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase md:hidden">Paid this month</span>
                     </div>
                     <div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase hidden md:inline-block mb-1">Paid this month</span>
-                        <p className="text-lg md:text-xl font-black text-slate-800 text-right md:text-left">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase hidden md:inline-block mb-1">Paid this month</span>
+                        <p className="text-lg md:text-xl font-bold text-slate-800 text-right md:text-left">
                             Rp {Array.isArray(expenses) ? expenses.filter(e => e?.status === 'PAID').reduce((sum, e) => sum + (e?.amount || 0), 0).toLocaleString() : '0'}
                         </p>
                     </div>
@@ -320,11 +320,11 @@ export default function OperationalExpensesPage() {
                         <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
                             <Clock size={18} />
                         </div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase md:hidden">Pending Approval</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase md:hidden">Pending Approval</span>
                     </div>
                     <div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase hidden md:inline-block mb-1">Pending Approval</span>
-                        <p className="text-lg md:text-xl font-black text-slate-800 text-right md:text-left">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase hidden md:inline-block mb-1">Pending Approval</span>
+                        <p className="text-lg md:text-xl font-bold text-slate-800 text-right md:text-left">
                             {Array.isArray(expenses) ? expenses.filter(e => e?.status === 'DRAFT').length : '0'} Items
                         </p>
                     </div>
@@ -334,7 +334,7 @@ export default function OperationalExpensesPage() {
             {/* Expenses List */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-slate-50 flex items-center justify-between">
-                    <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">Daftar Biaya Operasional</h2>
+                    <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Daftar Biaya Operasional</h2>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                         <input
@@ -349,12 +349,12 @@ export default function OperationalExpensesPage() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50">
-                                <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest pl-6">Nama Biaya</th>
-                                <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kategori</th>
-                                <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Bulan/Tahun</th>
-                                <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
-                                <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                                <th className="p-3 text-[10px] font-black text-slate-400 uppercase tracking-widest pr-6 text-right">Aksi</th>
+                                <th className="p-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-6">Nama Biaya</th>
+                                <th className="p-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kategori</th>
+                                <th className="p-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Bulan/Tahun</th>
+                                <th className="p-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount</th>
+                                <th className="p-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                                <th className="p-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest pr-6 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -367,40 +367,40 @@ export default function OperationalExpensesPage() {
                                     <td className="p-3 pl-6">
                                         <div className="flex flex-col">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm font-black text-slate-800 uppercase">{expense.name}</span>
+                                                <span className="text-sm font-bold text-slate-800 uppercase">{expense.name}</span>
                                                 {expense.attachment && (
                                                     <button
                                                         onClick={() => setSelectedImage(`${process.env.NEXT_PUBLIC_API_URL}${expense.attachment}`)}
-                                                        className="text-[9px] font-black text-indigo-500 hover:text-indigo-600 uppercase flex items-center gap-1"
+                                                        className="text-[9px] font-bold text-indigo-500 hover:text-indigo-600 uppercase flex items-center gap-1"
                                                     >
                                                         <div className="w-1 h-1 rounded-full bg-indigo-400" />
                                                         Lihat Bukti
                                                     </button>
                                                 )}
                                             </div>
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">COA: {expense.coa?.name} ({expense.coa?.code})</span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">COA: {expense.coa?.name} ({expense.coa?.code})</span>
                                         </div>
                                     </td>
                                     <td className="p-3">
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2">
                                                 {getIcon(expense.category)}
-                                                <span className="text-[10px] font-black text-slate-600 uppercase">{expense.category}</span>
+                                                <span className="text-[10px] font-bold text-slate-600 uppercase">{expense.category}</span>
                                             </div>
                                             {expense.workOrder && <div className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded w-fit">WO: {expense.workOrder.number}</div>}
                                             {expense.project && <div className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded w-fit">PRJ: {expense.project.number}</div>}
                                         </div>
                                     </td>
                                     <td className="p-3">
-                                        <span className="text-[10px] font-black text-slate-600 uppercase italic">
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase italic">
                                             {MONTHS[expense.month - 1]} {expense.year}
                                         </span>
                                     </td>
                                     <td className="p-3">
-                                        <span className="text-sm font-black text-slate-800">Rp {expense.amount.toLocaleString()}</span>
+                                        <span className="text-sm font-bold text-slate-800">Rp {expense.amount.toLocaleString()}</span>
                                     </td>
                                     <td className="p-3">
-                                        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase ${expense.status === 'PAID' ? 'bg-indigo-50 text-indigo-600' :
+                                        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold uppercase ${expense.status === 'PAID' ? 'bg-indigo-50 text-indigo-600' :
                                             expense.status === 'POSTED' || expense.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
                                             }`}>
                                             <div className={`w-1.5 h-1.5 rounded-full ${expense.status === 'PAID' ? 'bg-indigo-500' :
@@ -430,13 +430,13 @@ export default function OperationalExpensesPage() {
                                         {(expense.status === 'POSTED' || expense.status === 'APPROVED') && (
                                             <button
                                                 onClick={() => { setSelectedExpense(expense); setShowPayModal(true); }}
-                                                className="px-3 py-1.5 bg-indigo-600 text-white rounded-md text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-sm shadow-indigo-600/20"
+                                                className="px-3 py-1.5 bg-indigo-600 text-white rounded-md text-[9px] font-bold uppercase tracking-widest hover:bg-indigo-700 shadow-sm shadow-indigo-600/20"
                                             >
                                                 PELUNASAN
                                             </button>
                                         )}
                                         {expense.status === 'PAID' && (
-                                            <span className="text-[9px] font-black text-slate-400 uppercase italic">Paid on {expense.paidAt ? new Date(expense.paidAt).toLocaleDateString() : '-'}</span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase italic">Paid on {expense.paidAt ? new Date(expense.paidAt).toLocaleDateString() : '-'}</span>
                                         )}
                                     </td>
                                 </tr>
@@ -455,11 +455,11 @@ export default function OperationalExpensesPage() {
                         <div key={expense.id} className="bg-white rounded-xl p-4 border border-slate-100 shadow-sm flex flex-col gap-3 relative overflow-hidden">
                             <div className="flex justify-between items-start z-10">
                                 <div className="space-y-1">
-                                    <h3 className="text-sm font-black text-slate-900 uppercase leading-tight pr-4">{expense.name}</h3>
-                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">COA: {expense.coa?.name}</div>
+                                    <h3 className="text-sm font-bold text-slate-900 uppercase leading-tight pr-4">{expense.name}</h3>
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">COA: {expense.coa?.name}</div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <div className="text-sm font-black text-slate-900">Rp {expense.amount.toLocaleString()}</div>
+                                    <div className="text-sm font-bold text-slate-900">Rp {expense.amount.toLocaleString()}</div>
                                     <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 italic">{MONTHS[expense.month - 1]} {expense.year}</div>
                                 </div>
                             </div>
@@ -475,7 +475,7 @@ export default function OperationalExpensesPage() {
 
                             <div className="flex flex-col gap-3 z-10">
                                 <div className="flex items-center justify-between">
-                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase border ${expense.status === 'PAID' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
+                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase border ${expense.status === 'PAID' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
                                         expense.status === 'POSTED' || expense.status === 'APPROVED' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'
                                         }`}>
                                         <div className={`w-1.5 h-1.5 rounded-full ${expense.status === 'PAID' ? 'bg-indigo-500' :
@@ -484,7 +484,7 @@ export default function OperationalExpensesPage() {
                                         {expense.status}
                                     </div>
                                     {expense.attachment && (
-                                        <button onClick={() => setSelectedImage(`${process.env.NEXT_PUBLIC_API_URL}${expense.attachment}`)} className="text-[10px] font-black text-indigo-600 uppercase flex items-center gap-1">
+                                        <button onClick={() => setSelectedImage(`${process.env.NEXT_PUBLIC_API_URL}${expense.attachment}`)} className="text-[10px] font-bold text-indigo-600 uppercase flex items-center gap-1">
                                             <ImageIcon size={12} className="text-indigo-500" /> Lihat Bukti
                                         </button>
                                     )}
@@ -495,7 +495,7 @@ export default function OperationalExpensesPage() {
                                     <div className="flex gap-2 pt-2 border-t border-slate-50">
                                         {expense.status === 'DRAFT' && (
                                             <>
-                                                <button onClick={() => handlePost(expense.id)} className="flex-1 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-widest shadow-md shadow-emerald-500/20">
+                                                <button onClick={() => handlePost(expense.id)} className="flex-1 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-widest shadow-md shadow-emerald-500/20">
                                                     Post Ledger
                                                 </button>
                                                 <button onClick={() => handleDelete(expense.id)} className="w-9 h-9 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-rose-50 flex items-center justify-center transition-colors">
@@ -504,7 +504,7 @@ export default function OperationalExpensesPage() {
                                             </>
                                         )}
                                         {(expense.status === 'POSTED' || expense.status === 'APPROVED') && (
-                                            <button onClick={() => { setSelectedExpense(expense); setShowPayModal(true); }} className="flex-1 h-9 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase tracking-widest shadow-md shadow-indigo-500/20">
+                                            <button onClick={() => { setSelectedExpense(expense); setShowPayModal(true); }} className="flex-1 h-9 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold uppercase tracking-widest shadow-md shadow-indigo-500/20">
                                                 Pelunasan
                                             </button>
                                         )}
@@ -532,27 +532,27 @@ export default function OperationalExpensesPage() {
                                         <Plus size={isMobile ? 20 : 24} />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-black text-slate-800 tracking-tight">DATA BIAYA OPERASIONAL</h3>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Input Biaya Rutin Bulanan</p>
+                                        <h3 className="text-lg font-bold text-slate-800 tracking-tight">DATA BIAYA OPERASIONAL</h3>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Input Biaya Rutin Bulanan</p>
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Nama Biaya</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Nama Biaya</label>
                                         <input
                                             type="text"
                                             placeholder="e.g. Pembayaran Listrik PLN"
-                                            className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                            className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-bold focus:ring-2 ring-indigo-500/10 outline-none"
                                             value={newExpense.name}
                                             onChange={e => setNewExpense({ ...newExpense, name: e.target.value })}
                                         />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Kategori</label>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Kategori</label>
                                             <select
-                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-bold focus:ring-2 ring-indigo-500/10 outline-none"
                                                 value={newExpense.category}
                                                 onChange={e => setNewExpense({ ...newExpense, category: e.target.value })}
                                             >
@@ -560,10 +560,10 @@ export default function OperationalExpensesPage() {
                                             </select>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Amount (Rp)</label>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Amount (Rp)</label>
                                             <input
                                                 type="number"
-                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-bold focus:ring-2 ring-indigo-500/10 outline-none"
                                                 value={newExpense.amount}
                                                 onChange={e => setNewExpense({ ...newExpense, amount: Number(e.target.value) })}
                                             />
@@ -571,9 +571,9 @@ export default function OperationalExpensesPage() {
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Bulan</label>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Bulan</label>
                                             <select
-                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-bold focus:ring-2 ring-indigo-500/10 outline-none"
                                                 value={newExpense.month}
                                                 onChange={e => setNewExpense({ ...newExpense, month: Number(e.target.value) })}
                                             >
@@ -581,19 +581,19 @@ export default function OperationalExpensesPage() {
                                             </select>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Tahun</label>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Tahun</label>
                                             <input
                                                 type="number"
-                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-bold focus:ring-2 ring-indigo-500/10 outline-none"
                                                 value={newExpense.year}
                                                 onChange={e => setNewExpense({ ...newExpense, year: Number(e.target.value) })}
                                             />
                                         </div>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Akun Beban (COA)</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Akun Beban (COA)</label>
                                         <select
-                                            className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                            className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-bold focus:ring-2 ring-indigo-500/10 outline-none"
                                             value={newExpense.coaId}
                                             onChange={e => setNewExpense({ ...newExpense, coaId: e.target.value })}
                                         >
@@ -606,9 +606,9 @@ export default function OperationalExpensesPage() {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Relasi Work Order <span className="text-slate-300 font-medium">(Opsional)</span></label>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Relasi Work Order <span className="text-slate-300 font-medium">(Opsional)</span></label>
                                             <select
-                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-bold focus:ring-2 ring-indigo-500/10 outline-none"
                                                 value={newExpense.workOrderId}
                                                 onChange={e => setNewExpense({ ...newExpense, workOrderId: e.target.value })}
                                             >
@@ -619,9 +619,9 @@ export default function OperationalExpensesPage() {
                                             </select>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Relasi Proyek <span className="text-slate-300 font-medium">(Opsional)</span></label>
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Relasi Proyek <span className="text-slate-300 font-medium">(Opsional)</span></label>
                                             <select
-                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                                className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-bold focus:ring-2 ring-indigo-500/10 outline-none"
                                                 value={newExpense.projectId}
                                                 onChange={e => setNewExpense({ ...newExpense, projectId: e.target.value })}
                                             >
@@ -636,12 +636,12 @@ export default function OperationalExpensesPage() {
                                     {/* Proyeksi 6-Bulan Generator Block */}
                                     <div className="p-3.5 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-3">
                                         <div className="flex items-center justify-between gap-2">
-                                            <label className="text-[10px] font-black text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                                            <label className="text-[10px] font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
                                                 <Calendar size={13} className="text-indigo-600 shrink-0" />
                                                 Proyeksi Rutin
                                             </label>
                                             <select
-                                                className="bg-white border border-indigo-200 px-3 py-1.5 rounded-lg text-[11px] font-black text-indigo-700 outline-none shadow-sm"
+                                                className="bg-white border border-indigo-200 px-3 py-1.5 rounded-lg text-[11px] font-bold text-indigo-700 outline-none shadow-sm"
                                                 value={newExpense.repeatMonths}
                                                 onChange={e => setNewExpense({ ...newExpense, repeatMonths: Number(e.target.value) })}
                                             >
@@ -670,7 +670,7 @@ export default function OperationalExpensesPage() {
                                         </p>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Bukti Pembayaran (Nota/Kwitansi)</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Bukti Pembayaran (Nota/Kwitansi)</label>
                                         <div className="relative group">
                                             <input
                                                 type="file"
@@ -685,7 +685,7 @@ export default function OperationalExpensesPage() {
                                                 <div className="w-7 h-7 rounded-md bg-white shadow-sm flex items-center justify-center text-slate-400 group-hover:text-indigo-500 transition-colors">
                                                     <ImageIcon size={14} />
                                                 </div>
-                                                <span className="text-[10px] font-black text-slate-400 group-hover:text-indigo-600 transition-colors uppercase tracking-widest text-center">
+                                                <span className="text-[10px] font-bold text-slate-400 group-hover:text-indigo-600 transition-colors uppercase tracking-widest text-center">
                                                     {newExpense.attachment ? newExpense.attachment.name : 'Pilih File Gambar (webp, jpg, png)'}
                                                 </span>
                                             </div>
@@ -694,8 +694,8 @@ export default function OperationalExpensesPage() {
                                 </div>
 
                                 <div className="flex items-center gap-3 pt-3">
-                                    <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 md:py-3 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">BATAL</button>
-                                    <button onClick={handleSubmit} disabled={saving} className="flex-1 py-2.5 md:py-3 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50">
+                                    <button onClick={() => setShowModal(false)} className="flex-1 py-2.5 md:py-3 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all">BATAL</button>
+                                    <button onClick={handleSubmit} disabled={saving} className="flex-1 py-2.5 md:py-3 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50">
                                         {saving ? 'SAVING...' : 'SIMPAN BIAYA'}
                                     </button>
                                 </div>
@@ -720,20 +720,20 @@ export default function OperationalExpensesPage() {
                                         <Landmark size={isMobile ? 20 : 24} />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-black text-slate-800 tracking-tight">PELUNASAN BIAYA</h3>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pilih Sumber Pembayaran</p>
+                                        <h3 className="text-lg font-bold text-slate-800 tracking-tight">PELUNASAN BIAYA</h3>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pilih Sumber Pembayaran</p>
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Total Dibayar</p>
-                                        <p className="text-lg font-black text-slate-800">Rp {selectedExpense?.amount.toLocaleString()}</p>
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Total Dibayar</p>
+                                        <p className="text-lg font-bold text-slate-800">Rp {selectedExpense?.amount.toLocaleString()}</p>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Sumber Rekening</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Sumber Rekening</label>
                                         <select
-                                            className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                            className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-bold focus:ring-2 ring-indigo-500/10 outline-none"
                                             value={paymentData.coaId}
                                             onChange={e => setPaymentData({ ...paymentData, coaId: e.target.value })}
                                         >
@@ -743,10 +743,10 @@ export default function OperationalExpensesPage() {
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Tanggal Bayar</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Tanggal Bayar</label>
                                         <input
                                             type="date"
-                                            className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-black focus:ring-2 ring-indigo-500/10 outline-none"
+                                            className="w-full bg-slate-50 px-4 py-3 rounded-lg border-none text-[11px] font-bold focus:ring-2 ring-indigo-500/10 outline-none"
                                             value={paymentData.date}
                                             onChange={e => setPaymentData({ ...paymentData, date: e.target.value })}
                                         />
@@ -754,8 +754,8 @@ export default function OperationalExpensesPage() {
                                 </div>
 
                                 <div className="flex items-center gap-3 pt-3">
-                                    <button onClick={() => setShowPayModal(false)} className="flex-1 py-2.5 md:py-3 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">BATAL</button>
-                                    <button onClick={handlePay} disabled={paying} className="flex-1 py-2.5 md:py-3 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-600/20">
+                                    <button onClick={() => setShowPayModal(false)} className="flex-1 py-2.5 md:py-3 bg-slate-100 text-slate-600 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all">BATAL</button>
+                                    <button onClick={handlePay} disabled={paying} className="flex-1 py-2.5 md:py-3 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-600/20">
                                         {paying ? 'MEMPROSES...' : 'BAYAR SEKARANG'}
                                     </button>
                                 </div>

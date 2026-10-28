@@ -494,7 +494,7 @@ export default function ProfitLossPage() {
                         </div>
                     </div>
                     <div className="min-w-0">
-                        <p className={`text-base md:text-lg font-black tracking-tight truncate font-mono ${
+                        <p className={`text-base md:text-lg font-bold tracking-tight truncate font-mono ${
                             netProfit >= 0 ? 'text-emerald-900' : 'text-rose-900'
                         }`}>
                             {formatCurrency(netProfit)}
@@ -804,7 +804,7 @@ export default function ProfitLossPage() {
                                                 {grossMargin.toFixed(1)}%
                                             </td>
                                         )}
-                                        <td className="px-4 py-2.5 text-right font-mono font-black text-sm text-emerald-950">
+                                        <td className="px-4 py-2.5 text-right font-mono font-bold text-sm text-emerald-950">
                                             {formatCurrency(grossProfit)}
                                         </td>
                                     </tr>
@@ -903,7 +903,7 @@ export default function ProfitLossPage() {
                                                 {totalOperatingRevenue > 0 ? ((operatingIncome / totalOperatingRevenue) * 100).toFixed(1) + '%' : '0%'}
                                             </td>
                                         )}
-                                        <td className="px-4 py-2.5 text-right font-mono font-black text-sm text-slate-900">
+                                        <td className="px-4 py-2.5 text-right font-mono font-bold text-sm text-slate-900">
                                             {formatCurrency(operatingIncome)}
                                         </td>
                                     </tr>
@@ -1014,7 +1014,7 @@ export default function ProfitLossPage() {
                                             <div className="flex items-center gap-2">
                                                 {netProfit >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
                                                 <div>
-                                                    <p className="text-xs md:text-sm font-black uppercase tracking-wider">
+                                                    <p className="text-xs md:text-sm font-bold uppercase tracking-wider">
                                                         {netProfit >= 0 ? 'Laba Bersih Tahun Berjalan (Net Profit)' : 'Rugi Bersih Periode Berjalan (Net Loss)'}
                                                     </p>
                                                     <p className="text-[10px] text-white/80 font-normal">
@@ -1024,11 +1024,11 @@ export default function ProfitLossPage() {
                                             </div>
                                         </td>
                                         {showPercentCol && (
-                                            <td className="px-3 py-3.5 text-right font-mono font-black text-xs md:text-sm text-white/90">
+                                            <td className="px-3 py-3.5 text-right font-mono font-bold text-xs md:text-sm text-white/90">
                                                 {netMargin.toFixed(1)}%
                                             </td>
                                         )}
-                                        <td className="px-4 py-3.5 text-right font-mono font-black text-base md:text-xl text-white">
+                                        <td className="px-4 py-3.5 text-right font-mono font-bold text-base md:text-xl text-white">
                                             {formatCurrency(netProfit)}
                                         </td>
                                     </tr>

@@ -258,7 +258,7 @@ export default function ExpenseReportsPage() {
     }
 
     const ic = "w-full bg-white border border-slate-200 rounded-xl px-3 py-2 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all text-sm font-medium"
-    const lc = "text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5 block"
+    const lc = "text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block"
 
     return (
         <FinancePageShell>
@@ -279,7 +279,7 @@ export default function ExpenseReportsPage() {
                 <div className="flex gap-2 p-1.5 bg-white border border-slate-200 rounded-2xl shadow-sm md:col-span-2 overflow-x-auto hide-scrollbar w-full">
                     {["ALL", "PENDING", "APPROVED", "POSTED"].map(s => (
                         <button key={s} onClick={() => setFilterStatus(s)}
-                            className={`px-4 py-2.5 md:py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${filterStatus === s ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}>
+                            className={`px-4 py-2.5 md:py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${filterStatus === s ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}>
                             {s}
                         </button>
                     ))}
@@ -291,12 +291,12 @@ export default function ExpenseReportsPage() {
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="border-b border-slate-50 bg-slate-50/30">
-                                <th className="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Requested Date</th>
-                                <th className="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Staff / Type</th>
-                                <th className="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Category / Project</th>
-                                <th className="px-6 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Amount</th>
-                                <th className="px-6 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Status</th>
-                                <th className="px-6 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.15em]">Actions</th>
+                                <th className="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Requested Date</th>
+                                <th className="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Staff / Type</th>
+                                <th className="px-6 py-5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Category / Project</th>
+                                <th className="px-6 py-5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Amount</th>
+                                <th className="px-6 py-5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Status</th>
+                                <th className="px-6 py-5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -328,7 +328,7 @@ export default function ExpenseReportsPage() {
                                                     </div>
                                                     <div>
                                                         <div className="font-bold text-slate-900">{e.staffName || 'Anonymous Staff'}</div>
-                                                        <div className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${TYPE_CFG[e.type]?.color}`}>
+                                                        <div className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${TYPE_CFG[e.type]?.color}`}>
                                                             {TYPE_CFG[e.type]?.label}
                                                         </div>
                                                     </div>
@@ -343,11 +343,11 @@ export default function ExpenseReportsPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-5 text-right whitespace-nowrap">
-                                                <div className="font-black text-slate-900 text-base">{fmt(e.amount)}</div>
+                                                <div className="font-bold text-slate-900 text-base">{fmt(e.amount)}</div>
                                             </td>
                                             <td className="px-6 py-5">
                                                 <div className="flex justify-center">
-                                                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${STATUS_CFG[e.status]?.color}`}>
+                                                    <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap ${STATUS_CFG[e.status]?.color}`}>
                                                         {(() => { const C = STATUS_CFG[e.status]?.icon; return C ? <C size={12} strokeWidth={3} /> : null })()}
                                                         {STATUS_CFG[e.status]?.label}
                                                     </span>
@@ -363,7 +363,7 @@ export default function ExpenseReportsPage() {
                                                     {e.status === 'PENDING' && (
                                                         <>
                                                             <Button size="sm" onClick={() => handleStatusUpdate(e.id, 'APPROVED')}
-                                                                className="h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-widest px-4 shadow-lg shadow-emerald-600/10">
+                                                                className="h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase tracking-widest px-4 shadow-lg shadow-emerald-600/10">
                                                                 Approve
                                                             </Button>
                                                             <Button size="icon" variant="outline" onClick={() => handleStatusUpdate(e.id, 'REJECTED')}
@@ -374,7 +374,7 @@ export default function ExpenseReportsPage() {
                                                     )}
                                                     {e.status === 'APPROVED' && (
                                                         <Button size="sm" onClick={() => setPostingExpense(e)}
-                                                            className="h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest px-4 shadow-lg shadow-slate-900/10">
+                                                            className="h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold uppercase tracking-widest px-4 shadow-lg shadow-slate-900/10">
                                                             Post
                                                         </Button>
                                                     )}
@@ -394,7 +394,7 @@ export default function ExpenseReportsPage() {
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border ${TYPE_CFG[c.type]?.color}`}>
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider border ${TYPE_CFG[c.type]?.color}`}>
                                                             {TYPE_CFG[c.type]?.label}
                                                         </span>
                                                     </td>
@@ -467,7 +467,7 @@ export default function ExpenseReportsPage() {
                             <div className="flex justify-between items-start z-10">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
-                                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider border ${TYPE_CFG[e.type]?.color}`}>
+                                        <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider border ${TYPE_CFG[e.type]?.color}`}>
                                             {TYPE_CFG[e.type]?.label}
                                         </div>
                                         <span className="text-[9px] text-slate-400 font-mono uppercase">ID: {e.id.slice(-6)}</span>
@@ -475,7 +475,7 @@ export default function ExpenseReportsPage() {
                                     <h3 className="font-bold text-slate-900 text-sm leading-tight">{e.staffName || 'Anonymous Staff'}</h3>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <div className="font-black text-slate-900 text-sm">{fmt(e.amount)}</div>
+                                    <div className="font-bold text-slate-900 text-sm">{fmt(e.amount)}</div>
                                     <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{fmtDate(e.createdAt)}</div>
                                 </div>
                             </div>
@@ -490,7 +490,7 @@ export default function ExpenseReportsPage() {
                             </div>
 
                             <div className="flex items-center justify-between z-10">
-                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${STATUS_CFG[e.status]?.color}`}>
+                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${STATUS_CFG[e.status]?.color}`}>
                                     <StatusIcon size={12} strokeWidth={3} /> {STATUS_CFG[e.status]?.label}
                                 </span>
                                 <div className="flex items-center gap-2">
@@ -511,16 +511,16 @@ export default function ExpenseReportsPage() {
                             <div className="flex gap-2 z-10 pt-2 border-t border-slate-50 mt-1">
                                 {e.status === 'PENDING' && (
                                     <>
-                                        <Button size="sm" onClick={() => handleStatusUpdate(e.id, 'APPROVED')} className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white h-10 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-600/20">
+                                        <Button size="sm" onClick={() => handleStatusUpdate(e.id, 'APPROVED')} className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white h-10 text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-emerald-600/20">
                                             Approve
                                         </Button>
-                                        <Button size="sm" variant="outline" onClick={() => handleStatusUpdate(e.id, 'REJECTED')} className="flex-1 rounded-xl border-slate-200 text-slate-600 h-10 text-[10px] font-black uppercase tracking-widest">
+                                        <Button size="sm" variant="outline" onClick={() => handleStatusUpdate(e.id, 'REJECTED')} className="flex-1 rounded-xl border-slate-200 text-slate-600 h-10 text-[10px] font-bold uppercase tracking-widest">
                                             Reject
                                         </Button>
                                     </>
                                 )}
                                 {e.status === 'APPROVED' && (
-                                    <Button size="sm" onClick={() => setPostingExpense(e)} className="flex-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-white h-10 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-900/10">
+                                    <Button size="sm" onClick={() => setPostingExpense(e)} className="flex-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-white h-10 text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-slate-900/10">
                                         Post
                                     </Button>
                                 )}
@@ -537,7 +537,7 @@ export default function ExpenseReportsPage() {
                                                         <div className="space-y-1">
                                                             <div className="flex items-center gap-2">
                                                                 <CornerDownRight size={12} className="text-slate-400" />
-                                                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider border ${TYPE_CFG[c.type]?.color}`}>
+                                                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider border ${TYPE_CFG[c.type]?.color}`}>
                                                                     {TYPE_CFG[c.type]?.label}
                                                                 </div>
                                                             </div>
@@ -598,7 +598,7 @@ export default function ExpenseReportsPage() {
                     <div className="w-20 h-20 rounded-[2.5rem] bg-slate-50 flex items-center justify-center mx-auto mb-6 scale-110">
                         <Receipt size={32} className="text-slate-200" />
                     </div>
-                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">No Reports Found</h3>
+                    <h3 className="text-lg font-bold text-slate-900 uppercase tracking-tight">No Reports Found</h3>
                     <p className="text-sm text-slate-400 font-medium max-w-[280px] mx-auto mt-2 italic">Try adjusting your search or filters to find what you&apos;re looking for.</p>
                 </div>
             )}
@@ -618,8 +618,8 @@ export default function ExpenseReportsPage() {
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-600/20"><Receipt size={isMobile ? 20 : 24} className="text-white" /></div>
                                     <div>
-                                        <h2 className="font-black text-slate-900 text-lg md:text-xl uppercase tracking-tight">Create Report</h2>
-                                        <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Expense & Settlement Submission</p>
+                                        <h2 className="font-bold text-slate-900 text-lg md:text-xl uppercase tracking-tight">Create Report</h2>
+                                        <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Expense & Settlement Submission</p>
                                     </div>
                                 </div>
                                 <button onClick={() => setModalOpen(false)} className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"><X size={20} className="md:w-6 md:h-6" /></button>
@@ -633,7 +633,7 @@ export default function ExpenseReportsPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 {(['SETTLEMENT', 'FUND_REQUEST'] as const).map(t => (
                                                     <button key={t} type="button" onClick={() => setForm({ ...form, type: t })}
-                                                        className={`relative flex flex-col items-center justify-center gap-2 p-5 rounded-3xl border-2 transition-all font-black text-xs uppercase tracking-widest ${form.type === t ? 'bg-emerald-50 border-emerald-600 text-emerald-700 shadow-inner' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}>
+                                                        className={`relative flex flex-col items-center justify-center gap-2 p-5 rounded-3xl border-2 transition-all font-bold text-xs uppercase tracking-widest ${form.type === t ? 'bg-emerald-50 border-emerald-600 text-emerald-700 shadow-inner' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}>
                                                         {(() => { const I = TYPE_CFG[t].icon; return <I size={20} /> })()}
                                                         {TYPE_CFG[t].label}
                                                         {form.type === t && <div className="absolute top-3 right-3 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
@@ -682,26 +682,26 @@ export default function ExpenseReportsPage() {
                                             <div className="col-span-2 md:col-span-1">
                                                 <label className={lc}>Nominal (IDR)</label>
                                                 <div className="relative">
-                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-emerald-600/50">RP</div>
-                                                    <input type="number" required min="1" value={form.amount} onChange={e => setForm({ ...form, amount: +e.target.value })} className={`${ic} pl-10 font-black text-emerald-700 text-base`} />
+                                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600/50">RP</div>
+                                                    <input type="number" required min="1" value={form.amount} onChange={e => setForm({ ...form, amount: +e.target.value })} className={`${ic} pl-10 font-bold text-emerald-700 text-base`} />
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div>
-                                            <label className={lc}>Evidence / Receipt {form.type === 'SETTLEMENT' && <span className="text-rose-500 ml-1 italic font-black">*Required</span>}</label>
+                                            <label className={lc}>Evidence / Receipt {form.type === 'SETTLEMENT' && <span className="text-rose-500 ml-1 italic font-bold">*Required</span>}</label>
                                             <div className="relative h-32 group">
                                                 <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                                                 <div className={`w-full h-full border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center gap-2 transition-all ${file ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-200 group-hover:border-emerald-300 group-hover:bg-slate-50'}`}>
                                                     {file ? (
                                                         <>
                                                             <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center"><CheckCircle2 size={24} className="text-emerald-600" /></div>
-                                                            <span className="text-xs font-black text-emerald-900 truncate max-w-[240px] px-4">{file.name}</span>
+                                                            <span className="text-xs font-bold text-emerald-900 truncate max-w-[240px] px-4">{file.name}</span>
                                                         </>
                                                     ) : (
                                                         <>
                                                             <Camera size={28} className="text-slate-300 group-hover:scale-110 transition-transform" />
-                                                            <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Click or Drag Receipt</span>
+                                                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Click or Drag Receipt</span>
                                                         </>
                                                     )}
                                                 </div>
@@ -715,8 +715,8 @@ export default function ExpenseReportsPage() {
                                     </div>
 
                                     <div className="flex gap-4 pt-4">
-                                        <Button type="button" variant="outline" onClick={() => setModalOpen(false)} className="flex-1 h-14 md:h-16 rounded-[1.25rem] md:rounded-[1.5rem] font-black uppercase text-[10px] md:text-xs tracking-[0.2em] border-slate-200 text-slate-400">Cancel</Button>
-                                        <Button type="submit" disabled={saving} className="flex-1 h-14 md:h-16 rounded-[1.25rem] md:rounded-[1.5rem] bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-[10px] md:text-xs tracking-[0.2em] shadow-2xl shadow-slate-900/20 active:scale-95 transition-all">
+                                        <Button type="button" variant="outline" onClick={() => setModalOpen(false)} className="flex-1 h-14 md:h-16 rounded-[1.25rem] md:rounded-[1.5rem] font-bold uppercase text-[10px] md:text-xs tracking-[0.2em] border-slate-200 text-slate-400">Cancel</Button>
+                                        <Button type="submit" disabled={saving} className="flex-1 h-14 md:h-16 rounded-[1.25rem] md:rounded-[1.5rem] bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase text-[10px] md:text-xs tracking-[0.2em] shadow-2xl shadow-slate-900/20 active:scale-95 transition-all">
                                             {saving ? 'Processing...' : 'Submit Report'}
                                         </Button>
                                     </div>
@@ -743,7 +743,7 @@ export default function ExpenseReportsPage() {
                                     <Briefcase size={isMobile ? 24 : 32} className="text-white" />
                                 </div>
                                 <div className="space-y-2">
-                                    <h2 className="font-black text-slate-900 text-2xl uppercase tracking-tight">Post to General Ledger</h2>
+                                    <h2 className="font-bold text-slate-900 text-2xl uppercase tracking-tight">Post to General Ledger</h2>
                                     <p className="text-xs text-slate-400 font-medium px-4">
                                         {postingExpense.type === 'SETTLEMENT'
                                             ? `Confirming settlement for ${postingExpense.staffName}. This will reduce the Staff Advance account.`
@@ -763,19 +763,19 @@ export default function ExpenseReportsPage() {
 
                                 <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 space-y-3">
                                     <div className="flex justify-between items-center px-2">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Amount</span>
-                                        <span className="font-black text-slate-900 text-xl">{fmt(postingExpense.amount)}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Amount</span>
+                                        <span className="font-bold text-slate-900 text-xl">{fmt(postingExpense.amount)}</span>
                                     </div>
                                     <div className="h-px bg-slate-200" />
                                     <div className="flex justify-between items-center px-2">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Staff</span>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Staff</span>
                                         <span className="font-bold text-slate-700 text-sm">{postingExpense.staffName}</span>
                                     </div>
                                 </div>
 
                                 <div className="flex gap-3 pt-2">
-                                    <Button variant="outline" onClick={() => setPostingExpense(null)} className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest border-slate-200">Cancel</Button>
-                                    <Button onClick={handlePost} className="flex-1 h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-600/20">
+                                    <Button variant="outline" onClick={() => setPostingExpense(null)} className="flex-1 h-14 rounded-2xl font-bold uppercase text-[10px] tracking-widest border-slate-200">Cancel</Button>
+                                    <Button onClick={handlePost} className="flex-1 h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] tracking-widest shadow-xl shadow-emerald-600/20">
                                         Confirm Posting
                                     </Button>
                                 </div>
@@ -793,7 +793,7 @@ export default function ExpenseReportsPage() {
                             <button onClick={() => setPreviewImg(null)} className="absolute -top-12 md:-top-16 right-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-white/40 hover:text-white transition-colors bg-white/10 rounded-full border border-white/10"><X size={24} className="md:w-7 md:h-7" /></button>
                             <img src={previewImg} alt="Receipt Preview" className="rounded-2xl md:rounded-[3rem] shadow-2xl max-w-full max-h-[80vh] object-contain border-4 md:border-8 border-white/10 ring-1 ring-white/20" />
                             <div className="mt-6 text-center">
-                                <p className="text-white font-black uppercase tracking-[0.3em] text-xs">Evidence of Expenditure</p>
+                                <p className="text-white font-bold uppercase tracking-[0.3em] text-xs">Evidence of Expenditure</p>
                             </div>
                         </motion.div>
                     </div>

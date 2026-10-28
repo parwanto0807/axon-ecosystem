@@ -132,7 +132,7 @@ export default function LedgerPage() {
             {/* Filter Bar */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 md:p-6 rounded-[2rem] md:rounded-3xl border border-slate-100 shadow-sm">
                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Account</label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Account</label>
                     <select
                         value={filters.coaId}
                         onChange={e => setFilters({ ...filters, coaId: e.target.value })}
@@ -145,7 +145,7 @@ export default function LedgerPage() {
                     </select>
                 </div>
                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dari Tanggal</label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Dari Tanggal</label>
                     <input
                         type="date"
                         value={filters.startDate}
@@ -154,7 +154,7 @@ export default function LedgerPage() {
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Sampai Tanggal</label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Sampai Tanggal</label>
                     <input
                         type="date"
                         value={filters.endDate}
@@ -174,12 +174,12 @@ export default function LedgerPage() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-slate-100 bg-slate-50/50">
-                            <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Date / Ref</th>
-                            <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Description</th>
-                            <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Debit</th>
-                            <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Credit</th>
+                            <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date / Ref</th>
+                            <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</th>
+                            <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Debit</th>
+                            <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Credit</th>
                             {filters.coaId && (
-                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                     Balance
                                 </th>
                             )}
@@ -199,7 +199,7 @@ export default function LedgerPage() {
                                             {isNewEntry && (
                                                 <>
                                                     <div className="font-bold text-slate-900">{new Date(item.journalEntry.date).toLocaleDateString('id-ID')}</div>
-                                                    <div className="text-[10px] font-black text-indigo-500 uppercase mt-0.5">{item.journalEntry.number}</div>
+                                                    <div className="text-[10px] font-bold text-indigo-500 uppercase mt-0.5">{item.journalEntry.number}</div>
                                                 </>
                                             )}
                                         </td>
@@ -216,7 +216,7 @@ export default function LedgerPage() {
                                             {item.credit > 0 ? item.credit.toLocaleString('id-ID') : '-'}
                                         </td>
                                         {filters.coaId && (
-                                            <td className="px-6 py-4 text-right font-mono font-black text-slate-900 bg-slate-50/50">
+                                            <td className="px-6 py-4 text-right font-mono font-bold text-slate-900 bg-slate-50/50">
                                                 {item.balance.toLocaleString('id-ID')}
                                             </td>
                                         )}
@@ -245,7 +245,7 @@ export default function LedgerPage() {
                                 {isNewEntry && (
                                     <div className="flex justify-between items-center pb-2 border-b border-slate-100/50 mb-1">
                                         <span className="font-bold text-slate-900 text-xs">{new Date(item.journalEntry.date).toLocaleDateString('id-ID')}</span>
-                                        <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-lg">{item.journalEntry.number}</span>
+                                        <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-lg">{item.journalEntry.number}</span>
                                     </div>
                                 )}
 
@@ -258,19 +258,19 @@ export default function LedgerPage() {
 
                                 <div className="grid grid-cols-2 gap-2 mt-1">
                                     <div className="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100 text-right">
-                                        <p className="text-[9px] font-black text-emerald-600/70 uppercase tracking-widest mb-0.5">Debit</p>
+                                        <p className="text-[9px] font-bold text-emerald-600/70 uppercase tracking-widest mb-0.5">Debit</p>
                                         <p className="font-mono font-bold text-emerald-700 text-sm">{item.debit > 0 ? item.debit.toLocaleString('id-ID') : '-'}</p>
                                     </div>
                                     <div className="bg-rose-50/50 p-2.5 rounded-xl border border-rose-100 text-right">
-                                        <p className="text-[9px] font-black text-rose-600/70 uppercase tracking-widest mb-0.5">Credit</p>
+                                        <p className="text-[9px] font-bold text-rose-600/70 uppercase tracking-widest mb-0.5">Credit</p>
                                         <p className="font-mono font-bold text-rose-700 text-sm">{item.credit > 0 ? item.credit.toLocaleString('id-ID') : '-'}</p>
                                     </div>
                                 </div>
 
                                 {filters.coaId && (
                                     <div className="mt-1 bg-slate-50 p-3 rounded-xl border border-slate-200 flex justify-between items-center">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Balance</span>
-                                        <span className="font-mono font-black text-slate-900 text-base">{item.balance.toLocaleString('id-ID')}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Balance</span>
+                                        <span className="font-mono font-bold text-slate-900 text-base">{item.balance.toLocaleString('id-ID')}</span>
                                     </div>
                                 )}
                             </div>

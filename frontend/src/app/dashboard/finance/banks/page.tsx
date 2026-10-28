@@ -186,8 +186,8 @@ export default function BankAccountsPage() {
 
                             <div className="space-y-4 relative z-10 flex-1">
                                 <div>
-                                    <h3 className="text-xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{bank.bankName}</h3>
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1">{bank.branch || "Kantor Pusat"}</p>
+                                    <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{bank.bankName}</h3>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">{bank.branch || "Kantor Pusat"}</p>
                                 </div>
 
                                 <div className="space-y-2">
@@ -205,15 +205,15 @@ export default function BankAccountsPage() {
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <Activity size={14} className="text-indigo-500" />
-                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">COA Linked</span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">COA Linked</span>
                                         </div>
                                         {bank.coa ? (
                                             <div className="text-right">
-                                                <p className="text-[10px] font-black text-slate-900">{bank.coa.code}</p>
+                                                <p className="text-[10px] font-bold text-slate-900">{bank.coa.code}</p>
                                                 <p className="text-[9px] font-bold text-indigo-600 truncate max-w-[120px]">{bank.coa.name}</p>
                                             </div>
                                         ) : (
-                                            <span className="text-[9px] font-black text-rose-500 uppercase flex items-center gap-1 italic">
+                                            <span className="text-[9px] font-bold text-rose-500 uppercase flex items-center gap-1 italic">
                                                 <AlertCircle size={10} /> Unlinked
                                             </span>
                                         )}
@@ -222,7 +222,7 @@ export default function BankAccountsPage() {
                             </div>
 
                             {/* Status Pill */}
-                            <div className={`absolute top-8 right-8 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${bank.isActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400'}`}>
+                            <div className={`absolute top-8 right-8 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest ${bank.isActive ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400'}`}>
                                 {bank.isActive ? 'Active' : 'Inactive'}
                             </div>
 
@@ -252,7 +252,7 @@ export default function BankAccountsPage() {
                                 </div>
                             )}
                             <div className="p-6 md:p-4 sm:p-6 lg:p-8 pb-0 flex items-center justify-between shrink-0">
-                                <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+                                <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
                                     {editingBank ? "Edit Rekening" : "Tambah Rekening Baru"}
                                 </h2>
                                 {!isMobile && (
@@ -266,7 +266,7 @@ export default function BankAccountsPage() {
                                 <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nama Bank</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Nama Bank</label>
                                         <div className="relative">
                                             <Building2 size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500" />
                                             <input
@@ -280,7 +280,7 @@ export default function BankAccountsPage() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nomor Rekening</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Nomor Rekening</label>
                                         <div className="relative">
                                             <CreditCard size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500" />
                                             <input
@@ -294,7 +294,7 @@ export default function BankAccountsPage() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Pemilik Rekening</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Pemilik Rekening</label>
                                         <div className="relative">
                                             <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500" />
                                             <input
@@ -308,7 +308,7 @@ export default function BankAccountsPage() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Cabang (Opsional)</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Cabang (Opsional)</label>
                                         <div className="relative">
                                             <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500" />
                                             <input
@@ -323,7 +323,7 @@ export default function BankAccountsPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hubungkan ke Akun COA</label>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Hubungkan ke Akun COA</label>
                                     <div className="relative">
                                         <Activity size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500" />
                                         <select
@@ -350,20 +350,20 @@ export default function BankAccountsPage() {
                                         onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
                                         className="w-5 h-5 accent-indigo-600 rounded-lg cursor-pointer"
                                     />
-                                    <label htmlFor="active" className="text-xs font-black text-slate-700 uppercase tracking-widest cursor-pointer">Rekening Aktif</label>
+                                    <label htmlFor="active" className="text-xs font-bold text-slate-700 uppercase tracking-widest cursor-pointer">Rekening Aktif</label>
                                 </div>
 
                                 <div className="pt-2 flex gap-3 pb-4">
                                     <button
                                         type="button"
                                         onClick={() => setIsModalOpen(false)}
-                                        className="flex-1 py-3 md:py-4 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-slate-600 transition-all border border-slate-100 rounded-2xl bg-white"
+                                        className="flex-1 py-3 md:py-4 text-slate-400 font-bold text-[10px] uppercase tracking-widest hover:text-slate-600 transition-all border border-slate-100 rounded-2xl bg-white"
                                     >
                                         Batal
                                     </button>
                                     <button
                                         type="submit"
-                                        className="flex-1 py-3 md:py-4 bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-black transition-all shadow-xl shadow-slate-900/20 flex items-center justify-center gap-2"
+                                        className="flex-1 py-3 md:py-4 bg-slate-900 text-white font-bold text-[10px] uppercase tracking-widest rounded-2xl hover:bg-black transition-all shadow-xl shadow-slate-900/20 flex items-center justify-center gap-2"
                                     >
                                         <Check size={16} /> {editingBank ? "Update Rekening" : "Simpan Rekening"}
                                     </button>

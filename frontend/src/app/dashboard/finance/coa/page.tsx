@@ -230,12 +230,12 @@ export default function COAPage() {
                     <table className="w-full text-sm border-collapse sticky-header">
                         <thead className="sticky top-0 z-10">
                             <tr className="border-b border-slate-100 bg-slate-50/90 backdrop-blur-md">
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest w-40">Kode Akun</th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Nama Akun</th>
-                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipe</th>
-                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Posting</th>
-                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Balance</th>
-                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Aksi</th>
+                                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest w-40">Kode Akun</th>
+                                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nama Akun</th>
+                                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipe</th>
+                                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Posting</th>
+                                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Balance</th>
+                                <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest w-24">Aksi</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -265,7 +265,7 @@ export default function COAPage() {
                                     return (
                                         <tr key={acc.id} className={`${isHeader ? 'bg-slate-50/30' : 'hover:bg-slate-50/50'} transition-colors group`}>
                                             <td className="px-6 py-4">
-                                                <span className={`font-mono text-xs font-black ${isHeader ? 'text-indigo-600' : 'text-slate-500'}`}>
+                                                <span className={`font-mono text-xs font-bold ${isHeader ? 'text-indigo-600' : 'text-slate-500'}`}>
                                                     {acc.code}
                                                 </span>
                                             </td>
@@ -279,7 +279,7 @@ export default function COAPage() {
                                                         <div className="w-5 h-5" />
                                                     )}
                                                     <div>
-                                                        <p className={`text-sm ${isHeader ? 'font-black text-slate-900' : 'font-semibold text-slate-700'}`}>
+                                                        <p className={`text-sm ${isHeader ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>
                                                             {acc.name}
                                                         </p>
                                                         {acc.description && !isHeader && (
@@ -289,7 +289,7 @@ export default function COAPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${TYPE_COLORS[acc.type] || 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                                <span className={`px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider border ${TYPE_COLORS[acc.type] || 'bg-slate-50 text-slate-400 border-slate-200'}`}>
                                                     {acc.type}
                                                 </span>
                                             </td>
@@ -298,7 +298,7 @@ export default function COAPage() {
                                                     {acc.postingType}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-center text-[10px] font-black text-slate-500">
+                                            <td className="px-6 py-4 text-center text-[10px] font-bold text-slate-500">
                                                 {acc.normalBalance}
                                             </td>
                                             <td className="px-6 py-4">
@@ -345,10 +345,10 @@ export default function COAPage() {
                             <div key={acc.id} className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex flex-col gap-3" style={{ marginLeft: `${indent * 12}px` }}>
                                 <div className="flex items-start justify-between">
                                     <div className="flex flex-col gap-1 pr-3">
-                                        <span className={`font-mono text-[9px] font-black uppercase tracking-widest ${isHeader ? 'text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded w-fit' : 'text-slate-400'}`}>{acc.code}</span>
-                                        <span className={`text-sm leading-tight ${isHeader ? 'font-black text-slate-900' : 'font-bold text-slate-700'}`}>{acc.name}</span>
+                                        <span className={`font-mono text-[9px] font-bold uppercase tracking-widest ${isHeader ? 'text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded w-fit' : 'text-slate-400'}`}>{acc.code}</span>
+                                        <span className={`text-sm leading-tight ${isHeader ? 'font-bold text-slate-900' : 'font-bold text-slate-700'}`}>{acc.name}</span>
                                     </div>
-                                    <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider border shrink-0 ${TYPE_COLORS[acc.type] || 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                    <span className={`px-2 py-1 rounded-lg text-[8px] font-bold uppercase tracking-wider border shrink-0 ${TYPE_COLORS[acc.type] || 'bg-slate-50 text-slate-400 border-slate-200'}`}>
                                         {acc.type}
                                     </span>
                                 </div>
@@ -387,8 +387,8 @@ export default function COAPage() {
 
                             <div className="p-6 md:p-4 sm:p-6 lg:p-8 border-b border-slate-100 flex items-center justify-between shrink-0">
                                 <div>
-                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Account Management</p>
-                                    <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{editingAccount ? 'Edit Account' : 'New Account'}</h2>
+                                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Account Management</p>
+                                    <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">{editingAccount ? 'Edit Account' : 'New Account'}</h2>
                                 </div>
                                 {!isMobile && (
                                     <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"><X size={20} /></button>
@@ -398,26 +398,26 @@ export default function COAPage() {
                             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 md:p-4 sm:p-6 lg:p-8 space-y-6 no-scrollbar">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                                     <div className="space-y-1.5">
-                                        <label className="font-black text-slate-400 uppercase tracking-widest pl-1">Nomor Akun (Code)</label>
+                                        <label className="font-bold text-slate-400 uppercase tracking-widest pl-1">Nomor Akun (Code)</label>
                                         <input required value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} placeholder="e.g. 1-10001"
                                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-[1.25rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all text-sm md:text-xs" />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="font-black text-slate-400 uppercase tracking-widest pl-1">Nama Akun</label>
+                                        <label className="font-bold text-slate-400 uppercase tracking-widest pl-1">Nama Akun</label>
                                         <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Kas Bank"
                                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-[1.25rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all text-sm md:text-xs" />
                                     </div>
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="font-black text-slate-400 uppercase tracking-widest pl-1 text-[10px]">Deskripsi</label>
+                                    <label className="font-bold text-slate-400 uppercase tracking-widest pl-1 text-[10px]">Deskripsi</label>
                                     <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-[1.25rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all resize-none text-sm md:text-xs" />
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                                     <div className="space-y-1.5">
-                                        <label className="font-black text-slate-400 uppercase tracking-widest pl-1">Tipe Akun</label>
+                                        <label className="font-bold text-slate-400 uppercase tracking-widest pl-1">Tipe Akun</label>
                                         <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
                                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-[1.25rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all text-sm md:text-xs">
                                             <option value="ASET">ASET</option>
@@ -429,7 +429,7 @@ export default function COAPage() {
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="font-black text-slate-400 uppercase tracking-widest pl-1">Normal Balance</label>
+                                        <label className="font-bold text-slate-400 uppercase tracking-widest pl-1">Normal Balance</label>
                                         <select value={form.normalBalance} onChange={e => setForm({ ...form, normalBalance: e.target.value })}
                                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-[1.25rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all text-sm md:text-xs">
                                             <option value="DEBIT">DEBIT</option>
@@ -440,7 +440,7 @@ export default function COAPage() {
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                                     <div className="space-y-1.5">
-                                        <label className="font-black text-slate-400 uppercase tracking-widest pl-1">Posting Type</label>
+                                        <label className="font-bold text-slate-400 uppercase tracking-widest pl-1">Posting Type</label>
                                         <select value={form.postingType} onChange={e => setForm({ ...form, postingType: e.target.value })}
                                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-[1.25rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all text-sm md:text-xs">
                                             <option value="HEADER">HEADER</option>
@@ -448,7 +448,7 @@ export default function COAPage() {
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="font-black text-slate-400 uppercase tracking-widest pl-1">Cashflow Type</label>
+                                        <label className="font-bold text-slate-400 uppercase tracking-widest pl-1">Cashflow Type</label>
                                         <select value={form.cashflowType} onChange={e => setForm({ ...form, cashflowType: e.target.value })}
                                             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-[1.25rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all text-sm md:text-xs">
                                             <option value="NONE">NONE</option>
@@ -460,7 +460,7 @@ export default function COAPage() {
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="font-black text-slate-400 uppercase tracking-widest pl-1 text-[10px]">Induk Akun (Parent)</label>
+                                    <label className="font-bold text-slate-400 uppercase tracking-widest pl-1 text-[10px]">Induk Akun (Parent)</label>
                                     <select value={form.parentId} onChange={e => setForm({ ...form, parentId: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-[1.25rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all text-sm md:text-xs">
                                         <option value="">(Tanpa Induk)</option>
@@ -477,7 +477,7 @@ export default function COAPage() {
                                             <div className={`w-12 h-6 rounded-full transition-all ${form.isReconcilable ? 'bg-indigo-600' : 'bg-slate-200'}`} />
                                             <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${form.isReconcilable ? 'translate-x-6' : 'translate-x-0'}`} />
                                         </div>
-                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-700">Reconcilable</span>
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest group-hover:text-slate-700">Reconcilable</span>
                                     </label>
                                     <label className="flex items-center gap-3 cursor-pointer group">
                                         <div className="relative shrink-0">
@@ -485,7 +485,7 @@ export default function COAPage() {
                                             <div className={`w-12 h-6 rounded-full transition-all ${form.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                                             <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${form.status === 'ACTIVE' ? 'translate-x-6' : 'translate-x-0'}`} />
                                         </div>
-                                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-700">Active</span>
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest group-hover:text-slate-700">Active</span>
                                     </label>
                                 </div>
 
@@ -494,13 +494,13 @@ export default function COAPage() {
                                         <button
                                             type="button"
                                             onClick={() => setIsModalOpen(false)}
-                                            className="flex-1 py-3 text-slate-400 font-black text-[10px] uppercase tracking-widest hover:text-slate-600 transition-all border border-slate-100 rounded-[1.25rem] bg-white"
+                                            className="flex-1 py-3 text-slate-400 font-bold text-[10px] uppercase tracking-widest hover:text-slate-600 transition-all border border-slate-100 rounded-[1.25rem] bg-white"
                                         >
                                             Batal
                                         </button>
                                         <button
                                             type="submit"
-                                            className="flex-1 py-3 bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest rounded-[1.25rem] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-2"
+                                            className="flex-1 py-3 bg-indigo-600 text-white font-bold text-[10px] uppercase tracking-widest rounded-[1.25rem] hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-2"
                                         >
                                             <Check size={16} /> Simpan
                                         </button>
@@ -511,11 +511,11 @@ export default function COAPage() {
                             {!isMobile && (
                                 <div className="p-4 sm:p-6 lg:p-8 bg-slate-50 flex items-center justify-end gap-3 shrink-0">
                                     <button onClick={() => setIsModalOpen(false)}
-                                        className="px-6 py-2.5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all">
+                                        className="px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all">
                                         Cancel
                                     </button>
                                     <button onClick={handleSubmit}
-                                        className="px-4 sm:px-6 lg:px-8 py-3 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2">
+                                        className="px-4 sm:px-6 lg:px-8 py-3 bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2">
                                         <Check size={16} /> {editingAccount ? 'Save Changes' : 'Create Account'}
                                     </button>
                                 </div>

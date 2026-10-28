@@ -72,10 +72,10 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                         </div>
                         <div>
                             <div className="flex items-center gap-3">
-                                <h2 className="text-2xl font-black tracking-tighter text-foreground uppercase">
+                                <h2 className="text-2xl font-bold tracking-tight text-foreground uppercase">
                                     Detail Invoice
                                 </h2>
-                                <div className={`px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 ${s.color}`}>
+                                <div className={`px-3 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${s.color}`}>
                                     <s.icon size={12} />
                                     {s.label}
                                 </div>
@@ -100,27 +100,27 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                     {/* Top Row: Info Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="p-5 rounded-3xl bg-slate-50 border border-slate-100 space-y-3">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
                                 <User size={12} /> Customer
                             </p>
                             <div>
-                                <p className="font-black text-slate-900">{invoice.customer.name}</p>
+                                <p className="font-bold text-slate-900">{invoice.customer.name}</p>
                                 <p className="text-xs font-bold text-slate-500 mt-1 leading-relaxed">{invoice.customer.address || 'Alamat tidak tersedia'}</p>
                             </div>
                         </div>
 
                         <div className="p-5 rounded-3xl bg-slate-50 border border-slate-100 space-y-3">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
                                 <Calendar size={12} /> Timeline
                             </p>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs font-bold text-slate-500">Tanggal Invoice</span>
-                                    <span className="text-xs font-black text-slate-900">{fmtDate(invoice.date)}</span>
+                                    <span className="text-xs font-bold text-slate-900">{fmtDate(invoice.date)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs font-bold text-slate-500">Jatuh Tempo</span>
-                                    <span className={`text-xs font-black ${new Date(invoice.dueDate || '') < new Date() && invoice.status !== 'PAID' ? 'text-rose-600' : 'text-slate-900'}`}>
+                                    <span className={`text-xs font-bold ${new Date(invoice.dueDate || '') < new Date() && invoice.status !== 'PAID' ? 'text-rose-600' : 'text-slate-900'}`}>
                                         {fmtDate(invoice.dueDate)}
                                     </span>
                                 </div>
@@ -128,32 +128,32 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                         </div>
 
                         <div className="p-5 rounded-3xl bg-slate-50 border border-slate-100 space-y-3">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
                                 <Briefcase size={12} /> Referensi
                             </p>
                             <div className="space-y-2">
                                 {invoice.contract && (
                                     <div className="flex justify-between items-center gap-2">
-                                        <span className="text-[10px] font-black uppercase text-slate-500 shrink-0">Contract</span>
-                                        <span className="text-xs font-black text-indigo-600 truncate">{invoice.contract.number}</span>
+                                        <span className="text-[10px] font-bold uppercase text-slate-500 shrink-0">Contract</span>
+                                        <span className="text-xs font-bold text-indigo-600 truncate">{invoice.contract.number}</span>
                                     </div>
                                 )}
                                 {invoice.project && (
                                     <div className="flex justify-between items-center gap-2">
-                                        <span className="text-[10px] font-black uppercase text-slate-500 shrink-0">Project</span>
-                                        <span className="text-xs font-black text-emerald-600 truncate">{invoice.project.number}</span>
+                                        <span className="text-[10px] font-bold uppercase text-slate-500 shrink-0">Project</span>
+                                        <span className="text-xs font-bold text-emerald-600 truncate">{invoice.project.number}</span>
                                     </div>
                                 )}
                                 {invoice.salesOrder && (
                                     <div className="flex justify-between items-center gap-2">
-                                        <span className="text-[10px] font-black uppercase text-slate-500 shrink-0">SO</span>
-                                        <span className="text-xs font-black text-blue-600 truncate">{invoice.salesOrder.number}</span>
+                                        <span className="text-[10px] font-bold uppercase text-slate-500 shrink-0">SO</span>
+                                        <span className="text-xs font-bold text-blue-600 truncate">{invoice.salesOrder.number}</span>
                                     </div>
                                 )}
                                 {invoice.deliveryOrder && (
                                     <div className="flex justify-between items-center gap-2">
-                                        <span className="text-[10px] font-black uppercase text-slate-500 shrink-0">DO/BAST</span>
-                                        <span className="text-xs font-black text-indigo-600 truncate">{invoice.deliveryOrder.number}</span>
+                                        <span className="text-[10px] font-bold uppercase text-slate-500 shrink-0">DO/BAST</span>
+                                        <span className="text-xs font-bold text-indigo-600 truncate">{invoice.deliveryOrder.number}</span>
                                     </div>
                                 )}
                             </div>
@@ -162,18 +162,18 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
 
                     {/* Items Table */}
                     <div className="space-y-4">
-                        <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 ml-1">
+                        <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2 ml-1">
                             <FileText size={14} /> Baris Tagihan
                         </h3>
                         <div className="rounded-[2rem] border border-slate-100 overflow-hidden bg-slate-50/30">
                             <table className="w-full text-left border-collapse">
                                 <thead className="bg-slate-50">
                                     <tr>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 w-16 text-center">No</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Deskripsi Item / Layanan</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Qty</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Harga Satuan</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Jumlah</th>
+                                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 w-16 text-center">No</th>
+                                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Deskripsi Item / Layanan</th>
+                                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-center">Qty</th>
+                                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Harga Satuan</th>
+                                        <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Jumlah</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -181,17 +181,17 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                                         <tr key={idx} className="bg-white/50 group hover:bg-white transition-colors">
                                             <td className="px-6 py-4 text-center text-xs font-bold text-slate-400">{it.no}</td>
                                             <td className="px-6 py-4">
-                                                <p className="text-sm font-black text-slate-900 leading-relaxed">{it.description}</p>
+                                                <p className="text-sm font-bold text-slate-900 leading-relaxed">{it.description}</p>
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <p className="text-sm font-bold text-slate-700">{it.qty} <span className="text-[10px] text-slate-400 uppercase tracking-widest">{it.unit}</span></p>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <p className="text-sm font-bold text-slate-700">{fmt(it.unitPrice)}</p>
-                                                {it.discount > 0 && <p className="text-[10px] font-black text-rose-500 uppercase">Disc {it.discount}%</p>}
+                                                {it.discount > 0 && <p className="text-[10px] font-bold text-rose-500 uppercase">Disc {it.discount}%</p>}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <p className="text-sm font-black text-emerald-600">{fmt(it.amount)}</p>
+                                                <p className="text-sm font-bold text-emerald-600">{fmt(it.amount)}</p>
                                             </td>
                                         </tr>
                                     ))}
@@ -203,24 +203,24 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                     {/* Payment History */}
                     {invoice.payments && invoice.payments.length > 0 && (
                         <div className="space-y-4">
-                            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 ml-1">
+                            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2 ml-1">
                                 <DollarSign size={14} /> Riwayat Pembayaran
                             </h3>
                             <div className="rounded-[2rem] border border-slate-100 overflow-hidden bg-slate-50/30">
                                 <table className="w-full text-left border-collapse">
                                     <thead className="bg-slate-50">
                                         <tr>
-                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Tanggal</th>
-                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Referensi</th>
-                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Nominal</th>
+                                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Tanggal</th>
+                                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Referensi</th>
+                                            <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Nominal</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {invoice.payments.map((p, idx) => (
                                             <tr key={idx} className="bg-white/50 group hover:bg-white transition-colors">
                                                 <td className="px-6 py-4 text-xs font-bold text-slate-600">{fmtDate(p.date)}</td>
-                                                <td className="px-6 py-4 text-sm font-black text-slate-900">{p.notes || '-'}</td>
-                                                <td className="px-6 py-4 text-right text-sm font-black text-emerald-600">{fmt(p.amount)}</td>
+                                                <td className="px-6 py-4 text-sm font-bold text-slate-900">{p.notes || '-'}</td>
+                                                <td className="px-6 py-4 text-right text-sm font-bold text-emerald-600">{fmt(p.amount)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -235,13 +235,13 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                             {/* Payment Info */}
                             {invoice.bankAccount ? (
                                 <div className="p-6 rounded-[2rem] bg-indigo-600/5 border border-indigo-600/10 space-y-4">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600 flex items-center gap-2">
                                         <DollarSign size={12} /> Informasi Pembayaran
                                     </p>
                                     <div>
                                         <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">{invoice.bankAccount.bankName}</p>
-                                        <p className="text-lg font-black text-slate-900 mt-1 tracking-tight">{invoice.bankAccount.accountNumber}</p>
-                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">A/N: {invoice.bankAccount.accountHolder}</p>
+                                        <p className="text-lg font-bold text-slate-900 mt-1 tracking-tight">{invoice.bankAccount.accountNumber}</p>
+                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">A/N: {invoice.bankAccount.accountHolder}</p>
                                     </div>
                                 </div>
                             ) : (
@@ -253,7 +253,7 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                             {/* Notes */}
                             {invoice.paymentTerms && (
                                 <div className="space-y-2">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Syarat & Ketentuan Pembayaran</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 ml-1">Syarat & Ketentuan Pembayaran</p>
                                     <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-xs font-medium text-slate-600 leading-relaxed italic whitespace-pre-wrap shadow-inner">
                                         {invoice.paymentTerms}
                                     </div>
@@ -279,9 +279,9 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                             </div>
                             <div className="flex justify-between items-end pt-2 pb-2">
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500 leading-none">Grand Total</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 leading-none">Grand Total</p>
                                 </div>
-                                <p className="text-xl font-black tracking-tighter text-white">{fmt(invoice.grandTotal)}</p>
+                                <p className="text-xl font-bold tracking-tight text-white">{fmt(invoice.grandTotal)}</p>
                             </div>
                             
                             {totalPaid > 0 && (
@@ -292,18 +292,18 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                                     </div>
                                     <div className="flex justify-between items-end pt-2">
                                         <div className="space-y-1">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 leading-none">Sisa Tagihan</p>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-rose-500 leading-none">Sisa Tagihan</p>
                                         </div>
-                                        <p className="text-3xl font-black tracking-tighter text-white">{fmt(remainingBalance)}</p>
+                                        <p className="text-2xl font-bold tracking-tight text-white">{fmt(remainingBalance)}</p>
                                     </div>
                                 </>
                             )}
                             {totalPaid === 0 && (
                                 <div className="flex justify-between items-end pt-2 border-t border-white/10 mt-2">
                                     <div className="space-y-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-rose-500 leading-none">Sisa Tagihan</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-rose-500 leading-none">Sisa Tagihan</p>
                                     </div>
-                                    <p className="text-3xl font-black tracking-tighter text-white">{fmt(invoice.grandTotal)}</p>
+                                    <p className="text-2xl font-bold tracking-tight text-white">{fmt(invoice.grandTotal)}</p>
                                 </div>
                             )}
                         </div>

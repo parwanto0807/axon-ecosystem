@@ -63,14 +63,14 @@ export default function BalanceSheetPage() {
             {/* Date Filter & Summary */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
                 <div className="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-center">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Per Tanggal</label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 mb-2">Per Tanggal</label>
                     <div className="relative">
                         <Calendar size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-indigo-500" />
                         <input
                             type="date"
                             value={date}
                             onChange={e => setDate(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-indigo-500 font-black text-slate-900 transition-all"
+                            className="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-indigo-500 font-bold text-slate-900 transition-all"
                         />
                     </div>
                 </div>
@@ -78,19 +78,19 @@ export default function BalanceSheetPage() {
                 <div className="lg:col-span-2 bg-slate-900 flex-col md:flex-row rounded-[2rem] md:rounded-[2.5rem] p-6 flex flex-wrap md:flex-nowrap gap-4 md:gap-0 items-center justify-around overflow-hidden relative">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
                     <div className="text-center z-10 w-full sm:w-auto">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Aktiva (Assets)</p>
-                        <p className="text-xl md:text-2xl font-black text-white tracking-tighter truncate">{totalAssets.toLocaleString('id-ID')}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Aktiva (Assets)</p>
+                        <p className="text-xl md:text-2xl font-bold text-white tracking-tight truncate">{totalAssets.toLocaleString('id-ID')}</p>
                     </div>
                     <div className="w-full h-px md:w-px md:h-12 bg-slate-700/50" />
                     <div className="text-center z-10 w-full sm:w-auto">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Pasiva (Liab + Equity)</p>
-                        <p className="text-xl md:text-2xl font-black text-indigo-400 tracking-tighter truncate">{totalLiabAndEquity.toLocaleString('id-ID')}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pasiva (Liab + Equity)</p>
+                        <p className="text-xl md:text-2xl font-bold text-indigo-400 tracking-tight truncate">{totalLiabAndEquity.toLocaleString('id-ID')}</p>
                     </div>
                     <div className="w-full h-px md:w-px md:h-12 bg-slate-700/50" />
                     <div className="text-center z-10 w-full sm:w-auto flex justify-center">
                         <div className={`px-4 py-2 md:py-2.5 rounded-2xl flex items-center justify-center gap-2 w-full md:w-auto ${Math.abs(totalAssets - totalLiabAndEquity) < 1 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
                             {Math.abs(totalAssets - totalLiabAndEquity) < 1 ? <ShieldCheck size={16} /> : <Search size={16} />}
-                            <span className="text-[10px] md:text-xs font-black uppercase tracking-widest">
+                            <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest">
                                 {Math.abs(totalAssets - totalLiabAndEquity) < 1 ? 'Balanced' : 'Unbalanced'}
                             </span>
                         </div>
@@ -103,7 +103,7 @@ export default function BalanceSheetPage() {
                 <div className="space-y-4 md:space-y-6">
                     <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col min-h-full md:min-h-[500px]">
                         <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-4 md:py-6 bg-slate-50/50 border-b border-slate-100">
-                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">AKTIVA (ASSETS)</h2>
+                            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">AKTIVA (ASSETS)</h2>
                         </div>
                         <div className="flex-1 overflow-auto">
                             <table className="w-full text-xs">
@@ -119,13 +119,13 @@ export default function BalanceSheetPage() {
                                                     <span className="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{acc.code}</span>
                                                     <span className={`font-bold leading-tight ${isAbnormal ? 'text-rose-600' : 'text-slate-700'}`}>{acc.name}</span>
                                                     {isAbnormal && (
-                                                        <span title="Saldo abnormal: aset tidak seharusnya negatif" className="flex items-center gap-1 text-[9px] font-black text-rose-500 bg-rose-100 px-1.5 py-0.5 rounded-full">
+                                                        <span title="Saldo abnormal: aset tidak seharusnya negatif" className="flex items-center gap-1 text-[9px] font-bold text-rose-500 bg-rose-100 px-1.5 py-0.5 rounded-full">
                                                             <AlertTriangle size={9} /> ABNORMAL
                                                         </span>
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className={`px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-rose-600' : 'text-slate-900'}`}>
+                                            <td className={`px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 text-right font-mono font-bold ${isAbnormal ? 'text-rose-600' : 'text-slate-900'}`}>
                                                 {acc.balance.toLocaleString('id-ID')}
                                             </td>
                                         </tr>
@@ -134,8 +134,8 @@ export default function BalanceSheetPage() {
                             </table>
                         </div>
                         <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-4 md:py-6 bg-indigo-600 text-white flex items-center justify-between mt-auto">
-                            <span className="font-black text-[10px] uppercase tracking-widest">TOTAL AKTIVA</span>
-                            <span className="text-base md:text-lg font-black tracking-tight">{totalAssets.toLocaleString('id-ID')}</span>
+                            <span className="font-bold text-[10px] uppercase tracking-widest">TOTAL AKTIVA</span>
+                            <span className="text-base md:text-lg font-bold tracking-tight">{totalAssets.toLocaleString('id-ID')}</span>
                         </div>
                     </div>
                 </div>
@@ -145,7 +145,7 @@ export default function BalanceSheetPage() {
                     {/* Liabilities */}
                     <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
                         <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-4 md:py-6 bg-slate-50/50 border-b border-slate-100">
-                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">KEWAJIBAN (LIABILITIES)</h2>
+                            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">KEWAJIBAN (LIABILITIES)</h2>
                         </div>
                         <table className="w-full text-xs">
                             <tbody className="divide-y divide-slate-50">
@@ -158,13 +158,13 @@ export default function BalanceSheetPage() {
                                                 <span className="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{acc.code}</span>
                                                 <span className={`font-bold leading-tight ${isAbnormal ? 'text-amber-600' : 'text-slate-700'}`}>{acc.name}</span>
                                                 {isAbnormal && (
-                                                    <span title="Saldo abnormal: kewajiban tidak seharusnya negatif" className="flex items-center gap-1 text-[9px] font-black text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                                                    <span title="Saldo abnormal: kewajiban tidak seharusnya negatif" className="flex items-center gap-1 text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">
                                                         <AlertTriangle size={9} /> ABNORMAL
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className={`px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-amber-600' : 'text-slate-900'}`}>
+                                        <td className={`px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 text-right font-mono font-bold ${isAbnormal ? 'text-amber-600' : 'text-slate-900'}`}>
                                             {acc.balance.toLocaleString('id-ID')}
                                         </td>
                                     </tr>
@@ -172,15 +172,15 @@ export default function BalanceSheetPage() {
                             </tbody>
                         </table>
                         <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 bg-slate-900 text-slate-100 flex items-center justify-between border-t border-slate-700">
-                            <span className="font-black text-[9px] uppercase tracking-widest text-slate-400">TOTAL KEWAJIBAN</span>
-                            <span className="font-black tracking-tight">{totalLiabilities.toLocaleString('id-ID')}</span>
+                            <span className="font-bold text-[9px] uppercase tracking-widest text-slate-400">TOTAL KEWAJIBAN</span>
+                            <span className="font-bold tracking-tight">{totalLiabilities.toLocaleString('id-ID')}</span>
                         </div>
                     </div>
 
                     {/* Equity */}
                     <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
                         <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-4 md:py-6 bg-slate-50/50 border-b border-slate-100">
-                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">EKUITAS (EQUITY)</h2>
+                            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-widest">EKUITAS (EQUITY)</h2>
                         </div>
                         <table className="w-full text-xs">
                             <tbody className="divide-y divide-slate-50">
@@ -195,16 +195,16 @@ export default function BalanceSheetPage() {
                                                 <span className="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{acc.code}</span>
                                                 <span className={`font-bold leading-tight ${isAbnormal ? 'text-amber-600' : acc.id === 'NET_PROFIT' && acc.balance < 0 ? 'text-rose-500' : 'text-slate-700'}`}>{acc.name}</span>
                                                 {isAbnormal && (
-                                                    <span title="Saldo abnormal: ekuitas tidak seharusnya negatif" className="flex items-center gap-1 text-[9px] font-black text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                                                    <span title="Saldo abnormal: ekuitas tidak seharusnya negatif" className="flex items-center gap-1 text-[9px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">
                                                         <AlertTriangle size={9} /> ABNORMAL
                                                     </span>
                                                 )}
                                                 {acc.id === 'NET_PROFIT' && acc.balance < 0 && (
-                                                    <span className="text-[9px] font-black text-rose-400 bg-rose-100 px-1.5 py-0.5 rounded-full">RUGI</span>
+                                                    <span className="text-[9px] font-bold text-rose-400 bg-rose-100 px-1.5 py-0.5 rounded-full">RUGI</span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className={`px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-amber-600' : acc.id === 'NET_PROFIT' && acc.balance < 0 ? 'text-rose-500' : 'text-slate-900'}`}>
+                                        <td className={`px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 text-right font-mono font-bold ${isAbnormal ? 'text-amber-600' : acc.id === 'NET_PROFIT' && acc.balance < 0 ? 'text-rose-500' : 'text-slate-900'}`}>
                                             {acc.balance.toLocaleString('id-ID')}
                                         </td>
                                     </tr>
@@ -212,12 +212,12 @@ export default function BalanceSheetPage() {
                             </tbody>
                         </table>
                         <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 bg-slate-900 text-slate-100 flex items-center justify-between border-t border-slate-700">
-                            <span className="font-black text-[9px] uppercase tracking-widest text-slate-400">TOTAL EKUITAS</span>
-                            <span className="font-black tracking-tight">{totalEquity.toLocaleString('id-ID')}</span>
+                            <span className="font-bold text-[9px] uppercase tracking-widest text-slate-400">TOTAL EKUITAS</span>
+                            <span className="font-bold tracking-tight">{totalEquity.toLocaleString('id-ID')}</span>
                         </div>
                         <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-4 md:py-6 bg-indigo-600 text-white flex items-center justify-between">
-                            <span className="font-black text-[10px] uppercase tracking-widest">TOTAL PASIVA</span>
-                            <span className="text-base md:text-lg font-black tracking-tight">{totalLiabAndEquity.toLocaleString('id-ID')}</span>
+                            <span className="font-bold text-[10px] uppercase tracking-widest">TOTAL PASIVA</span>
+                            <span className="text-base md:text-lg font-bold tracking-tight">{totalLiabAndEquity.toLocaleString('id-ID')}</span>
                         </div>
                     </div>
                 </div>

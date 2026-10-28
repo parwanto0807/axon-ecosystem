@@ -129,7 +129,7 @@ export default function SystemAccountsPage() {
                     <Info className="text-amber-600" size={20} />
                 </div>
                 <div className="text-sm">
-                    <p className="font-black text-amber-900 uppercase tracking-tight text-xs">Informasi Penting</p>
+                    <p className="font-bold text-amber-900 uppercase tracking-tight text-xs">Informasi Penting</p>
                     <p className="text-amber-700 font-medium leading-relaxed mt-1">
                         Halaman ini digunakan untuk menentukan akun mana yang akan digunakan secara otomatis oleh sistem saat melakukan transaksi seperti penjurnalan invoice, pengakuan utang supplier, atau mutasi stok. Mengubah mapping ini akan mempengaruhi transaksi masa depan.
                     </p>
@@ -154,11 +154,11 @@ export default function SystemAccountsPage() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-slate-100 bg-slate-50/50">
-                            <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">System Key</th>
+                            <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Key</th>
                             <th className="px-6 py-4 text-center text-slate-400"><ArrowRightLeft size={14} className="mx-auto" /></th>
-                            <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Mapped Ledger Account</th>
-                            <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Description</th>
-                            <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Actions</th>
+                            <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mapped Ledger Account</th>
+                            <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</th>
+                            <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest w-24">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50 text-xs">
@@ -169,7 +169,7 @@ export default function SystemAccountsPage() {
                         ) : (
                             filtered.map((acc) => (
                                 <tr key={acc.id} className="hover:bg-slate-50/50 transition-colors group">
-                                    <td className="px-6 py-4 font-black text-indigo-600 tracking-tight uppercase">{acc.key}</td>
+                                    <td className="px-6 py-4 font-bold text-indigo-600 tracking-tight uppercase">{acc.key}</td>
                                     <td className="px-6 py-4 text-center text-slate-300"><LinkIcon size={12} className="mx-auto" /></td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
@@ -205,8 +205,8 @@ export default function SystemAccountsPage() {
                         <div key={acc.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex flex-col gap-4 relative overflow-hidden">
                             <div className="flex justify-between items-start gap-2">
                                 <div className="flex flex-col">
-                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">System Key</span>
-                                    <span className="font-black text-indigo-600 tracking-tight uppercase">{acc.key}</span>
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 tracking-widest mb-1">System Key</span>
+                                    <span className="font-bold text-indigo-600 tracking-tight uppercase">{acc.key}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">
                                     <button onClick={() => handleEdit(acc)} className="p-2 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-xl transition-all"><Edit2 size={14} /></button>
@@ -249,21 +249,21 @@ export default function SystemAccountsPage() {
                             
                             <div className="p-6 md:p-4 sm:p-6 lg:p-8 border-b border-slate-100 flex items-center justify-between shrink-0">
                                 <div>
-                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Mapping Configuration</p>
-                                    <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{editingAccount ? 'Update Mapping' : 'New System Key'}</h2>
+                                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Mapping Configuration</p>
+                                    <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">{editingAccount ? 'Update Mapping' : 'New System Key'}</h2>
                                 </div>
                                 <button onClick={() => setIsModalOpen(false)} className={`w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all ${isMobile ? 'absolute top-4 right-4' : ''}`}><X size={20} /></button>
                             </div>
 
                             <form onSubmit={handleSubmit} className="p-6 md:p-4 sm:p-6 lg:p-8 space-y-5 md:space-y-6 overflow-y-auto">
                                 <div className="space-y-1.5">
-                                    <label className="font-black text-slate-400 uppercase tracking-widest pl-1 text-[9px] md:text-[10px]">System Key</label>
+                                    <label className="font-bold text-slate-400 uppercase tracking-widest pl-1 text-[9px] md:text-[10px]">System Key</label>
                                     <input required disabled={!!editingAccount} value={form.key} onChange={e => setForm({ ...form, key: e.target.value.toUpperCase() })} placeholder="e.g. ACCOUNTS_PAYABLE"
                                         className="w-full px-4 py-3 text-sm md:text-base bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-extrabold text-indigo-600 disabled:opacity-50 transition-all" />
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="font-black text-slate-400 uppercase tracking-widest pl-1 text-[9px] md:text-[10px]">Ledger Account (COA)</label>
+                                    <label className="font-bold text-slate-400 uppercase tracking-widest pl-1 text-[9px] md:text-[10px]">Ledger Account (COA)</label>
                                     <select required value={form.coaId} onChange={e => setForm({ ...form, coaId: e.target.value })}
                                         className="w-full px-4 py-3 text-sm md:text-base bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all truncate pr-8">
                                         <option value="">Pilih Akun Ledger...</option>
@@ -274,7 +274,7 @@ export default function SystemAccountsPage() {
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="font-black text-slate-400 uppercase tracking-widest pl-1 text-[9px] md:text-[10px]">Description & Usage</label>
+                                    <label className="font-bold text-slate-400 uppercase tracking-widest pl-1 text-[9px] md:text-[10px]">Description & Usage</label>
                                     <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={3}
                                         className="w-full px-4 py-3 text-sm md:text-base bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 font-bold text-slate-700 transition-all resize-none" />
                                 </div>
@@ -282,12 +282,12 @@ export default function SystemAccountsPage() {
                                 <div className="pt-4 flex flex-col md:flex-row items-center justify-end gap-3 pb-8 md:pb-0">
                                     {!isMobile && (
                                         <button type="button" onClick={() => setIsModalOpen(false)}
-                                            className="w-full md:w-auto px-6 py-2.5 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all text-center">
+                                            className="w-full md:w-auto px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all text-center">
                                             Cancel
                                         </button>
                                     )}
                                     <button type="submit"
-                                        className="w-full md:w-auto px-4 sm:px-6 lg:px-8 py-3.5 md:py-3 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl md:rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2">
+                                        className="w-full md:w-auto px-4 sm:px-6 lg:px-8 py-3.5 md:py-3 bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest rounded-2xl md:rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2">
                                         <Check size={16} /> Save Changes
                                     </button>
                                 </div>

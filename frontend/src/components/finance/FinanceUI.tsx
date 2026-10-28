@@ -55,11 +55,11 @@ export function FinancePageHeader({
             </span>
           )}
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">
+            <h1 className="truncate text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-lg">
               {title}
             </h1>
             {description && (
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+              <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400 sm:text-xs">
                 {description}
               </p>
             )}
@@ -116,7 +116,7 @@ export function FinanceStatCard({
           <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             {label}
           </p>
-          <p className="mt-1 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+          <p className="mt-1 text-lg font-bold tracking-tight text-slate-900 dark:text-white sm:text-xl">
             {value}
           </p>
           {hint && (

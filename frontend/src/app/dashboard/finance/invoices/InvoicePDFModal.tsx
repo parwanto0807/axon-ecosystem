@@ -293,7 +293,7 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                                 </div>
                             </div>
                             <div className="text-right">
-                                <h1 className={`text-2xl font-black ${isPrintMode ? 'text-black' : 'text-indigo-600'} uppercase tracking-tighter mb-2`}>
+                                <h1 className={`text-2xl font-bold ${isPrintMode ? 'text-black' : 'text-indigo-600'} uppercase tracking-tight mb-2`}>
                                     {invoice.invoiceType === 'DOWN_PAYMENT' ? 'Invoice - Uang Muka (DP)' :
                                      invoice.invoiceType === 'PROGRESS' ? 'Invoice - Termin Progress' :
                                      invoice.invoiceType === 'FINAL' ? 'Invoice - Pelunasan' :
@@ -319,12 +319,12 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
 
                         <div className="grid grid-cols-2 gap-12 mb-10">
                             <div>
-                                <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-2">Tagihan Kepada</div>
+                                <div className="text-[8px] font-bold uppercase tracking-widest text-slate-400 mb-2">Tagihan Kepada</div>
                                 <div className="font-bold text-sm">{c?.name}</div>
                                 <div className="text-[10px] text-slate-500 mt-2 leading-relaxed">{c?.address || '-'}</div>
                             </div>
                             <div>
-                                <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-2">Metadata Tagihan</div>
+                                <div className="text-[8px] font-bold uppercase tracking-widest text-slate-400 mb-2">Metadata Tagihan</div>
                                 <table className="text-[10px] w-full">
                                     <tbody>
                                         {[
@@ -346,7 +346,7 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
 
                         <table className="w-full text-[10px] mb-8 border-collapse">
                             <thead>
-                                <tr className={`${isPrintMode ? 'border-y-2 border-black text-black font-bold' : 'bg-indigo-600 text-white font-black'} uppercase text-[8px] tracking-widest`}>
+                                <tr className={`${isPrintMode ? 'border-y-2 border-black text-black font-bold' : 'bg-indigo-600 text-white font-bold'} uppercase text-[8px] tracking-widest`}>
                                     <th className="p-3 w-10 text-center">No</th>
                                     <th className="p-3 text-left">Deskripsi Item / Layanan</th>
                                     <th className="p-3 w-16 text-center">Qty</th>
@@ -357,13 +357,13 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                             </thead>
                             <tbody className="border-x border-b border-slate-100 divide-y divide-slate-100 font-medium">
                                 <tr className={`${isPrintMode ? 'bg-white' : 'bg-slate-50/50'}`}>
-                                    <td colSpan={6} className={`p-3 text-center text-[9px] font-black uppercase tracking-widest ${isPrintMode ? 'text-black' : 'text-slate-500'}`}>
+                                    <td colSpan={6} className={`p-3 text-center text-[9px] font-bold uppercase tracking-widest ${isPrintMode ? 'text-black' : 'text-slate-500'}`}>
                                         Project: <span className={`${isPrintMode ? 'text-black' : 'text-indigo-600'} ml-1`}>{invoice.project?.name || '-'}</span>
                                     </td>
                                 </tr>
                                 {invoice.items?.map((it, idx) => (
                                     <tr key={idx}>
-                                        <td className={`p-3 text-center ${isPrintMode ? 'text-black font-black' : 'text-slate-400 font-bold'}`}>{it.no}</td>
+                                        <td className={`p-3 text-center ${isPrintMode ? 'text-black font-bold' : 'text-slate-400 font-bold'}`}>{it.no}</td>
                                         <td className={`p-3 ${isPrintMode ? 'text-black' : 'text-slate-800'}`}>{it.description}</td>
                                         <td className="p-3 text-center">{it.qty} {it.unit}</td>
                                         <td className="p-3 text-right">{fr(it.unitPrice)}</td>
@@ -390,7 +390,7 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                                     <span>Pajak (PPN {invoice.tax}%)</span>
                                     <span className="font-bold">+ {fr(invoice.taxAmt)}</span>
                                 </div>
-                                <div className={`flex justify-between ${isPrintMode ? 'text-black' : 'text-indigo-700'} text-sm font-black pt-1`}>
+                                <div className={`flex justify-between ${isPrintMode ? 'text-black' : 'text-indigo-700'} text-sm font-bold pt-1`}>
                                     <span>TOTAL TAGIHAN</span>
                                     <span>{fr(invoice.grandTotal)}</span>
                                 </div>
@@ -400,15 +400,15 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                         {invoice.bankAccount && (
                             <div className="flex justify-between items-end mb-12">
                                 <div className={`p-5 ${isPrintMode ? 'bg-white border-2 border-black' : 'bg-slate-50 border border-slate-100'} rounded-2xl w-72`}>
-                                    <div className={`text-[8px] font-black tracking-widest ${isPrintMode ? 'text-black' : 'text-slate-400'} uppercase mb-3`}>Informasi Pembayaran (Transfer)</div>
-                                    <div className={`font-extrabold ${isPrintMode ? 'text-black font-black' : 'text-indigo-600'} text-[11px] mb-1`}>{invoice.bankAccount.bankName}</div>
-                                    <div className="font-black text-slate-900 text-sm mb-1">{invoice.bankAccount.accountNumber}</div>
-                                    <div className={`text-[10px] font-bold ${isPrintMode ? 'text-black' : 'text-slate-500'} uppercase tracking-tighter`}>A/N: {invoice.bankAccount.accountHolder}</div>
+                                    <div className={`text-[8px] font-bold tracking-widest ${isPrintMode ? 'text-black' : 'text-slate-400'} uppercase mb-3`}>Informasi Pembayaran (Transfer)</div>
+                                    <div className={`font-extrabold ${isPrintMode ? 'text-black font-bold' : 'text-indigo-600'} text-[11px] mb-1`}>{invoice.bankAccount.bankName}</div>
+                                    <div className="font-bold text-slate-900 text-sm mb-1">{invoice.bankAccount.accountNumber}</div>
+                                    <div className={`text-[10px] font-bold ${isPrintMode ? 'text-black' : 'text-slate-500'} uppercase tracking-tight`}>A/N: {invoice.bankAccount.accountHolder}</div>
                                 </div>
                                 <div className="text-center w-56 space-y-12">
                                     <div className="space-y-1">
-                                        <div className={`text-[9px] font-black uppercase tracking-widest ${isPrintMode ? 'text-black' : 'text-slate-400'}`}>Hormat Kami,</div>
-                                        <div className={`text-[8px] font-bold ${isPrintMode ? 'text-black font-black' : 'text-indigo-600'} uppercase tracking-tighter`}>{company.name || 'PT. Axon Ecosystem'}</div>
+                                        <div className={`text-[9px] font-bold uppercase tracking-widest ${isPrintMode ? 'text-black' : 'text-slate-400'}`}>Hormat Kami,</div>
+                                        <div className={`text-[8px] font-bold ${isPrintMode ? 'text-black font-bold' : 'text-indigo-600'} uppercase tracking-tight`}>{company.name || 'PT. Axon Ecosystem'}</div>
                                     </div>
                                     
                                     <div className="relative h-16 flex items-center justify-center">
@@ -419,7 +419,7 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
  
                                     <div className="space-y-1">
                                         <div className={`font-bold border-b ${isPrintMode ? 'border-black' : 'border-slate-900'} pb-1 text-slate-900 mx-auto w-40`}>{invoice.signerName || '____________________'}</div>
-                                        <div className={`text-[8px] ${isPrintMode ? 'text-black font-black' : 'text-slate-400 font-bold'} uppercase tracking-tighter`}>{invoice.signerPosition || 'Finance Department'}</div>
+                                        <div className={`text-[8px] ${isPrintMode ? 'text-black font-bold' : 'text-slate-400 font-bold'} uppercase tracking-tight`}>{invoice.signerPosition || 'Finance Department'}</div>
                                     </div>
                                 </div>
                             </div>
@@ -428,7 +428,7 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                         {!invoice.bankAccount && (
                             <div className="flex justify-end mt-20">
                                 <div className="text-center w-56 space-y-2">
-                                    <div className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Hormat Kami,</div>
+                                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">Hormat Kami,</div>
                                     <div className="relative h-16 flex items-center justify-center">
                                         {showSignature && (
                                             <img src="/TTD Fix.png" alt="Stamp" className="h-16 w-auto object-contain z-10" />
@@ -436,7 +436,7 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                                     </div>
                                     <div className="space-y-1">
                                         <div className="font-bold border-b border-slate-900 pb-1 text-slate-900">{invoice.signerName || '____________________'}</div>
-                                        <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter">{invoice.signerPosition || 'Finance Department'}</div>
+                                        <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">{invoice.signerPosition || 'Finance Department'}</div>
                                     </div>
                                 </div>
                             </div>
