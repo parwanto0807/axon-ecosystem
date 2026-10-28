@@ -156,7 +156,7 @@ export default function ApprovalsPage() {
     const totalPosted = expenses.filter(e => e.status === 'POSTED').reduce((s, e) => s + e.amount, 0)
 
     return (
-        <div className="p-4 md:px-6 md:py-8 space-y-6 md:space-y-8 w-full font-inter bg-slate-50/30 min-h-screen pb-24 md:pb-8">
+        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-6 md:space-y-8 w-full font-inter bg-slate-50/30 min-h-screen pb-24 md:pb-8">
             <AnimatePresence>
                 {toast && (
                     <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -532,7 +532,7 @@ export default function ApprovalsPage() {
                             animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0 }} 
                             exit={isMobile ? { y: '100%' } : { opacity: 0, scale: 0.95, y: 10 }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="bg-white rounded-t-[2.5rem] md:rounded-[2.5rem] p-6 md:p-8 w-full md:max-w-md shadow-2xl relative z-10 border border-slate-100 flex flex-col max-h-[90vh]">
+                            className="bg-white rounded-t-[2.5rem] md:rounded-[2.5rem] p-6 md:p-4 sm:p-6 lg:p-8 w-full md:max-w-md shadow-2xl relative z-10 border border-slate-100 flex flex-col max-h-[90vh]">
                             
                             {/* Mobile Drag Handle */}
                             <div className="md:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 shrink-0" />

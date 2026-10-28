@@ -126,7 +126,7 @@ export default function BankAccountsPage() {
     )
 
     return (
-        <div className="p-4 md:px-6 md:py-8 space-y-6 md:space-y-8 w-full font-inter bg-slate-50/30 min-h-screen pb-24 md:pb-8">
+        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-6 md:space-y-8 w-full font-inter bg-slate-50/30 min-h-screen pb-24 md:pb-8">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3 md:gap-4">
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 shrink-0">
@@ -169,7 +169,7 @@ export default function BankAccountsPage() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ delay: idx * 0.05 }}
-                            className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm p-6 md:p-8 hover:shadow-xl transition-all group flex flex-col relative overflow-hidden"
+                            className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm p-6 md:p-4 sm:p-6 lg:p-8 hover:shadow-xl transition-all group flex flex-col relative overflow-hidden"
                         >
                             <div className="flex items-start justify-between mb-4 md:mb-6 relative z-10">
                                 <div className="p-3 md:p-4 rounded-xl md:rounded-2xl bg-slate-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
@@ -228,7 +228,7 @@ export default function BankAccountsPage() {
                             </div>
 
                             {/* Decorative Background */}
-                            <div className="absolute top-0 right-0 p-8 opacity-5 -mr-10 -mt-10 group-hover:opacity-10 group-hover:-mr-5 group-hover:-mt-5 transition-all">
+                            <div className="absolute top-0 right-0 p-4 sm:p-6 lg:p-8 opacity-5 -mr-10 -mt-10 group-hover:opacity-10 group-hover:-mr-5 group-hover:-mt-5 transition-all">
                                 <Landmark size={180} />
                             </div>
                         </motion.div>
@@ -252,7 +252,7 @@ export default function BankAccountsPage() {
                                     <div className="w-12 h-1.5 bg-slate-200 rounded-full"></div>
                                 </div>
                             )}
-                            <div className="p-6 md:p-8 pb-0 flex items-center justify-between shrink-0">
+                            <div className="p-6 md:p-4 sm:p-6 lg:p-8 pb-0 flex items-center justify-between shrink-0">
                                 <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
                                     {editingBank ? "Edit Rekening" : "Tambah Rekening Baru"}
                                 </h2>
@@ -263,7 +263,7 @@ export default function BankAccountsPage() {
                                 )}
                             </div>
 
-                            <div className="overflow-y-auto flex-1 p-6 md:p-8 space-y-6">
+                            <div className="overflow-y-auto flex-1 p-6 md:p-4 sm:p-6 lg:p-8 space-y-6">
                                 <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2">

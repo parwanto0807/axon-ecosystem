@@ -48,7 +48,7 @@ export default function TrialBalancePage() {
     }), { debit: 0, credit: 0 })
 
     return (
-        <div className="p-4 md:px-6 md:py-8 space-y-4 md:space-y-6 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
+        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-4 md:space-y-6 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
             <header className="flex flex-col md:flex-row md:items-center justify-between font-inter gap-4">
                 <div className="flex items-center gap-3 md:gap-4">
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 shrink-0">
@@ -84,7 +84,7 @@ export default function TrialBalancePage() {
                         </div>
                     </div>
                 </div>
-                <div className="flex gap-4 md:gap-8 px-4 md:px-8 py-3 bg-slate-50 rounded-2xl md:rounded-3xl border border-slate-100 uppercase tracking-widest">
+                <div className="flex gap-4 md:gap-8 px-4 md:px-4 sm:px-6 lg:px-8 py-3 bg-slate-50 rounded-2xl md:rounded-3xl border border-slate-100 uppercase tracking-widest">
                     <div className="flex flex-col text-left md:text-right w-1/2 md:w-auto">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Debit</p>
                         <p className="text-sm md:text-lg font-black text-emerald-600 tracking-tight leading-none truncate">{totals.debit.toLocaleString('id-ID')}</p>
@@ -101,11 +101,11 @@ export default function TrialBalancePage() {
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-slate-100 bg-slate-50/50">
-                            <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Account Code & Name</th>
-                            <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</th>
-                            <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Debit</th>
-                            <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Credit</th>
-                            <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest bg-indigo-50/30">End Balance</th>
+                            <th className="px-4 sm:px-6 lg:px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Account Code & Name</th>
+                            <th className="px-4 sm:px-6 lg:px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</th>
+                            <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Debit</th>
+                            <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Credit</th>
+                            <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest bg-indigo-50/30">End Balance</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -116,26 +116,26 @@ export default function TrialBalancePage() {
                         ) : (
                             report.map((item) => (
                                 <tr key={item.id} className="hover:bg-slate-50/20 transition-colors group">
-                                    <td className="px-8 py-4">
+                                    <td className="px-4 sm:px-6 lg:px-8 py-4">
                                         <div className="flex items-center gap-3">
                                             <span className="font-mono text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">{item.code}</span>
                                             <span className="font-black text-slate-900 tracking-tight">{item.name}</span>
                                         </div>
                                     </td>
-                                    <td className="px-8 py-4">
+                                    <td className="px-4 sm:px-6 lg:px-8 py-4">
                                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.type}</span>
                                     </td>
-                                    <td className="px-8 py-4 text-right">
+                                    <td className="px-4 sm:px-6 lg:px-8 py-4 text-right">
                                         <span className={`font-mono font-bold text-xs ${item.debit > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
                                             {item.debit > 0 ? item.debit.toLocaleString('id-ID') : '0'}
                                         </span>
                                     </td>
-                                    <td className="px-8 py-4 text-right">
+                                    <td className="px-4 sm:px-6 lg:px-8 py-4 text-right">
                                         <span className={`font-mono font-bold text-xs ${item.credit > 0 ? 'text-rose-600' : 'text-slate-300'}`}>
                                             {item.credit > 0 ? item.credit.toLocaleString('id-ID') : '0'}
                                         </span>
                                     </td>
-                                    <td className="px-8 py-4 text-right bg-indigo-50/20">
+                                    <td className="px-4 sm:px-6 lg:px-8 py-4 text-right bg-indigo-50/20">
                                         <div className="flex items-center justify-end gap-2">
                                             <span className="font-mono font-black text-slate-900">{item.balance.toLocaleString('id-ID')}</span>
                                             {item.balance > 0 ? (
@@ -150,10 +150,10 @@ export default function TrialBalancePage() {
                         )}
                         {/* Footer Balance Check */}
                         <tr className="bg-slate-900 text-white font-black">
-                            <td colSpan={2} className="px-8 py-5 uppercase tracking-widest text-[11px] text-slate-400 italic">Financial Balance Check</td>
-                            <td className="px-8 py-5 text-right font-mono">{totals.debit.toLocaleString('id-ID')}</td>
-                            <td className="px-8 py-5 text-right font-mono">{totals.credit.toLocaleString('id-ID')}</td>
-                            <td className="px-8 py-5 text-right font-mono bg-indigo-600">
+                            <td colSpan={2} className="px-4 sm:px-6 lg:px-8 py-5 uppercase tracking-widest text-[11px] text-slate-400 italic">Financial Balance Check</td>
+                            <td className="px-4 sm:px-6 lg:px-8 py-5 text-right font-mono">{totals.debit.toLocaleString('id-ID')}</td>
+                            <td className="px-4 sm:px-6 lg:px-8 py-5 text-right font-mono">{totals.credit.toLocaleString('id-ID')}</td>
+                            <td className="px-4 sm:px-6 lg:px-8 py-5 text-right font-mono bg-indigo-600">
                                 {Math.abs(totals.debit - totals.credit) < 1 ? 'BALANCED' : 'UNBALANCED'}
                             </td>
                         </tr>

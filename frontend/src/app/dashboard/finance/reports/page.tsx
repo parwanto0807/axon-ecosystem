@@ -61,7 +61,7 @@ const reports = [
 
 export default function ReportsDirectoryPage() {
     return (
-        <div className="p-4 md:px-6 md:py-8 space-y-6 md:space-y-8 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
+        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-6 md:space-y-8 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
             <header className="flex flex-col gap-2">
                 <div className="flex items-center gap-3 md:gap-4">
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 shrink-0">
@@ -81,7 +81,7 @@ export default function ReportsDirectoryPage() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: idx * 0.1 }}
-                            className="bg-white p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group flex flex-col h-full cursor-pointer relative overflow-hidden"
+                            className="bg-white p-6 md:p-4 sm:p-6 lg:p-8 rounded-3xl md:rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group flex flex-col h-full cursor-pointer relative overflow-hidden"
                         >
                             <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${report.color} flex items-center justify-center text-white shadow-lg mb-5 md:mb-6 group-hover:scale-110 transition-transform`}>
                                 <report.icon size={24} className="md:w-7 md:h-7" />
@@ -97,7 +97,7 @@ export default function ReportsDirectoryPage() {
                             </div>
 
                             {/* Background Pattern */}
-                            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <div className="absolute top-0 right-0 p-4 sm:p-6 lg:p-8 opacity-5 group-hover:opacity-10 transition-opacity">
                                 <report.icon size={120} className="-mr-10 -mt-10" />
                             </div>
                         </motion.div>

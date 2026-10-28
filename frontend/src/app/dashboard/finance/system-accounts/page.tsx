@@ -114,7 +114,7 @@ export default function SystemAccountsPage() {
     }
 
     return (
-        <div className="p-4 md:px-6 md:py-8 space-y-6 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
+        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-6 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3 md:gap-4">
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 shrink-0">
@@ -265,7 +265,7 @@ export default function SystemAccountsPage() {
 
                             {isMobile && <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 shrink-0" />}
                             
-                            <div className="p-6 md:p-8 border-b border-slate-100 flex items-center justify-between shrink-0">
+                            <div className="p-6 md:p-4 sm:p-6 lg:p-8 border-b border-slate-100 flex items-center justify-between shrink-0">
                                 <div>
                                     <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Mapping Configuration</p>
                                     <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{editingAccount ? 'Update Mapping' : 'New System Key'}</h2>
@@ -273,7 +273,7 @@ export default function SystemAccountsPage() {
                                 <button onClick={() => setIsModalOpen(false)} className={`w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all ${isMobile ? 'absolute top-4 right-4' : ''}`}><X size={20} /></button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-5 md:space-y-6 overflow-y-auto">
+                            <form onSubmit={handleSubmit} className="p-6 md:p-4 sm:p-6 lg:p-8 space-y-5 md:space-y-6 overflow-y-auto">
                                 <div className="space-y-1.5">
                                     <label className="font-black text-slate-400 uppercase tracking-widest pl-1 text-[9px] md:text-[10px]">System Key</label>
                                     <input required disabled={!!editingAccount} value={form.key} onChange={e => setForm({ ...form, key: e.target.value.toUpperCase() })} placeholder="e.g. ACCOUNTS_PAYABLE"
@@ -305,7 +305,7 @@ export default function SystemAccountsPage() {
                                         </button>
                                     )}
                                     <button type="submit"
-                                        className="w-full md:w-auto px-8 py-3.5 md:py-3 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl md:rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2">
+                                        className="w-full md:w-auto px-4 sm:px-6 lg:px-8 py-3.5 md:py-3 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-2xl md:rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2">
                                         <Check size={16} /> Save Changes
                                     </button>
                                 </div>

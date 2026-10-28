@@ -119,7 +119,7 @@ export default function LedgerPage() {
     const displayItems = [...itemsWithBalance].reverse();
 
     return (
-        <div className="p-4 md:px-6 md:py-8 space-y-4 md:space-y-6 font-inter max-w-full mx-auto pb-24 md:pb-8">
+        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-4 md:space-y-6 font-inter max-w-full mx-auto pb-24 md:pb-8">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3 md:gap-4">
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 shrink-0">

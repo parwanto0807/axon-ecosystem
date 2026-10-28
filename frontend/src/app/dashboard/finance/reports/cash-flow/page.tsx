@@ -126,7 +126,7 @@ export default function CashFlowPage() {
             <div className="space-y-8 pb-12">
                 {/* Operating Section */}
                 <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                    <div className="px-4 sm:px-6 lg:px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600"><Activity size={16} /></div>
                             <h2 className="text-xs font-black text-slate-900 uppercase tracking-widest">Aktivitas Operasional</h2>
@@ -138,11 +138,11 @@ export default function CashFlowPage() {
                     <table className="w-full text-xs">
                         <tbody className="divide-y divide-slate-50">
                             {data.operating.items.length === 0 ? (
-                                <tr><td className="px-8 py-4 text-slate-400 italic">Tidak ada arus kas operasional</td></tr>
+                                <tr><td className="px-4 sm:px-6 lg:px-8 py-4 text-slate-400 italic">Tidak ada arus kas operasional</td></tr>
                             ) : data.operating.items.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50/20">
-                                    <td className="px-8 py-4 text-slate-700 font-bold">{item.description}</td>
-                                    <td className={`px-8 py-4 text-right font-mono font-black ${item.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    <td className="px-4 sm:px-6 lg:px-8 py-4 text-slate-700 font-bold">{item.description}</td>
+                                    <td className={`px-4 sm:px-6 lg:px-8 py-4 text-right font-mono font-black ${item.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                                         {item.amount >= 0 ? `+${item.amount.toLocaleString('id-ID')}` : item.amount.toLocaleString('id-ID')}
                                     </td>
                                 </tr>
@@ -153,7 +153,7 @@ export default function CashFlowPage() {
 
                 {/* Investing Section */}
                 <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                    <div className="px-4 sm:px-6 lg:px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600"><ArrowUpCircle size={16} /></div>
                             <h2 className="text-xs font-black text-slate-900 uppercase tracking-widest">Aktivitas Investasi</h2>
@@ -165,11 +165,11 @@ export default function CashFlowPage() {
                     <table className="w-full text-xs">
                         <tbody className="divide-y divide-slate-50">
                             {data.investing.items.length === 0 ? (
-                                <tr><td className="px-8 py-4 text-slate-400 italic">Tidak ada aktivitas investasi</td></tr>
+                                <tr><td className="px-4 sm:px-6 lg:px-8 py-4 text-slate-400 italic">Tidak ada aktivitas investasi</td></tr>
                             ) : data.investing.items.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50/20">
-                                    <td className="px-8 py-4 text-slate-700 font-bold">{item.description}</td>
-                                    <td className={`px-8 py-4 text-right font-mono font-black ${item.amount >= 0 ? 'text-indigo-600' : 'text-slate-600'}`}>
+                                    <td className="px-4 sm:px-6 lg:px-8 py-4 text-slate-700 font-bold">{item.description}</td>
+                                    <td className={`px-4 sm:px-6 lg:px-8 py-4 text-right font-mono font-black ${item.amount >= 0 ? 'text-indigo-600' : 'text-slate-600'}`}>
                                         {item.amount >= 0 ? `+${item.amount.toLocaleString('id-ID')}` : item.amount.toLocaleString('id-ID')}
                                     </td>
                                 </tr>
@@ -180,7 +180,7 @@ export default function CashFlowPage() {
 
                 {/* Financing Section */}
                 <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-                    <div className="px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                    <div className="px-4 sm:px-6 lg:px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600"><ArrowDownCircle size={16} /></div>
                             <h2 className="text-xs font-black text-slate-900 uppercase tracking-widest">Aktivitas Pendanaan</h2>
@@ -192,11 +192,11 @@ export default function CashFlowPage() {
                     <table className="w-full text-xs">
                         <tbody className="divide-y divide-slate-50">
                             {data.financing.items.length === 0 ? (
-                                <tr><td className="px-8 py-4 text-slate-400 italic">Tidak ada aktivitas pendanaan</td></tr>
+                                <tr><td className="px-4 sm:px-6 lg:px-8 py-4 text-slate-400 italic">Tidak ada aktivitas pendanaan</td></tr>
                             ) : data.financing.items.map(item => (
                                 <tr key={item.id} className="hover:bg-slate-50/20">
-                                    <td className="px-8 py-4 text-slate-700 font-bold">{item.description}</td>
-                                    <td className={`px-8 py-4 text-right font-mono font-black ${item.amount >= 0 ? 'text-blue-600' : 'text-slate-600'}`}>
+                                    <td className="px-4 sm:px-6 lg:px-8 py-4 text-slate-700 font-bold">{item.description}</td>
+                                    <td className={`px-4 sm:px-6 lg:px-8 py-4 text-right font-mono font-black ${item.amount >= 0 ? 'text-blue-600' : 'text-slate-600'}`}>
                                         {item.amount >= 0 ? `+${item.amount.toLocaleString('id-ID')}` : item.amount.toLocaleString('id-ID')}
                                     </td>
                                 </tr>
@@ -206,7 +206,7 @@ export default function CashFlowPage() {
                 </div>
 
                 {/* Final Total */}
-                <div className={`p-8 rounded-[3rem] text-white flex items-center justify-between shadow-2xl ${netCashFlow >= 0 ? 'bg-indigo-600 shadow-indigo-500/20' : 'bg-rose-600 shadow-rose-500/20'}`}>
+                <div className={`p-4 sm:p-6 lg:p-8 rounded-[3rem] text-white flex items-center justify-between shadow-2xl ${netCashFlow >= 0 ? 'bg-indigo-600 shadow-indigo-500/20' : 'bg-rose-600 shadow-rose-500/20'}`}>
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60 mb-1">Total Kenaikan / Penurunan Kas</p>
                         <h2 className="text-3xl font-black tracking-tighter">NET CASH FLOW OVER PERIOD</h2>

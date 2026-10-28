@@ -773,7 +773,7 @@ export default function OperationalExpensesPage() {
             {/* Image Preview Modal */}
             <AnimatePresence>
                 {selectedImage && (
-                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-8">
+                    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-4 sm:p-6 lg:p-8">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedImage(null)} className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" />
                         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative w-[95vw] md:w-auto max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl md:rounded-2xl bg-white shadow-2xl">
                             <button onClick={() => setSelectedImage(null)} className="absolute top-4 md:top-6 right-4 md:right-6 w-10 md:w-12 h-10 md:h-12 rounded-2xl bg-slate-900/20 md:bg-white/20 hover:bg-slate-900/40 md:hover:bg-white/40 backdrop-blur-xl text-white flex items-center justify-center transition-all z-20">

@@ -160,7 +160,7 @@ export default function CashFlowForecastPage() {
     const maxBarVal = Math.max(...data.forecast.map(m => Math.max(m.inflow, m.outflow, Math.abs(m.closingBalance))), 1)
 
     return (
-        <div className="w-full p-4 md:p-8 space-y-6 md:space-y-8 font-inter bg-slate-50/50 min-h-screen pb-24 md:pb-8 overflow-x-hidden box-border">
+        <div className="w-full p-4 md:p-4 sm:p-6 lg:p-8 space-y-6 md:space-y-8 font-inter bg-slate-50/50 min-h-screen pb-24 md:pb-8 overflow-x-hidden box-border">
 
             {/* ── Header ── */}
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
@@ -225,7 +225,7 @@ export default function CashFlowForecastPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 {/* Chart */}
-                <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm">
+                <div className="lg:col-span-2 bg-white rounded-[2.5rem] p-4 sm:p-6 lg:p-8 border border-slate-100 shadow-sm">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                         <h2 className="text-sm md:text-base font-black text-slate-900 tracking-tight">Tren Arus Kas Bulanan</h2>
                         <div className="flex flex-wrap items-center gap-3 md:gap-4 text-[8px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -402,7 +402,7 @@ export default function CashFlowForecastPage() {
 
             {/* ── Monthly Projection Table / Cards ── */}
             <section className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-                <div className="px-6 md:px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-center gap-3">
+                <div className="px-6 md:px-4 sm:px-6 lg:px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-center gap-3">
                     <Calendar size={16} className="text-indigo-600" />
                     <h2 className="text-[10px] md:text-xs font-black text-slate-900 uppercase tracking-widest">Rincian Proyeksi Bulanan</h2>
                 </div>
@@ -501,7 +501,7 @@ export default function CashFlowForecastPage() {
             {/* ── Detail Drawer for Selected Month ── */}
             <section className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
                 <button
-                    className="w-full px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-left hover:bg-slate-100 transition-colors"
+                    className="w-full px-4 sm:px-6 lg:px-8 py-5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-left hover:bg-slate-100 transition-colors"
                     onClick={() => setExpandedDetail(expandedDetail ? null : 'invoices')}>
                     <div className="flex items-center gap-3">
                         <Info size={16} className="text-indigo-600" />
@@ -516,7 +516,7 @@ export default function CashFlowForecastPage() {
                 <AnimatePresence>
                     {expandedDetail !== null && (
                         <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
-                            <div className="p-5 md:p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                            <div className="p-5 md:p-4 sm:p-6 lg:p-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
 
                                 {/* Invoice Inflows */}
                                 <DetailSection
@@ -668,7 +668,7 @@ export default function CashFlowForecastPage() {
                             {isMobile && <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 shrink-0" />}
 
                             {/* Modal Header */}
-                            <div className="px-6 md:px-10 py-6 md:py-8 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
+                            <div className="px-6 md:px-10 py-6 md:py-4 sm:py-6 lg:py-8 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
                                 <div className="flex items-center gap-3 md:gap-5">
                                     <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-[2rem] bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200 shrink-0">
                                         <Calendar size={isMobile ? 24 : 28} className="text-white" />
@@ -779,7 +779,7 @@ export default function CashFlowForecastPage() {
                             </div>
 
                             {/* Modal Footer Summary */}
-                            <div className="px-6 md:px-10 py-6 md:py-8 bg-slate-900 flex flex-col md:flex-row md:items-center justify-between text-white gap-6">
+                            <div className="px-6 md:px-10 py-6 md:py-4 sm:py-6 lg:py-8 bg-slate-900 flex flex-col md:flex-row md:items-center justify-between text-white gap-6">
                                 <div className="flex gap-8 md:gap-12">
                                     <div>
                                         <p className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Masuk</p>

@@ -138,7 +138,7 @@ export default function OpeningBalancePage() {
     }
 
     return (
-        <div className="p-4 md:px-6 md:py-8 space-y-6 md:space-y-8 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
+        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-6 md:space-y-8 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 shrink-0">
@@ -207,10 +207,10 @@ export default function OpeningBalancePage() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="bg-slate-50/50 border-b border-slate-100">
-                                    <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Account</th>
-                                    <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">Debit</th>
-                                    <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">Credit</th>
-                                    <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Actions</th>
+                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Account</th>
+                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">Debit</th>
+                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">Credit</th>
+                                    <th className="px-4 sm:px-6 lg:px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -228,19 +228,19 @@ export default function OpeningBalancePage() {
                                     </tr>
                                 ) : draftEntries.map(b => (
                                     <tr key={b.id} className="hover:bg-slate-50/30 transition-colors group">
-                                        <td className="px-8 py-4">
+                                        <td className="px-4 sm:px-6 lg:px-8 py-4">
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-bold text-indigo-500 font-mono mb-0.5">{b.code}</span>
                                                 <span className="font-black text-slate-900">{b.name}</span>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-4 text-right">
+                                        <td className="px-4 sm:px-6 lg:px-8 py-4 text-right">
                                             <span className="font-mono font-bold text-slate-700">{b.debit ? b.debit.toLocaleString('id-ID') : '-'}</span>
                                         </td>
-                                        <td className="px-8 py-4 text-right">
+                                        <td className="px-4 sm:px-6 lg:px-8 py-4 text-right">
                                             <span className="font-mono font-bold text-slate-700">{b.credit ? b.credit.toLocaleString('id-ID') : '-'}</span>
                                         </td>
-                                        <td className="px-8 py-4 text-right">
+                                        <td className="px-4 sm:px-6 lg:px-8 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button onClick={() => openModal(b)} className="p-1.5 text-slate-400 hover:text-indigo-600 bg-slate-50 hover:bg-indigo-50 rounded-lg transition-colors">
                                                     <Edit2 size={14} />
@@ -298,7 +298,7 @@ export default function OpeningBalancePage() {
                 </div>
 
                 <div className="space-y-6">
-                    <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl sticky top-8">
+                    <div className="bg-slate-900 rounded-[2.5rem] p-4 sm:p-6 lg:p-8 text-white shadow-2xl sticky top-8">
                         <h2 className="text-xl font-black mb-6 flex items-center gap-2">
                             Draft Summary
                         </h2>
@@ -358,7 +358,7 @@ export default function OpeningBalancePage() {
                             animate={isMobile ? { y: 0 } : { opacity: 1, scale: 1, y: 0 }}
                             exit={isMobile ? { y: "100%" } : { opacity: 0, scale: 0.95, y: 10 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className={`relative bg-white w-full rounded-[2.5rem] p-6 md:p-8 shadow-2xl border border-slate-100 flex flex-col 
+                            className={`relative bg-white w-full rounded-[2.5rem] p-6 md:p-4 sm:p-6 lg:p-8 shadow-2xl border border-slate-100 flex flex-col 
                                 ${isMobile ? "rounded-b-none mt-auto pb-8" : "max-w-md"}`}
                         >
                             {isMobile && <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 shrink-0" />}

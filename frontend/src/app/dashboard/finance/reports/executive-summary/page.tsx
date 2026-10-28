@@ -73,7 +73,7 @@ export default function ExecutiveSummaryPage() {
 
     if (loading && !data) {
         return (
-            <div className="p-8 flex items-center justify-center min-h-[60vh]">
+            <div className="p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
                 <div className="flex flex-col items-center gap-3">
                     <RefreshCw size={32} className="animate-spin text-indigo-600" />
                     <p className="text-sm font-semibold text-slate-500">Memuat Executive Summary...</p>
@@ -130,7 +130,7 @@ export default function ExecutiveSummaryPage() {
     }
 
     return (
-        <div className="p-4 md:px-6 md:py-8 space-y-8 w-full font-inter print:p-0">
+        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-8 w-full font-inter print:p-0">
             {/* ── HEADER & CONTROLS ──────────────────────────────────────────────── */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
                 <div>

@@ -260,7 +260,7 @@ export default function ExpenseReportsPage() {
     const lc = "text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5 block"
 
     return (
-        <div className="p-4 md:px-4 md:py-8 space-y-6 md:space-y-8 font-inter w-full min-h-screen bg-slate-50/30 pb-24 md:pb-8">
+        <div className="p-4 md:px-4 md:py-4 sm:py-6 lg:py-8 space-y-6 md:space-y-8 font-inter w-full min-h-screen bg-slate-50/30 pb-24 md:pb-8">
             <AnimatePresence>
                 {toast && (
                     <motion.div initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
@@ -639,7 +639,7 @@ export default function ExpenseReportsPage() {
                             {/* Mobile Drag Handle */}
                             <div className="md:hidden w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 shrink-0" />
 
-                            <div className="px-6 md:px-10 py-6 md:py-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50 shrink-0">
+                            <div className="px-6 md:px-10 py-6 md:py-4 sm:py-6 lg:py-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50 shrink-0">
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-600/20"><Receipt size={isMobile ? 20 : 24} className="text-white" /></div>
                                     <div>
@@ -813,7 +813,7 @@ export default function ExpenseReportsPage() {
             {/* Image Preview */}
             <AnimatePresence>
                 {previewImg && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-8 bg-slate-900/90 backdrop-blur-xl" onClick={() => setPreviewImg(null)}>
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 md:p-4 sm:p-6 lg:p-8 bg-slate-900/90 backdrop-blur-xl" onClick={() => setPreviewImg(null)}>
                         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="relative max-w-5xl max-h-full">
                             <button onClick={() => setPreviewImg(null)} className="absolute -top-12 md:-top-16 right-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-white/40 hover:text-white transition-colors bg-white/10 rounded-full border border-white/10"><X size={24} className="md:w-7 md:h-7" /></button>
                             <img src={previewImg} alt="Receipt Preview" className="rounded-2xl md:rounded-[3rem] shadow-2xl max-w-full max-h-[80vh] object-contain border-4 md:border-8 border-white/10 ring-1 ring-white/20" />

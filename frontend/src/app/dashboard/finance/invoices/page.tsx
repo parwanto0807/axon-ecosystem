@@ -688,7 +688,7 @@ export default function InvoicesPage() {
                                 ${isMobile ? "rounded-t-[2rem] mt-auto h-[95vh]" : "rounded-[2.5rem] max-w-5xl border border-white/20"}`}
                         >
                             {isMobile && <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 shrink-0" />}
-                            <div className="p-4 md:p-8 border-b border-border/50 flex items-center justify-between bg-slate-50/50">
+                            <div className="p-4 md:p-4 sm:p-6 lg:p-8 border-b border-border/50 flex items-center justify-between bg-slate-50/50">
                                 <div>
                                     <h2 className="text-2xl font-black tracking-tighter text-foreground uppercase">
                                         {editMode ? 'Edit Invoice' : 'Buat Invoice Baru'}
@@ -700,7 +700,7 @@ export default function InvoicesPage() {
                                 </Button>
                             </div>
 
-                            <div className="p-4 md:p-8 overflow-y-auto custom-scrollbar space-y-6 md:space-y-8 pb-24 md:pb-8">
+                            <div className="p-4 md:p-4 sm:p-6 lg:p-8 overflow-y-auto custom-scrollbar space-y-6 md:space-y-8 pb-24 md:pb-8">
                                 <div className="p-4 bg-emerald-600/5 rounded-2xl border border-emerald-600/10 flex flex-col md:flex-row md:items-center gap-4">
                                     <div className="flex-1 flex items-center gap-4">
                                         <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shrink-0">
@@ -1038,7 +1038,7 @@ export default function InvoicesPage() {
                                 </div>
                             </div>
 
-                            <div className="p-8 border-t border-border/50 flex items-center justify-end gap-3 bg-slate-50/50 mt-auto">
+                            <div className="p-4 sm:p-6 lg:p-8 border-t border-border/50 flex items-center justify-end gap-3 bg-slate-50/50 mt-auto">
                                 <Button variant="ghost" onClick={() => setModalOpen(false)} className="h-12 rounded-2xl px-6 font-bold hover:bg-white text-muted-foreground bg-white">Batal</Button>
                                 <Button
                                     onClick={handleSave}
@@ -1099,7 +1099,7 @@ export default function InvoicesPage() {
                             exit={isMobile ? { y: "100%" } : { scale: 0.9, opacity: 0 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
                             className={`bg-white relative z-10 shadow-2xl overflow-hidden flex flex-col
-                                ${isMobile ? "w-full rounded-t-[2rem] mt-auto max-h-[90vh]" : "rounded-[2rem] p-8 w-full max-w-md"}`}
+                                ${isMobile ? "w-full rounded-t-[2rem] mt-auto max-h-[90vh]" : "rounded-[2rem] p-4 sm:p-6 lg:p-8 w-full max-w-md"}`}
                         >
                             {isMobile && <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-2 shrink-0" />}
                             <div className={`${isMobile ? 'p-6 pb-8 overflow-y-auto' : ''}`}>
@@ -1170,7 +1170,7 @@ export default function InvoicesPage() {
                             exit={isMobile ? { y: "100%" } : { scale: 0.9, opacity: 0 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
                             className={`bg-white relative z-10 shadow-2xl flex flex-col 
-                                ${isMobile ? "w-full rounded-t-[2rem] mt-auto pb-8 pt-4 px-6 border-t-8 border-indigo-600" : "rounded-[2rem] p-8 w-full max-w-md border-t-8 border-indigo-600"}`}
+                                ${isMobile ? "w-full rounded-t-[2rem] mt-auto pb-8 pt-4 px-6 border-t-8 border-indigo-600" : "rounded-[2rem] p-4 sm:p-6 lg:p-8 w-full max-w-md border-t-8 border-indigo-600"}`}
                         >
                             {isMobile && <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 shrink-0" />}
                             <div className="flex items-center gap-4 mb-6">
@@ -1216,7 +1216,7 @@ export default function InvoicesPage() {
                             exit={isMobile ? { y: "100%" } : { scale: 0.9, opacity: 0 }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
                             className={`bg-white relative z-10 shadow-2xl flex flex-col 
-                                ${isMobile ? "w-full rounded-t-[2rem] mt-auto pb-8 pt-4 px-6 border-t-8 border-emerald-600" : "rounded-[2rem] p-8 w-full max-w-md border-t-8 border-emerald-600"}`}
+                                ${isMobile ? "w-full rounded-t-[2rem] mt-auto pb-8 pt-4 px-6 border-t-8 border-emerald-600" : "rounded-[2rem] p-4 sm:p-6 lg:p-8 w-full max-w-md border-t-8 border-emerald-600"}`}
                         >
                             {isMobile && <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 shrink-0" />}
                             <div className="flex items-center gap-4 mb-6">

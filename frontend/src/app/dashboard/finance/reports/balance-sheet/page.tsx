@@ -50,7 +50,7 @@ export default function BalanceSheetPage() {
     const totalLiabAndEquity = totalLiabilities + totalEquity
 
     return (
-        <div className="p-4 md:px-6 md:py-8 space-y-4 md:space-y-6 font-inter max-w-full mx-auto pb-24 md:pb-8">
+        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-4 md:space-y-6 font-inter max-w-full mx-auto pb-24 md:pb-8">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-3 md:gap-4">
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 shrink-0">
@@ -113,7 +113,7 @@ export default function BalanceSheetPage() {
                 {/* Left Side: Assets */}
                 <div className="space-y-4 md:space-y-6">
                     <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col min-h-full md:min-h-[500px]">
-                        <div className="px-5 md:px-8 py-4 md:py-6 bg-slate-50/50 border-b border-slate-100">
+                        <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-4 md:py-6 bg-slate-50/50 border-b border-slate-100">
                             <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">AKTIVA (ASSETS)</h2>
                         </div>
                         <div className="flex-1 overflow-auto">
@@ -125,7 +125,7 @@ export default function BalanceSheetPage() {
                                         const isAbnormal = acc.balance < 0 && !acc.name.toLowerCase().includes('akumulasi') && !acc.name.toLowerCase().includes('amortisasi');
                                         return (
                                         <tr key={acc.id} className={`hover:bg-slate-50/50 transition-colors ${isAbnormal ? 'bg-rose-50/50' : ''}`}>
-                                            <td className="px-5 md:px-8 py-3 md:py-4">
+                                            <td className="px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4">
                                                 <div className="flex items-center gap-2 md:gap-3">
                                                     <span className="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{acc.code}</span>
                                                     <span className={`font-bold leading-tight ${isAbnormal ? 'text-rose-600' : 'text-slate-700'}`}>{acc.name}</span>
@@ -136,7 +136,7 @@ export default function BalanceSheetPage() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className={`px-5 md:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-rose-600' : 'text-slate-900'}`}>
+                                            <td className={`px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-rose-600' : 'text-slate-900'}`}>
                                                 {acc.balance.toLocaleString('id-ID')}
                                             </td>
                                         </tr>
@@ -144,7 +144,7 @@ export default function BalanceSheetPage() {
                                 </tbody>
                             </table>
                         </div>
-                        <div className="px-5 md:px-8 py-4 md:py-6 bg-indigo-600 text-white flex items-center justify-between mt-auto">
+                        <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-4 md:py-6 bg-indigo-600 text-white flex items-center justify-between mt-auto">
                             <span className="font-black text-[10px] uppercase tracking-widest">TOTAL AKTIVA</span>
                             <span className="text-base md:text-lg font-black tracking-tight">{totalAssets.toLocaleString('id-ID')}</span>
                         </div>
@@ -155,7 +155,7 @@ export default function BalanceSheetPage() {
                 <div className="space-y-4 md:space-y-6">
                     {/* Liabilities */}
                     <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-                        <div className="px-5 md:px-8 py-4 md:py-6 bg-slate-50/50 border-b border-slate-100">
+                        <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-4 md:py-6 bg-slate-50/50 border-b border-slate-100">
                             <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">KEWAJIBAN (LIABILITIES)</h2>
                         </div>
                         <table className="w-full text-xs">
@@ -164,7 +164,7 @@ export default function BalanceSheetPage() {
                                     const isAbnormal = acc.balance < 0;
                                     return (
                                     <tr key={acc.id} className={`hover:bg-slate-50/50 transition-colors ${isAbnormal ? 'bg-amber-50/50' : ''}`}>
-                                        <td className="px-5 md:px-8 py-3 md:py-4">
+                                        <td className="px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4">
                                             <div className="flex items-center gap-2 md:gap-3">
                                                 <span className="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{acc.code}</span>
                                                 <span className={`font-bold leading-tight ${isAbnormal ? 'text-amber-600' : 'text-slate-700'}`}>{acc.name}</span>
@@ -175,14 +175,14 @@ export default function BalanceSheetPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className={`px-5 md:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-amber-600' : 'text-slate-900'}`}>
+                                        <td className={`px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-amber-600' : 'text-slate-900'}`}>
                                             {acc.balance.toLocaleString('id-ID')}
                                         </td>
                                     </tr>
                                 )})}
                             </tbody>
                         </table>
-                        <div className="px-5 md:px-8 py-3 md:py-4 bg-slate-900 text-slate-100 flex items-center justify-between border-t border-slate-700">
+                        <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 bg-slate-900 text-slate-100 flex items-center justify-between border-t border-slate-700">
                             <span className="font-black text-[9px] uppercase tracking-widest text-slate-400">TOTAL KEWAJIBAN</span>
                             <span className="font-black tracking-tight">{totalLiabilities.toLocaleString('id-ID')}</span>
                         </div>
@@ -190,7 +190,7 @@ export default function BalanceSheetPage() {
 
                     {/* Equity */}
                     <div className="bg-white rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-                        <div className="px-5 md:px-8 py-4 md:py-6 bg-slate-50/50 border-b border-slate-100">
+                        <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-4 md:py-6 bg-slate-50/50 border-b border-slate-100">
                             <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">EKUITAS (EQUITY)</h2>
                         </div>
                         <table className="w-full text-xs">
@@ -201,7 +201,7 @@ export default function BalanceSheetPage() {
                                     const isAbnormal = acc.balance < 0 && acc.id !== 'NET_PROFIT' && !acc.name.toLowerCase().includes('prive');
                                     return (
                                     <tr key={acc.id} className={`hover:bg-slate-50/50 transition-colors ${isAbnormal ? 'bg-amber-50/50' : ''}`}>
-                                        <td className="px-5 md:px-8 py-3 md:py-4">
+                                        <td className="px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4">
                                             <div className="flex items-center gap-2 md:gap-3">
                                                 <span className="font-mono text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{acc.code}</span>
                                                 <span className={`font-bold leading-tight ${isAbnormal ? 'text-amber-600' : acc.id === 'NET_PROFIT' && acc.balance < 0 ? 'text-rose-500' : 'text-slate-700'}`}>{acc.name}</span>
@@ -215,18 +215,18 @@ export default function BalanceSheetPage() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className={`px-5 md:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-amber-600' : acc.id === 'NET_PROFIT' && acc.balance < 0 ? 'text-rose-500' : 'text-slate-900'}`}>
+                                        <td className={`px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 text-right font-mono font-black ${isAbnormal ? 'text-amber-600' : acc.id === 'NET_PROFIT' && acc.balance < 0 ? 'text-rose-500' : 'text-slate-900'}`}>
                                             {acc.balance.toLocaleString('id-ID')}
                                         </td>
                                     </tr>
                                 )})}
                             </tbody>
                         </table>
-                        <div className="px-5 md:px-8 py-3 md:py-4 bg-slate-900 text-slate-100 flex items-center justify-between border-t border-slate-700">
+                        <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-3 md:py-4 bg-slate-900 text-slate-100 flex items-center justify-between border-t border-slate-700">
                             <span className="font-black text-[9px] uppercase tracking-widest text-slate-400">TOTAL EKUITAS</span>
                             <span className="font-black tracking-tight">{totalEquity.toLocaleString('id-ID')}</span>
                         </div>
-                        <div className="px-5 md:px-8 py-4 md:py-6 bg-indigo-600 text-white flex items-center justify-between">
+                        <div className="px-5 md:px-4 sm:px-6 lg:px-8 py-4 md:py-6 bg-indigo-600 text-white flex items-center justify-between">
                             <span className="font-black text-[10px] uppercase tracking-widest">TOTAL PASIVA</span>
                             <span className="text-base md:text-lg font-black tracking-tight">{totalLiabAndEquity.toLocaleString('id-ID')}</span>
                         </div>
