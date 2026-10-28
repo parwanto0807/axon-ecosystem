@@ -8,6 +8,7 @@ import {
     CreditCard, User, MapPin, Activity,
     ChevronRight, AlertCircle
 } from "lucide-react"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 
 interface BankAccount {
     id: string
@@ -126,28 +127,26 @@ export default function BankAccountsPage() {
     )
 
     return (
-        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-6 md:space-y-8 w-full font-inter bg-slate-50/30 min-h-screen pb-24 md:pb-8">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 shrink-0">
-                        <Landmark size={24} className="text-white w-5 md:w-6 h-5 md:h-6" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight">Master Bank</h1>
-                        <p className="text-xs md:text-sm font-medium text-slate-400">Pengelolaan rekening bank dan integrasi COA</p>
-                    </div>
-                </div>
-                <button
-                    onClick={() => {
-                        setEditingBank(null)
-                        setFormData({ bankName: "", accountNumber: "", accountHolder: "", branch: "", coaId: "", isActive: true })
-                        setIsModalOpen(true)
-                    }}
-                    className="flex w-full md:w-auto justify-center items-center gap-2 px-6 py-3.5 md:py-3 bg-indigo-600 text-white rounded-[1.25rem] md:rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 active:scale-95 mt-2 md:mt-0"
-                >
-                    <Plus size={18} /> Tambah Rekening
-                </button>
-            </header>
+        <FinancePageShell>
+            <FinancePageHeader
+                title="Master Bank"
+                description="Pengelolaan rekening bank dan integrasi COA"
+                icon={<Landmark className="h-5 w-5" />}
+                actions={
+                    <button
+                        onClick={() => {
+                            setEditingBank(null)
+                            setFormData({ bankName: "", accountNumber: "", accountHolder: "", branch: "", coaId: "", isActive: true })
+                            setIsModalOpen(true)
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-indigo-600/20 transition-colors hover:bg-indigo-700 md:w-auto"
+                    >
+                        <Plus size={16} /> Tambah Rekening
+                    </button>
+                }
+            />
+
+            {/* search + table tetap di bawah */}
 
             <div className="flex items-center gap-3 md:gap-4 bg-white p-2 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 shadow-sm max-w-md w-full">
                 <div className="pl-3 md:pl-4 text-slate-400"><Search size={18} /></div>
@@ -375,6 +374,6 @@ export default function BankAccountsPage() {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </FinancePageShell>
     )
 }

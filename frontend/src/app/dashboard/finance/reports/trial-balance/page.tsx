@@ -6,6 +6,7 @@ import {
     Activity, Printer, Download, Search,
     RefreshCw, Calendar, ArrowUpRight, ArrowDownRight
 } from "lucide-react"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 
 interface TrialBalanceItem {
     id: string
@@ -46,28 +47,29 @@ export default function TrialBalancePage() {
         debit: acc.debit + item.debit,
         credit: acc.credit + item.credit
     }), { debit: 0, credit: 0 })
-
     return (
-        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-4 md:space-y-6 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
-            <header className="flex flex-col md:flex-row md:items-center justify-between font-inter gap-4">
-                <div className="flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 shrink-0">
-                        <Activity size={20} className="text-white md:w-6 md:h-6" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Neraca Saldo</h1>
-                        <p className="text-[9px] md:text-[11px] font-black text-slate-400 uppercase tracking-widest leading-none mt-0.5 md:mt-1">Trial Balance Summary</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
-                    <button onClick={() => window.print()} className="flex-1 md:flex-none flex justify-center items-center h-11 md:h-auto md:p-2.5 text-slate-400 bg-slate-50 md:bg-transparent hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition-all border border-slate-100 md:border-transparent">
-                        <Printer size={18} />
-                    </button>
-                    <button className="flex-auto md:flex-none flex items-center justify-center gap-2 px-4 h-11 md:h-auto md:py-2.5 bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20">
-                        <Download size={16} /> Export
-                    </button>
-                </div>
-            </header>
+        <FinancePageShell>
+            <FinancePageHeader
+                title="Neraca Saldo"
+                description="Trial Balance Summary"
+                icon={<Activity className="h-5 w-5" />}
+                actions={
+                    <>
+                        <button
+                            onClick={() => window.print()}
+                            className="flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                            aria-label="Cetak"
+                        >
+                            <Printer size={16} />
+                        </button>
+                        <button className="flex h-9 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-indigo-600/20 transition-colors hover:bg-indigo-700">
+                            <Download size={16} /> Export
+                        </button>
+                    </>
+                }
+            />
+
+            {/* filter card + table tetap di bawah */}
 
             <div className="bg-white p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4 w-full md:w-auto">
@@ -225,6 +227,6 @@ export default function TrialBalancePage() {
                     </div>
                 )}
             </div>
-        </div>
+        </FinancePageShell>
     )
 }

@@ -3,10 +3,6 @@
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/**
- * Shell halaman modul finance/akuntansi.
- * Mengikuti UI_UX_Guidelines: padding responsif, latar slate, dark-mode aware.
- */
 export function FinancePageShell({
   children,
   className = "",
@@ -27,14 +23,11 @@ export function FinancePageShell({
   );
 }
 
-/**
- * Header halaman finance yang ringkas & elegan.
- * Breadcrumb (text + /), judul + count badge, area aksi (desktop only, mobile pakai FAB).
- */
 export function FinancePageHeader({
   breadcrumb,
   title,
   count,
+  description,
   icon,
   actions,
   className = "",
@@ -42,6 +35,7 @@ export function FinancePageHeader({
   breadcrumb?: ReactNode;
   title: string;
   count?: number;
+  description?: string;
   icon?: ReactNode;
   actions?: ReactNode;
   className?: string;
@@ -61,9 +55,14 @@ export function FinancePageHeader({
             </span>
           )}
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            <h1 className="truncate text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">
               {title}
             </h1>
+            {description && (
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+                {description}
+              </p>
+            )}
           </div>
           {typeof count === "number" && (
             <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
@@ -79,9 +78,6 @@ export function FinancePageHeader({
   );
 }
 
-/**
- * Stat card dengan blur orb (mengikuti guideline: text-2xl font-black, accent border).
- */
 export function FinanceStatCard({
   label,
   value,
@@ -98,20 +94,19 @@ export function FinanceStatCard({
   className?: string;
 }) {
   const toneMap: Record<string, string> = {
-    indigo: "from-indigo-500 to-indigo-600 border-indigo-200 dark:border-indigo-800",
-    emerald: "from-emerald-500 to-emerald-600 border-emerald-200 dark:border-emerald-800",
-    blue: "from-blue-500 to-blue-600 border-blue-200 dark:border-blue-800",
-    amber: "from-amber-500 to-amber-600 border-amber-200 dark:border-amber-800",
-    rose: "from-rose-500 to-rose-600 border-rose-200 dark:border-rose-800",
-    slate: "from-slate-500 to-slate-700 border-slate-200 dark:border-slate-700",
-    purple: "from-purple-500 to-purple-600 border-purple-200 dark:border-purple-800",
+    indigo: "from-indigo-500 to-indigo-600",
+    emerald: "from-emerald-500 to-emerald-600",
+    blue: "from-blue-500 to-blue-600",
+    amber: "from-amber-500 to-amber-600",
+    rose: "from-rose-500 to-rose-600",
+    slate: "from-slate-500 to-slate-700",
+    purple: "from-purple-500 to-purple-600",
   };
 
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-900",
-        toneMap[tone],
+        "group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-800 dark:bg-slate-900",
         className
       )}
     >
@@ -131,7 +126,12 @@ export function FinanceStatCard({
           )}
         </div>
         {icon && (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+          <span
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white shadow-sm",
+              toneMap[tone]
+            )}
+          >
             {icon}
           </span>
         )}
@@ -140,9 +140,6 @@ export function FinanceStatCard({
   );
 }
 
-/**
- * Kartu pembungkus tabel: overflow horizontal di mobile, empty state slot.
- */
 export function FinanceTableCard({
   children,
   title,
@@ -180,9 +177,6 @@ export function FinanceTableCard({
   );
 }
 
-/**
- * Empty state ringkas (guideline: centered, icon + heading + description + CTA).
- */
 export function FinanceEmptyState({
   icon,
   title,
