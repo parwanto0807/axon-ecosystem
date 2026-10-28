@@ -27,7 +27,7 @@ import Link from 'next/link'
 import { useUIStore } from "@/store/uiStore"
 
 const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api`
-const MODEL_URL = "https://vladmandic.github.io/face-api/model/"
+const MODEL_URL = "/models/face-api"
 
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3;
@@ -53,6 +53,8 @@ export default function AttendanceLogPage() {
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
     const [modelsLoaded, setModelsLoaded] = useState(false)
+    const [modelError, setModelError] = useState<string | null>(null)
+    const [cameraError, setCameraError] = useState<string | null>(null)
     const [faceapi, setFaceapi] = useState<any>(null)
     const [faceDetected, setFaceDetected] = useState(false)
     const [autoCaptureProgress, setAutoCaptureProgress] = useState(0)
@@ -69,7 +71,7 @@ export default function AttendanceLogPage() {
     const assignedLoc = status?.employee?.attendanceLocation;
     const currentDist = (location && assignedLoc) ? getDistance(location.lat, location.lon, assignedLoc.latitude, assignedLoc.longitude) : null;
     const isOutOfRange = currentDist !== null && currentDist > assignedLoc.radius;
-    const isLowAccuracy = location !== null && location.accuracy > 200; // Akurasi di atas 200m dianggap tidak akurat/ISP
+    const isLowAccuracy = location !== null && location.accuracy > 500; // toleransi GPS indoor
     const isNoAssignment = status?.employee && !assignedLoc;
 
     const hasIn = status?.logs?.some((l: any) => l.type === 'CLOCK_IN');
@@ -78,7 +80,9 @@ export default function AttendanceLogPage() {
     const inWindow = true;
     const outWindow = true;
 
-    const canShowCamera = isCapturing && sensorStatus.gps && !isLowAccuracy && !isOutOfRange && assignedLoc && !hasOut && (inWindow || outWindow);
+    // Kamera tetap ditampilkan selama GPS tersedia. Validasi radius tetap
+    // dilakukan backend, jadi user tidak "terkunci" hanya karena GPS indoor.
+    const canShowCamera = isCapturing && sensorStatus.gps && !hasOut && (inWindow || outWindow);
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000)
@@ -97,31 +101,30 @@ export default function AttendanceLogPage() {
     }, [modelsLoaded])
 
     useEffect(() => {
-        // Only start camera if GPS is valid, in range, and NOT finished for the day
-        if (modelsLoaded && sensorStatus.gps && !isLowAccuracy && !isOutOfRange && assignedLoc && !hasOut) {
+        // Kamera cukup butuh GPS + model. Radius/akurasi tidak memblokir
+        // pengambilan foto; backend tetap menentukan status VALID/INVALID.
+        if (modelsLoaded && sensorStatus.gps && !hasOut) {
             startCamera()
         } else {
             stopCamera()
         }
-        // Cleanup on unmount or state change
         return () => {
-            if (!sensorStatus.gps || isLowAccuracy || isOutOfRange) {
-                stopCamera()
-            }
+            if (!sensorStatus.gps || hasOut) stopCamera()
         }
-    }, [modelsLoaded, sensorStatus.gps, isLowAccuracy, isOutOfRange, assignedLoc])
+    }, [modelsLoaded, sensorStatus.gps, hasOut])
 
     const loadModels = async () => {
+        setModelError(null)
         try {
             const faceapiModule = await import("@vladmandic/face-api")
             setFaceapi(faceapiModule)
-            await Promise.all([
-                faceapiModule.nets.tinyFaceDetector.load(MODEL_URL),
-                faceapiModule.nets.faceLandmark68Net.load(MODEL_URL),
-            ])
+            // Model deteksi wajah disimpan lokal di /public/models/face-api
+            // supaya tidak bergantung pada CDN eksternal.
+            await faceapiModule.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
             setModelsLoaded(true)
         } catch (e) {
             console.error(e)
+            setModelError("Gagal memuat pendeteksi wajah. Coba muat ulang.")
         }
     }
 
@@ -165,66 +168,94 @@ export default function AttendanceLogPage() {
     const startCamera = async () => {
         setIsCapturing(true)
         setPhoto(null)
+        setCameraError(null)
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "user", width: { ideal: 1080 }, height: { ideal: 1080 } },
+                // Resolusi 720p lebih ringan & lebih stabil untuk deteksi wajah
+                // dibanding 1080p, terutama di HP kelas menengah.
+                video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 720 } },
                 audio: false
             })
             if (videoRef.current) {
                 videoRef.current.srcObject = stream
+                await videoRef.current.play().catch(() => {})
                 setSensorStatus(prev => ({ ...prev, camera: true }))
             }
         } catch (err) {
+            console.error(err)
             setSensorStatus(prev => ({ ...prev, camera: false }))
+            setCameraError("Kamera tidak bisa dibuka. Izinkan akses kamera lalu coba lagi.")
             setIsCapturing(false)
         }
     }
 
     useEffect(() => {
         let interval: any = null;
+        let cancelled = false;
+        let detecting = false;
+        let detectionCount = 0;
+        const captureThreshold = 5;
 
-        if (isCapturing && videoRef.current && !photo && modelsLoaded) {
-            let detectionCount = 0;
-            interval = setInterval(async () => {
-                if (videoRef.current && videoRef.current.readyState === 4) {
-                    // Relaxed threshold (0.5) to make detection easier while still being effective
-                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
-                    const detection = await faceapi.detectSingleFace(videoRef.current, options);
+        if (isCapturing && !photo && modelsLoaded && faceapi) {
+            // Threshold lebih longgar + inputSize lebih besar agar wajah dengan
+            // kacamata, cahaya redup, atau sudut sedikit miring tetap terdeteksi.
+            const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.35 });
 
-                    if (detection && videoRef.current) {
+            const detect = async () => {
+                const video = videoRef.current;
+                if (detecting || cancelled || !video || video.readyState < 2) return;
+
+                detecting = true;
+                try {
+                    const detection = await faceapi.detectSingleFace(video, options);
+                    if (cancelled) return;
+
+                    if (detection) {
                         const { x, y, width, height } = detection.box;
-                        const videoWidth = videoRef.current.videoWidth;
+                        const videoWidth = video.videoWidth || 720;
+                        const videoHeight = video.videoHeight || 720;
                         const centerX = x + width / 2;
+                        const centerY = y + height / 2;
+                        const faceRatio = Math.max(width / videoWidth, height / videoHeight);
 
-                        // Validation: Slightly more lenient size and centering
-                        const isLargeEnough = width > 100;
-                        const isCentered = centerX > videoWidth * 0.15 && centerX < videoWidth * 0.85;
+                        const isLargeEnough = faceRatio >= 0.12;
+                        const isCentered =
+                            centerX > videoWidth * 0.08 && centerX < videoWidth * 0.92 &&
+                            centerY > videoHeight * 0.08 && centerY < videoHeight * 0.92;
 
                         if (isLargeEnough && isCentered) {
-                            setFaceDetected(true);
                             detectionCount++;
-                            // Faster capture: 10 frames (~1 second) instead of 20
-                            setAutoCaptureProgress(Math.min((detectionCount / 10) * 100, 100));
-                            if (detectionCount >= 10) {
-                                clearInterval(interval);
+                            setFaceDetected(true);
+                            setAutoCaptureProgress(Math.min((detectionCount / captureThreshold) * 100, 100));
+
+                            if (detectionCount >= captureThreshold) {
+                                cancelled = true;
+                                if (interval) clearInterval(interval);
                                 takePhoto();
                             }
                         } else {
-                            // If face found but position is wrong (side profile or too small)
                             setFaceDetected(false);
-                            detectionCount = 0;
-                            setAutoCaptureProgress(0);
+                            detectionCount = Math.max(0, detectionCount - 1);
+                            setAutoCaptureProgress((detectionCount / captureThreshold) * 100);
                         }
                     } else {
                         setFaceDetected(false);
                         detectionCount = 0;
                         setAutoCaptureProgress(0);
                     }
+                } catch (e) {
+                    console.error("Face detection error:", e);
+                } finally {
+                    detecting = false;
                 }
-            }, 100);
+            };
+
+            interval = setInterval(detect, 150);
+            detect();
         }
 
         return () => {
+            cancelled = true;
             if (interval) clearInterval(interval);
             setFaceDetected(false);
             setAutoCaptureProgress(0);
@@ -232,18 +263,21 @@ export default function AttendanceLogPage() {
     }, [isCapturing, photo, modelsLoaded, faceapi]);
 
     const takePhoto = () => {
-        if (videoRef.current && canvasRef.current) {
-            const context = canvasRef.current.getContext('2d')
-            if (context) {
-                canvasRef.current.width = videoRef.current.videoWidth
-                canvasRef.current.height = videoRef.current.videoHeight
-                context.drawImage(videoRef.current, 0, 0)
-                setPhoto(canvasRef.current.toDataURL('image/webp'))
-                stopCamera()
-                setFaceDetected(false)
-                setAutoCaptureProgress(0)
-            }
-        }
+        const video = videoRef.current
+        const canvas = canvasRef.current
+        if (!video || !canvas || !video.videoWidth || !video.videoHeight) return
+
+        const context = canvas.getContext('2d')
+        if (!context) return
+
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        context.drawImage(video, 0, 0, canvas.width, canvas.height)
+        // JPEG lebih kompatibel di Android/iOS daripada WebP.
+        setPhoto(canvas.toDataURL('image/jpeg', 0.9))
+        stopCamera()
+        setFaceDetected(false)
+        setAutoCaptureProgress(0)
     }
 
     const stopCamera = () => {
@@ -259,7 +293,7 @@ export default function AttendanceLogPage() {
         try {
             const formData = new FormData()
             const blob = await (await fetch(photo)).blob()
-            formData.append('image', blob, 'att.webp')
+            formData.append('image', blob, 'att.jpg')
             formData.append('type', type)
             formData.append('employeeId', session.user.id)
             formData.append('latitude', location.lat.toString())
@@ -350,7 +384,7 @@ export default function AttendanceLogPage() {
                 <div className="relative aspect-square w-full rounded-[2.5rem] bg-slate-900 overflow-hidden shadow-2xl border-2 border-slate-50">
                     {canShowCamera ? (
                         <>
-                            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                 <motion.div
                                     animate={{
@@ -368,12 +402,38 @@ export default function AttendanceLogPage() {
                                     )}
                                 </motion.div>
                             </div>
+
+                            {/* Petunjuk + fallback manual: tetap bisa absen walau auto-detect gagal */}
+                            <div className="absolute inset-x-0 bottom-3 z-10 flex flex-col items-center gap-1.5 px-4">
+                                <p className={`text-[9px] font-bold uppercase tracking-wider ${faceDetected ? 'text-emerald-300' : 'text-white/80'}`}>
+                                    {faceDetected ? 'Wajah terdeteksi — tahan sebentar...' : 'Posisikan wajah di area kamera'}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={takePhoto}
+                                    disabled={!sensorStatus.camera}
+                                    className="flex items-center gap-1.5 rounded-full bg-white/90 px-4 py-2 text-[9px] font-black uppercase tracking-wider text-slate-900 shadow-lg active:scale-95 disabled:opacity-40"
+                                >
+                                    <Camera size={13} /> Ambil Foto Manual
+                                </button>
+                            </div>
                         </>
                     ) : photo ? (
                         <img src={photo} alt="P" className="w-full h-full object-cover scale-x-[-1]" />
                     ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-center px-8">
-                            {!modelsLoaded ? (
+                            {modelError ? (
+                                <>
+                                    <AlertCircle className="text-rose-500/40" size={40} />
+                                    <p className="text-[10px] font-black text-rose-400/80 uppercase tracking-widest leading-relaxed">{modelError}</p>
+                                    <button
+                                        onClick={loadModels}
+                                        className="mt-2 px-6 py-2.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10 active:scale-95 transition-all"
+                                    >
+                                        Muat Ulang
+                                    </button>
+                                </>
+                            ) : !modelsLoaded ? (
                                 <>
                                     <Loader2 className="animate-spin text-white/20" size={32} />
                                     <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Loading AI Models...</p>
@@ -390,6 +450,17 @@ export default function AttendanceLogPage() {
                                         className="mt-4 px-6 py-2.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10 active:scale-95 transition-all"
                                     >
                                         Coba Lagi
+                                    </button>
+                                </>
+                            ) : cameraError ? (
+                                <>
+                                    <Camera className="text-rose-500/30" size={40} />
+                                    <p className="text-[10px] font-black text-rose-400/80 uppercase tracking-widest leading-relaxed">{cameraError}</p>
+                                    <button
+                                        onClick={startCamera}
+                                        className="mt-2 px-6 py-2.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10 active:scale-95 transition-all"
+                                    >
+                                        Buka Kamera
                                     </button>
                                 </>
                             ) : isLowAccuracy ? (
