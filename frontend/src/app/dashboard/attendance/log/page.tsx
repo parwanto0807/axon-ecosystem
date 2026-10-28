@@ -343,7 +343,7 @@ export default function AttendanceLogPage() {
                 {/* Geofencing Warning Banners */}
                 <AnimatePresence>
                     {isNoAssignment && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-center gap-4">
+                        <motion.div key="no-assignment" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-center gap-4">
                             <div className="w-10 h-10 rounded-2xl bg-amber-500 flex items-center justify-center text-white shrink-0"><AlertCircle size={20} /></div>
                             <div>
                                 <p className="text-[10px] font-black text-amber-600 uppercase">Lokasi Belum Diatur</p>
@@ -353,7 +353,7 @@ export default function AttendanceLogPage() {
                     )}
 
                     {isLowAccuracy && !isNoAssignment && (
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center gap-4">
+                        <motion.div key="low-accuracy" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="bg-blue-50 border border-blue-100 rounded-2xl p-4 flex items-center gap-4">
                             <div className="w-10 h-10 rounded-2xl bg-blue-500 flex items-center justify-center text-white shrink-0"><Activity size={20} /></div>
                             <div className="flex-1">
                                 <p className="text-[10px] font-black text-blue-600 uppercase">Akurasi GPS Rendah (±{Math.round(location?.accuracy || 0)}m)</p>
@@ -364,6 +364,7 @@ export default function AttendanceLogPage() {
 
                     {isOutOfRange && !isNoAssignment && (
                         <motion.div
+                            key="out-of-range"
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
