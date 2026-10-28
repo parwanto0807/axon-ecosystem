@@ -23,6 +23,7 @@ import {
     X,
     ImageIcon
 } from "lucide-react"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
@@ -267,29 +268,22 @@ export default function OperationalExpensesPage() {
     }
 
     return (
-        <div className="p-4 md:p-6 space-y-6 md:space-y-6 max-w-full bg-slate-50/50 min-h-screen pb-24 md:pb-8">
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0">
-                                <Wallet className="text-white w-4.5 h-4.5" />
-                            </div>
-                            <h1 className="text-lg md:text-xl font-black text-slate-800 tracking-tight uppercase">BIAYA OPERASIONAL</h1>
-                        </div>
-                        <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest md:pl-[3rem]">Manajemen Pengeluaran Rutin & Utilitas</p>
-                </div>
-
-                <div className="flex items-center gap-3">
+        <FinancePageShell>
+            <FinancePageHeader
+                title="Biaya Operasional"
+                description="Manajemen Pengeluaran Rutin & Utilitas"
+                icon={<Wallet className="h-5 w-5" />}
+                actions={
                     <button
                         onClick={() => setShowModal(true)}
-                        className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-black hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20"
+                        className="flex h-9 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-indigo-600/20 transition-colors hover:bg-indigo-700"
                     >
-                        <Plus size={14} />
-                        INPUT BIAYA BARU
+                        <Plus size={14} /> Input Biaya Baru
                     </button>
-                </div>
-            </div>
+                }
+            />
+
+            {/* Quick Stats + table tetap di bawah */}
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
@@ -784,6 +778,6 @@ export default function OperationalExpensesPage() {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </FinancePageShell>
     )
 }

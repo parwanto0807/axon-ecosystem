@@ -8,6 +8,7 @@ import {
     Clock, DollarSign, Calendar, FileText, Briefcase,
     Check, Ban, Printer, ArrowRight, Percent, Tag, Send, Eye
 } from "lucide-react"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 import { Button } from "@/components/ui/button"
 import { useSession } from "next-auth/react"
 import InvoicePDFModal from "./InvoicePDFModal"
@@ -328,32 +329,29 @@ export default function InvoicesPage() {
     }, {})
 
     return (
-        <div className="p-4 md:p-6 space-y-6 max-w-full mx-auto pb-24 md:pb-20">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-xl md:text-3xl font-black tracking-tighter text-foreground flex items-center gap-3">
-                        <div className="p-2 bg-emerald-600 rounded-xl shadow-lg shadow-emerald-600/20 shrink-0">
-                            <Receipt className="text-white w-5 h-5 md:w-6 md:h-6" />
-                        </div>
-                        INVOICES / PENAGIHAN
-                    </h1>
-                    <p className="text-[10px] md:text-sm text-muted-foreground font-medium mt-1">Kelola penagihan piutang customer hasil dari penjualan dan project</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" onClick={loadData} className="w-full md:w-auto h-11 rounded-xl glass">
-                        <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                        Refresh
-                    </Button>
-                    <Button
-                        onClick={() => { setEditMode(false); setForm({ ...form, items: [], contractId: '', projectId: '', customerId: '', salesOrderId: '', deliveryOrderId: '' }); setModalOpen(true) }}
-                        className="w-full md:w-auto h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20 px-6 font-bold"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Buat Invoice Baru
-                    </Button>
-                </div>
-            </div>
+        <FinancePageShell>
+            <FinancePageHeader
+                title="Invoices / Penagihan"
+                description="Kelola penagihan piutang customer hasil dari penjualan dan project"
+                icon={<Receipt className="h-5 w-5" />}
+                actions={
+                    <>
+                        <Button variant="outline" onClick={loadData} className="h-9 rounded-xl glass">
+                            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                            Refresh
+                        </Button>
+                        <Button
+                            onClick={() => { setEditMode(false); setForm({ ...form, items: [], contractId: '', projectId: '', customerId: '', salesOrderId: '', deliveryOrderId: '' }); setModalOpen(true) }}
+                            className="h-9 rounded-xl bg-emerald-600 px-5 font-bold text-white shadow-xl shadow-emerald-600/20 hover:bg-emerald-700"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Buat Invoice Baru
+                        </Button>
+                    </>
+                }
+            />
+
+            {/* stats + table tetap di bawah */}
 
             {/* Stats Summary */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1285,6 +1283,6 @@ export default function InvoicesPage() {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </FinancePageShell>
     )
 }
