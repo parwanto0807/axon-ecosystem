@@ -8,6 +8,7 @@ import {
     RefreshCw, Download, FileText, LayoutList,
     X, Check, AlertCircle
 } from "lucide-react"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 
 interface Account {
     id: string
@@ -153,37 +154,39 @@ export default function COAPage() {
     }
 
     return (
-        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-4 md:space-y-6 w-full font-inter overflow-hidden pb-24 md:pb-8">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 shrink-0">
-                        <TableProperties size={20} className="text-white md:w-6 md:h-6" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Chart of Accounts</h1>
-                        <p className="text-[10px] md:text-sm font-semibold text-slate-400 md:font-medium uppercase md:normal-case tracking-widest md:tracking-normal mt-0.5 md:mt-1">Daftar Akun & Struktur Ledger</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
-                    <button onClick={load} className="flex-none p-3 lg:p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition-all border border-slate-100 md:border-transparent bg-white md:bg-transparent">
-                        <RefreshCw size={18} />
-                    </button>
-                    <button
-                        onClick={() => {
-                            setEditingAccount(null)
-                            setForm({
-                                code: '', name: '', description: '', type: 'ASET',
-                                normalBalance: 'DEBIT', postingType: 'POSTING', cashflowType: 'NONE',
-                                isReconcilable: false, status: 'ACTIVE', parentId: ''
-                            })
-                            setIsModalOpen(true)
-                        }}
-                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 md:py-2.5 bg-indigo-600 text-white text-[10px] md:text-xs font-bold uppercase tracking-wider rounded-xl md:rounded-[1.25rem] hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20"
-                    >
-                        <Plus size={16} /> Tambah Akun
-                    </button>
-                </div>
-            </header>
+        <FinancePageShell>
+            <FinancePageHeader
+                title="Chart of Accounts"
+                description="Daftar Akun & Struktur Ledger"
+                icon={<TableProperties className="h-5 w-5" />}
+                actions={
+                    <>
+                        <button
+                            onClick={load}
+                            className="flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                            aria-label="Muat ulang"
+                        >
+                            <RefreshCw size={16} />
+                        </button>
+                        <button
+                            onClick={() => {
+                                setEditingAccount(null)
+                                setForm({
+                                    code: '', name: '', description: '', type: 'ASET',
+                                    normalBalance: 'DEBIT', postingType: 'POSTING', cashflowType: 'NONE',
+                                    isReconcilable: false, status: 'ACTIVE', parentId: ''
+                                })
+                                setIsModalOpen(true)
+                            }}
+                            className="flex h-9 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-indigo-600/20 transition-colors hover:bg-indigo-700"
+                        >
+                            <Plus size={16} /> Tambah Akun
+                        </button>
+                    </>
+                }
+            />
+
+            {/* filter bar + table tetap di bawah */}
 
             {/* Filter Bar */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 bg-white p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 shadow-sm">
@@ -536,6 +539,6 @@ export default function COAPage() {
                     scrollbar-width: none;
                 }
             `}</style>
-        </div>
+        </FinancePageShell>
     )
 }

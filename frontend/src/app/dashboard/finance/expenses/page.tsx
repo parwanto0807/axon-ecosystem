@@ -9,6 +9,7 @@ import {
     Search, Briefcase, Clock, Ban, ShieldCheck, MapPin,
     ChevronRight, ChevronDown, CornerDownRight
 } from "lucide-react"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 import { Button } from "@/components/ui/button"
 
 interface Expense {
@@ -260,40 +261,14 @@ export default function ExpenseReportsPage() {
     const lc = "text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5 block"
 
     return (
-        <div className="p-4 md:px-4 md:py-4 sm:py-6 lg:py-8 space-y-6 md:space-y-8 font-inter w-full min-h-screen bg-slate-50/30 pb-24 md:pb-8">
-            <AnimatePresence>
-                {toast && (
-                    <motion.div initial={{ opacity: 0, y: -20, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                        className={`fixed top-8 right-8 z-[300] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl text-sm font-bold border ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-                        {toast.type === 'success' ? <CheckCircle2 size={20} className="text-emerald-500" /> : <AlertCircle size={20} className="text-rose-500" />}
-                        {toast.msg}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+        <FinancePageShell>
+            <FinancePageHeader
+                title="Accountability Reports"
+                description="Expense & Settlement Management"
+                icon={<Receipt className="h-5 w-5" />}
+            />
 
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-600/20 ring-4 ring-emerald-50 shrink-0">
-                            <Receipt size={20} className="text-white md:w-6 md:h-6" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Accountability Reports</h1>
-                            <p className="text-[9px] md:text-[11px] font-black text-slate-400 uppercase md:tracking-[0.2em] flex items-center gap-1.5 md:gap-2 mt-0.5 md:mt-0 leading-tight">
-                                <ShieldCheck size={12} className="text-emerald-500 shrink-0" /> Expense & Settlement Management
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    <Button onClick={() => setModalOpen(true)} className="flex-1 md:flex-none rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white h-12 px-6 text-[10px] md:text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
-                        <Plus size={16} className="mr-2 stroke-[3]" /> Request <span className="hidden md:inline">/ Settle Expense</span>
-                    </Button>
-                    <Button variant="outline" onClick={load} className="rounded-2xl border-slate-200 bg-white text-slate-600 h-12 w-12 p-0 shadow-sm hover:bg-slate-50 transition-all shrink-0">
-                        <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-                    </Button>
-                </div>
-            </header>
+            {/* filter card + table tetap di bawah */}
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="md:col-span-2 relative group w-full">
@@ -824,6 +799,6 @@ export default function ExpenseReportsPage() {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </FinancePageShell>
     )
 }
