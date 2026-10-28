@@ -1,14 +1,14 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Receipt, Plus, Search, Edit, Trash2, X, Save,
-    CheckCircle2, AlertCircle, RefreshCw, ChevronDown,
-    Clock, DollarSign, Calendar, FileText, Briefcase,
-    Check, Ban, Printer, ArrowRight, Percent, Tag, Send, Eye
+    CheckCircle2, AlertCircle, RefreshCw,
+    Clock, DollarSign, FileText,
+    Ban, Printer, Percent, Tag, Send, Eye
 } from "lucide-react"
-import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
+import { FinancePageShell } from "@/components/finance/FinanceUI"
 import { Button } from "@/components/ui/button"
 import { useSession } from "next-auth/react"
 import InvoicePDFModal from "./InvoicePDFModal"
@@ -54,6 +54,7 @@ const INV_STATUS: Record<string, { label: string; color: string; icon: any }> = 
     DRAFT: { label: 'Draft', color: 'bg-slate-100 text-slate-600 border-slate-200', icon: Clock },
     POSTED: { label: 'Posted', color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: Send },
     SENT: { label: 'Sent', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: FileText },
+    PARTIAL: { label: 'Partial', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
     PAID: { label: 'Paid', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
     OVERDUE: { label: 'Overdue', color: 'bg-rose-50 text-rose-700 border-rose-200', icon: AlertCircle },
     CANCELLED: { label: 'Cancelled', color: 'bg-slate-50 text-slate-400 border-slate-200 line-through', icon: Ban },
@@ -83,8 +84,8 @@ export default function InvoicesPage() {
     const [editMode, setEditMode] = useState(false)
     const [selectedId, setSelectedId] = useState<string | null>(null)
     const [search, setSearch] = useState('')
-    const [currentPage, setCurrentPage] = useState(1)
-    const itemsPerPage = 20
+    const [filterStatus, setFilterStatus] = useState('ALL')
+    const [filterProject, setFilterProject] = useState('ALL')
 
     const [saving, setSaving] = useState(false)
     const [viewModal, setViewModal] = useState<Invoice | null>(null)
@@ -306,369 +307,362 @@ export default function InvoicesPage() {
         }
     }
 
+    const openEdit = (inv: Invoice) => {
+        setSelectedId(inv.id)
+        setEditMode(true)
+        setForm({
+            customerId: inv.customerId,
+            projectId: inv.projectId || '',
+            contractId: inv.contractId || '',
+            salesOrderId: inv.salesOrderId || '',
+            deliveryOrderId: inv.deliveryOrderId || '',
+            bankAccountId: inv.bankAccountId || '',
+            signerName: inv.signerName || '',
+            signerPosition: inv.signerPosition || '',
+            date: inv.date.split('T')[0],
+            dueDate: inv.dueDate ? inv.dueDate.split('T')[0] : '',
+            notes: inv.notes || '',
+            paymentTerms: inv.paymentTerms || '',
+            invoiceType: inv.invoiceType || 'STANDARD',
+            terminType: inv.terminType || 'PERCENT',
+            terminPercent: inv.terminPercent || 30,
+            terminNominal: inv.terminNominal || 0,
+            subtotal: inv.subtotal,
+            tax: inv.tax,
+            discountType: (inv as any).discountType || 'PERCENTAGE',
+            discount: inv.discount,
+            discountAmt: inv.discountAmt,
+            taxAmt: inv.taxAmt,
+            grandTotal: inv.grandTotal,
+            items: inv.items
+        })
+        setModalOpen(true)
+    }
+
+    const paidOf = (inv: Invoice) => (inv.payments || [])
+        .filter(p => p.status === 'SUCCESS')
+        .reduce((s, p) => s + p.amount, 0)
+
     const filtered = (invoices || [])
-        .filter(inv =>
-            inv.number.toLowerCase().includes(search.toLowerCase()) ||
-            inv.customer.name.toLowerCase().includes(search.toLowerCase()) ||
-            inv.contract?.number.toLowerCase().includes(search.toLowerCase())
-        )
+        .filter(inv => {
+            const s = search.toLowerCase()
+            const matchSearch =
+                inv.number.toLowerCase().includes(s) ||
+                (inv.customer?.name?.toLowerCase().includes(s) ?? false) ||
+                (inv.contract?.number?.toLowerCase().includes(s) ?? false) ||
+                (inv.project?.number?.toLowerCase().includes(s) ?? false) ||
+                (inv.salesOrder?.number?.toLowerCase().includes(s) ?? false)
+            return matchSearch &&
+                (filterStatus === 'ALL' || inv.status === filterStatus) &&
+                (filterProject === 'ALL' || inv.projectId === filterProject)
+        })
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
-    const totalPages = Math.ceil(filtered.length / itemsPerPage)
-    const paginatedFiltered = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+    const billable = invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED')
+    const stats = {
+        total: invoices.length,
+        docValue: billable.reduce((s, inv) => s + inv.grandTotal, 0),
+        paid: billable.reduce((s, inv) => s + paidOf(inv), 0),
+        outstanding: billable.reduce((s, inv) => s + Math.max(0, inv.grandTotal - paidOf(inv)), 0),
+    }
 
-    const groupedInvoices = paginatedFiltered.reduce((groups: Record<string, { month: string, total: number, invoices: Invoice[] }>, inv) => {
-        const date = new Date(inv.date)
-        const monthHeader = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
-        if (!groups[monthHeader]) {
-            groups[monthHeader] = { month: monthHeader, total: 0, invoices: [] }
-        }
-        groups[monthHeader].invoices.push(inv)
-        groups[monthHeader].total += inv.grandTotal
-        return groups
-    }, {})
+    const counts: Record<string, number> = {
+        ALL: invoices.length,
+        ...Object.keys(INV_STATUS).reduce((acc, k) => ({ ...acc, [k]: invoices.filter(i => i.status === k).length }), {} as Record<string, number>)
+    }
 
     return (
         <FinancePageShell>
-            <FinancePageHeader
-                title="Invoices / Penagihan"
-                description="Kelola penagihan piutang customer hasil dari penjualan dan project"
-                icon={<Receipt className="h-5 w-5" />}
-                actions={
-                    <>
-                        <Button variant="outline" onClick={loadData} className="glass h-8 rounded-lg px-2.5 text-[11px] sm:h-9 sm:rounded-xl sm:px-3 sm:text-xs">
-                            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4 ${loading ? 'animate-spin' : ''}`} />
-                            <span className="hidden sm:inline">Refresh</span>
-                        </Button>
-                        <Button
-                            onClick={() => { setEditMode(false); setForm({ ...form, items: [], contractId: '', projectId: '', customerId: '', salesOrderId: '', deliveryOrderId: '' }); setModalOpen(true) }}
-                            className="h-8 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 sm:h-9 sm:rounded-xl sm:px-5 sm:text-xs"
-                        >
-                            <Plus className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
-                            <span className="sm:hidden">Invoice Baru</span>
-                            <span className="hidden sm:inline">Buat Invoice Baru</span>
-                        </Button>
-                    </>
-                }
-            />
-
-            {/* stats + table tetap di bawah */}
-
-            {/* Stats Summary */}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
-                {[
-                    { label: 'Jml. Dokumen Invoice', val: `${invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED').length} Dok.`, icon: FileText, color: 'text-indigo-600' },
-                    { label: 'Total Keseluruhan Tagihan', val: fmt(invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED').reduce((sum, inv) => sum + inv.grandTotal, 0)), icon: FileText, color: 'text-blue-600' },
-                    { label: 'Sudah Dibayar (PAID)', val: fmt(invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED').reduce((sum, inv) => sum + (inv.payments?.filter(p => p.status === 'SUCCESS').reduce((s, p) => s + p.amount, 0) || 0), 0)), icon: CheckCircle2, color: 'text-emerald-600' },
-                    { label: 'Belum Dibayar (UNPAID)', val: fmt(invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED').reduce((sum, inv) => {
-                        const paid = inv.payments?.filter(p => p.status === 'SUCCESS').reduce((s, p) => s + p.amount, 0) || 0;
-                        return sum + (inv.grandTotal - paid);
-                    }, 0)), icon: DollarSign, color: 'text-rose-600' },
-                ].map((s, i) => (
-                    <motion.div
-                        key={i}
-                        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                        className="glass-card flex items-center justify-between gap-3 rounded-xl border border-border/50 px-3 py-2.5 shadow-sm sm:px-4 sm:py-3"
-                    >
-                        <div className="flex min-w-0 items-center gap-2.5">
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 ${s.color} sm:h-9 sm:w-9`}>
-                                <s.icon className="h-4 w-4" />
-                            </div>
-                            <p className="min-w-0 truncate text-[9px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[10px]">
-                                {s.label}
-                            </p>
-                        </div>
-                        <span className="shrink-0 text-xs font-semibold tracking-tight sm:text-sm xl:text-base">{s.val}</span>
-                    </motion.div>
-                ))}
-            </div>
-
-            {/* Content Table */}
-            <div className="glass-card overflow-hidden rounded-2xl border border-border/50 shadow-lg sm:rounded-3xl">
-                <div className="flex flex-col justify-between gap-3 border-b border-border/50 p-3 sm:flex-row sm:items-center sm:p-4">
-                    <div className="relative w-full max-w-md flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15} />
-                        <input
-                            type="text" placeholder="Cari invoice / customer..."
-                            value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-                            className="h-9 w-full rounded-lg border-none bg-slate-50 pl-9 pr-3 text-xs font-medium transition-all focus:ring-2 focus:ring-emerald-600/20 sm:h-10 sm:rounded-xl sm:text-sm"
-                        />
+            {/* Compact Header */}
+            <header className="flex flex-col justify-between gap-2 border-b border-slate-200 pb-2 dark:border-slate-800 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-emerald-600 text-white shadow-2xs">
+                        <Receipt size={13} />
                     </div>
-                    <p className="text-[10px] font-medium text-muted-foreground sm:text-xs">
-                        {filtered.length} invoice
-                    </p>
+                    <div className="flex items-center gap-2">
+                        <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-emerald-600 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-400">
+                            // FINANCE
+                        </span>
+                        <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white lg:text-base">Invoice / Penagihan</h1>
+                        <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">[{invoices.length} RECORDS]</span>
+                    </div>
                 </div>
 
-                <div className="hidden overflow-x-auto lg:block">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50/50">
-                                <th className="px-3 py-2.5 text-[9px] font-semibold uppercase tracking-wider xl:px-4 xl:text-[10px] text-muted-foreground w-12 text-center">No</th>
-                                <th className="px-3 py-2.5 text-[9px] font-semibold uppercase tracking-wider xl:px-4 xl:text-[10px] text-muted-foreground">Invoice Info</th>
-                                <th className="px-3 py-2.5 text-[9px] font-semibold uppercase tracking-wider xl:px-4 xl:text-[10px] text-muted-foreground">Customer & Kontrak</th>
-                                <th className="px-3 py-2.5 text-[9px] font-semibold uppercase tracking-wider xl:px-4 xl:text-[10px] text-muted-foreground text-right">Total Tagihan</th>
-                                <th className="px-3 py-2.5 text-[9px] font-semibold uppercase tracking-wider xl:px-4 xl:text-[10px] text-muted-foreground">Status</th>
-                                <th className="px-3 py-2.5 text-[9px] font-semibold uppercase tracking-wider xl:px-4 xl:text-[10px] text-muted-foreground text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/50">
-                            {Object.entries(groupedInvoices).map(([month, data]) => (
-                                <React.Fragment key={month}>
-                                    <tr className="bg-slate-50/80 border-y border-border/50">
-                                        <td colSpan={6} className="px-3 py-2 xl:px-4">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar size={14} className="text-emerald-600" />
-                                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-900">{month}</span>
-                                                    <span className="text-[9px] font-semibold text-slate-400 bg-white px-1.5 py-0.5 rounded-md border border-slate-100 ml-1.5">
-                                                        {data.invoices.length} Invoices
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide">Total Period:</span>
-                                                    <span className="text-[11px] font-semibold text-emerald-700">{fmt(data.total)}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {data.invoices.map((inv) => (
-                                        <tr key={inv.id} className="hover:bg-emerald-600/[0.02] transition-colors group">
-                                            <td className="px-3 py-3 xl:px-4 text-center text-xs font-bold text-slate-400">
-                                                {filtered.indexOf(inv) + 1}
-                                            </td>
-                                            <td className="px-3 py-3 xl:px-4">
-                                                <p className="text-xs font-semibold text-foreground transition-colors group-hover:text-emerald-600 xl:text-sm">{inv.number}</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-tight xl:text-[10px]">{fmtDate(inv.date)}</p>
-                                                    <span className="w-1 h-1 rounded-full bg-slate-300" />
-                                                    <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-tight xl:text-[10px]">Due: {fmtDate(inv.dueDate)}</p>
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-3 xl:px-4">
-                                                <p className="text-xs font-semibold tracking-tight xl:text-sm">{inv.customer.name}</p>
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    {inv.contract ? (
-                                                        <span className="text-[9px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-100 uppercase tracking-tight">
-                                                            Contract {inv.contract.number}
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <div className="hidden items-center gap-1.5 rounded border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-[11px] dark:border-slate-800 dark:bg-slate-900 xl:flex">
+                        <span className="text-[9.5px] uppercase text-slate-500 dark:text-slate-400">BILLED:</span>
+                        <strong className="font-bold text-slate-700 dark:text-slate-300">{fmt(stats.docValue)}</strong>
+                    </div>
+                    <div className="hidden items-center gap-1.5 rounded border border-rose-200 bg-rose-50 px-2 py-1 font-mono text-[11px] dark:border-rose-900 dark:bg-rose-950/30 md:flex">
+                        <span className="text-[9.5px] uppercase text-slate-500 dark:text-slate-400">OUTSTANDING:</span>
+                        <strong className="font-bold text-rose-600 dark:text-rose-400">{fmt(stats.outstanding)}</strong>
+                    </div>
+                    <div className="hidden items-center gap-1.5 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 font-mono text-[11px] dark:border-emerald-900 dark:bg-emerald-950/30 lg:flex">
+                        <span className="text-[9.5px] uppercase text-slate-500 dark:text-slate-400">PAID:</span>
+                        <strong className="font-bold text-emerald-700 dark:text-emerald-400">{fmt(stats.paid)}</strong>
+                    </div>
+
+                    <Button variant="outline" onClick={loadData} className="h-7 rounded border border-slate-200 px-2.5 font-mono text-[11px] text-slate-700 shadow-2xs hover:bg-slate-100 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800">
+                        <RefreshCw size={11} className={`mr-1 ${loading ? 'animate-spin' : ''}`} /> RELOAD
+                    </Button>
+                    <Button
+                        onClick={() => { setEditMode(false); setForm({ ...form, items: [], contractId: '', projectId: '', customerId: '', salesOrderId: '', deliveryOrderId: '' }); setModalOpen(true) }}
+                        className="h-7 rounded bg-emerald-600 px-3 font-mono text-[11px] text-white shadow-2xs hover:bg-emerald-700"
+                    >
+                        <Plus size={12} className="mr-1" /> NEW INVOICE
+                    </Button>
+                </div>
+            </header>
+
+            {/* Segmented Toolbar: Status Tabs & Search */}
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 p-1.5 dark:border-slate-800 dark:bg-[#0b0f17]">
+                <div className="flex flex-wrap items-center gap-1">
+                    {['ALL', ...Object.keys(INV_STATUS)].map(s => {
+                        const count = counts[s] || 0
+                        const active = filterStatus === s
+                        return (
+                            <button
+                                key={s}
+                                onClick={() => setFilterStatus(s)}
+                                className={`inline-flex items-center gap-1.5 rounded px-2 py-1 font-mono text-[11px] transition-colors ${active
+                                        ? 'bg-emerald-600 font-semibold text-white shadow-2xs'
+                                        : 'border border-slate-200 bg-white text-slate-600 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-white'
+                                    }`}
+                            >
+                                <span>{s === 'ALL' ? 'All' : INV_STATUS[s].label}</span>
+                                <span className={`rounded px-1 py-0.2 font-mono text-[9.5px] ${active ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-100 text-slate-500 dark:bg-slate-800'}`}>
+                                    {count}
+                                </span>
+                            </button>
+                        )
+                    })}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                    <div className="relative">
+                        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Search number, customer, contract..."
+                            className="h-7 w-48 rounded border border-slate-200 bg-white pl-7 pr-2.5 font-mono text-xs text-slate-900 placeholder:text-slate-400 shadow-2xs focus:border-emerald-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white lg:w-64"
+                        />
+                    </div>
+                    <select
+                        value={filterProject}
+                        onChange={e => setFilterProject(e.target.value)}
+                        className="h-7 rounded border border-slate-200 bg-white px-2 font-mono text-xs text-slate-700 focus:border-emerald-600 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                    >
+                        <option value="ALL">All Projects</option>
+                        {(Array.isArray(projects) ? projects : []).map(p => (
+                            <option key={p.id} value={p.id}>{p.number} - {p.name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            {/* Active Project Highlight Pill */}
+            {filterProject !== 'ALL' && (() => {
+                const p = projects.find(x => x.id === filterProject)
+                return (
+                    <div className="flex items-center justify-between gap-3 rounded border border-slate-800 bg-slate-900 p-2 text-xs text-white">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded border border-emerald-800 bg-emerald-950 px-1 py-0.2 font-mono text-[9px] font-bold uppercase text-emerald-300">Active Project</span>
+                            <span className="font-mono font-bold text-slate-400">#{p?.number}</span>
+                            <span className="font-semibold text-slate-200">{p?.name}</span>
+                            <span className="text-slate-500">•</span>
+                            <span className="font-mono text-[11px] font-bold text-emerald-400">{fmt(filtered.reduce((s, i) => s + i.grandTotal, 0))}</span>
+                        </div>
+                        <button onClick={() => setFilterProject('ALL')} className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white">
+                            <X size={13} />
+                        </button>
+                    </div>
+                )
+            })()}
+
+            {/* High-Density Data Table */}
+            {loading ? (
+                <div className="flex h-48 items-center justify-center"><div className="h-5 w-5 animate-spin rounded-full border-b-2 border-emerald-600" /></div>
+            ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center rounded-md border border-dashed border-slate-200 bg-white py-12 dark:border-slate-800 dark:bg-[#0b0f17]">
+                    <Receipt size={32} className="mb-1.5 text-slate-300 dark:text-slate-600" />
+                    <p className="font-mono text-xs uppercase tracking-wider text-slate-400">No invoices found</p>
+                </div>
+            ) : (
+                <>
+                    {/* Desktop High-Density Linear Table */}
+                    <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white shadow-2xs dark:border-slate-800 dark:bg-[#0b0f17] md:block">
+                        <table className="w-full border-collapse text-left font-sans text-xs">
+                            <thead>
+                                <tr className="border-b border-slate-200 bg-slate-50 text-[9px] font-mono uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-400">
+                                    <th className="px-3 py-2 font-semibold">Number</th>
+                                    <th className="px-3 py-2 font-semibold">Customer</th>
+                                    <th className="px-3 py-2 font-semibold">Date</th>
+                                    <th className="px-3 py-2 font-semibold">Due Date</th>
+                                    <th className="px-3 py-2 text-right font-semibold">Grand Total</th>
+                                    <th className="px-3 py-2 text-right font-semibold">Paid</th>
+                                    <th className="px-3 py-2 text-right font-semibold">Sisa</th>
+                                    <th className="px-3 py-2 text-center font-semibold">Status</th>
+                                    <th className="px-3 py-2 text-right font-semibold">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                {filtered.map(inv => {
+                                    const sc = INV_STATUS[inv.status] || INV_STATUS.DRAFT
+                                    const Icon = sc.icon
+                                    const paid = paidOf(inv)
+                                    const remaining = Math.max(0, inv.grandTotal - paid)
+                                    const overdue = remaining > 0 && inv.status !== 'CANCELLED' && !!inv.dueDate && new Date(inv.dueDate).getTime() < Date.now()
+
+                                    return (
+                                        <tr key={inv.id} className="group transition-colors hover:bg-emerald-50/40 dark:hover:bg-slate-900/60">
+                                            {/* Number */}
+                                            <td className="whitespace-nowrap px-3 py-2">
+                                                <div className="flex items-center gap-1.5">
+                                                    <button onClick={() => setDetailModal(inv)} className="font-mono text-xs font-bold text-emerald-600 hover:underline dark:text-emerald-400">
+                                                        {inv.number}
+                                                    </button>
+                                                    {inv.project && (
+                                                        <span className="rounded bg-slate-100 px-1 py-0.2 font-mono text-[9px] text-slate-400 dark:bg-slate-800 dark:text-slate-500" title={inv.project.name}>
+                                                            {inv.project.number}
                                                         </span>
-                                                    ) : (
-                                                        <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-tight xl:text-[10px] border-l-2 border-slate-200 pl-2">Tanpa Kontrak</span>
                                                     )}
                                                 </div>
-                                            </td>
-                                            <td className="px-3 py-3 xl:px-4 text-right">
-                                                <p className="text-xs font-semibold text-foreground xl:text-sm">{fmt(inv.grandTotal)}</p>
-                                                {inv.payments && inv.payments.length > 0 && inv.status !== 'PAID' && (
-                                                    <p className="text-[9px] font-semibold text-rose-500 uppercase tracking-tight mt-1">
-                                                        Sisa: {fmt(inv.grandTotal - inv.payments.reduce((s, p) => s + p.amount, 0))}
+                                                {inv.contract && (
+                                                    <p className="mt-0.5 max-w-[150px] truncate font-mono text-[9px] text-slate-400 dark:text-slate-500" title={inv.contract.subject}>
+                                                        KTR {inv.contract.number}
                                                     </p>
                                                 )}
                                             </td>
-                                            <td className="px-3 py-3 xl:px-4">
-                                                <div className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[9px] font-semibold uppercase tracking-wide xl:text-[10px] ${INV_STATUS[inv.status]?.color || ''}`}>
-                                                    {inv.status}
-                                                </div>
+
+                                            {/* Customer */}
+                                            <td className="max-w-[170px] px-3 py-2 truncate">
+                                                <span className="block truncate text-xs font-semibold text-slate-800 dark:text-slate-200" title={`${inv.customer?.name} (${inv.customer?.code})`}>
+                                                    {inv.customer?.name}
+                                                </span>
+                                                {inv.salesOrder && (
+                                                    <p className="mt-0.5 truncate font-mono text-[9px] text-slate-400" title={`Sales Order ${inv.salesOrder.number}`}>
+                                                        SO {inv.salesOrder.number}
+                                                    </p>
+                                                )}
                                             </td>
-                                            <td className="px-3 py-3 xl:px-4 text-right">
-                                                <div className="flex items-center justify-end gap-1 xl:gap-2">
-                                                    <Button variant="ghost" size="icon" onClick={() => setDetailModal(inv)} title="View Detail" className="h-8 w-8 rounded-lg text-emerald-600 hover:bg-emerald-50">
-                                                        <Eye size={16} />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" onClick={() => setViewModal(inv)} title="Print / Preview Invoice" className="h-8 w-8 rounded-lg hover:bg-slate-100">
-                                                        <Printer size={16} />
-                                                    </Button>
+
+                                            {/* Date */}
+                                            <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-slate-500">
+                                                {fmtDate(inv.date)}
+                                            </td>
+
+                                            {/* Due Date */}
+                                            <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px]">
+                                                <span className={overdue ? 'font-semibold text-rose-500' : 'text-slate-500'}>{fmtDate(inv.dueDate)}</span>
+                                                {overdue && <span className="ml-1 rounded bg-rose-50 px-1 py-0.2 font-mono text-[9px] font-bold uppercase text-rose-500">Overdue</span>}
+                                            </td>
+
+                                            {/* Grand Total */}
+                                            <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                <span className="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">{fmt(inv.grandTotal)}</span>
+                                            </td>
+
+                                            {/* Paid */}
+                                            <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                <span className={`font-mono text-xs ${paid > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>{paid > 0 ? fmt(paid) : '—'}</span>
+                                            </td>
+
+                                            {/* Sisa */}
+                                            <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                <span className={`font-mono text-xs font-bold ${remaining > 0 ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>{remaining > 0 ? fmt(remaining) : 'LUNAS'}</span>
+                                            </td>
+
+                                            {/* Status */}
+                                            <td className="whitespace-nowrap px-3 py-2 text-center">
+                                                <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-wider ${sc.color}`}>
+                                                    <Icon size={9} /> {sc.label}
+                                                </span>
+                                            </td>
+
+                                            {/* Actions */}
+                                            <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                <div className="flex items-center justify-end gap-1">
                                                     {inv.status === 'DRAFT' && (
-                                                        <Button
-                                                            variant="ghost" size="sm"
-                                                            onClick={() => setPostingInvoice(inv)}
-                                                            className="h-8 gap-1 rounded-lg px-2 text-[9px] font-semibold text-indigo-600 hover:bg-indigo-50 xl:text-[10px]"
-                                                        >
-                                                            <Send size={14} /> POSTING
-                                                        </Button>
+                                                        <button onClick={() => setPostingInvoice(inv)} title="Posting ke Buku Besar" className="inline-flex h-6 items-center gap-0.5 rounded px-1.5 font-mono text-[9px] font-semibold uppercase text-indigo-600 transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-950/40">
+                                                            <Send size={10} /> POST
+                                                        </button>
                                                     )}
                                                     {['POSTED', 'PARTIAL'].includes(inv.status) && (
-                                                        <Button
-                                                            variant="ghost" size="sm"
-                                                            onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '', amount: inv.grandTotal - (inv.payments?.reduce((s, p) => s + p.amount, 0) || 0) })}
-                                                            className="h-8 gap-1 rounded-lg px-2 text-[9px] font-semibold text-emerald-600 hover:bg-emerald-50 xl:text-[10px]"
-                                                        >
-                                                            <DollarSign size={14} /> PAY
-                                                        </Button>
+                                                        <button onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '', amount: remaining })} title="Catat Pembayaran" className="inline-flex h-6 items-center gap-0.5 rounded px-1.5 font-mono text-[9px] font-semibold uppercase text-emerald-600 transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-950/40">
+                                                            <DollarSign size={10} /> PAY
+                                                        </button>
                                                     )}
-                                                    <Button variant="ghost" size="icon" onClick={() => {
-                                                        setSelectedId(inv.id);
-                                                        setEditMode(true);
-                                                        setForm({
-                                                            customerId: inv.customerId,
-                                                            projectId: inv.projectId || '',
-                                                            contractId: inv.contractId || '',
-                                                            salesOrderId: inv.salesOrderId || '',
-                                                            deliveryOrderId: inv.deliveryOrderId || '',
-                                                            bankAccountId: inv.bankAccountId || '',
-                                                            signerName: inv.signerName || '',
-                                                            signerPosition: inv.signerPosition || '',
-                                                            date: inv.date.split('T')[0],
-                                                            dueDate: inv.dueDate ? inv.dueDate.split('T')[0] : '',
-                                                            notes: inv.notes || '',
-                                                            paymentTerms: inv.paymentTerms || '',
-                                                            invoiceType: inv.invoiceType || 'STANDARD',
-                                                            terminType: inv.terminType || 'PERCENT',
-                                                            terminPercent: inv.terminPercent || 30,
-                                                            terminNominal: inv.terminNominal || 0,
-                                                            subtotal: inv.subtotal,
-                                                            tax: inv.tax,
-                                                            discountType: (inv as any).discountType || 'PERCENTAGE',
-                                                            discount: inv.discount,
-                                                            discountAmt: inv.discountAmt,
-                                                            taxAmt: inv.taxAmt,
-                                                            grandTotal: inv.grandTotal,
-                                                            items: inv.items
-                                                        });
-                                                        setModalOpen(true);
-                                                    }} className="h-8 w-8 rounded-lg text-emerald-600 hover:bg-emerald-50">
-                                                        <Edit size={16} />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(inv.id)} title="Delete" className="h-8 w-8 rounded-lg text-rose-600 hover:bg-rose-50">
-                                                        <Trash2 size={16} />
-                                                    </Button>
+                                                    <button onClick={() => setDetailModal(inv)} title="View Detail" className="flex h-6 w-6 items-center justify-center rounded text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/40">
+                                                        <Eye size={12} />
+                                                    </button>
+                                                    <button onClick={() => setViewModal(inv)} title="Print / Preview Invoice" className="flex h-6 w-6 items-center justify-center rounded text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800">
+                                                        <Printer size={12} />
+                                                    </button>
+                                                    <button onClick={() => openEdit(inv)} title="Edit" className="flex h-6 w-6 items-center justify-center rounded text-slate-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40">
+                                                        <Edit size={12} />
+                                                    </button>
+                                                    <button onClick={() => handleDelete(inv.id)} title="Delete" className="flex h-6 w-6 items-center justify-center rounded text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40">
+                                                        <Trash2 size={12} />
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
-                                </React.Fragment>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
 
-                {/* Mobile / Tablet Cards View */}
-                <div className="bg-slate-50/30 p-2.5 sm:p-4 lg:hidden">
-                    {Object.entries(groupedInvoices).map(([month, data]) => (
-                        <div key={month} className="mb-4 space-y-2 last:mb-0">
-                            <div className="flex items-center justify-between border-b border-slate-200 px-1 pb-1.5">
-                                <h3 className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{month}</h3>
-                                <span className="text-[10px] font-semibold text-emerald-600">{fmt(data.total)}</span>
-                            </div>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                                {data.invoices.map((inv) => (
-                                    <div key={inv.id} className="flex flex-col gap-2.5 rounded-xl border border-slate-200/70 bg-white p-3 shadow-sm">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="min-w-0">
-                                                <p className="truncate text-xs font-semibold tracking-tight text-slate-800 sm:text-sm">{inv.number}</p>
-                                                <p className="mt-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{fmtDate(inv.date)}</p>
-                                            </div>
-                                            <span className={`inline-flex shrink-0 items-center rounded-md border px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide sm:text-[9px] ${INV_STATUS[inv.status]?.color || ''}`}>
-                                                {inv.status}
-                                            </span>
+                    {/* Mobile View: High Density Cards */}
+                    <div className="space-y-2 md:hidden">
+                        {filtered.map(inv => {
+                            const sc = INV_STATUS[inv.status] || INV_STATUS.DRAFT
+                            const Icon = sc.icon
+                            const paid = paidOf(inv)
+                            const remaining = Math.max(0, inv.grandTotal - paid)
+                            return (
+                                <div key={inv.id} className="space-y-1.5 rounded border border-slate-200 bg-white p-2.5 shadow-2xs dark:border-slate-800 dark:bg-[#0b0f17]">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                            <button onClick={() => setDetailModal(inv)} className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">{inv.number}</button>
+                                            {inv.project && <span className="font-mono text-[9px] text-slate-400">#{inv.project.number}</span>}
                                         </div>
-
+                                        <span className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.2 font-mono text-[9px] font-semibold uppercase ${sc.color}`}>
+                                            <Icon size={8} /> {sc.label}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold leading-tight text-slate-800 dark:text-slate-200">{inv.customer?.name}</p>
+                                        <p className="truncate text-[10px] text-slate-500">
+                                            Due: {fmtDate(inv.dueDate)}{inv.contract ? ` • ${inv.contract.number}` : ''}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center justify-between border-t border-slate-100 pt-1 font-mono text-xs dark:border-slate-800/60">
                                         <div className="min-w-0">
-                                            <p className="truncate text-[11px] font-semibold text-slate-700 sm:text-xs">{inv.customer.name}</p>
-                                            <p className="mt-0.5 truncate text-[9px] text-muted-foreground">
-                                                {inv.contract ? `Kontrak ${inv.contract.number}` : 'Tanpa Kontrak'}
-                                            </p>
-                                        </div>
-
-                                        <div className="flex items-end justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
-                                            <div className="min-w-0">
-                                                <p className="text-[8px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-[9px]">Total Tagihan</p>
-                                                <p className="text-xs font-semibold tracking-tight text-slate-900 sm:text-sm">{fmt(inv.grandTotal)}</p>
-                                            </div>
-                                            {inv.payments && inv.payments.length > 0 && inv.status !== 'PAID' && (
-                                                <p className="shrink-0 text-[8px] font-semibold uppercase tracking-wide text-rose-500 sm:text-[9px]">
-                                                    Sisa {fmt(inv.grandTotal - inv.payments.reduce((s, p) => s + p.amount, 0))}
-                                                </p>
+                                            <span className="font-bold text-slate-900 dark:text-slate-100">{fmt(inv.grandTotal)}</span>
+                                            {remaining > 0 && paid > 0 && (
+                                                <span className="ml-1 text-[9px] text-rose-500">sisa {fmt(remaining)}</span>
                                             )}
                                         </div>
-
-                                        <div className="flex flex-wrap items-center justify-end gap-1 border-t border-slate-100 pt-2">
-                                            <Button variant="ghost" size="icon" onClick={() => setDetailModal(inv)} title="View Detail" className="h-7 w-7 rounded-md text-emerald-600 hover:bg-emerald-50">
-                                                <Eye size={14} />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => setViewModal(inv)} title="Print / Preview Invoice" className="h-7 w-7 rounded-md hover:bg-slate-100">
-                                                <Printer size={14} />
-                                            </Button>
+                                        <div className="flex items-center gap-1">
                                             {inv.status === 'DRAFT' && (
-                                                <Button variant="ghost" size="sm" onClick={() => setPostingInvoice(inv)} className="h-7 gap-1 rounded-md bg-indigo-50 px-2 text-[9px] font-semibold text-indigo-600 hover:bg-indigo-100">
-                                                    <Send size={12} /> POSTING
-                                                </Button>
+                                                <button onClick={() => setPostingInvoice(inv)} title="Posting" className="rounded p-1 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"><Send size={12} /></button>
                                             )}
                                             {['POSTED', 'PARTIAL'].includes(inv.status) && (
-                                                <Button variant="ghost" size="sm" onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '', amount: inv.grandTotal - (inv.payments?.reduce((s, p) => s + p.amount, 0) || 0) })} className="h-7 gap-1 rounded-md bg-emerald-50 px-2 text-[9px] font-semibold text-emerald-600 hover:bg-emerald-100">
-                                                    <DollarSign size={12} /> PAY
-                                                </Button>
+                                                <button onClick={() => setPaymentConfirm({ invoice: inv, bankAccountId: inv.bankAccountId || '', amount: remaining })} title="Pay" className="rounded p-1 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"><DollarSign size={12} /></button>
                                             )}
-                                            <Button variant="ghost" size="icon" onClick={() => {
-                                                setSelectedId(inv.id);
-                                                setEditMode(true);
-                                                setForm({
-                                                    customerId: inv.customerId,
-                                                    projectId: inv.projectId || '',
-                                                    contractId: inv.contractId || '',
-                                                    salesOrderId: inv.salesOrderId || '',
-                                                    deliveryOrderId: inv.deliveryOrderId || '',
-                                                    bankAccountId: inv.bankAccountId || '',
-                                                    signerName: inv.signerName || '',
-                                                    signerPosition: inv.signerPosition || '',
-                                                    date: inv.date.split('T')[0],
-                                                    dueDate: inv.dueDate ? inv.dueDate.split('T')[0] : '',
-                                                    notes: inv.notes || '',
-                                                    paymentTerms: inv.paymentTerms || '',
-                                                    invoiceType: inv.invoiceType || 'STANDARD',
-                                                    terminType: inv.terminType || 'PERCENT',
-                                                    terminPercent: inv.terminPercent || 30,
-                                                    terminNominal: inv.terminNominal || 0,
-                                                    subtotal: inv.subtotal,
-                                                    tax: inv.tax,
-                                                    discountType: (inv as any).discountType || 'PERCENTAGE',
-                                                    discount: inv.discount,
-                                                    discountAmt: inv.discountAmt,
-                                                    taxAmt: inv.taxAmt,
-                                                    grandTotal: inv.grandTotal,
-                                                    items: inv.items
-                                                });
-                                                setModalOpen(true);
-                                            }} title="Edit" className="h-7 w-7 rounded-md text-emerald-600 hover:bg-emerald-50">
-                                                <Edit size={14} />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => handleDelete(inv.id)} title="Delete" className="h-7 w-7 rounded-md text-rose-500 hover:bg-rose-50">
-                                                <Trash2 size={14} />
-                                            </Button>
+                                            <button onClick={() => setViewModal(inv)} title="Print" className="rounded p-1 text-slate-500 hover:text-slate-900 dark:hover:bg-slate-800"><Printer size={12} /></button>
+                                            <button onClick={() => openEdit(inv)} title="Edit" className="rounded p-1 text-slate-500 hover:text-blue-600 dark:hover:bg-blue-950/40"><Edit size={12} /></button>
+                                            <button onClick={() => handleDelete(inv.id)} title="Delete" className="rounded p-1 text-slate-400 hover:text-rose-600 dark:hover:bg-rose-950/40"><Trash2 size={12} /></button>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                {/* Pagination Controls */}
-                {totalPages > 1 && (
-                    <div className="flex flex-col items-center justify-between gap-2 border-t border-border/50 bg-white p-3 sm:flex-row sm:p-4">
-                        <div className="text-[10px] font-medium text-muted-foreground sm:text-xs">
-                            Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filtered.length)} dari {filtered.length} invoice
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline" size="sm"
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                                className="h-7 rounded-md px-2.5 text-[10px] sm:h-8 sm:rounded-lg sm:text-xs"
-                            >
-                                Prev
-                            </Button>
-                            <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold sm:text-xs">{currentPage} / {totalPages}</span>
-                            <Button
-                                variant="outline" size="sm"
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
-                                className="h-7 rounded-md px-2.5 text-[10px] sm:h-8 sm:rounded-lg sm:text-xs"
-                            >
-                                Next
-                            </Button>
-                        </div>
+                                </div>
+                            )
+                        })}
                     </div>
-                )}
-            </div>
+                </>
+            )}
 
             {/* Modal Form */}
             <AnimatePresence>
