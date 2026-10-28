@@ -1139,7 +1139,7 @@ function ItOslAssetsContent() {
 
             {q && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-medium">
-                "{q}"
+                &quot;{q}&quot;
                 <button onClick={() => setQ("")}><X size={11} /></button>
               </span>
             )}

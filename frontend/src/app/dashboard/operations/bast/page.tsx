@@ -1,13 +1,11 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, type ReactNode } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     ClipboardCheck, Plus, Search, Edit, Trash2, X, Save,
-    CheckCircle2, AlertCircle, RefreshCw, ChevronDown,
-    Clock, MapPin, User, Calendar, FileText, Briefcase,
-    Check, Ban, Printer, ArrowRight, ClipboardSignature,
-    PenTool, Wrench, PackageCheck
+    CheckCircle2, AlertCircle, RefreshCw, Calendar, FileText,
+    Briefcase, Printer, PenTool, PackageCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import BASTPDFModal from "./BASTPDFModal"
@@ -32,23 +30,92 @@ interface BASTItem {
 
 interface Ref { id: string; number: string; name?: string; customer?: { name: string } }
 
+interface PillConfig { label: string; color: string; dot: string }
+
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
-const BAST_TYPE: Record<string, { label: string; color: string; icon: any }> = {
-    PROJECT_COMPLETION: { label: 'Penyelesaian Proyek', color: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: ClipboardCheck },
-    UNIT_HANDOVER: { label: 'Serah Terima Unit', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: PackageCheck },
-    MAINTENANCE_VISIT: { label: 'Kunjungan Maintenance', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Wrench },
+const BAST_TYPE: Record<string, PillConfig> = {
+    PROJECT_COMPLETION: {
+        label: "Penyelesaian Proyek",
+        color: "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-400",
+        dot: "bg-indigo-500",
+    },
+    UNIT_HANDOVER: {
+        label: "Serah Terima Unit",
+        color: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400",
+        dot: "bg-emerald-500",
+    },
+    MAINTENANCE_VISIT: {
+        label: "Kunjungan Maintenance",
+        color: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-400",
+        dot: "bg-amber-500",
+    },
 }
 
-const BAST_STATUS: Record<string, { label: string; color: string; icon: any }> = {
-    DRAFT: { label: 'Draft', color: 'bg-slate-100 text-slate-600 border-slate-200', icon: Clock },
-    SIGNED: { label: 'Signed', color: 'bg-blue-50 text-blue-700 border-blue-200', icon: PenTool },
-    COMPLETED: { label: 'Completed', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
-    CANCELLED: { label: 'Cancelled', color: 'bg-slate-50 text-slate-400 border-slate-200 line-through', icon: Ban },
+const BAST_STATUS: Record<string, PillConfig> = {
+    DRAFT: { label: "Draft", color: "border-border bg-muted text-muted-foreground", dot: "bg-muted-foreground/50" },
+    SIGNED: {
+        label: "Signed",
+        color: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-400",
+        dot: "bg-blue-500",
+    },
+    COMPLETED: {
+        label: "Completed",
+        color: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400",
+        dot: "bg-emerald-500",
+    },
+    CANCELLED: {
+        label: "Cancelled",
+        color: "border-border bg-muted text-muted-foreground line-through",
+        dot: "bg-muted-foreground/40",
+    },
 }
 
-// Fixed import paths if needed (relative to this file)
 const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+
+const inputClass =
+    "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
+
+const selectClass = `${inputClass} cursor-pointer`
+
+const textareaClass =
+    "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15 resize-none"
+
+function Field({
+    label,
+    required,
+    children,
+    className = "",
+}: {
+    label: string
+    required?: boolean
+    children: ReactNode
+    className?: string
+}) {
+    return (
+        <div className={`space-y-1.5 ${className}`}>
+            <label className="block text-xs font-medium text-muted-foreground">
+                {label}
+                {required && <span className="ml-0.5 text-rose-500">*</span>}
+            </label>
+            {children}
+        </div>
+    )
+}
+
+function Pill({ config, label }: { config?: PillConfig; label: string }) {
+    const c = config || {
+        label,
+        color: "border-border bg-muted text-muted-foreground",
+        dot: "bg-muted-foreground/50",
+    }
+    return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${c.color}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
+            {c.label}
+        </span>
+    )
+}
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
@@ -203,333 +270,463 @@ export default function BASTPage() {
         b.project?.name.toLowerCase().includes(search.toLowerCase())
     )
 
+    const stats = [
+        { label: 'Total BAST', val: basts.length, icon: FileText },
+        { label: 'Completed', val: basts.filter(b => b.status === 'COMPLETED').length, icon: CheckCircle2 },
+        { label: 'Signed', val: basts.filter(b => b.status === 'SIGNED').length, icon: PenTool },
+        { label: 'Unit Handover', val: basts.filter(b => b.type === 'UNIT_HANDOVER').length, icon: PackageCheck },
+    ]
+
+    const openEdit = (b: BAST) => {
+        setSelectedId(b.id)
+        setEditMode(true)
+        setForm({
+            customerId: b.customerId,
+            projectId: b.projectId || '',
+            salesOrderId: b.salesOrderId || '',
+            workOrderId: b.workOrderId || '',
+            date: b.date.split('T')[0],
+            type: b.type,
+            status: b.status,
+            notes: b.notes || '',
+            receiverName: b.receiverName || '',
+            technicianName: b.technicianName || '',
+            items: b.items
+        })
+        setModalOpen(true)
+    }
+
     return (
-        <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-6 md:py-8 md:max-w-screen space-y-5 md:space-y-6 w-full font-inter bg-slate-50/30 min-h-screen pb-24 md:pb-8">
-            {/* Header */}
-            <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/20 shrink-0">
-                        <ClipboardCheck className="text-white" size={20} />
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                <header className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-foreground">
+                            <ClipboardCheck size={18} />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-semibold tracking-tight text-foreground">Berita Acara (BAST)</h1>
+                            <p className="mt-0.5 text-xs text-muted-foreground">Serah terima pekerjaan & handover proyek</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-none">Berita Acara (BAST)</h1>
-                        <p className="text-[10px] md:text-sm text-slate-400 font-medium mt-0.5 md:mt-1">Serah terima pekerjaan & handover proyek</p>
-                    </div>
+                    <Button
+                        onClick={() => { setEditMode(false); setForm({ ...form, items: [] }); setModalOpen(true) }}
+                        className="h-9 rounded-lg px-4 text-sm font-medium"
+                    >
+                        <Plus size={16} className="mr-1.5" />
+                        Buat BAST
+                    </Button>
+                </header>
+
+                <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {stats.map((s) => (
+                        <div key={s.label} className="rounded-xl border border-border bg-card p-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] font-medium text-muted-foreground">{s.label}</p>
+                                <s.icon size={14} className="text-muted-foreground" />
+                            </div>
+                            <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{s.val}</p>
+                        </div>
+                    ))}
                 </div>
-                <div className="flex gap-2 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64 md:flex-none">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="relative flex-1 sm:max-w-sm">
+                        <Search
+                            size={15}
+                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        />
                         <input
-                            type="text" placeholder="Cari nomor BAST, Customer..."
-                            value={search} onChange={e => setSearch(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
+                            type="text"
+                            placeholder="Cari nomor BAST, Customer..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className={`${inputClass} pl-9`}
                         />
                     </div>
-                    <Button onClick={() => { setEditMode(false); setForm({ ...form, items: [] }); setModalOpen(true) }}
-                        className="flex items-center gap-2 bg-emerald-600 text-white px-4 md:px-5 py-2.5 h-auto rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 active:scale-95 whitespace-nowrap text-sm">
-                        <Plus size={16} /> Buat BAST
-                    </Button>
+                    <span className="text-xs text-muted-foreground sm:ml-auto">
+                        {filtered.length} BAST
+                    </span>
                 </div>
-            </header>
 
-            {/* Stats Summary */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                {[
-                    { label: 'Total BAST', val: basts.length, icon: FileText, color: 'bg-indigo-600' },
-                    { label: 'Completed', val: basts.filter(b => b.status === 'COMPLETED').length, icon: CheckCircle2, color: 'bg-emerald-600' },
-                    { label: 'Signed', val: basts.filter(b => b.status === 'SIGNED').length, icon: PenTool, color: 'bg-blue-600' },
-                    { label: 'Unit Handover', val: basts.filter(b => b.type === 'UNIT_HANDOVER').length, icon: PackageCheck, color: 'bg-violet-600' },
-                ].map((s, i) => (
-                    <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                        className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 border border-slate-100 shadow-sm">
-                        <div className={`w-8 h-8 md:w-9 md:h-9 rounded-xl ${s.color} flex items-center justify-center mb-2 md:mb-3`}><s.icon size={15} className="text-white" /></div>
-                        <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{s.label}</p>
-                        <p className="text-xl md:text-2xl font-black text-slate-900">{s.val}</p>
-                    </motion.div>
-                ))}
-            </div>
-
-            {/* Desktop Table */}
-            <div className="hidden md:block bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50/50 border-b border-slate-100">
-                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Info BAST</th>
-                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Tipe</th>
-                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Customer / Project</th>
-                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Penerima</th>
-                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                            {filtered.map((b) => (
-                                <tr key={b.id} className="hover:bg-emerald-600/[0.02] transition-colors group">
-                                    <td className="px-6 py-5">
-                                        <p className="font-black text-sm text-emerald-600">{b.number}</p>
-                                        <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-1"><Calendar size={11} /> {fmtDate(b.date)}</p>
-                                    </td>
-                                    <td className="px-6 py-5">
-                                        <span className={`px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider border ${BAST_TYPE[b.type]?.color}`}>{BAST_TYPE[b.type]?.label || b.type}</span>
-                                    </td>
-                                    <td className="px-6 py-5">
-                                        <p className="font-bold text-sm text-slate-800">{b.customer.name}</p>
-                                        {b.project && <p className="text-xs text-emerald-600 font-bold mt-1 flex items-center gap-1"><Briefcase size={11} /> {b.project.name}</p>}
-                                    </td>
-                                    <td className="px-6 py-5">
-                                        <p className="font-bold text-xs uppercase tracking-tight">{b.receiverName || '—'}</p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">Oleh: {b.technicianName || '—'}</p>
-                                    </td>
-                                    <td className="px-6 py-5 text-right">
-                                        <div className="flex items-center justify-end gap-1">
-                                            <button onClick={() => setViewModal(b)} title="Print BAST" className="w-8 h-8 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-emerald-600 transition-all"><Printer size={15} /></button>
-                                            <button onClick={() => { setSelectedId(b.id); setEditMode(true); setForm({ customerId: b.customerId, projectId: b.projectId || '', salesOrderId: b.salesOrderId || '', workOrderId: b.workOrderId || '', date: b.date.split('T')[0], type: b.type, status: b.status, notes: b.notes || '', receiverName: b.receiverName || '', technicianName: b.technicianName || '', items: b.items }); setModalOpen(true); }}
-                                                className="w-8 h-8 rounded-xl hover:bg-emerald-50 flex items-center justify-center text-slate-400 hover:text-emerald-600 transition-all"><Edit size={15} /></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* Mobile Card List */}
-            <div className="md:hidden space-y-4">
                 {loading ? (
-                    [1, 2, 3].map(i => <div key={i} className="animate-pulse bg-white rounded-2xl p-4 h-32 border border-slate-100" />)
-                ) : filtered.length === 0 ? (
-                    <div className="py-16 text-center bg-white rounded-2xl border border-slate-100 shadow-sm">
-                        <ClipboardCheck size={48} className="text-slate-200 mx-auto mb-3" />
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tidak ada BAST</p>
+                    <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+                        <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
                     </div>
-                ) : filtered.map(b => (
-                    <motion.div key={b.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                        className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
-                        <div className="flex items-start justify-between pl-2">
-                            <div>
-                                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block">{b.number}</span>
-                                <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1 mt-0.5"><Calendar size={10} />{fmtDate(b.date)}</span>
+                ) : filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-20 text-center">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <ClipboardCheck size={22} />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">Tidak ada BAST</p>
+                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                            {search
+                                ? "Coba sesuaikan pencarian untuk menemukan BAST yang Anda cari."
+                                : "Belum ada BAST yang dibuat. Buat BAST pertama Anda untuk memulai."}
+                        </p>
+                        <Button
+                            onClick={() => { setEditMode(false); setForm({ ...form, items: [] }); setModalOpen(true) }}
+                            className="mt-5 h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            <Plus size={16} className="mr-1.5" />
+                            Buat BAST
+                        </Button>
+                    </div>
+                ) : (
+                    <>
+                        {/* Desktop table */}
+                        <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                            <th className="px-3 py-2.5 font-medium">Info BAST</th>
+                                            <th className="px-3 py-2.5 font-medium">Tipe</th>
+                                            <th className="px-3 py-2.5 font-medium">Customer / Project</th>
+                                            <th className="px-3 py-2.5 font-medium">Status</th>
+                                            <th className="px-3 py-2.5 font-medium">Penerima</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {filtered.map((b) => (
+                                            <tr key={b.id} className="hover:bg-muted/30">
+                                                <td className="px-3 py-2.5">
+                                                    <p className="font-mono text-xs font-medium text-foreground">{b.number}</p>
+                                                    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                        <Calendar size={11} />
+                                                        {fmtDate(b.date)}
+                                                    </p>
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <Pill config={BAST_TYPE[b.type]} label={b.type} />
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <p className="text-sm font-medium text-foreground">{b.customer.name}</p>
+                                                    {b.project && (
+                                                        <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                            <Briefcase size={11} />
+                                                            {b.project.name}
+                                                        </p>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <Pill config={BAST_STATUS[b.status]} label={b.status} />
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <p className="text-xs font-medium text-foreground">{b.receiverName || '—'}</p>
+                                                    <p className="mt-0.5 text-[11px] text-muted-foreground">Oleh: {b.technicianName || '—'}</p>
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <div className="flex items-center justify-end gap-0.5">
+                                                        <Button
+                                                            onClick={() => setViewModal(b)}
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            title="Print BAST"
+                                                            className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                        >
+                                                            <Printer size={15} />
+                                                        </Button>
+                                                        <Button
+                                                            onClick={() => openEdit(b)}
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            title="Edit BAST"
+                                                            className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                        >
+                                                            <Edit size={15} />
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                            <span className={`inline-flex items-center px-2 py-1 rounded-lg text-[9px] font-black border ${BAST_TYPE[b.type]?.color}`}>{BAST_TYPE[b.type]?.label || b.type}</span>
                         </div>
-                        <div className="pl-2">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Customer</p>
-                            <p className="text-[13px] font-black text-slate-900">{b.customer.name}</p>
-                            {b.project && <p className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 mt-0.5"><Briefcase size={10} />{b.project.name}</p>}
+
+                        {/* Mobile cards */}
+                        <div className="grid grid-cols-1 gap-3 md:hidden">
+                            {filtered.map((b) => (
+                                <div key={b.id} className="rounded-xl border border-border bg-card p-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="truncate font-mono text-xs font-medium text-foreground">{b.number}</p>
+                                            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                <Calendar size={10} />
+                                                {fmtDate(b.date)}
+                                            </p>
+                                        </div>
+                                        <Pill config={BAST_TYPE[b.type]} label={b.type} />
+                                    </div>
+                                    <div className="mt-2.5">
+                                        <p className="truncate text-sm font-medium text-foreground">{b.customer.name}</p>
+                                        {b.project && (
+                                            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                <Briefcase size={10} />
+                                                {b.project.name}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                                        <Pill config={BAST_STATUS[b.status]} label={b.status} />
+                                        <span>Penerima: <span className="font-medium text-foreground">{b.receiverName || '—'}</span></span>
+                                        <span>Teknisi: <span className="font-medium text-foreground">{b.technicianName || '—'}</span></span>
+                                    </div>
+                                    <div className="mt-3 flex items-center justify-end gap-1 border-t border-border pt-2">
+                                        <Button
+                                            onClick={() => setViewModal(b)}
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 rounded-md px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                                        >
+                                            <Printer size={14} className="mr-1.5" /> Print
+                                        </Button>
+                                        <Button
+                                            onClick={() => openEdit(b)}
+                                            variant="ghost"
+                                            size="icon"
+                                            title="Edit BAST"
+                                            className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        >
+                                            <Edit size={14} />
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                        <div className="pl-2">
-                            <span className="text-[10px] text-slate-400">Penerima: <strong>{b.receiverName || '—'}</strong> · Teknisi: <strong>{b.technicianName || '—'}</strong></span>
-                        </div>
-                        <div className="pl-2 pt-2 border-t border-slate-50 flex items-center justify-end gap-2">
-                            <button onClick={() => setViewModal(b)}
-                                className="h-9 px-3 rounded-xl bg-slate-50 text-slate-600 flex items-center gap-1.5 border border-slate-200 text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all">
-                                <Printer size={13} /> Print
-                            </button>
-                            <button onClick={() => { setSelectedId(b.id); setEditMode(true); setForm({ customerId: b.customerId, projectId: b.projectId || '', salesOrderId: b.salesOrderId || '', workOrderId: b.workOrderId || '', date: b.date.split('T')[0], type: b.type, status: b.status, notes: b.notes || '', receiverName: b.receiverName || '', technicianName: b.technicianName || '', items: b.items }); setModalOpen(true); }}
-                                className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200 active:scale-95 transition-all">
-                                <Edit size={15} />
-                            </button>
-                        </div>
-                    </motion.div>
-                ))}
+                    </>
+                )}
             </div>
 
             {/* Modal Form */}
             <AnimatePresence>
                 {modalOpen && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
                         <motion.div
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setModalOpen(false)}
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setModalOpen(false)}
                         />
                         <motion.div
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="bg-white rounded-[2.5rem] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl relative z-10 flex flex-col border border-white/20"
+                            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                            className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-2xl sm:rounded-2xl"
                         >
-                            <div className="p-8 border-b border-border/50 flex items-center justify-between bg-slate-50/50">
-                                <div>
-                                    <h2 className="text-2xl font-black tracking-tighter text-foreground uppercase">
-                                        {editMode ? 'Edit BAST' : 'Buat BAST Baru'}
-                                    </h2>
-                                    <p className="text-sm font-medium text-muted-foreground">Lengkapi data serah terima pekerjaan di bawah ini</p>
+                            <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                        <ClipboardCheck size={16} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h2 className="truncate text-sm font-semibold text-foreground">
+                                            {editMode ? 'Edit BAST' : 'Buat BAST Baru'}
+                                        </h2>
+                                        <p className="truncate text-[11px] text-muted-foreground">
+                                            Lengkapi data serah terima pekerjaan di bawah ini
+                                        </p>
+                                    </div>
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={() => setModalOpen(false)} className="rounded-full h-10 w-10 hover:bg-white hover:shadow-md transition-all">
-                                    <X size={20} />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setModalOpen(false)}
+                                    className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground"
+                                >
+                                    <X size={16} />
                                 </Button>
-                            </div>
+                            </header>
 
-                            <div className="p-8 overflow-y-auto custom-scrollbar space-y-8">
-                                {/* Basic Info */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Referen Sales Order (Copy Data)</label>
+                            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <Field label="Referen Sales Order (Copy Data)">
                                         <select
                                             value={form.salesOrderId}
                                             onChange={e => copyFromSalesOrder(e.target.value)}
-                                            className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20"
+                                            className={selectClass}
                                         >
                                             <option value="">Pilih Sales Order untuk Copy Data...</option>
                                             {salesOrders.map(so => (
                                                 <option key={so.id} value={so.id}>{so.number} - {so.name || (so as any).subject}</option>
                                             ))}
                                         </select>
-                                    </div>
+                                    </Field>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Referen Work Order (Copy Data)</label>
+                                    <Field label="Referen Work Order (Copy Data)">
                                         <select
                                             value={form.workOrderId}
                                             onChange={e => copyFromWorkOrder(e.target.value)}
-                                            className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20"
+                                            className={selectClass}
                                         >
                                             <option value="">Pilih Work Order untuk Copy Data...</option>
                                             {workOrders.filter(w => (w as any).status !== 'CLOSED').map(wo => (
                                                 <option key={wo.id} value={wo.id}>{wo.number} - {wo.name || (wo as any).title}</option>
                                             ))}
                                         </select>
-                                    </div>
+                                    </Field>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Tipe BAST</label>
+                                    <Field label="Tipe BAST">
                                         <select
                                             value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}
-                                            className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20"
+                                            className={selectClass}
                                         >
                                             {Object.entries(BAST_TYPE).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                                         </select>
-                                    </div>
+                                    </Field>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Customer <span className="text-rose-500">*</span></label>
+                                    <Field label="Customer" required>
                                         <select
                                             value={form.customerId} onChange={e => setForm({ ...form, customerId: e.target.value })}
-                                            className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20"
+                                            className={selectClass}
                                         >
                                             <option value="">Pilih Customer...</option>
                                             {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
-                                    </div>
+                                    </Field>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Project</label>
+                                    <Field label="Project">
                                         <select
                                             value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })}
-                                            className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20"
+                                            className={selectClass}
                                         >
                                             <option value="">Pilih Project...</option>
                                             {projects.map(p => <option key={p.id} value={p.id}>{p.number} - {p.name}</option>)}
                                         </select>
-                                    </div>
+                                    </Field>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Tanggal</label>
+                                    <Field label="Tanggal">
                                         <input
                                             type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
-                                            className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold tracking-tight focus:ring-2 focus:ring-emerald-600/20"
+                                            className={inputClass}
                                         />
-                                    </div>
+                                    </Field>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Status</label>
+                                    <Field label="Status" className="sm:col-span-2">
                                         <select
                                             value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
-                                            className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20"
+                                            className={selectClass}
                                         >
                                             {Object.entries(BAST_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                                         </select>
-                                    </div>
+                                    </Field>
                                 </div>
 
-                                {/* Items Section */}
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between px-1">
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-emerald-600 flex items-center gap-2">
-                                            <ClipboardCheck size={14} /> Deskripsi Pekerjaan / Handover
+                                <div className="space-y-2 border-t border-border pt-3">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                            <ClipboardCheck size={13} /> Deskripsi Pekerjaan / Handover
                                         </h3>
-                                        <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-9 rounded-xl border-emerald-600/20 text-emerald-600 hover:bg-emerald-50">
-                                            <Plus size={14} className="mr-1" /> Tambah Item
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={addItem}
+                                            className="h-8 rounded-md px-3 text-xs font-medium"
+                                        >
+                                            <Plus size={13} className="mr-1" /> Tambah Item
                                         </Button>
                                     </div>
-                                    <div className="space-y-3">
+
+                                    <div className="space-y-2">
                                         {form.items.map((it, idx) => (
-                                            <motion.div
-                                                initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                                                key={idx} className="flex gap-3 items-start relative group"
+                                            <div
+                                                key={idx}
+                                                className="flex flex-col gap-2 rounded-lg border border-border p-2.5 sm:flex-row sm:items-start"
                                             >
-                                                <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-xs text-muted-foreground flex-shrink-0 mt-1">
+                                                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground">
                                                     {idx + 1}
                                                 </div>
-                                                <div className="flex-1">
+                                                <div className="min-w-0 flex-1">
                                                     <input
                                                         placeholder="Deskripsi Hasil Pekerjaan..."
-                                                        value={it.description} onChange={e => updateItem(idx, 'description', e.target.value)}
-                                                        className="w-full h-12 rounded-xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner"
+                                                        value={it.description}
+                                                        onChange={e => updateItem(idx, 'description', e.target.value)}
+                                                        className={inputClass}
                                                     />
                                                 </div>
-                                                <div className="w-24">
+                                                <div className="flex gap-2">
                                                     <input
-                                                        type="number" placeholder="Qty"
-                                                        value={it.qty} onChange={e => updateItem(idx, 'qty', e.target.value)}
-                                                        className="w-full h-12 rounded-xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner text-center"
+                                                        type="number"
+                                                        placeholder="Qty"
+                                                        value={it.qty}
+                                                        onChange={e => updateItem(idx, 'qty', e.target.value)}
+                                                        className={`${inputClass} w-20 text-center`}
                                                     />
-                                                </div>
-                                                <div className="w-24">
                                                     <input
                                                         placeholder="Unit"
-                                                        value={it.unit} onChange={e => updateItem(idx, 'unit', e.target.value)}
-                                                        className="w-full h-12 rounded-xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner text-center"
+                                                        value={it.unit}
+                                                        onChange={e => updateItem(idx, 'unit', e.target.value)}
+                                                        className={`${inputClass} w-20 text-center`}
                                                     />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => removeItem(idx)}
+                                                        title="Hapus item"
+                                                        className="h-9 w-9 flex-shrink-0 rounded-md text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </Button>
                                                 </div>
-                                                <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(idx)} className="h-10 w-10 text-rose-500 hover:bg-rose-50 rounded-xl mt-1">
-                                                    <Trash2 size={16} />
-                                                </Button>
-                                            </motion.div>
+                                            </div>
                                         ))}
+                                        {form.items.length === 0 && (
+                                            <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                                                Belum ada item. Tambahkan deskripsi pekerjaan.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 
-                                {/* Names Info */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Teknisi / Penanggung Jawab</label>
+                                <div className="grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-2">
+                                    <Field label="Teknisi / Penanggung Jawab">
                                         <input
                                             placeholder="Nama teknisi Axon..."
-                                            value={form.technicianName} onChange={e => setForm({ ...form, technicianName: e.target.value })}
-                                            className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner"
+                                            value={form.technicianName}
+                                            onChange={e => setForm({ ...form, technicianName: e.target.value })}
+                                            className={inputClass}
                                         />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Penerima (Customer Signature Name)</label>
+                                    </Field>
+                                    <Field label="Penerima (Customer Signature Name)">
                                         <input
                                             placeholder="Nama penerima/customer..."
-                                            value={form.receiverName} onChange={e => setForm({ ...form, receiverName: e.target.value })}
-                                            className="w-full h-12 rounded-2xl bg-slate-50 border-none font-bold text-sm focus:ring-2 focus:ring-emerald-600/20 shadow-inner"
+                                            value={form.receiverName}
+                                            onChange={e => setForm({ ...form, receiverName: e.target.value })}
+                                            className={inputClass}
                                         />
-                                    </div>
-                                    <div className="col-span-full space-y-2">
-                                        <label className="text-[10px] font-black uppercase p-1 tracking-widest text-muted-foreground ml-1">Catatan Tambahan</label>
+                                    </Field>
+                                    <Field label="Catatan Tambahan" className="sm:col-span-2">
                                         <textarea
                                             placeholder="Catatan hasil serah terima..."
-                                            value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}
-                                            className="w-full h-32 rounded-2xl bg-slate-50 border-none font-bold text-sm p-4 focus:ring-2 focus:ring-emerald-600/20 shadow-inner resize-none"
+                                            value={form.notes}
+                                            onChange={e => setForm({ ...form, notes: e.target.value })}
+                                            className={`${textareaClass} min-h-[88px]`}
                                         />
-                                    </div>
+                                    </Field>
                                 </div>
                             </div>
 
-                            <div className="p-8 border-t border-border/50 flex items-center justify-end gap-3 bg-slate-50/50">
-                                <Button variant="ghost" onClick={() => setModalOpen(false)} className="h-12 rounded-2xl px-6 font-bold hover:bg-white">Batal</Button>
+                            <footer className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setModalOpen(false)}
+                                    className="h-9 rounded-lg px-4 text-sm font-medium"
+                                >
+                                    Batal
+                                </Button>
                                 <Button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="h-12 rounded-2xl px-10 bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20 font-black tracking-tighter uppercase disabled:opacity-50"
+                                    className="h-9 rounded-lg px-4 text-sm font-medium disabled:opacity-50"
                                 >
-                                    {saving ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                    {saving ? <RefreshCw size={14} className="mr-1.5 animate-spin" /> : <Save size={14} className="mr-1.5" />}
                                     Simpan BAST
                                 </Button>
-                            </div>
+                            </footer>
                         </motion.div>
                     </div>
                 )}
@@ -539,18 +736,23 @@ export default function BASTPage() {
             <AnimatePresence>
                 {toast && (
                     <motion.div
-                        initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                        initial={{ opacity: 0, y: 16, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                        className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200]"
+                        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                        className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2"
                     >
-                        <div className={`px-6 py-4 rounded-[2rem] shadow-2xl flex items-center gap-3 border ${toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
-                            {toast.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-                            <span className="font-bold text-sm uppercase tracking-tight">{toast.msg}</span>
+                        <div className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-4 py-3 shadow-lg">
+                            {toast.type === 'success' ? (
+                                <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                                <AlertCircle size={16} className="text-rose-600 dark:text-rose-400" />
+                            )}
+                            <span className="text-sm font-medium text-foreground">{toast.msg}</span>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
+
             <AnimatePresence>
                 {viewModal && (
                     <BASTPDFModal bastData={viewModal} company={company} onClose={() => setViewModal(null)} />
@@ -559,5 +761,3 @@ export default function BASTPage() {
         </div>
     )
 }
-
-

@@ -7,7 +7,8 @@ import {
   ImagePlus, Trash2, Check, Package, User, MessageSquare, Users, 
   LayoutGrid, LayoutList, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, 
   ArrowUpDown, RotateCcw, Copy, Download, MapPin, CheckSquare, Square, Filter, Tag,
-  SlidersHorizontal, ChevronDown, Sparkles, Building2
+  SlidersHorizontal, ChevronDown, Sparkles, Building2,
+  PlayCircle, PauseCircle, CheckCircle2, Lock, Timer, ShieldCheck
 } from "lucide-react"
 import { useSession } from "next-auth/react"
 import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
@@ -100,6 +101,42 @@ const PHASES = [
   { id:"HASIL", label:"Hasil", desc:"Verifikasi & serah terima", icon: Check },
 ] as const
 
+const STATUS_LABEL: Record<string, string> = {
+  NEW: "Baru",
+  IN_PROGRESS: "Dikerjakan",
+  PENDING: "Ditunda",
+  RESOLVED: "Selesai",
+  CLOSED: "Ditutup",
+  CANCELLED: "Dibatalkan",
+  DUPLICATE: "Duplikat",
+  REOPENED: "Dibuka Lagi",
+}
+
+const STATUS_STEPS = [
+  { id: "NEW", label: "Baru" },
+  { id: "IN_PROGRESS", label: "Dikerjakan" },
+  { id: "RESOLVED", label: "Selesai" },
+  { id: "CLOSED", label: "Ditutup" },
+] as const
+
+function statusStepIndex(status: string) {
+  if (status === "CLOSED") return 3
+  if (status === "RESOLVED") return 2
+  if (status === "IN_PROGRESS" || status === "PENDING" || status === "REOPENED") return 1
+  return 0
+}
+
+const STATUS_META: Record<string, { label: string; hint: string; icon: typeof Search; tone: string }> = {
+  NEW: { label: "Baru", hint: "Tiket masuk dan belum ditangani.", icon: Sparkles, tone: "border-slate-200 bg-slate-50 text-slate-800" },
+  IN_PROGRESS: { label: "Dikerjakan", hint: "Teknisi sedang menangani tiket ini.", icon: Wrench, tone: "border-sky-200 bg-sky-50 text-sky-900" },
+  PENDING: { label: "Ditunda", hint: "Pengerjaan dijeda sementara.", icon: PauseCircle, tone: "border-amber-200 bg-amber-50 text-amber-900" },
+  RESOLVED: { label: "Selesai", hint: "Pekerjaan rampung, menunggu verifikasi.", icon: CheckCircle2, tone: "border-indigo-200 bg-indigo-50 text-indigo-900" },
+  CLOSED: { label: "Ditutup", hint: "Tiket selesai dan sudah diverifikasi.", icon: Lock, tone: "border-emerald-200 bg-emerald-50 text-emerald-900" },
+  CANCELLED: { label: "Dibatalkan", hint: "Tiket tidak dilanjutkan.", icon: X, tone: "border-slate-200 bg-slate-50 text-slate-700" },
+  DUPLICATE: { label: "Duplikat", hint: "Digabung ke tiket lain.", icon: Copy, tone: "border-slate-200 bg-slate-50 text-slate-700" },
+  REOPENED: { label: "Dibuka Lagi", hint: "Tiket perlu ditangani ulang.", icon: RotateCcw, tone: "border-rose-200 bg-rose-50 text-rose-900" },
+}
+
 export default function ItOslTicketsPage() {
   return (
     <ItOslAccessGuard>
@@ -174,6 +211,8 @@ function ItOslTicketsContent() {
   // Detail Drawer & Work-Items
   const [detailId, setDetailId] = useState<string | null>(null)
   const [detail, setDetail] = useState<TicketDetail | null>(null)
+  const detailStatusMeta = detail ? (STATUS_META[detail.status] || STATUS_META.NEW) : STATUS_META.NEW
+  const detailStepIndex = detail ? statusStepIndex(detail.status) : 0
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [activePhase, setActivePhase] = useState<"ANALISA"|"PENGERJAAN"|"HASIL">("ANALISA")
   const [newDesc, setNewDesc] = useState("")
@@ -515,11 +554,6 @@ function ItOslTicketsContent() {
       body.expectedResumeAt = exp.replace(" ", "T")
     }
     if (to === "RESOLVED") {
-      const rc = prompt("Akar Masalah (min 15 karakter)")
-      const ca = prompt("Tindakan Perbaikan (min 15 karakter)")
-      if (!rc || !ca) return
-      body.rootCause = rc
-      body.correctiveAction = ca
       body.solutionCategory = "Perbaikan"
       body.assetCondition = "NORMAL"
     }
@@ -531,6 +565,16 @@ function ItOslTicketsContent() {
     const d = await res.json()
     if (!res.ok) alert(d.message)
     else { load(); if(detailId===id) loadDetail(id) }
+  }
+
+  const deleteTicket = async (id: string) => {
+    if (!isAdmin) return alert("Hanya Admin/SuperAdmin yang boleh menghapus tiket")
+    if (!confirm("Hapus tiket ini secara permanen? Data pekerjaan & foto ikut terhapus dan tidak bisa dikembalikan.")) return
+    const res = await fetch(`${API}/api/it-osl/tickets/${id}`, { method: "DELETE", headers: getAuthHeaders() })
+    const d = await res.json().catch(() => ({}))
+    if (!res.ok) return alert(d.message || "Gagal menghapus tiket")
+    if (detailId === id) { setDetailId(null); setDetail(null) }
+    load()
   }
 
   const connectAsset = async (ticketId:string, assetId:string) => {
@@ -935,11 +979,11 @@ function ItOslTicketsContent() {
             className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700"
           >
             <option value="">Semua Status</option>
-            <option value="NEW">Baru (NEW)</option>
-            <option value="IN_PROGRESS">Sedang Dikerjakan</option>
-            <option value="PENDING">Tertahan (PENDING)</option>
-            <option value="RESOLVED">Selesai (RESOLVED)</option>
-            <option value="CLOSED">Ditutup (CLOSED)</option>
+            <option value="NEW">Baru</option>
+            <option value="IN_PROGRESS">Dikerjakan</option>
+            <option value="PENDING">Ditunda</option>
+            <option value="RESOLVED">Selesai (menunggu verifikasi)</option>
+            <option value="CLOSED">Ditutup (final)</option>
           </select>
 
           {/* Severity Filter */}
@@ -1178,7 +1222,7 @@ function ItOslTicketsContent() {
                         t.status === "RESOLVED" ? "bg-indigo-100 text-indigo-700 font-black" : 
                         "bg-emerald-100 text-emerald-700"
                       }`}>
-                        {t.status}
+                        {STATUS_LABEL[t.status] || t.status}
                       </span>
                     </div>
                   </div>
@@ -1244,36 +1288,21 @@ function ItOslTicketsContent() {
                     </span>
 
                     <div className="flex items-center gap-1.5">
-                      {t.status==="NEW" && (
-                        <button
-                          onClick={()=>changeStatus(t.id,"IN_PROGRESS")}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[10px] active:scale-95 transition"
-                        >
-                          Kerjakan
-                        </button>
-                      )}
-                      {t.status==="IN_PROGRESS" && (
-                        <button
-                          onClick={()=>changeStatus(t.id,"RESOLVED")}
-                          className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[10px] active:scale-95 transition"
-                        >
-                          Selesai
-                        </button>
-                      )}
-                      {t.status==="PENDING" && (
-                        <button
-                          onClick={()=>changeStatus(t.id,"IN_PROGRESS")}
-                          className="px-2.5 py-1 rounded-lg bg-sky-600 text-white font-bold text-[10px] active:scale-95 transition"
-                        >
-                          Lanjut
-                        </button>
-                      )}
                       <button
                         onClick={()=> { setDetail(null); setDetailId(t.id); }}
                         className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold text-[10px] active:scale-95 transition"
                       >
                         Detail
                       </button>
+                      {isAdmin && (
+                        <button
+                          onClick={()=>deleteTicket(t.id)}
+                          className="p-1 rounded-lg border border-rose-200 bg-white text-rose-500 active:scale-95 transition"
+                          title="Hapus tiket (Admin)"
+                        >
+                          <Trash2 size={12}/>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1469,43 +1498,27 @@ function ItOslTicketsContent() {
                                 "bg-emerald-100 text-emerald-700"
                               }`}>
                                 {t.status === "IN_PROGRESS" && <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />}
-                                {t.status}
+                                {STATUS_LABEL[t.status] || t.status}
                               </span>
                             </td>
 
                             <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-1.5">
-                                {t.status === "NEW" && (
-                                  <button
-                                    onClick={() => changeStatus(t.id, "IN_PROGRESS")}
-                                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-sm active:scale-95 transition"
-                                  >
-                                    Kerjakan
-                                  </button>
-                                )}
-                                {t.status === "IN_PROGRESS" && (
-                                  <button
-                                    onClick={() => changeStatus(t.id, "RESOLVED")}
-                                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] shadow-sm active:scale-95 transition"
-                                  >
-                                    Selesai
-                                  </button>
-                                )}
-                                {t.status === "PENDING" && (
-                                  <button
-                                    onClick={() => changeStatus(t.id, "IN_PROGRESS")}
-                                    className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-[10px] shadow-sm active:scale-95 transition"
-                                  >
-                                    Lanjut
-                                  </button>
-                                )}
-
                                 <button
                                   onClick={() => { setDetail(null); setDetailId(t.id); }}
                                   className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-[10px] shadow-sm active:scale-95 transition"
                                 >
                                   Detail
                                 </button>
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => deleteTicket(t.id)}
+                                    className="p-1.5 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-500 shadow-sm active:scale-95 transition"
+                                    title="Hapus tiket (Admin)"
+                                  >
+                                    <Trash2 size={12}/>
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1582,7 +1595,7 @@ function ItOslTicketsContent() {
                           t.status==="RESOLVED" ? "bg-indigo-100 text-indigo-700 font-black" : 
                           "bg-emerald-100 text-emerald-700"
                         }`}>
-                          {t.status}
+                          {STATUS_LABEL[t.status] || t.status}
                         </span>
                         <span className="text-slate-400 flex items-center gap-1 font-medium text-[10px]">
                           <Clock3 size={11} className="text-slate-400"/>
@@ -1594,10 +1607,19 @@ function ItOslTicketsContent() {
                     <div className="mt-3.5 pt-2.5 border-t border-slate-100 w-full flex items-center gap-2">
                       <button 
                         onClick={()=> { setDetail(null); setDetailId(t.id); }} 
-                        className="w-full py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition"
+                        className="flex-1 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition"
                       >
                         Detail Tiket
                       </button>
+                      {isAdmin && (
+                        <button
+                          onClick={()=>deleteTicket(t.id)}
+                          className="p-2 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-500 transition"
+                          title="Hapus tiket (Admin)"
+                        >
+                          <Trash2 size={14}/>
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -1948,7 +1970,7 @@ function ItOslTicketsContent() {
                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
                       detail.status==="NEW"?"bg-slate-200 text-slate-800":detail.status==="IN_PROGRESS"?"bg-sky-100 text-sky-700 font-black":detail.status==="PENDING"?"bg-amber-100 text-amber-700 font-black":detail.status==="RESOLVED"?"bg-indigo-100 text-indigo-700 font-black":"bg-emerald-100 text-emerald-700 font-black"
                     }`}>
-                      {detail.status}
+                      {STATUS_LABEL[detail.status] || detail.status}
                     </span>
                     {detail.slaStatus==="BREACH" && (
                       <span className="text-[9px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full">
@@ -1956,6 +1978,16 @@ function ItOslTicketsContent() {
                       </span>
                     )}
                   </div>
+
+                  {isAdmin && (
+                    <button 
+                      onClick={()=>deleteTicket(detail.id)} 
+                      className="p-1.5 sm:p-2 rounded-xl hover:bg-rose-50 active:scale-95 shrink-0 text-rose-500 hover:text-rose-700 transition"
+                      title="Hapus Tiket (Admin)"
+                    >
+                      <Trash2 size={18}/>
+                    </button>
+                  )}
 
                   <button 
                     onClick={()=>{setDetailId(null); setDetail(null)}} 
@@ -1984,74 +2016,111 @@ function ItOslTicketsContent() {
                     </div>
 
                     {/* Summary Metas Grid */}
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                        <p className="text-slate-400 font-bold uppercase text-[9px]">Dibuat</p>
-                        <p className="font-bold text-slate-800 truncate text-[11px] sm:text-xs mt-0.5">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
+                        <p className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-slate-400"><Clock3 size={10}/> Dibuat</p>
+                        <p className="mt-1 truncate text-[11px] font-bold text-slate-800 sm:text-xs">
                           {new Date(detail.createdAt).toLocaleDateString('id-ID', { day:'numeric', month:'short' })} • {new Date(detail.createdAt).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })}
                         </p>
                       </div>
-                      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                        <p className="text-slate-400 font-bold uppercase text-[9px]">Respon (FRT)</p>
-                        <p className="font-bold text-slate-800 truncate text-[11px] sm:text-xs mt-0.5">
-                          {detail.acknowledgedAt ? `${detail.frtMinutes}m` : <span className="text-slate-400 font-normal">Belum</span>}
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
+                        <p className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-slate-400"><Timer size={10}/> Respon FRT</p>
+                        <p className="mt-1 truncate text-[11px] font-bold text-slate-800 sm:text-xs">
+                          {detail.acknowledgedAt ? `${detail.frtMinutes}m` : <span className="font-normal text-slate-400">Belum</span>}
                         </p>
                       </div>
-                      <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100">
-                        <p className="text-slate-400 font-bold uppercase text-[9px]">Pelapor</p>
-                        <p className="font-bold text-slate-800 truncate text-[11px] sm:text-xs mt-0.5">
-                          {detail.reporterName || "-"}
-                        </p>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-2.5">
+                        <p className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-slate-400"><User size={10}/> Pelapor</p>
+                        <p className="mt-1 truncate text-[11px] font-bold text-slate-800 sm:text-xs">{detail.reporterName || "-"}</p>
                       </div>
                     </div>
 
-                    {/* Quick Status Action Buttons */}
-                    <div className="flex gap-2 pt-1 flex-wrap">
+                    {/* Status Hero & Flow */}
+                    <div className={`rounded-2xl border p-3.5 sm:p-4 ${detailStatusMeta.tone}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 items-start gap-2.5">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/60 bg-white/80 shadow-sm">
+                            <detailStatusMeta.icon size={17}/>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-black uppercase tracking-widest opacity-60">Status Tiket</p>
+                            <p className="text-sm font-black leading-tight">{detailStatusMeta.label}</p>
+                            <p className="mt-0.5 text-[11px] leading-relaxed opacity-80">{detailStatusMeta.hint}</p>
+                          </div>
+                        </div>
+                        {detail.slaStatus==="BREACH" && (
+                          <span className="shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[9px] font-black text-white">SLA BREACH</span>
+                        )}
+                      </div>
+
+                      <div className="mt-3.5 flex items-center gap-1">
+                        {STATUS_STEPS.map((s, i) => {
+                          const done = i < detailStepIndex
+                          const current = i === detailStepIndex
+                          return (
+                            <div key={s.id} className="flex flex-1 items-center gap-1 last:flex-none">
+                              <div className="flex shrink-0 flex-col items-center gap-1">
+                                <div className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-[9px] font-black transition ${
+                                  done ? "border-emerald-500 bg-emerald-500 text-white" :
+                                  current ? "border-indigo-500 bg-white text-indigo-600" :
+                                  "border-slate-200 bg-white text-slate-300"
+                                }`}>
+                                  {done ? <Check size={12}/> : i + 1}
+                                </div>
+                                <span className={`whitespace-nowrap text-[8px] font-bold ${done || current ? "text-slate-700" : "text-slate-400"}`}>{s.label}</span>
+                              </div>
+                              {i < STATUS_STEPS.length - 1 && (
+                                <div className={`mb-4 h-0.5 flex-1 rounded-full ${done ? "bg-emerald-500" : "bg-slate-200"}`} />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Status Actions */}
+                    <div className="space-y-2">
                       {detail.status==="NEW" && (
-                        <button 
-                          onClick={()=>changeStatus(detail.id,"IN_PROGRESS")} 
-                          className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
-                        >
-                          Mulai Kerjakan Tiket
-                        </button>
+                        <div className="flex items-start gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-3 text-[11px] font-semibold leading-relaxed text-indigo-800">
+                          <Sparkles size={15} className="mt-0.5 shrink-0 text-indigo-600"/>
+                          <span>Status otomatis menjadi <b>Dikerjakan</b> saat catatan pekerjaan pertama disimpan.</span>
+                        </div>
                       )}
                       {detail.status==="IN_PROGRESS" && (
-                        <>
-                          <button 
-                            onClick={()=>changeStatus(detail.id,"PENDING")} 
-                            className="flex-1 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
-                          >
-                            Tunda (Pending)
-                          </button>
-                          <button 
-                            onClick={()=>changeStatus(detail.id,"RESOLVED")} 
-                            className="flex-1 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
-                          >
-                            Selesaikan Tiket
-                          </button>
-                        </>
+                        <button
+                          onClick={()=>changeStatus(detail.id,"PENDING")}
+                          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-xs font-bold text-amber-800 transition hover:bg-amber-100 active:scale-[0.99]"
+                        >
+                          <PauseCircle size={15}/> Tunda Sementara
+                        </button>
                       )}
                       {detail.status==="PENDING" && (
-                        <button 
-                          onClick={()=>changeStatus(detail.id,"IN_PROGRESS")} 
-                          className="flex-1 py-2.5 px-4 rounded-xl bg-sky-600 hover:bg-sky-700 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
+                        <button
+                          onClick={()=>changeStatus(detail.id,"IN_PROGRESS")}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-xs font-black text-white shadow-md shadow-sky-600/20 transition hover:bg-sky-700 active:scale-[0.99]"
                         >
-                          Lanjutkan Pengerjaan
+                          <PlayCircle size={16}/> Lanjutkan Pengerjaan
                         </button>
                       )}
                       {detail.status==="RESOLVED" && canClose && (
-                        <button 
-                          onClick={()=>changeStatus(detail.id,"CLOSED")} 
-                          className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-98 text-white text-xs font-bold transition shadow-sm text-center"
+                        <button
+                          onClick={()=>changeStatus(detail.id,"CLOSED")}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-xs font-black text-white shadow-md shadow-slate-900/20 transition hover:bg-slate-800 active:scale-[0.99]"
                         >
-                          Tutup Tiket (Closed)
+                          <Lock size={15}/> Tutup Tiket (Final)
                         </button>
                       )}
                       {detail.status==="RESOLVED" && !canClose && (
-                        <p className="w-full text-center text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-xl py-2.5">
-                          Menunggu verifikasi Lead/Admin untuk menutup tiket.
-                        </p>
+                        <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-semibold text-slate-500">
+                          <ShieldCheck size={15}/> Menunggu verifikasi Lead/Admin
+                        </div>
                       )}
+                      <p className="text-center text-[10px] leading-relaxed text-slate-500">
+                        {detail.status === "NEW" && "Tiket berubah ke Dikerjakan otomatis setelah catatan disimpan."}
+                        {detail.status === "IN_PROGRESS" && "Tiket otomatis Selesai saat catatan fase Hasil disimpan."}
+                        {detail.status === "PENDING" && "Lanjutkan setelah hambatan atau sparepart tersedia."}
+                        {detail.status === "RESOLVED" && (canClose ? "Tutup tiket setelah verifikasi final." : "Menunggu verifikasi Lead/Admin.")}
+                      </p>
                     </div>
 
                     {/* Connected Entities: 3 Responsive Cards */}
@@ -2149,28 +2218,34 @@ function ItOslTicketsContent() {
                   </div>
 
                   {/* 3. Sticky 3-Phase Tabs Bar */}
-                  <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200 flex gap-1.5 p-2.5 shadow-xs">
-                    {PHASES.map(p=>{
+                  <div className="border-t border-slate-200 bg-white px-4 pt-4 sm:px-5">
+                    <h3 className="text-sm font-black text-slate-900">Catatan Pekerjaan</h3>
+                    <p className="mt-0.5 text-[11px] text-slate-500">Isi berurutan: Analisa → Pengerjaan → Hasil.</p>
+                  </div>
+                  <div className="sticky top-0 z-20 flex gap-1.5 border-b border-slate-200 bg-white/95 p-2.5 shadow-xs backdrop-blur-md">
+                    {PHASES.map((p, idx) => {
                       const cnt = phaseCounts[p.id]
                       const isActive = activePhase===p.id
                       return (
                         <button 
                           key={p.id} 
                           onClick={()=>setActivePhase(p.id as typeof activePhase)} 
-                          className={`flex-1 py-2 px-1.5 rounded-xl text-xs font-black flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${
+                          className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 text-xs font-black transition-all active:scale-95 ${
                             isActive ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                           }`}
                         >
                           <span className="flex items-center gap-1 text-[11px] sm:text-xs">
-                            <p.icon size={13} className="shrink-0"/> 
+                            <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-black ${isActive ? "bg-white/20 text-white" : "bg-white text-slate-500"}`}>
+                              {idx + 1}
+                            </span>
                             <span>{p.label}</span>
                             {cnt > 0 && (
-                              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isActive ? "bg-white text-indigo-600" : "bg-slate-900 text-white"}`}>
+                              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold ${isActive ? "bg-white text-indigo-600" : "bg-slate-900 text-white"}`}>
                                 {cnt}
                               </span>
                             )}
                           </span>
-                          <span className="text-[9px] font-normal opacity-80 hidden sm:block">{p.desc}</span>
+                          <span className="hidden text-[9px] font-normal opacity-80 sm:block">{p.desc}</span>
                         </button>
                       )
                     })}
@@ -2179,10 +2254,13 @@ function ItOslTicketsContent() {
                   {/* 4. Phase Content & Work Items Feed (Spacious bottom layout) */}
                   <div className="p-4 sm:p-5 space-y-4 pb-36 sm:pb-24">
                     {/* Guidance Tip */}
-                    <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3 text-xs text-amber-900 leading-relaxed">
-                      {activePhase==="ANALISA" && "💡 Analisa: Diagnosis gejala, log error, pengukuran voltase/sinyal, dan foto kondisi awal perangkat."}
-                      {activePhase==="PENGERJAAN" && "💡 Pengerjaan: Langkah eksekusi perbaikan — bongkar, crimping, replace part, dan foto langkah kerja."}
-                      {activePhase==="HASIL" && "💡 Hasil: Uji verifikasi fungsional, serah terima unit, dan foto hasil akhir yang telah normal."}
+                    <div className="flex items-start gap-2 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-3 text-[11px] leading-relaxed text-indigo-900">
+                      <Sparkles size={14} className="mt-0.5 shrink-0 text-indigo-600"/>
+                      <p>
+                        {activePhase==="ANALISA" && <><b>Analisa:</b> Catat diagnosis, gejala gangguan, hasil pengukuran, dan foto kondisi awal perangkat.</>}
+                        {activePhase==="PENGERJAAN" && <><b>Pengerjaan:</b> Uraikan tindakan perbaikan - pembongkaran, crimping, penggantian part, dan foto proses kerja.</>}
+                        {activePhase==="HASIL" && <><b>Hasil:</b> Catat pengujian verifikasi, serah terima unit, dan foto kondisi akhir yang sudah normal.</>}
+                      </p>
                     </div>
 
                     {/* Existing Work Items Feed */}
@@ -2204,11 +2282,11 @@ function ItOslTicketsContent() {
                               </p>
                             </div>
                             {isAdmin ? (
-                              <button onClick={()=>delWorkItem(w.id)} className="p-1.5 rounded-lg hover:bg-rose-50 text-rose-500 shrink-0" title="Hapus (Admin)">
-                                <Trash2 size={14}/>
+                              <button onClick={()=>delWorkItem(w.id)} className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-bold text-rose-600 transition hover:bg-rose-50" title="Hapus item pekerjaan">
+                                <Trash2 size={13}/> <span className="hidden sm:inline">Hapus</span>
                               </button>
                             ) : (
-                              <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 font-bold">Terkunci</span>
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold text-slate-400">Terkunci</span>
                             )}
                           </div>
 
@@ -2289,6 +2367,11 @@ function ItOslTicketsContent() {
                         {adding ? <Loader2 className="animate-spin" size={15}/> : <Plus size={15}/>} 
                         Simpan Catatan {activePhase}
                       </button>
+                      <p className="text-center text-[10px] leading-relaxed text-slate-400">
+                        {activePhase === "HASIL"
+                          ? "Menyimpan catatan Hasil akan otomatis menyelesaikan tiket."
+                          : "Status tiket diperbarui otomatis dari catatan pekerjaan."}
+                      </p>
                     </div>
 
                     {/* Resolution Summary (If resolved/closed) */}

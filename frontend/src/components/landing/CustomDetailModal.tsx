@@ -150,7 +150,7 @@ export function CustomDetailModal({ isOpen, onClose }: CustomDetailModalProps) {
                                             <Server className="absolute -right-3 -bottom-3 opacity-10 w-24 h-24" />
                                             <h4 className="font-bold text-xs uppercase tracking-[0.15em] text-background/60 mb-3">{t.whyChooseTitle}</h4>
                                             <p className="text-sm text-background/80 leading-relaxed relative z-10 font-medium italic">
-                                                "{t.whyChooseDesc}"
+                                                &quot;{t.whyChooseDesc}&quot;
                                             </p>
                                         </section>
                                     </div>

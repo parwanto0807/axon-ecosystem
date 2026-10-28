@@ -1,12 +1,12 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useMemo, Fragment } from "react"
+import React, { useState, useEffect, useCallback, useMemo } from "react"
 import {
-    FileText, Search, RefreshCw, Download, Users, Filter,
+    FileText, Search, RefreshCw, Download, Filter,
     Printer, Eye, CheckCircle2, Clock, AlertTriangle,
-    TrendingUp, ChevronDown, ChevronUp, ArrowUpDown,
-    DollarSign, Layers, Receipt, Calendar, Building2,
-    X, Sparkles, CreditCard, ChevronRight
+    ChevronDown, ChevronUp, ArrowUpDown,
+    Layers, Receipt, Calendar, Building2,
+    X, CreditCard
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/context/LanguageContext"
@@ -14,8 +14,6 @@ import { useSession } from "next-auth/react"
 import SalesMonitoringPDFModal from "./SalesMonitoringPDFModal"
 import {
     generateSalesMonitoringPDF,
-    RecapRowPDF,
-    QuotationOnlyPDF,
     SummaryPDF
 } from "./SalesMonitoringPDF"
 
@@ -106,6 +104,8 @@ const fmtDate = (d: string) => {
         return "-"
     }
 }
+
+const inputClass = "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
 
 export default function SalesBillingRecapPage() {
     const { lang } = useLanguage()
@@ -320,786 +320,774 @@ export default function SalesBillingRecapPage() {
     const unbilledPercent = summary.poTotal > 0 ? Math.min(100, Math.round((summary.unbilledTotal / summary.poTotal) * 100)) : 0
 
     return (
-        <div className="w-full max-w-none px-4 sm:px-6 lg:px-8 py-6 space-y-6 bg-[#f8fafc] min-h-screen">
-            {/* Top Bar / Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-slate-200">
-                <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 flex items-center gap-1.5">
-                            <Sparkles size={11} /> Enterprise Sales Hub
-                        </span>
-                        {lastRefresh && (
-                            <span className="text-[11px] text-slate-400 font-medium">
-                                • Diperbarui {lastRefresh}
-                            </span>
-                        )}
-                    </div>
-                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-600/20">
-                            <FileText size={22} />
-                        </div>
-                        {ID ? "Monitoring & Rekap Penjualan" : "Sales Order & Billing Recap"}
-                    </h1>
-                    <p className="text-xs sm:text-sm text-slate-600 mt-1 max-w-3xl">
-                        {ID
-                            ? "Pelacakan terintegrasi real-time siklus pesanan penjualan (SO/PO), realisasi penagihan faktur, arus kas pembayaran, dan piutang tertunggak."
-                            : "Real-time unified tracking for sales orders (SO/PO), invoice billing realization, payment cash-in, and unpaid receivables."}
-                    </p>
-                </div>
-
-                {/* Action Buttons Toolbar */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { loadRecap(); loadCustomers() }}
-                        className="h-9 px-3 text-xs font-semibold gap-1.5 border-slate-200 bg-white text-slate-700 hover:bg-slate-100 shadow-sm"
-                    >
-                        <RefreshCw size={13} className={loading ? "animate-spin text-indigo-600" : ""} />
-                        Refresh
-                    </Button>
-
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={exportCSV}
-                        disabled={filteredRows.length === 0}
-                        className="h-9 px-3 text-xs font-semibold gap-1.5 border-slate-200 bg-white text-slate-700 hover:bg-slate-100 shadow-sm"
-                    >
-                        <Download size={13} /> CSV
-                    </Button>
-
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsPdfModalOpen(true)}
-                        disabled={filteredRows.length === 0}
-                        className="h-9 px-3 text-xs font-semibold gap-1.5 border-slate-200 bg-white text-indigo-600 hover:bg-indigo-50 shadow-sm"
-                    >
-                        <Eye size={13} /> Pratinjau PDF
-                    </Button>
-
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleDirectDownloadPDF}
-                        disabled={filteredRows.length === 0 || isDownloadingDirect}
-                        className="h-9 px-3 text-xs font-bold gap-1.5 border-indigo-200 bg-white text-indigo-600 hover:bg-indigo-50 shadow-sm"
-                    >
-                        {isDownloadingDirect ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />}
-                        Unduh PDF
-                    </Button>
-
-                    <Button
-                        size="sm"
-                        onClick={handleDirectPrintPDF}
-                        disabled={filteredRows.length === 0 || isPrintingDirect}
-                        className="h-9 px-4 text-xs font-black gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white shadow-md shadow-indigo-600/25"
-                    >
-                        {isPrintingDirect ? <RefreshCw size={13} className="animate-spin" /> : <Printer size={14} />}
-                        Cetak PDF (jsPDF)
-                    </Button>
-                </div>
-            </div>
-
-            {/* Executive KPI Metric Cards (Full Width 5 Cards Grid) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-                {/* 1. Nilai Total PO / SO */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 to-indigo-600" />
-                    <div className="flex items-center justify-between text-slate-500 mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                            {ID ? "Total Nilai PO / SO" : "Total PO / SO Value"}
-                        </span>
-                        <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                            <Layers size={14} />
-                        </div>
-                    </div>
-                    <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                        {loading ? "..." : fmt(summary.poTotal)}
-                    </div>
-                    <div className="mt-2 text-[11px] text-slate-500 flex items-center justify-between font-medium">
-                        <span>{summary.count} Dokumen Pesanan</span>
-                        <span className="text-blue-600 font-bold">100% Kontrak</span>
-                    </div>
-                </div>
-
-                {/* 2. Sudah Ditagih (Invoiced) */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-purple-600" />
-                    <div className="flex items-center justify-between text-slate-500 mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                            {ID ? "Sudah Ditagih (Invoiced)" : "Invoiced Value"}
-                        </span>
-                        <div className="w-7 h-7 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                            <Receipt size={14} />
-                        </div>
-                    </div>
-                    <div className="text-xl sm:text-2xl font-black text-indigo-700 tracking-tight">
-                        {loading ? "..." : fmt(summary.invoicedTotal)}
-                    </div>
-                    <div className="mt-2">
-                        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 mb-1">
-                            <span>Realisasi Penagihan</span>
-                            <span className="text-indigo-700 font-bold">{invoicedPercent}%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-indigo-600 h-full rounded-full transition-all duration-500" style={{ width: `${invoicedPercent}%` }} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* 3. Sudah Dibayar (Cash In) */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-600" />
-                    <div className="flex items-center justify-between text-slate-500 mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                            {ID ? "Kas Diterima (Paid)" : "Cash Received (Paid)"}
-                        </span>
-                        <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                            <CheckCircle2 size={14} />
-                        </div>
-                    </div>
-                    <div className="text-xl sm:text-2xl font-black text-emerald-700 tracking-tight">
-                        {loading ? "..." : fmt(summary.paidTotal)}
-                    </div>
-                    <div className="mt-2">
-                        <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 mb-1">
-                            <span>Efektivitas Kas (Collection)</span>
-                            <span className="text-emerald-700 font-bold">{collectionPercent}%</span>
-                        </div>
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                            <div className="bg-emerald-600 h-full rounded-full transition-all duration-500" style={{ width: `${collectionPercent}%` }} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* 4. PO Belum Ditagih */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
-                    <div className="flex items-center justify-between text-slate-500 mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                            {ID ? "PO Belum Ditagih" : "Unbilled PO"}
-                        </span>
-                        <div className="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                            <Clock size={14} />
-                        </div>
-                    </div>
-                    <div className="text-xl sm:text-2xl font-black text-amber-700 tracking-tight">
-                        {loading ? "..." : fmt(summary.unbilledTotal)}
-                    </div>
-                    <div className="mt-2 text-[11px] text-slate-500 flex items-center justify-between font-medium">
-                        <span>Pipeline Tagihan</span>
-                        <span className="text-amber-700 font-bold">{unbilledPercent}% sisa</span>
-                    </div>
-                </div>
-
-                {/* 5. Piutang Belum Dibayar (Unpaid) */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-500 to-red-600" />
-                    <div className="flex items-center justify-between text-slate-500 mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                            {ID ? "Piutang Belum Dibayar" : "Unpaid Receivables"}
-                        </span>
-                        <div className="w-7 h-7 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-                            <AlertTriangle size={14} />
-                        </div>
-                    </div>
-                    <div className="text-xl sm:text-2xl font-black text-rose-700 tracking-tight">
-                        {loading ? "..." : fmt(summary.unpaidTotal)}
-                    </div>
-                    <div className="mt-2 text-[11px] flex items-center justify-between font-medium">
-                        <span className="text-slate-500">Tertunggak di Invoice</span>
-                        <span className={summary.unpaidTotal > 0 ? "text-rose-600 font-bold flex items-center gap-1" : "text-emerald-700 font-bold"}>
-                            {summary.unpaidTotal > 0 ? "Perlu Follow-up" : "Lancar"}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Filter Section Card */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5">
-                    {/* Customer Picker */}
-                    <div className="md:col-span-5 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                                <Building2 size={13} className="text-indigo-600" />
-                                {ID ? "Pilih Customer / Pelanggan" : "Select Customer"}
-                            </label>
-                            {customerId !== "ALL" && (
-                                <button
-                                    onClick={() => { setCustomerId("ALL"); setCustomerSearch("") }}
-                                    className="text-[10px] font-bold text-rose-600 hover:underline flex items-center gap-0.5"
-                                >
-                                    <X size={10} /> Reset Customer
-                                </button>
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                {/* Header */}
+                <header className="mb-5 flex flex-col gap-4 border-b border-border pb-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <div className="mb-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <span>Enterprise Sales Hub</span>
+                            {lastRefresh && (
+                                <>
+                                    <span className="text-muted-foreground/50">·</span>
+                                    <span>Diperbarui {lastRefresh}</span>
+                                </>
                             )}
                         </div>
+                        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
+                            <FileText size={18} className="text-muted-foreground" />
+                            {ID ? "Monitoring & Rekap Penjualan" : "Sales Order & Billing Recap"}
+                        </h1>
+                        <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
+                            {ID
+                                ? "Pelacakan terintegrasi real-time siklus pesanan penjualan (SO/PO), realisasi penagihan faktur, arus kas pembayaran, dan piutang tertunggak."
+                                : "Real-time unified tracking for sales orders (SO/PO), invoice billing realization, payment cash-in, and unpaid receivables."}
+                        </p>
+                    </div>
 
-                        <div className="space-y-1.5">
-                            <div className="relative">
-                                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    value={customerSearch}
-                                    onChange={e => setCustomerSearch(e.target.value)}
-                                    placeholder={ID ? "Ketik untuk menyaring customer..." : "Filter customer list..."}
-                                    className="w-full text-xs border border-slate-200 rounded-xl pl-9 pr-8 py-2 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-900 placeholder:text-slate-400"
-                                />
-                                {customerSearch && (
+                    {/* Action Buttons Toolbar */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { loadRecap(); loadCustomers() }}
+                            className="h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            <RefreshCw size={14} className={`mr-1.5 ${loading ? "animate-spin" : ""}`} />
+                            Refresh
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={exportCSV}
+                            disabled={filteredRows.length === 0}
+                            className="h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            <Download size={14} className="mr-1.5" /> CSV
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsPdfModalOpen(true)}
+                            disabled={filteredRows.length === 0}
+                            className="h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            <Eye size={14} className="mr-1.5" /> Pratinjau PDF
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleDirectDownloadPDF}
+                            disabled={filteredRows.length === 0 || isDownloadingDirect}
+                            className="h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            {isDownloadingDirect ? <RefreshCw size={14} className="mr-1.5 animate-spin" /> : <Download size={14} className="mr-1.5" />}
+                            Unduh PDF
+                        </Button>
+
+                        <Button
+                            size="sm"
+                            onClick={handleDirectPrintPDF}
+                            disabled={filteredRows.length === 0 || isPrintingDirect}
+                            className="h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            {isPrintingDirect ? <RefreshCw size={14} className="mr-1.5 animate-spin" /> : <Printer size={14} className="mr-1.5" />}
+                            Cetak PDF (jsPDF)
+                        </Button>
+                    </div>
+                </header>
+
+                {/* KPI Metric Cards */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    {/* 1. Nilai Total PO / SO */}
+                    <div className="rounded-xl border border-border bg-card p-4">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">
+                                {ID ? "Total Nilai PO / SO" : "Total PO / SO Value"}
+                            </span>
+                            <Layers size={14} className="shrink-0 text-muted-foreground" />
+                        </div>
+                        <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">
+                            {loading ? "..." : fmt(summary.poTotal)}
+                        </p>
+                        <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                            <span>{summary.count} Dokumen Pesanan</span>
+                            <span>100% Kontrak</span>
+                        </div>
+                    </div>
+
+                    {/* 2. Sudah Ditagih (Invoiced) */}
+                    <div className="rounded-xl border border-border bg-card p-4">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">
+                                {ID ? "Sudah Ditagih (Invoiced)" : "Invoiced Value"}
+                            </span>
+                            <Receipt size={14} className="shrink-0 text-muted-foreground" />
+                        </div>
+                        <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">
+                            {loading ? "..." : fmt(summary.invoicedTotal)}
+                        </p>
+                        <div className="mt-2">
+                            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                <span>Realisasi Penagihan</span>
+                                <span className="font-medium text-foreground">{invoicedPercent}%</span>
+                            </div>
+                            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted">
+                                <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${invoicedPercent}%` }} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. Sudah Dibayar (Cash In) */}
+                    <div className="rounded-xl border border-border bg-card p-4">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">
+                                {ID ? "Kas Diterima (Paid)" : "Cash Received (Paid)"}
+                            </span>
+                            <CheckCircle2 size={14} className="shrink-0 text-muted-foreground" />
+                        </div>
+                        <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">
+                            {loading ? "..." : fmt(summary.paidTotal)}
+                        </p>
+                        <div className="mt-2">
+                            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                <span>Efektivitas Kas (Collection)</span>
+                                <span className="font-medium text-foreground">{collectionPercent}%</span>
+                            </div>
+                            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted">
+                                <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${collectionPercent}%` }} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. PO Belum Ditagih */}
+                    <div className="rounded-xl border border-border bg-card p-4">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">
+                                {ID ? "PO Belum Ditagih" : "Unbilled PO"}
+                            </span>
+                            <Clock size={14} className="shrink-0 text-muted-foreground" />
+                        </div>
+                        <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">
+                            {loading ? "..." : fmt(summary.unbilledTotal)}
+                        </p>
+                        <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                            <span>Pipeline Tagihan</span>
+                            <span>{unbilledPercent}% sisa</span>
+                        </div>
+                    </div>
+
+                    {/* 5. Piutang Belum Dibayar (Unpaid) */}
+                    <div className="rounded-xl border border-border bg-card p-4">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-muted-foreground">
+                                {ID ? "Piutang Belum Dibayar" : "Unpaid Receivables"}
+                            </span>
+                            <AlertTriangle size={14} className="shrink-0 text-muted-foreground" />
+                        </div>
+                        <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">
+                            {loading ? "..." : fmt(summary.unpaidTotal)}
+                        </p>
+                        <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                            <span>Tertunggak di Invoice</span>
+                            <span className="font-medium text-foreground">
+                                {summary.unpaidTotal > 0 ? "Perlu Follow-up" : "Lancar"}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Filter Section */}
+                <div className="mt-4 rounded-xl border border-border bg-card p-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
+                        {/* Customer Picker */}
+                        <div className="space-y-1.5 md:col-span-5">
+                            <div className="flex items-center justify-between">
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                    <Building2 size={13} />
+                                    {ID ? "Pilih Customer / Pelanggan" : "Select Customer"}
+                                </label>
+                                {customerId !== "ALL" && (
                                     <button
-                                        onClick={() => setCustomerSearch("")}
-                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                        onClick={() => { setCustomerId("ALL"); setCustomerSearch("") }}
+                                        className="flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
                                     >
-                                        <X size={13} />
+                                        <X size={10} /> Reset Customer
                                     </button>
                                 )}
                             </div>
 
+                            <div className="space-y-1.5">
+                                <div className="relative">
+                                    <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                    <input
+                                        value={customerSearch}
+                                        onChange={e => setCustomerSearch(e.target.value)}
+                                        placeholder={ID ? "Ketik untuk menyaring customer..." : "Filter customer list..."}
+                                        className={`${inputClass} pl-9 pr-8`}
+                                    />
+                                    {customerSearch && (
+                                        <button
+                                            onClick={() => setCustomerSearch("")}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
+
+                                <select
+                                    value={customerId}
+                                    onChange={e => setCustomerId(e.target.value)}
+                                    className={`${inputClass} cursor-pointer`}
+                                >
+                                    <option value="ALL">{ID ? "— Semua Customer (Tampilkan Seluruh Data) —" : "— All Customers —"}</option>
+                                    {customerOptions.map(c => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.code} — {c.company || c.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Status Dropdown */}
+                        <div className="space-y-1.5 md:col-span-3">
+                            <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                <Filter size={13} />
+                                {ID ? "Filter Status Tagihan" : "Billing Status"}
+                            </label>
                             <select
-                                value={customerId}
-                                onChange={e => setCustomerId(e.target.value)}
-                                className="w-full text-xs font-semibold border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                value={status}
+                                onChange={e => setStatus(e.target.value)}
+                                className={`${inputClass} cursor-pointer`}
                             >
-                                <option value="ALL">{ID ? "— Semua Customer (Tampilkan Seluruh Data) —" : "— All Customers —"}</option>
-                                {customerOptions.map(c => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.code} — {c.company || c.name}
+                                <option value="ALL">{ID ? "Semua Status Pembayaran" : "All Status"}</option>
+                                {Object.entries(STATUS_META).map(([k, v]) => (
+                                    <option key={k} value={k}>
+                                        {ID ? v.ID : v.EN} ({statusCounts[k] || 0})
                                     </option>
                                 ))}
                             </select>
-                        </div>
-                    </div>
-
-                    {/* Status Dropdown */}
-                    <div className="md:col-span-3 space-y-1.5">
-                        <label className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                            <Filter size={13} className="text-indigo-600" />
-                            {ID ? "Filter Status Tagihan" : "Billing Status"}
-                        </label>
-                        <select
-                            value={status}
-                            onChange={e => setStatus(e.target.value)}
-                            className="w-full text-xs font-semibold border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                        >
-                            <option value="ALL">{ID ? "Semua Status Pembayaran" : "All Status"}</option>
-                            {Object.entries(STATUS_META).map(([k, v]) => (
-                                <option key={k} value={k}>
-                                    {ID ? v.ID : v.EN} ({statusCounts[k] || 0})
-                                </option>
-                            ))}
-                        </select>
-                        {selectedCustomer && (
-                            <p className="text-[11px] font-semibold text-emerald-700 truncate">
-                                Terpilih: {selectedCustomer.name}
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Global Search Doc Number */}
-                    <div className="md:col-span-4 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                                <Search size={13} className="text-indigo-600" />
-                                {ID ? "Pencarian No. Dokumen / Kata Kunci" : "Search Doc Number"}
-                            </label>
-                            {search && (
-                                <button
-                                    onClick={() => setSearch("")}
-                                    className="text-[10px] font-bold text-slate-400 hover:text-slate-600 flex items-center gap-0.5"
-                                >
-                                    <X size={10} /> Hapus
-                                </button>
-                            )}
-                        </div>
-                        <div className="relative">
-                            <input
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                                placeholder="Cari No. SO, No. PO, Invoice, Perihal..."
-                                className="w-full text-xs border border-slate-200 rounded-xl pl-3.5 pr-8 py-2.5 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                            />
-                            {search && (
-                                <button
-                                    onClick={() => setSearch("")}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                                >
-                                    <X size={14} />
-                                </button>
+                            {selectedCustomer && (
+                                <p className="truncate text-[11px] text-muted-foreground">
+                                    Terpilih: <span className="font-medium text-foreground">{selectedCustomer.name}</span>
+                                </p>
                             )}
                         </div>
 
-                        {/* Sort Selector */}
-                        <div className="flex items-center gap-2 pt-1">
-                            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
-                                <ArrowUpDown size={11} /> Urutkan:
-                            </span>
-                            <select
-                                value={sortBy}
-                                onChange={(e: any) => setSortBy(e.target.value)}
-                                className="text-[11px] font-medium border-0 bg-transparent text-slate-700 focus:outline-none cursor-pointer"
-                            >
-                                <option value="DATE_DESC">Tanggal SO Terbaru</option>
-                                <option value="DATE_ASC">Tanggal SO Terlama</option>
-                                <option value="PO_DESC">Nilai PO Tertinggi</option>
-                                <option value="UNPAID_DESC">Piutang Tertinggi</option>
-                                <option value="UNBILLED_DESC">Belum Ditagih Tertinggi</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+                        {/* Global Search Doc Number */}
+                        <div className="space-y-1.5 md:col-span-4">
+                            <div className="flex items-center justify-between">
+                                <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                    <Search size={13} />
+                                    {ID ? "Pencarian No. Dokumen / Kata Kunci" : "Search Doc Number"}
+                                </label>
+                                {search && (
+                                    <button
+                                        onClick={() => setSearch("")}
+                                        className="flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                                    >
+                                        <X size={10} /> Hapus
+                                    </button>
+                                )}
+                            </div>
+                            <div className="relative">
+                                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                    placeholder="Cari No. SO, No. PO, Invoice, Perihal..."
+                                    className={`${inputClass} pl-9 pr-8`}
+                                />
+                                {search && (
+                                    <button
+                                        onClick={() => setSearch("")}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
 
-                {/* Quick Status Pill Filters */}
-                <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 mr-1.5">
-                        Filter Cepat:
-                    </span>
-                    <button
-                        onClick={() => setStatus("ALL")}
-                        className={`text-xs px-3 py-1 rounded-full font-bold transition-all ${
-                            status === "ALL"
-                                ? "bg-slate-900 text-white shadow-sm"
-                                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        }`}
-                    >
-                        Semua ({rows.length})
-                    </button>
-                    {Object.entries(STATUS_META).map(([k, v]) => {
-                        const count = statusCounts[k] || 0
-                        const isSelected = status === k
-                        return (
-                            <button
-                                key={k}
-                                onClick={() => setStatus(k)}
-                                className={`text-xs px-3 py-1 rounded-full font-bold border transition-all flex items-center gap-1.5 ${
-                                    isSelected
-                                        ? `${v.color} shadow-sm ring-2 ring-indigo-500/20`
-                                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                                }`}
-                            >
-                                <span className={`w-1.5 h-1.5 rounded-full ${v.badge}`} />
-                                {ID ? v.ID : v.EN}
-                                <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700">
-                                    {count}
+                            {/* Sort Selector */}
+                            <div className="flex items-center gap-2 pt-0.5">
+                                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                    <ArrowUpDown size={11} /> Urutkan:
                                 </span>
-                            </button>
-                        )
-                    })}
-                </div>
-            </div>
-
-            {/* Main Data Table Card (Full Width) */}
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/70">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                            <Layers size={16} />
-                        </div>
-                        <div>
-                            <h2 className="text-sm sm:text-base font-black text-slate-900">
-                                {ID ? "Daftar Rincian Rekapitulasi SO & Penagihan" : "Detailed Sales Order & Billing Records"}
-                            </h2>
-                            <p className="text-xs text-slate-500">
-                                Menampilkan {filteredRows.length} dari total {rows.length} dokumen pesanan penjualan
-                            </p>
+                                <select
+                                    value={sortBy}
+                                    onChange={(e: any) => setSortBy(e.target.value)}
+                                    className="h-9 cursor-pointer rounded-lg border border-border bg-background px-2 text-xs text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+                                >
+                                    <option value="DATE_DESC">Tanggal SO Terbaru</option>
+                                    <option value="DATE_ASC">Tanggal SO Terlama</option>
+                                    <option value="PO_DESC">Nilai PO Tertinggi</option>
+                                    <option value="UNPAID_DESC">Piutang Tertinggi</option>
+                                    <option value="UNBILLED_DESC">Belum Ditagih Tertinggi</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        {filteredRows.length > 0 && (
-                            <span className="text-xs font-bold text-slate-600 bg-white border border-slate-200 px-3 py-1 rounded-xl shadow-xs">
-                                Total PO: <strong className="text-slate-900">{fmt(filteredRows.reduce((s, r) => s + r.poTotal, 0))}</strong>
-                            </span>
-                        )}
+                    {/* Quick Status Pill Filters */}
+                    <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
+                        <span className="mr-1 text-[11px] text-muted-foreground">
+                            Filter Cepat:
+                        </span>
+                        <button
+                            onClick={() => setStatus("ALL")}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                                status === "ALL"
+                                    ? "border-primary bg-primary/10 text-foreground"
+                                    : "border-border bg-card text-muted-foreground hover:bg-muted"
+                            }`}
+                        >
+                            Semua ({rows.length})
+                        </button>
+                        {Object.entries(STATUS_META).map(([k, v]) => {
+                            const count = statusCounts[k] || 0
+                            const isSelected = status === k
+                            return (
+                                <button
+                                    key={k}
+                                    onClick={() => setStatus(k)}
+                                    className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                                        isSelected
+                                            ? "border-primary bg-primary/10 text-foreground"
+                                            : "border-border bg-card text-muted-foreground hover:bg-muted"
+                                    }`}
+                                >
+                                    <span className={`h-1.5 w-1.5 rounded-full ${v.badge}`} />
+                                    {ID ? v.ID : v.EN}
+                                    <span className="text-muted-foreground">
+                                        {count}
+                                    </span>
+                                </button>
+                            )
+                        })}
                     </div>
                 </div>
 
-                {/* Table Container */}
-                <div className="overflow-x-auto">
-                    <table className="w-full text-xs border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50 text-slate-700 text-left border-b border-slate-200 font-black uppercase text-[10px] tracking-wider">
-                                <th className="px-2.5 py-3 w-8 text-center">No</th>
-                                <th className="px-3 py-3 min-w-[160px]">Customer</th>
-                                <th className="px-3 py-3 min-w-[210px]">Penawaran & Perihal</th>
-                                <th className="px-3 py-3 min-w-[140px]">SO & Ref PO</th>
-                                <th className="px-3 py-3 min-w-[100px] text-right">Nilai PO</th>
-                                <th className="px-3 py-3 min-w-[150px]">No. Invoice Terkait</th>
-                                <th className="px-3 py-3 min-w-[95px] text-right">Ditagih</th>
-                                <th className="px-3 py-3 min-w-[105px] text-right">Sudah Dibayar</th>
-                                <th className="px-3 py-3 min-w-[95px] text-right">Belum Tagih</th>
-                                <th className="px-3 py-3 min-w-[95px] text-right">Sisa Piutang</th>
-                                <th className="px-3 py-3 min-w-[120px] text-center">Status</th>
-                                <th className="px-2 py-3 w-10 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={12} className="px-4 py-16 text-center text-slate-500">
-                                        <div className="flex flex-col items-center justify-center gap-2">
-                                            <RefreshCw size={24} className="animate-spin text-indigo-600" />
-                                            <p className="text-xs font-semibold">Memuat rekapitulasi data penjualan...</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : filteredRows.length === 0 ? (
-                                <tr>
-                                    <td colSpan={12} className="px-4 py-16 text-center text-slate-500">
-                                        <div className="flex flex-col items-center justify-center gap-2">
-                                            <FileText size={32} className="text-slate-300" />
-                                            <p className="text-sm font-bold text-slate-700">
-                                                {customerId === "ALL"
-                                                    ? "Tidak ada data yang cocok dengan kriteria pencarian / filter."
-                                                    : "Tidak ditemukan transaksi PO/SO untuk customer ini."}
-                                            </p>
-                                            <p className="text-xs text-slate-400">
-                                                Silakan sesuaikan filter status atau reset pencarian customer.
-                                            </p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredRows.map((r, idx) => {
-                                    const meta = STATUS_META[r.billingStatus]
-                                    const isExpanded = expandedRowId === r.id
-                                    const payPercent = r.invoicedTotal > 0 ? Math.min(100, Math.round((r.paidTotal / r.invoicedTotal) * 100)) : 0
-
-                                    return (
-                                        <React.Fragment key={r.id}>
-                                            <tr className={`hover:bg-slate-50/80 transition-colors align-top ${isExpanded ? "bg-indigo-50/40" : ""}`}>
-                                                {/* No */}
-                                                <td className="px-3.5 py-3.5 text-center text-slate-400 font-bold">
-                                                    {idx + 1}
-                                                </td>
-
-                                                {/* Customer */}
-                                                <td className="px-3.5 py-3.5">
-                                                    <div className="flex items-start gap-2.5">
-                                                        <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-black text-[11px] flex items-center justify-center shrink-0 mt-0.5">
-                                                            {(r.customer?.name || "C").charAt(0).toUpperCase()}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-bold text-slate-900 leading-tight">
-                                                                {r.customer?.name || "-"}
-                                                            </p>
-                                                            {r.customer?.company && (
-                                                                <p className="text-[11px] text-slate-500 font-medium">
-                                                                    {r.customer.company}
-                                                                </p>
-                                                            )}
-                                                            <span className="inline-block text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded mt-1 border border-slate-200">
-                                                                {r.customer?.code || "-"}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </td>
-
-                                                {/* Penawaran & Perihal */}
-                                                <td className="px-3.5 py-3.5">
-                                                    {r.quotationNumber ? (
-                                                        <div className="space-y-1">
-                                                            <span className="inline-flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md text-[11px]">
-                                                                <FileText size={11} className="shrink-0 text-indigo-600" />
-                                                                {r.quotationNumber}
-                                                            </span>
-                                                            {r.quotationSubject && (
-                                                                <p className="text-[11px] text-slate-700 font-medium leading-snug break-words">
-                                                                    <span className="text-[10px] font-bold text-slate-400 mr-1 uppercase">Perihal:</span>
-                                                                    {r.quotationSubject}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    ) : r.quotationSubject || r.soSubject ? (
-                                                        <div className="space-y-1">
-                                                            <span className="text-[10px] text-slate-400 italic">Tanpa Ref Penawaran</span>
-                                                            <p className="text-[11px] text-slate-700 font-medium leading-snug break-words">
-                                                                <span className="text-[10px] font-bold text-slate-400 mr-1 uppercase">Perihal:</span>
-                                                                {r.quotationSubject || r.soSubject}
-                                                            </p>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-slate-400">-</span>
-                                                    )}
-                                                </td>
-
-                                                {/* SO & PO */}
-                                                <td className="px-3.5 py-3.5">
-                                                    <div className="space-y-0.5">
-                                                        <p className="font-black text-indigo-600 flex items-center gap-1">
-                                                            {r.soNumber}
-                                                        </p>
-                                                        {r.poNumber && (
-                                                            <p className="text-[11px] text-slate-700 font-medium">
-                                                                PO: <strong className="font-mono">{r.poNumber}</strong>
-                                                            </p>
-                                                        )}
-                                                        <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                                                            <Calendar size={10} />
-                                                            {fmtDate(r.soDate)}
-                                                        </p>
-                                                    </div>
-                                                </td>
-
-                                                {/* Nilai PO */}
-                                                <td className="px-3.5 py-3.5 text-right font-black text-slate-900">
-                                                    {fmt(r.poTotal)}
-                                                </td>
-
-                                                {/* Invoices List */}
-                                                <td className="px-3.5 py-3.5">
-                                                    {r.invoices.length === 0 ? (
-                                                        <span className="text-slate-400 italic text-[11px]">Belum ada invoice</span>
-                                                    ) : (
-                                                        <div className="space-y-1">
-                                                            {r.invoices.slice(0, 2).map(inv => (
-                                                                <div key={inv.id} className="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 flex items-center justify-between">
-                                                                    <span className="font-bold text-slate-800">
-                                                                        {inv.number}
-                                                                    </span>
-                                                                    <span className="text-slate-600 font-mono text-[10px]">
-                                                                        {fmt(inv.grandTotal)}
-                                                                    </span>
-                                                                </div>
-                                                            ))}
-                                                            {r.invoices.length > 2 && (
-                                                                <button
-                                                                    onClick={() => setExpandedRowId(isExpanded ? null : r.id)}
-                                                                    className="text-[10px] font-bold text-indigo-600 hover:underline"
-                                                                >
-                                                                    +{r.invoices.length - 2} invoice lainnya...
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </td>
-
-                                                {/* Ditagih */}
-                                                <td className="px-3.5 py-3.5 text-right font-semibold text-slate-800">
-                                                    {fmt(r.invoicedTotal)}
-                                                </td>
-
-                                                {/* Sudah Dibayar */}
-                                                <td className="px-3.5 py-3.5 text-right">
-                                                    <p className="font-black text-emerald-600">
-                                                        {fmt(r.paidTotal)}
-                                                    </p>
-                                                    {r.invoicedTotal > 0 && (
-                                                        <span className="text-[10px] font-bold text-emerald-700">
-                                                            ({payPercent}%)
-                                                        </span>
-                                                    )}
-                                                </td>
-
-                                                {/* Belum Ditagih */}
-                                                <td className="px-3.5 py-3.5 text-right">
-                                                    <span className={r.unbilledTotal > 0 ? "font-bold text-amber-700" : "text-slate-400 font-medium"}>
-                                                        {fmt(r.unbilledTotal)}
-                                                    </span>
-                                                </td>
-
-                                                {/* Sisa Piutang */}
-                                                <td className="px-3.5 py-3.5 text-right">
-                                                    <span className={r.unpaidTotal > 0 ? "font-black text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded" : "text-slate-400 font-medium"}>
-                                                        {fmt(r.unpaidTotal)}
-                                                    </span>
-                                                </td>
-
-                                                {/* Status */}
-                                                <td className="px-3.5 py-3.5 text-center">
-                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-black uppercase ${meta?.color || "bg-slate-100 text-slate-700 border-slate-200"}`}>
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${meta?.badge || "bg-slate-400"}`} />
-                                                        {ID ? meta?.ID : meta?.EN || r.billingStatus}
-                                                    </span>
-                                                </td>
-
-                                                {/* Aksi / Expand */}
-                                                <td className="px-3.5 py-3.5 text-center">
-                                                    <button
-                                                        onClick={() => setExpandedRowId(isExpanded ? null : r.id)}
-                                                        title="Lihat detail rincian"
-                                                        className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-colors"
-                                                    >
-                                                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                                    </button>
-                                                </td>
-                                            </tr>
-
-                                            {/* Expanded Row Detail Drawer */}
-                                            {isExpanded && (
-                                                <tr className="bg-slate-50 border-t border-b border-indigo-100">
-                                                    <td colSpan={12} className="p-4 sm:p-5">
-                                                        <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3 shadow-xs">
-                                                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                                                                <h4 className="text-xs font-black text-slate-900 flex items-center gap-2">
-                                                                    <Receipt size={14} className="text-indigo-600" />
-                                                                    Rincian Faktur & Pembayaran untuk SO: <span className="text-indigo-600 font-mono">{r.soNumber}</span>
-                                                                </h4>
-                                                                <span className="text-[11px] text-slate-500 font-medium">
-                                                                    Customer: {r.customer?.name} ({r.customer?.code})
-                                                                </span>
-                                                            </div>
-
-                                                            {r.invoices.length === 0 ? (
-                                                                <p className="text-xs text-slate-500 py-3 text-center">
-                                                                    Belum ada invoice yang diterbitkan untuk Sales Order ini. Seluruh nilai pesanan ({fmt(r.poTotal)}) masih berupa PO Belum Ditagih.
-                                                                </p>
-                                                            ) : (
-                                                                <div className="overflow-x-auto">
-                                                                    <table className="w-full text-xs">
-                                                                        <thead>
-                                                                            <tr className="text-slate-500 border-b border-slate-100 font-bold text-[10px] uppercase">
-                                                                                <th className="py-2 text-left">No. Invoice</th>
-                                                                                <th className="py-2 text-left">Tgl Invoice</th>
-                                                                                <th className="py-2 text-left">Jatuh Tempo</th>
-                                                                                <th className="py-2 text-right">Nilai Tagihan</th>
-                                                                                <th className="py-2 text-right">Dibayar</th>
-                                                                                <th className="py-2 text-right">Sisa Piutang</th>
-                                                                                <th className="py-2 text-center">Status</th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody className="divide-y divide-slate-100">
-                                                                            {r.invoices.map(inv => {
-                                                                                const remaining = Math.max(inv.grandTotal - inv.paid, 0)
-                                                                                return (
-                                                                                    <tr key={inv.id}>
-                                                                                        <td className="py-2 font-black text-indigo-600">{inv.number}</td>
-                                                                                        <td className="py-2 text-slate-700">{fmtDate(inv.date)}</td>
-                                                                                        <td className="py-2 text-slate-700">{inv.dueDate ? fmtDate(inv.dueDate) : "-"}</td>
-                                                                                        <td className="py-2 text-right font-bold text-slate-900">{fmt(inv.grandTotal)}</td>
-                                                                                        <td className="py-2 text-right text-emerald-600 font-bold">{fmt(inv.paid)}</td>
-                                                                                        <td className="py-2 text-right font-bold text-rose-600">{fmt(remaining)}</td>
-                                                                                        <td className="py-2 text-center">
-                                                                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                                                                                                {inv.status}
-                                                                                            </span>
-                                                                                        </td>
-                                                                                    </tr>
-                                                                                )
-                                                                            })}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
-                                    )
-                                })
-                            )}
-                        </tbody>
-
-                        {/* Grand Totals Sticky Footer */}
-                        {filteredRows.length > 0 && (
-                            <tfoot>
-                                <tr className="border-t-2 border-slate-200 bg-slate-50 font-black text-slate-900">
-                                    <td colSpan={4} className="px-3.5 py-3.5 text-right uppercase text-[11px] tracking-wider text-slate-600">
-                                        TOTAL KESELURUHAN ({filteredRows.length} SO)
-                                    </td>
-                                    <td className="px-3.5 py-3.5 text-right text-slate-900">
-                                        {fmt(filteredRows.reduce((s, r) => s + r.poTotal, 0))}
-                                    </td>
-                                    <td></td>
-                                    <td className="px-3.5 py-3.5 text-right text-indigo-700">
-                                        {fmt(filteredRows.reduce((s, r) => s + r.invoicedTotal, 0))}
-                                    </td>
-                                    <td className="px-3.5 py-3.5 text-right text-emerald-700">
-                                        {fmt(filteredRows.reduce((s, r) => s + r.paidTotal, 0))}
-                                    </td>
-                                    <td className="px-3.5 py-3.5 text-right text-amber-700">
-                                        {fmt(filteredRows.reduce((s, r) => s + r.unbilledTotal, 0))}
-                                    </td>
-                                    <td className="px-3.5 py-3.5 text-right text-rose-700">
-                                        {fmt(filteredRows.reduce((s, r) => s + r.unpaidTotal, 0))}
-                                    </td>
-                                    <td colSpan={2}></td>
-                                </tr>
-                            </tfoot>
-                        )}
-                    </table>
-                </div>
-            </div>
-
-            {/* Pipeline Penawaran Belum Jadi PO (Quotations Without SO) */}
-            {quoOnly.length > 0 && (
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div
-                        onClick={() => setShowQuoSection(!showQuoSection)}
-                        className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50 cursor-pointer select-none"
-                    >
+                {/* Main Data Table */}
+                <div className="mt-4 overflow-hidden rounded-xl border border-border bg-card">
+                    <div className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                                <CreditCard size={16} />
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                <Layers size={16} />
                             </div>
                             <div>
-                                <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                                    {ID ? "Penawaran Harga Belum Menjadi SO / PO" : "Quotations Without SO (Pipeline)"}
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                                        {quoOnly.length} Penawaran
-                                    </span>
-                                </h3>
-                                <p className="text-xs text-slate-500">
-                                    Estimasi potensi omzet: <strong className="text-amber-700">{fmt(quoOnly.reduce((s, q) => s + q.grandTotal, 0))}</strong>
+                                <h2 className="text-sm font-semibold text-foreground">
+                                    {ID ? "Daftar Rincian Rekapitulasi SO & Penagihan" : "Detailed Sales Order & Billing Records"}
+                                </h2>
+                                <p className="text-xs text-muted-foreground">
+                                    Menampilkan {filteredRows.length} dari total {rows.length} dokumen pesanan penjualan
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 text-slate-400">
-                            {showQuoSection ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                        </div>
+                        {filteredRows.length > 0 && (
+                            <span className="inline-flex items-center gap-1 self-start rounded-lg border border-border bg-muted/40 px-2.5 py-1 text-[11px] text-muted-foreground sm:self-auto">
+                                Total PO: <span className="font-medium text-foreground">{fmt(filteredRows.reduce((s, r) => s + r.poTotal, 0))}</span>
+                            </span>
+                        )}
                     </div>
 
-                    {showQuoSection && (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                                <thead>
-                                    <tr className="bg-slate-50 text-left font-black uppercase text-[10px] tracking-wider text-slate-600 border-b border-slate-200">
-                                        <th className="px-4 py-2.5 w-12 text-center">No</th>
-                                        <th className="px-4 py-2.5 min-w-[200px]">No. Penawaran & Perihal</th>
-                                        <th className="px-4 py-2.5">Customer</th>
-                                        <th className="px-4 py-2.5">Tanggal</th>
-                                        <th className="px-4 py-2.5">Status Penawaran</th>
-                                        <th className="px-4 py-2.5 text-right">Potensi Nilai (IDR)</th>
+                    {/* Table Container */}
+                    <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-left text-sm">
+                            <thead>
+                                <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                    <th className="w-8 px-3 py-2.5 text-center font-medium">No</th>
+                                    <th className="min-w-[160px] px-3 py-2.5 font-medium">Customer</th>
+                                    <th className="min-w-[210px] px-3 py-2.5 font-medium">Penawaran & Perihal</th>
+                                    <th className="min-w-[140px] px-3 py-2.5 font-medium">SO & Ref PO</th>
+                                    <th className="min-w-[100px] px-3 py-2.5 text-right font-medium">Nilai PO</th>
+                                    <th className="min-w-[150px] px-3 py-2.5 font-medium">No. Invoice Terkait</th>
+                                    <th className="min-w-[95px] px-3 py-2.5 text-right font-medium">Ditagih</th>
+                                    <th className="min-w-[105px] px-3 py-2.5 text-right font-medium">Sudah Dibayar</th>
+                                    <th className="min-w-[95px] px-3 py-2.5 text-right font-medium">Belum Tagih</th>
+                                    <th className="min-w-[95px] px-3 py-2.5 text-right font-medium">Sisa Piutang</th>
+                                    <th className="min-w-[120px] px-3 py-2.5 text-center font-medium">Status</th>
+                                    <th className="w-10 px-3 py-2.5 text-center font-medium">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={12} className="px-4 py-16 text-center">
+                                            <div className="flex flex-col items-center justify-center gap-2">
+                                                <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                                                <p className="text-xs text-muted-foreground">Memuat rekapitulasi data penjualan...</p>
+                                            </div>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {quoOnly.map((q, i) => (
-                                        <tr key={q.id} className="hover:bg-slate-50">
-                                            <td className="px-4 py-2.5 text-center text-slate-400 font-bold">{i + 1}</td>
-                                            <td className="px-4 py-2.5">
-                                                <p className="font-black text-indigo-600">{q.number}</p>
-                                                {q.subject && (
-                                                    <p className="text-[11px] text-slate-600 font-medium mt-0.5">
-                                                        <span className="text-[10px] font-bold text-slate-400 mr-1 uppercase">Perihal:</span>
-                                                        {q.subject}
-                                                    </p>
+                                ) : filteredRows.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={12} className="px-4 py-16 text-center">
+                                            <div className="flex flex-col items-center justify-center gap-2">
+                                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                                    <FileText size={22} />
+                                                </div>
+                                                <p className="text-sm font-medium text-foreground">
+                                                    {customerId === "ALL"
+                                                        ? "Tidak ada data yang cocok dengan kriteria pencarian / filter."
+                                                        : "Tidak ditemukan transaksi PO/SO untuk customer ini."}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Silakan sesuaikan filter status atau reset pencarian customer.
+                                                </p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredRows.map((r, idx) => {
+                                        const meta = STATUS_META[r.billingStatus]
+                                        const isExpanded = expandedRowId === r.id
+                                        const payPercent = r.invoicedTotal > 0 ? Math.min(100, Math.round((r.paidTotal / r.invoicedTotal) * 100)) : 0
+
+                                        return (
+                                            <React.Fragment key={r.id}>
+                                                <tr className={`align-top transition-colors ${isExpanded ? "bg-muted/20" : "hover:bg-muted/30"}`}>
+                                                    {/* No */}
+                                                    <td className="px-3 py-2.5 text-center text-[11px] font-medium tabular-nums text-muted-foreground">
+                                                        {idx + 1}
+                                                    </td>
+
+                                                    {/* Customer */}
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex items-start gap-2.5">
+                                                            <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-muted-foreground">
+                                                                {(r.customer?.name || "C").charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-sm font-medium leading-tight text-foreground">
+                                                                    {r.customer?.name || "-"}
+                                                                </p>
+                                                                {r.customer?.company && (
+                                                                    <p className="text-[11px] text-muted-foreground">
+                                                                        {r.customer.company}
+                                                                    </p>
+                                                                )}
+                                                                <span className="mt-1 inline-block rounded border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                                                                    {r.customer?.code || "-"}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Penawaran & Perihal */}
+                                                    <td className="px-3 py-2.5">
+                                                        {r.quotationNumber ? (
+                                                            <div className="space-y-1">
+                                                                <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-foreground">
+                                                                    <FileText size={11} className="shrink-0 text-muted-foreground" />
+                                                                    {r.quotationNumber}
+                                                                </span>
+                                                                {r.quotationSubject && (
+                                                                    <p className="text-[11px] leading-snug text-muted-foreground break-words">
+                                                                        <span className="mr-1 text-[10px] font-medium text-muted-foreground">Perihal:</span>
+                                                                        {r.quotationSubject}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        ) : r.quotationSubject || r.soSubject ? (
+                                                            <div className="space-y-1">
+                                                                <span className="text-[11px] italic text-muted-foreground">Tanpa Ref Penawaran</span>
+                                                                <p className="text-[11px] leading-snug text-muted-foreground break-words">
+                                                                    <span className="mr-1 text-[10px] font-medium text-muted-foreground">Perihal:</span>
+                                                                    {r.quotationSubject || r.soSubject}
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted-foreground">-</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* SO & PO */}
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="space-y-0.5">
+                                                            <p className="text-sm font-medium text-foreground">
+                                                                {r.soNumber}
+                                                            </p>
+                                                            {r.poNumber && (
+                                                                <p className="text-[11px] text-muted-foreground">
+                                                                    PO: <strong className="font-mono font-medium text-foreground">{r.poNumber}</strong>
+                                                                </p>
+                                                            )}
+                                                            <p className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                                <Calendar size={10} />
+                                                                {fmtDate(r.soDate)}
+                                                            </p>
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Nilai PO */}
+                                                    <td className="px-3 py-2.5 text-right text-sm font-medium tabular-nums text-foreground">
+                                                        {fmt(r.poTotal)}
+                                                    </td>
+
+                                                    {/* Invoices List */}
+                                                    <td className="px-3 py-2.5">
+                                                        {r.invoices.length === 0 ? (
+                                                            <span className="text-[11px] italic text-muted-foreground">Belum ada invoice</span>
+                                                        ) : (
+                                                            <div className="space-y-1">
+                                                                {r.invoices.slice(0, 2).map(inv => (
+                                                                    <div key={inv.id} className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-2 py-1 text-[11px]">
+                                                                        <span className="font-medium text-foreground">
+                                                                            {inv.number}
+                                                                        </span>
+                                                                        <span className="font-mono text-[10px] text-muted-foreground">
+                                                                            {fmt(inv.grandTotal)}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                                {r.invoices.length > 2 && (
+                                                                    <button
+                                                                        onClick={() => setExpandedRowId(isExpanded ? null : r.id)}
+                                                                        className="text-[10px] font-medium text-muted-foreground transition-colors hover:text-foreground hover:underline"
+                                                                    >
+                                                                        +{r.invoices.length - 2} invoice lainnya...
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Ditagih */}
+                                                    <td className="px-3 py-2.5 text-right text-sm font-medium tabular-nums text-foreground">
+                                                        {fmt(r.invoicedTotal)}
+                                                    </td>
+
+                                                    {/* Sudah Dibayar */}
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <p className="text-sm font-medium tabular-nums text-foreground">
+                                                            {fmt(r.paidTotal)}
+                                                        </p>
+                                                        {r.invoicedTotal > 0 && (
+                                                            <span className="text-[10px] text-muted-foreground">
+                                                                ({payPercent}%)
+                                                            </span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Belum Ditagih */}
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <span className={r.unbilledTotal > 0 ? "text-sm font-medium tabular-nums text-foreground" : "text-sm tabular-nums text-muted-foreground"}>
+                                                            {fmt(r.unbilledTotal)}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Sisa Piutang */}
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <span className={r.unpaidTotal > 0 ? "inline-flex rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-sm font-medium tabular-nums text-foreground" : "text-sm tabular-nums text-muted-foreground"}>
+                                                            {fmt(r.unpaidTotal)}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Status */}
+                                                    <td className="px-3 py-2.5 text-center">
+                                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-foreground">
+                                                            <span className={`h-1.5 w-1.5 rounded-full ${meta?.badge || "bg-muted-foreground"}`} />
+                                                            {ID ? meta?.ID : meta?.EN || r.billingStatus}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Aksi / Expand */}
+                                                    <td className="px-3 py-2.5 text-center">
+                                                        <button
+                                                            onClick={() => setExpandedRowId(isExpanded ? null : r.id)}
+                                                            title="Lihat detail rincian"
+                                                            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                        >
+                                                            {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+
+                                                {/* Expanded Row Detail */}
+                                                {isExpanded && (
+                                                    <tr className="bg-muted/20">
+                                                        <td colSpan={12} className="px-3 pb-4 pt-0">
+                                                            <div className="space-y-3 rounded-lg border border-border bg-background p-3">
+                                                                <div className="flex flex-col gap-1 border-b border-border pb-2 sm:flex-row sm:items-center sm:justify-between">
+                                                                    <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                                                        <Receipt size={14} className="text-muted-foreground" />
+                                                                        Rincian Faktur & Pembayaran untuk SO: <span className="font-mono">{r.soNumber}</span>
+                                                                    </h4>
+                                                                    <span className="text-[11px] text-muted-foreground">
+                                                                        Customer: {r.customer?.name} ({r.customer?.code})
+                                                                    </span>
+                                                                </div>
+
+                                                                {r.invoices.length === 0 ? (
+                                                                    <p className="py-3 text-center text-xs text-muted-foreground">
+                                                                        Belum ada invoice yang diterbitkan untuk Sales Order ini. Seluruh nilai pesanan ({fmt(r.poTotal)}) masih berupa PO Belum Ditagih.
+                                                                    </p>
+                                                                ) : (
+                                                                    <div className="overflow-x-auto">
+                                                                        <table className="w-full text-left text-sm">
+                                                                            <thead>
+                                                                                <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                                                                    <th className="px-2 py-2 font-medium">No. Invoice</th>
+                                                                                    <th className="px-2 py-2 font-medium">Tgl Invoice</th>
+                                                                                    <th className="px-2 py-2 font-medium">Jatuh Tempo</th>
+                                                                                    <th className="px-2 py-2 text-right font-medium">Nilai Tagihan</th>
+                                                                                    <th className="px-2 py-2 text-right font-medium">Dibayar</th>
+                                                                                    <th className="px-2 py-2 text-right font-medium">Sisa Piutang</th>
+                                                                                    <th className="px-2 py-2 text-center font-medium">Status</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody className="divide-y divide-border">
+                                                                                {r.invoices.map(inv => {
+                                                                                    const remaining = Math.max(inv.grandTotal - inv.paid, 0)
+                                                                                    return (
+                                                                                        <tr key={inv.id}>
+                                                                                            <td className="px-2 py-2 font-mono text-[11px] font-medium text-foreground">{inv.number}</td>
+                                                                                            <td className="px-2 py-2 text-xs text-muted-foreground">{fmtDate(inv.date)}</td>
+                                                                                            <td className="px-2 py-2 text-xs text-muted-foreground">{inv.dueDate ? fmtDate(inv.dueDate) : "-"}</td>
+                                                                                            <td className="px-2 py-2 text-right text-xs font-medium tabular-nums text-foreground">{fmt(inv.grandTotal)}</td>
+                                                                                            <td className="px-2 py-2 text-right text-xs font-medium tabular-nums text-foreground">{fmt(inv.paid)}</td>
+                                                                                            <td className="px-2 py-2 text-right text-xs font-medium tabular-nums text-foreground">{fmt(remaining)}</td>
+                                                                                            <td className="px-2 py-2 text-center">
+                                                                                                <span className="inline-flex rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                                                                    {inv.status}
+                                                                                                </span>
+                                                                                            </td>
+                                                                                        </tr>
+                                                                                    )
+                                                                                })}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
                                                 )}
-                                            </td>
-                                            <td className="px-4 py-2.5 font-bold text-slate-800">
-                                                {q.customer?.name || "-"}
-                                                {q.customer?.code && (
-                                                    <span className="text-[10px] text-slate-400 ml-1">({q.customer.code})</span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-2.5 text-slate-600">{fmtDate(q.date)}</td>
-                                            <td className="px-4 py-2.5">
-                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                                                    {q.status}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-2.5 text-right font-black text-slate-900">
-                                                {fmt(q.grandTotal)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                            </React.Fragment>
+                                        )
+                                    })
+                                )}
+                            </tbody>
+
+                            {/* Grand Totals Footer */}
+                            {filteredRows.length > 0 && (
+                                <tfoot>
+                                    <tr className="border-t border-border bg-muted/40 text-sm font-medium text-foreground">
+                                        <td colSpan={4} className="px-3 py-2.5 text-right text-[11px] font-medium text-muted-foreground">
+                                            Total keseluruhan ({filteredRows.length} SO)
+                                        </td>
+                                        <td className="px-3 py-2.5 text-right tabular-nums">
+                                            {fmt(filteredRows.reduce((s, r) => s + r.poTotal, 0))}
+                                        </td>
+                                        <td></td>
+                                        <td className="px-3 py-2.5 text-right tabular-nums">
+                                            {fmt(filteredRows.reduce((s, r) => s + r.invoicedTotal, 0))}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-right tabular-nums">
+                                            {fmt(filteredRows.reduce((s, r) => s + r.paidTotal, 0))}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-right tabular-nums">
+                                            {fmt(filteredRows.reduce((s, r) => s + r.unbilledTotal, 0))}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-right tabular-nums">
+                                            {fmt(filteredRows.reduce((s, r) => s + r.unpaidTotal, 0))}
+                                        </td>
+                                        <td colSpan={2}></td>
+                                    </tr>
+                                </tfoot>
+                            )}
+                        </table>
+                    </div>
                 </div>
-            )}
+
+                {/* Pipeline Penawaran Belum Jadi PO (Quotations Without SO) */}
+                {quoOnly.length > 0 && (
+                    <div className="mt-4 overflow-hidden rounded-xl border border-border bg-card">
+                        <button
+                            type="button"
+                            onClick={() => setShowQuoSection(!showQuoSection)}
+                            className="flex w-full items-center justify-between gap-3 border-b border-border px-4 py-3 text-left select-none transition-colors hover:bg-muted/30"
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                    <CreditCard size={16} />
+                                </div>
+                                <div>
+                                    <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                        {ID ? "Penawaran Harga Belum Menjadi SO / PO" : "Quotations Without SO (Pipeline)"}
+                                        <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                            {quoOnly.length} Penawaran
+                                        </span>
+                                    </h3>
+                                    <p className="text-xs text-muted-foreground">
+                                        Estimasi potensi omzet: <span className="font-medium text-foreground">{fmt(quoOnly.reduce((s, q) => s + q.grandTotal, 0))}</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <span className="text-muted-foreground">
+                                {showQuoSection ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                            </span>
+                        </button>
+
+                        {showQuoSection && (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                            <th className="w-12 px-3 py-2.5 text-center font-medium">No</th>
+                                            <th className="min-w-[200px] px-3 py-2.5 font-medium">No. Penawaran & Perihal</th>
+                                            <th className="px-3 py-2.5 font-medium">Customer</th>
+                                            <th className="px-3 py-2.5 font-medium">Tanggal</th>
+                                            <th className="px-3 py-2.5 font-medium">Status Penawaran</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Potensi Nilai (IDR)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {quoOnly.map((q, i) => (
+                                            <tr key={q.id} className="transition-colors hover:bg-muted/30">
+                                                <td className="px-3 py-2.5 text-center text-[11px] font-medium tabular-nums text-muted-foreground">{i + 1}</td>
+                                                <td className="px-3 py-2.5">
+                                                    <p className="font-mono text-[11px] font-medium text-foreground">{q.number}</p>
+                                                    {q.subject && (
+                                                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                                            <span className="mr-1 text-[10px] font-medium text-muted-foreground">Perihal:</span>
+                                                            {q.subject}
+                                                        </p>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <span className="text-sm font-medium text-foreground">
+                                                        {q.customer?.name || "-"}
+                                                    </span>
+                                                    {q.customer?.code && (
+                                                        <span className="ml-1 text-[10px] text-muted-foreground">({q.customer.code})</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2.5 text-xs text-muted-foreground">{fmtDate(q.date)}</td>
+                                                <td className="px-3 py-2.5">
+                                                    <span className="inline-flex rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                        {q.status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right text-sm font-medium tabular-nums text-foreground">
+                                                    {fmt(q.grandTotal)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
 
             {/* Interactive PDF Preview & Print Modal */}
             <SalesMonitoringPDFModal

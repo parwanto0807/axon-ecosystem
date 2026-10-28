@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
     PackagePlus, Plus, Search, Trash2, X, CheckCircle2,
     AlertCircle, RefreshCw, Check, Ban, DollarSign, Eye,
-    Clock, Tag, MapPin, Briefcase, FileText, ChevronDown
+    Clock, MapPin, Briefcase
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -32,10 +32,40 @@ interface PurchaseOrder {
 }
 interface FormItem { skuId: string; qty: number; unitCost: number; notes?: string; _sku?: SKU }
 
-const STATUS_CFG: Record<string, { label: string; color: string; icon: any }> = {
-    DRAFT: { label: 'Draft', color: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
-    CONFIRMED: { label: 'Confirmed', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
-    CANCELLED: { label: 'Cancelled', color: 'bg-slate-50 text-slate-500 border-slate-200', icon: Ban }
+const STATUS_CFG: Record<string, { label: string; color: string; dot: string; icon: any }> = {
+    DRAFT: {
+        label: 'Draft',
+        color: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-400',
+        dot: 'bg-amber-500',
+        icon: Clock,
+    },
+    CONFIRMED: {
+        label: 'Confirmed',
+        color: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400',
+        dot: 'bg-emerald-500',
+        icon: CheckCircle2,
+    },
+    CANCELLED: {
+        label: 'Cancelled',
+        color: 'border-border bg-muted text-muted-foreground',
+        dot: 'bg-muted-foreground/50',
+        icon: Ban,
+    },
+}
+
+const inputClass =
+    "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
+
+const iconButtonClass = "h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+
+function StatusPill({ status }: { status: string }) {
+    const cfg = STATUS_CFG[status] || STATUS_CFG.DRAFT
+    return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cfg.color}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+            {cfg.label}
+        </span>
+    )
 }
 
 export default function StockInPage() {
@@ -270,312 +300,409 @@ export default function StockInPage() {
     const pendingCount = movements.filter(m => m.status === 'DRAFT').length
     const confirmedCount = movements.filter(m => m.status === 'CONFIRMED').length
 
-    const ic = "w-full bg-white border border-slate-200 rounded-xl px-3 py-2 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all text-sm"
-    const lc = "text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block"
+    const stats = [
+        { label: 'Total S-In', value: movements.length, icon: PackagePlus, sub: 'Total Transaksi' },
+        { label: 'Pending', value: pendingCount, icon: Clock, sub: 'Perlu Konfirmasi' },
+        { label: 'Confirmed', value: confirmedCount, icon: CheckCircle2, sub: 'Sudah Masuk Stok' },
+        { label: 'Total Nilai', value: fmt(totalInValue), icon: DollarSign, sub: 'Confirmed Value' },
+    ]
 
     return (
-        <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-6 md:py-8 md:max-w-screen space-y-5 md:space-y-6 font-inter w-full bg-slate-50/30 min-h-screen pb-24 md:pb-8">
-            <AnimatePresence>
-                {toast && (
-                    <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        className={`fixed top-6 right-6 z-[300] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl text-sm font-semibold border ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-                        {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />} {toast.msg}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                <AnimatePresence>
+                    {toast && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -16 }}
+                            className="fixed right-4 top-4 z-[300] flex items-center gap-2.5 rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-lg"
+                        >
+                            {toast.type === 'success'
+                                ? <CheckCircle2 size={16} className="text-emerald-600" />
+                                : <AlertCircle size={16} className="text-rose-600" />}
+                            {toast.msg}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/20 shrink-0">
-                        <PackagePlus size={22} className="text-white" />
-                    </div>
+                <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-none">Stok Masuk</h1>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1 md:mt-1.5">Penerimaan Barang ke Gudang</p>
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground">Stok Masuk</h1>
+                        <p className="mt-0.5 text-xs text-muted-foreground">Penerimaan Barang ke Gudang</p>
                     </div>
-                </div>
-                <div className="flex gap-2 w-full md:w-auto mt-1 md:mt-0">
-                    <Button variant="outline" onClick={load} className="flex-1 md:flex-none rounded-xl border-slate-200 bg-white text-slate-600 h-11 px-4 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95 shadow-sm">
-                        <RefreshCw size={13} className={`mr-1.5 md:mr-2 ${loading ? 'animate-spin' : ''}`} /> Reload
-                    </Button>
-                    <Button onClick={() => setModalOpen(true)} className="flex-[2] md:flex-none rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-5 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-600/20 transition-all active:scale-95">
-                        <Plus size={14} className="mr-1.5 md:mr-2" /> Penerimaan Baru
-                    </Button>
-                </div>
-            </header>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                {[
-                    { label: 'Total S-In', value: movements.length, icon: PackagePlus, color: 'text-emerald-600', bg: 'bg-emerald-50', sub: 'Total Transaksi' },
-                    { label: 'Pending', value: pendingCount, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', sub: 'Perlu Konfirmasi' },
-                    { label: 'Confirmed', value: confirmedCount, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', sub: 'Sudah Masuk Stok' },
-                    { label: 'Total Nilai', value: fmt(totalInValue), icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50', sub: 'Confirmed Value' },
-                ].map((s, i) => (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} key={i}
-                        className="bg-white p-4 md:p-5 rounded-[1.25rem] md:rounded-3xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-start md:items-center gap-3 hover:shadow-md transition-shadow">
-                        <div className={`w-10 h-10 rounded-xl md:rounded-2xl ${s.bg} ${s.color} flex items-center justify-center shrink-0`}>
-                            <s.icon size={18} />
-                        </div>
-                        <div>
-                            <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{s.label}</p>
-                            <p className="text-base md:text-lg font-black text-slate-900 leading-tight">{s.value}</p>
-                            <p className="text-[9px] font-bold text-slate-400 mt-0.5 italic hidden md:block">{s.sub}</p>
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-
-            <div className="flex flex-col md:flex-row md:items-center gap-3 bg-white p-3 md:p-4 rounded-[1.25rem] md:rounded-3xl border border-slate-100 shadow-sm">
-                <div className="relative w-full md:flex-1 md:max-w-md">
-                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Cari nomor, proyek, gudang..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full bg-slate-50/50 border border-slate-100 rounded-xl md:rounded-2xl pl-11 pr-4 py-2.5 text-[11px] md:text-sm font-medium focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-300 outline-none transition-all"
-                    />
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 hide-scrollbar w-full md:w-auto">
-                    <div className="bg-slate-100 p-1 md:p-1.5 rounded-xl md:rounded-2xl flex gap-1 min-w-max">
-                        {['ALL', 'DRAFT', 'CONFIRMED', 'CANCELLED'].map((s) => (
-                            <button
-                                key={s}
-                                onClick={() => setFilterStatus(s)}
-                                className={`px-3 md:px-4 py-1.5 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${filterStatus === s
-                                    ? 'bg-white text-emerald-600 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'}`}
-                            >
-                                {s === 'ALL' ? 'Semua' : s}
-                            </button>
-                        ))}
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={load}
+                            className="h-9 rounded-lg px-3 text-sm font-medium"
+                        >
+                            <RefreshCw size={15} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+                            Reload
+                        </Button>
+                        <Button
+                            onClick={() => setModalOpen(true)}
+                            className="h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            <Plus size={16} className="mr-1.5" />
+                            Tambah stok masuk
+                        </Button>
                     </div>
-                </div>
-            </div>
+                </header>
 
-            <div className="hidden md:block bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col">
-
-                <div className="overflow-x-auto" style={{ display: 'block' }}>
-                    <table className="w-full text-sm border-collapse">
-                        <thead>
-                            <tr className="border-b border-slate-100 bg-slate-50/30">
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaksi</th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Gudang & Referensi</th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Proyek / Work Order</th>
-                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Items</th>
-                                <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Nilai</th>
-                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                                <th className="px-6 py-4"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
-                            {filtered.map(m => {
-                                const totalVal = m.items.reduce((s, i) => s + i.qty * i.unitCost, 0)
-                                const status = STATUS_CFG[m.status] || STATUS_CFG.DRAFT
-                                return (
-                                    <tr key={m.id} className="hover:bg-slate-50/50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="font-black text-xs text-emerald-600 tabular-nums tracking-tight">{m.number}</span>
-                                                <span className="text-[10px] font-bold text-slate-400 mt-0.5">{fmtDate(m.date)}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {m.workOrder ? (
-                                                <div className="flex flex-col max-w-[220px]">
-                                                    <div className="flex items-center gap-1.5 overflow-hidden">
-                                                        <Briefcase size={10} className="text-slate-400 flex-shrink-0" />
-                                                        <span className="font-black text-[10px] text-slate-700 truncate">{m.workOrder.project?.name || m.workOrder.title}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                                        <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-emerald-100/50">WO: {m.workOrder.number}</span>
-                                                        {m.workOrder.customer && (
-                                                            <span className="text-[9px] font-bold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-slate-100 truncate max-w-[120px]" title={m.workOrder.customer.name}>
-                                                                {m.workOrder.customer.name}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col max-w-[200px]">
-                                                    <span className="text-[10px] font-black text-slate-300 uppercase italic tracking-widest leading-none">Manual In</span>
-                                                    {m.notes && (
-                                                        <span className="text-[10px] font-medium text-slate-500 mt-1.5 line-clamp-2 leading-tight" title={m.notes}>
-                                                            {m.notes}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex flex-col items-end">
-                                                <span className="font-black text-slate-700 text-xs">{m.items.length} Items</span>
-                                                <div className="flex flex-col items-end gap-0.5 mt-1">
-                                                    {m.items.slice(0, 2).map((it, idx) => (
-                                                        <span key={idx} className="text-[9px] font-bold text-slate-400 truncate max-w-[140px] leading-none uppercase tracking-tighter" title={it.sku?.product?.name || it.sku?.name}>
-                                                            {it.sku?.product?.name || it.sku?.name}
-                                                        </span>
-                                                    ))}
-                                                    {m.items.length > 2 && <span className="text-[8px] font-black text-slate-300">+{m.items.length - 2} OTHERS</span>}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className="font-black text-emerald-700 text-xs tabular-nums tracking-tight">{fmt(totalVal)}</span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex justify-center">
-                                                <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider border ${status.color}`}>
-                                                    <status.icon size={12} className="opacity-80" />
-                                                    {status.label}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => { setSelectedMovement(m); setViewModalOpen(true); }}
-                                                    className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center shadow-sm"
-                                                    title="Detail"
-                                                >
-                                                    <Eye size={14} />
-                                                </button>
-                                                {m.status === 'DRAFT' && (
-                                                    <>
-                                                        <button onClick={() => handleConfirm(m.id)} className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Konfirmasi"><Check size={14} /></button>
-                                                        <button onClick={() => handleCancel(m.id)} className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all flex items-center justify-center shadow-sm" title="Batalkan"><Ban size={14} /></button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                    {(loading || filtered.length === 0) && (
-                        <div className="py-24 flex flex-col items-center justify-center text-center">
-                            <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mb-4">
-                                {loading ? <RefreshCw size={32} className="text-emerald-500 animate-spin" /> : <PackagePlus size={32} className="text-slate-200" />}
+                <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {stats.map((s) => {
+                        const Icon = s.icon
+                        return (
+                            <div key={s.label} className="rounded-xl border border-border bg-card p-4">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs text-muted-foreground">{s.label}</p>
+                                    <Icon size={15} className="text-muted-foreground" />
+                                </div>
+                                <p className="mt-1 text-lg font-semibold tabular-nums tracking-tight text-foreground">{s.value}</p>
+                                <p className="mt-0.5 text-[11px] text-muted-foreground">{s.sub}</p>
                             </div>
-                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-1">{loading ? 'Memuat Data...' : 'Tidak Ada Data'}</h3>
-                            <p className="text-xs font-bold text-slate-400 max-w-[240px] leading-relaxed">
-                                {loading ? 'Sabar ya, data sedang kami ambil dari server.' : 'Coba ubah kata kunci pencarian atau filter status untuk hasil lain.'}
+                        )
+                    })}
+                </div>
+
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="relative w-full sm:max-w-xs">
+                        <Search
+                            size={15}
+                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <input
+                            type="text"
+                            placeholder="Cari nomor, proyek, gudang..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className={`${inputClass} pl-9`}
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 overflow-x-auto">
+                        <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+                            {['ALL', 'DRAFT', 'CONFIRMED', 'CANCELLED'].map((s) => (
+                                <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => setFilterStatus(s)}
+                                    className={`h-8 whitespace-nowrap rounded-md px-3 text-xs font-medium transition-colors ${
+                                        filterStatus === s
+                                            ? 'bg-background text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    {s === 'ALL' ? 'Semua' : s}
+                                </button>
+                            ))}
+                        </div>
+                        <span className="hidden text-xs text-muted-foreground sm:block">
+                            {filtered.length} transaksi
+                        </span>
+                    </div>
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden md:block">
+                    {loading ? (
+                        <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+                            <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-20 text-center">
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                <PackagePlus size={22} />
+                            </div>
+                            <p className="text-sm font-medium text-foreground">Tidak Ada Data</p>
+                            <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                                Coba ubah kata kunci pencarian atau filter status untuk hasil lain.
                             </p>
+                        </div>
+                    ) : (
+                        <div className="overflow-hidden rounded-xl border border-border bg-card">
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                            <th className="px-3 py-2.5 font-medium">Transaksi</th>
+                                            <th className="px-3 py-2.5 font-medium">Referensi / Proyek</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Items</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Total Nilai</th>
+                                            <th className="px-3 py-2.5 font-medium">Status</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {filtered.map(m => {
+                                            const totalVal = m.items.reduce((s, i) => s + i.qty * i.unitCost, 0)
+                                            return (
+                                                <tr key={m.id} className="transition-colors hover:bg-muted/30">
+                                                    <td className="px-3 py-2.5">
+                                                        <p className="text-xs font-medium tabular-nums text-foreground">{m.number}</p>
+                                                        <p className="mt-0.5 text-[11px] text-muted-foreground">{fmtDate(m.date)}</p>
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex items-center gap-1.5 text-xs text-foreground">
+                                                            <MapPin size={11} className="flex-shrink-0 text-muted-foreground" />
+                                                            <span className="truncate">{m.warehouse?.name || '—'}</span>
+                                                        </div>
+                                                        {m.workOrder ? (
+                                                            <div className="mt-1 space-y-1">
+                                                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                                    <Briefcase size={10} className="flex-shrink-0" />
+                                                                    <span className="max-w-[200px] truncate">
+                                                                        {m.workOrder.project?.name || m.workOrder.title}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                                        WO: {m.workOrder.number}
+                                                                    </span>
+                                                                    {m.workOrder.customer && (
+                                                                        <span
+                                                                            className="max-w-[140px] truncate rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                                                            title={m.workOrder.customer.name}
+                                                                        >
+                                                                            {m.workOrder.customer.name}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="mt-1">
+                                                                <span className="text-[11px] text-muted-foreground">Manual In</span>
+                                                                {m.referenceNumber && (
+                                                                    <span className="ml-1 text-[11px] text-muted-foreground">· {m.referenceNumber}</span>
+                                                                )}
+                                                                {m.notes && (
+                                                                    <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground" title={m.notes}>
+                                                                        {m.notes}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <p className="text-xs font-medium text-foreground">{m.items.length} item</p>
+                                                        <div className="mt-0.5 flex flex-col items-end gap-0.5">
+                                                            {m.items.slice(0, 2).map((it, idx) => (
+                                                                <span
+                                                                    key={idx}
+                                                                    className="max-w-[140px] truncate text-[11px] text-muted-foreground"
+                                                                    title={it.sku?.product?.name || it.sku?.name}
+                                                                >
+                                                                    {it.sku?.product?.name || it.sku?.name}
+                                                                </span>
+                                                            ))}
+                                                            {m.items.length > 2 && (
+                                                                <span className="text-[10px] text-muted-foreground/70">
+                                                                    +{m.items.length - 2} others
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <span className="text-sm font-medium tabular-nums text-foreground">{fmt(totalVal)}</span>
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <StatusPill status={m.status} />
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex items-center justify-end gap-0.5">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => { setSelectedMovement(m); setViewModalOpen(true); }}
+                                                                title="Detail"
+                                                                className={iconButtonClass}
+                                                            >
+                                                                <Eye size={15} />
+                                                            </Button>
+                                                            {m.status === 'DRAFT' && (
+                                                                <>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => handleConfirm(m.id)}
+                                                                        title="Konfirmasi"
+                                                                        className={iconButtonClass}
+                                                                    >
+                                                                        <Check size={15} />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={() => handleCancel(m.id)}
+                                                                        title="Batalkan"
+                                                                        className={iconButtonClass}
+                                                                    >
+                                                                        <Ban size={15} />
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </div>
-            </div>
 
-            {/* Mobile Card List */}
-            <div className="md:hidden space-y-4">
-                {loading ? (
-                    [1, 2, 3].map(i => <div key={i} className="animate-pulse bg-white rounded-2xl p-4 h-36 border border-slate-100" />)
-                ) : filtered.length === 0 ? (
-                    <div className="py-16 text-center bg-white rounded-2xl border border-slate-100 shadow-sm">
-                        <PackagePlus size={48} className="text-slate-200 mx-auto mb-3" />
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data tidak ditemukan</p>
-                    </div>
-                ) : filtered.map(m => {
-                    const totalVal = m.items.reduce((s, i) => s + i.qty * i.unitCost, 0)
-                    const st = STATUS_CFG[m.status] || STATUS_CFG.DRAFT
-                    const StatusIcon = st.icon
-                    return (
-                        <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                            className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
-                            <div className="flex items-start justify-between gap-3 pl-2">
-                                <div>
-                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">{m.number}</span>
-                                    <span className="text-[15px] font-extrabold text-slate-900">{fmtDate(m.date)}</span>
-                                </div>
-                                <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-wider border ${st.color}`}>
-                                    <StatusIcon size={12} /> {st.label}
-                                </span>
+                {/* Mobile cards */}
+                <div className="md:hidden">
+                    {loading ? (
+                        <div className="flex h-40 items-center justify-center rounded-xl border border-border bg-card">
+                            <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                        </div>
+                    ) : filtered.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
+                            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                <PackagePlus size={22} />
                             </div>
-                            <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 ml-2">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <MapPin size={11} className="text-slate-400" />
-                                    <span className="text-[11px] font-black text-slate-700">{m.warehouse?.name}</span>
-                                </div>
-                                {m.referenceNumber && <span className="text-[10px] font-medium text-slate-400 italic">Ref: {m.referenceNumber}</span>}
-                                {m.workOrder && (
-                                    <span className="text-[9px] font-black text-indigo-600 mt-1.5 flex items-center gap-1.5 bg-indigo-50/50 w-fit px-2 py-1 rounded-md border border-indigo-100/50">
-                                        <Briefcase size={10} /> {m.workOrder.project?.name || m.workOrder.title}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="flex items-center justify-between pl-2 pt-2 border-t border-slate-50">
-                                <div>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">{m.items.length} item &bull; Total Nilai</span>
-                                    <span className="text-sm font-black text-emerald-700">{fmt(totalVal)}</span>
-                                </div>
-                                <div className="flex gap-2">
-                                    {m.status === 'DRAFT' && (
-                                        <button onClick={() => handleConfirm(m.id)} className="h-9 px-3 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-emerald-100 active:scale-95 transition-all">
-                                            <Check size={13} /> Konfirmasi
-                                        </button>
-                                    )}
-                                    <button onClick={() => { setSelectedMovement(m); setViewModalOpen(true); }} className="h-9 px-3 rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-slate-200 active:scale-95 transition-all">
-                                        <Eye size={13} /> Detail
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )
-                })}
-            </div>
-
-            <AnimatePresence>
-                {modalOpen && (
-                    <div className="fixed inset-0 z-[100] flex flex-col justify-end md:justify-center p-0 md:p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setModalOpen(false)} className="absolute inset-0" />
-                        <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="bg-white rounded-t-[1.5rem] md:rounded-[2rem] shadow-2xl w-full max-w-3xl mx-auto relative flex flex-col max-h-[95vh] md:max-h-[85vh] border border-white/20">
-                            <div className="flex justify-center pt-3 pb-2 md:hidden bg-slate-50/50 shrink-0 rounded-t-[1.5rem]">
-                                <div className="w-12 h-1.5 bg-slate-300/50 rounded-full" />
-                            </div>
-                            <div className="flex items-center justify-between px-6 md:px-8 py-4 md:py-6 border-b border-slate-50 bg-slate-50/50 shrink-0">
-                                <div className="flex items-center gap-3 md:gap-4">
-                                    <div className="w-9 h-9 md:w-10 md:h-10 rounded-xl md:rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/20"><Plus size={18} className="text-white" /></div>
-                                    <div>
-                                        <h2 className="font-black text-slate-900 text-base md:text-lg uppercase tracking-tight leading-none">Penerimaan Barang</h2>
-                                        <p className="text-[9px] md:text-[10px] font-bold text-slate-400 mt-1 md:mt-1.5 uppercase tracking-widest">Input Stok Masuk Baru</p>
+                            <p className="text-sm font-medium text-foreground">Data tidak ditemukan</p>
+                            <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                                Coba ubah kata kunci pencarian atau filter status untuk hasil lain.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {filtered.map(m => {
+                                const totalVal = m.items.reduce((s, i) => s + i.qty * i.unitCost, 0)
+                                return (
+                                    <div key={m.id} className="rounded-xl border border-border bg-card p-3">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <p className="truncate text-xs font-medium tabular-nums text-foreground">{m.number}</p>
+                                                <p className="mt-0.5 text-[11px] text-muted-foreground">{fmtDate(m.date)}</p>
+                                            </div>
+                                            <StatusPill status={m.status} />
+                                        </div>
+                                        <div className="mt-2 rounded-lg border border-border bg-muted/30 p-2.5">
+                                            <p className="flex items-center gap-1.5 text-xs text-foreground">
+                                                <MapPin size={11} className="flex-shrink-0 text-muted-foreground" />
+                                                <span className="truncate">{m.warehouse?.name}</span>
+                                            </p>
+                                            {m.referenceNumber && (
+                                                <p className="mt-0.5 text-[11px] text-muted-foreground">Ref: {m.referenceNumber}</p>
+                                            )}
+                                            {m.workOrder && (
+                                                <p className="mt-1 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
+                                                    <Briefcase size={10} className="flex-shrink-0" />
+                                                    <span className="truncate">{m.workOrder.project?.name || m.workOrder.title}</span>
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2">
+                                            <div>
+                                                <p className="text-[11px] text-muted-foreground">{m.items.length} item · Total Nilai</p>
+                                                <p className="text-sm font-semibold tabular-nums text-foreground">{fmt(totalVal)}</p>
+                                            </div>
+                                            <div className="flex items-center gap-0.5">
+                                                {m.status === 'DRAFT' && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleConfirm(m.id)}
+                                                        className="h-8 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                                                    >
+                                                        <Check size={14} className="mr-1.5" /> Konfirmasi
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => { setSelectedMovement(m); setViewModalOpen(true); }}
+                                                    className="h-8 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                                                >
+                                                    <Eye size={14} className="mr-1.5" /> Detail
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                                <button type="button" onClick={() => setModalOpen(false)} className="w-8 h-8 md:w-10 md:h-10 rounded-full md:rounded-xl bg-white hover:bg-rose-50 flex items-center justify-center text-slate-400 hover:text-rose-600 transition-colors shadow-sm"><X size={18} /></button>
-                            </div>
-                            <div className="overflow-y-auto flex-1">
-                                <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 md:space-y-8">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-1.5">
-                                            <label className={lc}>Gudang Tujuan <span className="text-rose-500">*</span></label>
-                                            <div className="relative group">
-                                                <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                                                <select required value={form.warehouseId} onChange={e => setForm({ ...form, warehouseId: e.target.value })} className={`${ic} pl-10`}>
+                                )
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Create modal */}
+                <AnimatePresence>
+                    {modalOpen && (
+                        <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setModalOpen(false)}
+                                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                                className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-3xl sm:rounded-2xl"
+                            >
+                                <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                            <PackagePlus size={17} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h2 className="truncate text-sm font-semibold text-foreground">Penerimaan Barang</h2>
+                                            <p className="truncate text-[11px] text-muted-foreground">Input Stok Masuk Baru</p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setModalOpen(false)}
+                                        className={iconButtonClass}
+                                    >
+                                        <X size={16} />
+                                    </Button>
+                                </header>
+
+                                <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                                    <form onSubmit={handleSubmit} className="space-y-3">
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div className="space-y-1.5">
+                                                <label className="block text-[11px] font-medium text-muted-foreground">
+                                                    Gudang Tujuan <span className="text-rose-500">*</span>
+                                                </label>
+                                                <select
+                                                    required
+                                                    value={form.warehouseId}
+                                                    onChange={e => setForm({ ...form, warehouseId: e.target.value })}
+                                                    className={`${inputClass} cursor-pointer`}
+                                                >
                                                     <option value="">-- Pilih Gudang --</option>
                                                     {warehouses.map(w => <option key={w.id} value={w.id}>{w.code} - {w.name}</option>)}
                                                 </select>
                                             </div>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className={lc}>Tanggal Penerimaan</label>
-                                            <div className="relative group">
-                                                <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                                                <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={`${ic} pl-10`} />
+                                            <div className="space-y-1.5">
+                                                <label className="block text-[11px] font-medium text-muted-foreground">Tanggal Penerimaan</label>
+                                                <input
+                                                    type="date"
+                                                    value={form.date}
+                                                    onChange={e => setForm({ ...form, date: e.target.value })}
+                                                    className={inputClass}
+                                                />
                                             </div>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className={lc}>Referensi PO (Opsional)</label>
-                                            <div className="relative group">
-                                                <FileText size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+                                            <div className="space-y-1.5">
+                                                <label className="block text-[11px] font-medium text-muted-foreground">Referensi PO (Opsional)</label>
                                                 <select
                                                     value={selectedPO}
                                                     onChange={e => {
                                                         if (e.target.value) { loadPOItems(e.target.value) }
                                                         else { clearPO() }
                                                     }}
-                                                    className={`${ic} pl-10 pr-8 appearance-none cursor-pointer`}
+                                                    className={`${inputClass} cursor-pointer pr-8`}
                                                 >
                                                     <option value="">-- Pilih PO --</option>
                                                     {poList.filter(po => po.status !== 'CANCELLED').map(po => (
@@ -583,219 +710,316 @@ export default function StockInPage() {
                                                     ))}
                                                 </select>
                                             </div>
+                                            <div className="space-y-1.5">
+                                                <label className="block text-[11px] font-medium text-muted-foreground">Nomor Referensi (Manual)</label>
+                                                <input
+                                                    value={form.referenceNumber}
+                                                    onChange={e => setForm({ ...form, referenceNumber: e.target.value })}
+                                                    placeholder="DO Number, dll."
+                                                    className={inputClass}
+                                                    disabled={!!selectedPO}
+                                                />
+                                            </div>
+
+                                            {selectedPO && (() => {
+                                                const p = poList.find(x => x.id === selectedPO)
+                                                if (!p) return null
+                                                return (
+                                                    <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 p-3 sm:col-span-2">
+                                                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                                                            <span className="flex items-center gap-1 font-medium text-foreground">
+                                                                <CheckCircle2 size={13} className="text-emerald-600" /> Referensi PO: {p.number}
+                                                            </span>
+                                                            <span className="text-muted-foreground">• {p.vendor?.name}</span>
+                                                            <span className="font-mono font-medium text-foreground">• {fmt(p.grandTotal)}</span>
+                                                            <span className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                                {items.length} item
+                                                            </span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={clearPO}
+                                                            className="flex-shrink-0 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                                                        >
+                                                            ✕ Batalkan PO
+                                                        </button>
+                                                    </div>
+                                                )
+                                            })()}
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <label className={lc}>Nomor Referensi (Manual)</label>
-                                            <div className="relative group">
-                                                <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                                                <input value={form.referenceNumber} onChange={e => setForm({ ...form, referenceNumber: e.target.value })} placeholder="DO Number, dll." className={`${ic} pl-10`} disabled={!!selectedPO} />
+
+                                        <div className="space-y-2 border-t border-border pt-3">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <h3 className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                                                    <PackagePlus size={14} className="text-muted-foreground" /> Daftar Barang
+                                                </h3>
+                                                <button
+                                                    type="button"
+                                                    onClick={addItem}
+                                                    className="inline-flex h-8 items-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                                                >
+                                                    <Plus size={13} className="mr-1" /> Tambah Baris
+                                                </button>
+                                            </div>
+                                            <div className="max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                                                {items.length === 0 ? (
+                                                    <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border px-4 py-8 text-center">
+                                                        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                                            <PackagePlus size={18} />
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground">Belum ada barang</p>
+                                                    </div>
+                                                ) : (
+                                                    items.map((item, idx) => (
+                                                        <div key={idx} className="rounded-lg border border-border bg-background p-2.5">
+                                                            <div className="grid grid-cols-12 gap-2">
+                                                                <div className="col-span-12 sm:col-span-5">
+                                                                    <select
+                                                                        value={item.skuId}
+                                                                        onChange={e => updateItem(idx, 'skuId', e.target.value)}
+                                                                        className={`h-9 w-full rounded-lg border bg-background px-3 text-xs outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15 ${
+                                                                            !item.skuId
+                                                                                ? 'border-amber-400 text-amber-700'
+                                                                                : 'border-border text-foreground'
+                                                                        }`}
+                                                                    >
+                                                                        <option value="">-- {!item.skuId ? '⚠️ Wajib Pilih SKU Barang' : 'Pilih Barang'} --</option>
+                                                                        {skus.map(s => <option key={s.id} value={s.id}>{s.code} - {s.product?.name}</option>)}
+                                                                    </select>
+                                                                    {item.notes && (
+                                                                        <p className="mt-1 truncate pl-1 text-[10px] text-muted-foreground" title={item.notes}>
+                                                                            Item PO: <span className="font-medium text-foreground">{item.notes}</span>
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="col-span-4 sm:col-span-2">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0.01"
+                                                                        step="any"
+                                                                        placeholder="Qty"
+                                                                        value={item.qty}
+                                                                        onChange={e => updateItem(idx, 'qty', +e.target.value)}
+                                                                        className="h-9 w-full rounded-lg border border-border bg-background px-2 text-center text-xs text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+                                                                    />
+                                                                </div>
+                                                                <div className="col-span-5 sm:col-span-3">
+                                                                    <div className="relative">
+                                                                        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-medium text-muted-foreground">Rp</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            placeholder="Harga"
+                                                                            value={item.unitCost}
+                                                                            onChange={e => updateItem(idx, 'unitCost', +e.target.value)}
+                                                                            className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-2 text-xs tabular-nums text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="col-span-2 flex items-center justify-end sm:col-span-1">
+                                                                    <span className="text-[11px] font-medium tabular-nums text-foreground">
+                                                                        {fmt(item.qty * item.unitCost)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="col-span-1 flex items-center justify-end">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => removeItem(idx)}
+                                                                        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                        title="Hapus baris"
+                                                                    >
+                                                                        <Trash2 size={15} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
                                             </div>
                                         </div>
+                                    </form>
+                                </div>
 
-                                        {selectedPO && (() => {
-                                            const p = poList.find(x => x.id === selectedPO)
-                                            if (!p) return null
-                                            return (
-                                                <div className="md:col-span-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className="font-bold text-emerald-800 flex items-center gap-1">
-                                                            <CheckCircle2 size={13} className="text-emerald-600" /> Referensi PO: {p.number}
-                                                        </span>
-                                                        <span className="text-slate-500">• {p.vendor?.name}</span>
-                                                        <span className="text-emerald-700 font-mono font-bold">• {fmt(p.grandTotal)}</span>
-                                                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-semibold">{items.length} item</span>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={clearPO}
-                                                        className="text-[11px] font-bold text-rose-600 hover:text-rose-800 bg-white hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 transition-colors shrink-0"
-                                                    >
-                                                        ✕ Batalkan PO
-                                                    </button>
-                                                </div>
-                                            )
-                                        })()}
-                                    </div>
-
-                                    <div className="space-y-4 pt-4 border-t border-slate-50">
-                                        <div className="flex items-center justify-between">
-                                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
-                                                <PackagePlus size={16} className="text-emerald-500" /> Daftar Barang
-                                            </h3>
-                                            <button type="button" onClick={addItem} className="text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-4 py-2 rounded-xl transition-all active:scale-95 shadow-sm border border-emerald-100">+ Tambah Baris</button>
-                                        </div>
-                                        <div className="space-y-3 max-h-[320px] overflow-y-auto pr-2 custom-scrollbar">
-                                            {items.length === 0 ? (
-                                                <div className="text-center py-12 bg-slate-50/50 rounded-[2rem] border-2 border-dashed border-slate-200">
-                                                    <PackagePlus size={32} className="text-slate-200 mx-auto mb-3" />
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Belum ada barang</p>
-                                                </div>
-                                            ) : (
-                                                items.map((item, idx) => (
-                                                    <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} key={idx} className="grid grid-cols-12 gap-3 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm items-center hover:shadow-md transition-shadow group/item">
-                                                        <div className="col-span-5">
-                                                            <select
-                                                                value={item.skuId}
-                                                                onChange={e => updateItem(idx, 'skuId', e.target.value)}
-                                                                className={`w-full border rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all ${
-                                                                    !item.skuId ? 'border-amber-400 bg-amber-50/60 text-amber-900' : 'bg-slate-50 border-slate-100 text-slate-800 focus:bg-white'
-                                                                }`}
-                                                            >
-                                                                <option value="">-- {!item.skuId ? '⚠️ Wajib Pilih SKU Barang' : 'Pilih Barang'} --</option>
-                                                                {skus.map(s => <option key={s.id} value={s.id}>{s.code} - {s.product?.name}</option>)}
-                                                            </select>
-                                                            {item.notes && (
-                                                                <p className="text-[10px] text-slate-400 font-medium mt-1 truncate pl-1" title={item.notes}>
-                                                                    Item PO: <span className="text-slate-600 font-semibold">{item.notes}</span>
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                        <div className="col-span-2">
-                                                            <div className="relative shadow-sm">
-                                                                <input type="number" min="0.01" step="any" placeholder="Qty" value={item.qty} onChange={e => updateItem(idx, 'qty', +e.target.value)} className="w-full bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 text-xs font-black outline-none text-center focus:ring-2 focus:ring-emerald-500/20 focus:bg-white transition-all" />
-                                                                <span className="absolute -top-2 left-2 px-1 bg-white text-[8px] font-black text-slate-300 uppercase">Qty</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="col-span-3">
-                                                            <div className="relative shadow-sm">
-                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">Rp</span>
-                                                                <input type="number" min="0" placeholder="Harga" value={item.unitCost} onChange={e => updateItem(idx, 'unitCost', +e.target.value)} className="w-full bg-slate-50 border border-slate-100 rounded-xl pl-8 pr-3 py-2 text-xs font-black outline-none focus:ring-2 focus:ring-emerald-500/20 focus:bg-white transition-all text-emerald-600" />
-                                                                <span className="absolute -top-2 left-2 px-1 bg-white text-[8px] font-black text-slate-300 uppercase">Unit Cost</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="col-span-1 text-right">
-                                                            <p className="text-[10px] font-black text-emerald-600 tabular-nums">{fmt(item.qty * item.unitCost)}</p>
-                                                        </div>
-                                                        <div className="col-span-1 flex justify-end">
-                                                            <button type="button" onClick={() => removeItem(idx)} className="w-8 h-8 rounded-lg text-slate-300 hover:text-rose-500 transition-all opacity-0 group-hover/item:opacity-100"><Trash2 size={16} /></button>
-                                                        </div>
-                                                    </motion.div>
-                                                ))
-                                            )}
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                            <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-100 shrink-0">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                <footer className="flex flex-col gap-3 border-t border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Estimasi</span>
-                                        <p className="text-xl font-black text-emerald-700 mt-0.5">{fmt(totalValue)}</p>
+                                        <p className="text-[11px] text-muted-foreground">Total Estimasi</p>
+                                        <p className="mt-0.5 text-base font-semibold tabular-nums text-foreground">{fmt(totalValue)}</p>
                                     </div>
-                                    <div className="flex gap-2 w-full md:w-auto">
-                                        <Button type="button" variant="outline" onClick={() => setModalOpen(false)} className="flex-1 md:flex-none rounded-xl bg-white h-12 md:h-14 md:px-8 font-black uppercase tracking-widest text-[10px] border-slate-200 hover:bg-slate-50 transition-all">Batal</Button>
+                                    <div className="flex w-full gap-2 sm:w-auto">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setModalOpen(false)}
+                                            className="h-9 flex-1 rounded-lg px-4 text-sm font-medium sm:flex-none"
+                                        >
+                                            Batal
+                                        </Button>
                                         <Button
                                             type="button"
                                             onClick={() => handleSubmit()}
                                             disabled={saving || items.length === 0}
-                                            className="flex-[2] md:flex-none rounded-xl h-12 md:h-14 md:px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-emerald-600/30 transition-all disabled:opacity-50 active:scale-95 cursor-pointer"
+                                            className="h-9 flex-1 rounded-lg px-4 text-sm font-medium sm:flex-none"
                                         >
                                             {saving ? 'Menyimpan...' : 'Simpan Draft'}
                                         </Button>
                                     </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                                </footer>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
 
-            <AnimatePresence>
-                {viewModalOpen && selectedMovement && (
-                    <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 bg-black/40 backdrop-blur-md overflow-y-auto pt-8 pb-20 no-scrollbar">
-                        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-                            className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-100">
-                            <div className="flex items-center justify-between px-8 py-6 border-b border-slate-50 bg-slate-50/50">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20"><Eye size={20} className="text-white" /></div>
-                                    <div>
-                                        <h2 className="font-black text-slate-900 text-lg uppercase tracking-tight leading-none">Detail Transaksi</h2>
-                                        <p className="text-[10px] font-bold text-indigo-600 mt-1.5 uppercase tracking-widest">{selectedMovement.number}</p>
+                {/* View detail modal */}
+                <AnimatePresence>
+                    {viewModalOpen && selectedMovement && (
+                        <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setViewModalOpen(false)}
+                                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                                className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-3xl sm:rounded-2xl"
+                            >
+                                <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                            <Eye size={17} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h2 className="truncate text-sm font-semibold text-foreground">Detail Transaksi</h2>
+                                            <p className="truncate text-[11px] text-muted-foreground">{selectedMovement.number}</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <button onClick={() => setViewModalOpen(false)} className="w-10 h-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-colors"><X size={24} /></button>
-                            </div>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setViewModalOpen(false)}
+                                        className={iconButtonClass}
+                                    >
+                                        <X size={16} />
+                                    </Button>
+                                </header>
 
-                            <div className="p-8 space-y-8">
-                                <div className="grid grid-cols-2 gap-y-6 gap-x-8 pb-8 border-b border-slate-100">
-                                    <div className="space-y-1"><label className={lc}>Gudang</label><p className="font-black text-slate-900 flex items-center gap-2"><MapPin size={12} className="text-indigo-500" />{selectedMovement.warehouse?.name}</p></div>
-                                    <div className="space-y-1"><label className={lc}>Tanggal</label><p className="font-black text-slate-900 flex items-center gap-2"><Clock size={12} className="text-indigo-500" />{new Date(selectedMovement.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}</p></div>
-                                    <div className="space-y-1">
-                                        <label className={lc}>Status Transaksi</label>
-                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider border ${STATUS_CFG[selectedMovement.status]?.color || ''}`}>
-                                            {STATUS_CFG[selectedMovement.status]?.label || selectedMovement.status}
-                                        </span>
-                                    </div>
-                                    <div className="space-y-1"><label className={lc}>Referensi / DO</label><p className="font-black text-slate-900 uppercase italic text-xs">{selectedMovement.referenceNumber || '-'}</p></div>
-                                    {selectedMovement.workOrder && (
-                                        <div className="col-span-2 pt-4 border-t border-slate-50">
-                                            <label className={lc}>Konteks Proyek</label>
-                                            <div className="flex items-center gap-3 bg-indigo-50/50 p-4 rounded-3xl border border-indigo-100/50 mt-1">
-                                                <div className="w-10 h-10 rounded-2xl bg-white border border-indigo-200 flex items-center justify-center text-indigo-600 shadow-sm"><Briefcase size={20} /></div>
-                                                <div>
-                                                    <p className="font-black text-slate-900 text-xs">{selectedMovement.workOrder.project?.name || selectedMovement.workOrder.title}</p>
-                                                    <div className="flex gap-2 mt-1">
-                                                        <span className="text-[9px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded-lg border border-indigo-100 uppercase tracking-tighter">WO: {selectedMovement.workOrder.number}</span>
+                                <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                                    <div className="grid grid-cols-1 gap-3 border-b border-border pb-3 sm:grid-cols-2">
+                                        <div>
+                                            <p className="text-[11px] text-muted-foreground">Gudang</p>
+                                            <p className="mt-0.5 flex items-center gap-1.5 text-sm text-foreground">
+                                                <MapPin size={12} className="text-muted-foreground" />
+                                                {selectedMovement.warehouse?.name}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] text-muted-foreground">Tanggal</p>
+                                            <p className="mt-0.5 flex items-center gap-1.5 text-sm text-foreground">
+                                                <Clock size={12} className="text-muted-foreground" />
+                                                {new Date(selectedMovement.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] text-muted-foreground">Status Transaksi</p>
+                                            <div className="mt-1">
+                                                <StatusPill status={selectedMovement.status} />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-[11px] text-muted-foreground">Referensi / DO</p>
+                                            <p className="mt-0.5 truncate text-sm text-foreground">{selectedMovement.referenceNumber || '-'}</p>
+                                        </div>
+                                        {selectedMovement.workOrder && (
+                                            <div className="border-t border-border pt-3 sm:col-span-2">
+                                                <p className="text-[11px] text-muted-foreground">Konteks Proyek</p>
+                                                <div className="mt-1 flex items-center gap-2.5 rounded-lg border border-border bg-muted/30 p-3">
+                                                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground">
+                                                        <Briefcase size={15} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-xs font-medium text-foreground">
+                                                            {selectedMovement.workOrder.project?.name || selectedMovement.workOrder.title}
+                                                        </p>
+                                                        <span className="mt-1 inline-block rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                            WO: {selectedMovement.workOrder.number}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
+                                        )}
+                                        <div className="border-t border-border pt-3 sm:col-span-2">
+                                            <p className="text-[11px] text-muted-foreground">Catatan</p>
+                                            <p className="mt-0.5 text-xs text-muted-foreground">{selectedMovement.notes || '-'}</p>
                                         </div>
-                                    )}
-                                    <div className="col-span-2 pt-2"><label className={lc}>Catatan</label><p className="font-medium text-slate-500 italic text-xs leading-relaxed">{selectedMovement.notes || '-'}</p></div>
-                                </div>
+                                    </div>
 
-                                <div className="space-y-4">
-                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">Daftar Barang ({selectedMovement.items.length})</h3>
-                                    <div className="bg-white rounded-[2rem] overflow-hidden border border-slate-100">
-                                        <table className="w-full text-xs text-left">
-                                            <thead>
-                                                <tr className="border-b border-slate-50 bg-slate-50/50">
-                                                    <th className="px-6 py-4 font-black text-slate-400 uppercase tracking-widest">Barang / SKU</th>
-                                                    <th className="px-6 py-4 text-center font-black text-slate-400 uppercase tracking-widest w-24">Qty</th>
-                                                    <th className="px-6 py-4 text-right font-black text-slate-400 uppercase tracking-widest w-32">Unit Cost</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-50">
-                                                {selectedMovement.items.map(item => (
-                                                    <tr key={item.id} className="hover:bg-slate-50/30 transition-colors">
-                                                        <td className="px-6 py-4">
-                                                            <div className="flex flex-col">
-                                                                <span className="font-black text-slate-900">{item.sku?.code}</span>
-                                                                <span className="text-[10px] font-bold text-slate-400 mt-0.5">{item.sku?.product?.name}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-center font-black text-slate-900 tabular-nums">{item.qty} Items</td>
-                                                        <td className="px-6 py-4 text-right font-black text-emerald-600 tabular-nums">{fmt(item.unitCost)}</td>
+                                    <div className="space-y-2">
+                                        <h3 className="text-xs font-medium text-foreground">
+                                            Daftar Barang ({selectedMovement.items.length})
+                                        </h3>
+                                        <div className="overflow-hidden rounded-lg border border-border">
+                                            <table className="w-full text-left text-sm">
+                                                <thead>
+                                                    <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                                        <th className="px-3 py-2 font-medium">Barang / SKU</th>
+                                                        <th className="w-24 px-3 py-2 text-center font-medium">Qty</th>
+                                                        <th className="w-32 px-3 py-2 text-right font-medium">Unit Cost</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div className="mt-4 flex justify-between items-center p-6 bg-slate-900 rounded-3xl text-white shadow-xl">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Nilai</span>
-                                            <span className="text-[9px] font-bold opacity-60 italic uppercase mt-0.5 tracking-tighter">Inventory Value Added</span>
+                                                </thead>
+                                                <tbody className="divide-y divide-border">
+                                                    {selectedMovement.items.map(item => (
+                                                        <tr key={item.id} className="hover:bg-muted/30">
+                                                            <td className="px-3 py-2">
+                                                                <p className="text-xs font-medium text-foreground">{item.sku?.code}</p>
+                                                                <p className="mt-0.5 text-[11px] text-muted-foreground">{item.sku?.product?.name}</p>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-center text-xs tabular-nums text-foreground">{item.qty} item</td>
+                                                            <td className="px-3 py-2 text-right text-xs font-medium tabular-nums text-foreground">{fmt(item.unitCost)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                        <span className="font-black text-2xl text-emerald-400 tabular-nums tracking-tighter">{fmt(selectedMovement.items.reduce((s, i) => s + i.qty * i.unitCost, 0))}</span>
+                                        <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+                                            <div>
+                                                <p className="text-[11px] text-muted-foreground">Total Nilai</p>
+                                                <p className="mt-0.5 text-[10px] text-muted-foreground">Inventory Value Added</p>
+                                            </div>
+                                            <span className="text-base font-semibold tabular-nums text-foreground">
+                                                {fmt(selectedMovement.items.reduce((s, i) => s + i.qty * i.unitCost, 0))}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="pt-6 flex gap-4">
-                                    <Button onClick={() => setViewModalOpen(false)} className="flex-1 rounded-2xl h-14 bg-slate-900 text-white font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 border-b-4 border-black">Tutup</Button>
+                                <footer className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setViewModalOpen(false)}
+                                        className="h-9 rounded-lg px-4 text-sm font-medium"
+                                    >
+                                        Tutup
+                                    </Button>
                                     {selectedMovement.status === 'DRAFT' && (
                                         <Button
+                                            type="button"
                                             onClick={() => { handleConfirm(selectedMovement.id); setViewModalOpen(false); }}
-                                            className="flex-2 rounded-2xl h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 border-b-4 border-emerald-800"
+                                            className="h-9 rounded-lg px-4 text-sm font-medium"
                                         >
                                             Konfirmasi Stok Masuk
                                         </Button>
                                     )}
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                                </footer>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+            </div>
         </div>
     )
 }

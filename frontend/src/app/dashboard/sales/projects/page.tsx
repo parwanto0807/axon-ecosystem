@@ -1,23 +1,20 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { useSession, signOut } from "next-auth/react"
+import { useSession } from "next-auth/react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-    Plus, Search, Eye, Edit, Trash2, X, Save,
+    Plus, Search, Eye, Edit, Trash2, X,
     CheckCircle2, AlertCircle, RefreshCw,
-    Briefcase, Clock, Check, Ban, TrendingUp,
-    Users, FileText, ShoppingCart, DollarSign,
-    ArrowUpRight, ArrowDownRight, Percent,
-    BarChart3, LayoutGrid, List, Filter,
-    ChevronDown, Calendar, MoreVertical,
-    Download, Printer, Share2, Star,
-    Building2, Phone, Mail, MapPin,
-    Package, Truck, Receipt, PieChart,
-    Activity, Target, Award, Zap,
-    Settings, Menu, Home, Bell,
-    User, LogOut, HelpCircle, AlertTriangle
+    Briefcase, Clock, FileText, ShoppingCart, Ban,
+    DollarSign, Percent, BarChart3, LayoutGrid, List, Filter,
+    ChevronDown, Calendar, Building2, Package,
+    Activity, TrendingUp, Menu,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { useUIStore } from "@/store/uiStore"
+import ProjectDetailModal from "@/components/sales/ProjectDetailModal"
+import ProjectPDFModal from "@/components/sales/ProjectPDFModal"
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 const formatCurrencyCompact = (value: number) => {
@@ -29,17 +26,7 @@ const formatCurrencyCompact = (value: number) => {
     }).format(value);
 };
 
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR'
-    }).format(value);
-};
-import { Button } from "@/components/ui/button"
-import { useUIStore } from "@/store/uiStore"
-import ProjectDetailModal from "@/components/sales/ProjectDetailModal"
-import ProjectPDFModal from "@/components/sales/ProjectPDFModal"
-import { generateProjectPDF } from "@/components/sales/ProjectPDFReport"
+const inputClass = "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 interface Customer { id: string; name: string; code: string; email?: string; phone?: string; address?: string }
@@ -65,24 +52,22 @@ interface WorkOrder { id: string; number: string; status: string; stockMovements
 interface WorkOrderItem { id: string; type: string; totalCost: number; isReleased: boolean }
 interface SurveyExpense { id: string; amount: number; status: string; purchaseOrderId?: string | null }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType; progress: number }> = {
-    PROSPECTING: { label: 'Prospecting', color: 'bg-slate-200 text-slate-700 border-slate-300', icon: Search, progress: 10 },
-    SURVEY_STAGE: { label: 'Survey Stage', color: 'bg-amber-100 text-amber-800 border-amber-300', icon: Clock, progress: 30 },
-    QUOTATION_STAGE: { label: 'Quotation Stage', color: 'bg-blue-100 text-blue-800 border-blue-300', icon: FileText, progress: 50 },
-    ORDERED: { label: 'Ordered', color: 'bg-purple-100 text-purple-800 border-purple-300', icon: ShoppingCart, progress: 70 },
-    COMPLETED: { label: 'Completed', color: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: CheckCircle2, progress: 100 },
-    LOST: { label: 'Lost', color: 'bg-rose-100 text-rose-800 border-rose-300', icon: Ban, progress: 0 },
+const STATUS_CONFIG: Record<string, { label: string; dot: string; icon: React.ElementType; progress: number }> = {
+    PROSPECTING: { label: 'Prospecting', dot: 'bg-muted-foreground/60', icon: Search, progress: 10 },
+    SURVEY_STAGE: { label: 'Survey Stage', dot: 'bg-amber-500', icon: Clock, progress: 30 },
+    QUOTATION_STAGE: { label: 'Quotation Stage', dot: 'bg-blue-500', icon: FileText, progress: 50 },
+    ORDERED: { label: 'Ordered', dot: 'bg-violet-500', icon: ShoppingCart, progress: 70 },
+    COMPLETED: { label: 'Completed', dot: 'bg-emerald-500', icon: CheckCircle2, progress: 100 },
+    LOST: { label: 'Lost', dot: 'bg-rose-500', icon: Ban, progress: 0 },
 }
 
-const PRIORITY_CONFIG: Record<string, { color: string; icon: React.ElementType }> = {
-    HIGH: { color: 'bg-rose-100 text-rose-800 border-rose-300', icon: Zap },
-    MEDIUM: { color: 'bg-amber-100 text-amber-800 border-amber-300', icon: Activity },
-    LOW: { color: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: Target },
+const PRIORITY_CONFIG: Record<string, { dot: string }> = {
+    HIGH: { dot: 'bg-rose-500' },
+    MEDIUM: { dot: 'bg-amber-500' },
+    LOW: { dot: 'bg-emerald-500' },
 }
 
-const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
-const fmtDateTime = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 const calcProjectStats = (p: PreSalesProject) => {
     const revenue = p.salesOrders?.reduce((acc, so) => acc + (so.grandTotal || 0), 0) || 0
@@ -154,6 +139,84 @@ const calcProjectStats = (p: PreSalesProject) => {
     return { revenue, cogs, materialUsageCosts, directPurchaseCosts, operationalExpenses, profit, margin, quotationRevenue, quotationHpp, quotationProfit, quotationMargin }
 }
 
+// ─── SHARED UI ────────────────────────────────────────────────────────────────
+function StatusPill({ label, dot }: { label: string; dot: string }) {
+    return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-foreground">
+            <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+            {label}
+        </span>
+    )
+}
+
+function PriorityPill({ label, dot }: { label: string; dot: string }) {
+    return (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+            {label}
+        </span>
+    )
+}
+
+function FlagPill({ tone, label, title }: { tone: 'rose' | 'amber'; label: string; title: string }) {
+    const toneCls = tone === 'rose'
+        ? 'border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400'
+        : 'border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-400'
+    const dot = tone === 'rose' ? 'bg-rose-500' : 'bg-amber-500'
+    return (
+        <span title={title} className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${toneCls}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+            {label}
+        </span>
+    )
+}
+
+function Segmented<T extends string>({
+    options,
+    value,
+    onChange,
+}: {
+    options: { value: T; label: string; icon?: React.ReactNode }[]
+    value: T
+    onChange: (value: T) => void
+}) {
+    return (
+        <div className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            {options.map((option) => (
+                <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => onChange(option.value)}
+                    aria-pressed={value === option.value}
+                    className={`inline-flex h-8 items-center gap-1 rounded-md px-3 text-xs font-medium transition-colors ${
+                        value === option.value
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                >
+                    {option.label}
+                    {option.icon}
+                </button>
+            ))}
+        </div>
+    )
+}
+
+function StatCard({ label, value, icon: Icon }: { label: string; value: string; icon: React.ElementType }) {
+    return (
+        <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                    <p className="mt-1 truncate text-lg font-semibold tracking-tight text-foreground tabular-nums">{value}</p>
+                </div>
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                    <Icon size={16} />
+                </div>
+            </div>
+        </div>
+    )
+}
 
 // ─── PULL TO REFRESH ──────────────────────────────────────────────────────────
 const PullToRefresh = ({ onRefresh, children }: { onRefresh: () => Promise<void>; children: React.ReactNode }) => {
@@ -210,15 +273,15 @@ const PullToRefresh = ({ onRefresh, children }: { onRefresh: () => Promise<void>
         <div ref={containerRef} className="w-full">
             <div className="relative">
                 <div
-                    className="absolute left-0 right-0 flex justify-center transition-all z-50"
-                    style={{ 
+                    className="absolute left-0 right-0 z-50 flex justify-center transition-all"
+                    style={{
                         transform: `translateY(${pullDistance}px)`,
                         opacity: pullDistance > 0 || refreshing ? 1 : 0,
                         pointerEvents: 'none'
                     }}
                 >
-                    <div className={`w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg ${refreshing ? 'animate-spin' : ''}`}>
-                        <RefreshCw size={16} className="text-white" />
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ${refreshing ? 'animate-spin' : ''}`}>
+                        <RefreshCw size={16} />
                     </div>
                 </div>
                 <div style={{ transform: `translateY(${pullDistance}px)` }}>
@@ -237,23 +300,23 @@ function Pagination(props: any) {
     for (let i = start; i <= Math.min(start + 4, totalPages); i++) pages.push(i)
 
     return (
-        <div className="flex items-center justify-between px-2 py-3 border-t border-slate-200 mt-2">
-            <span className="text-[11px] text-slate-500 font-medium">
+        <div className="mt-3 flex items-center justify-between border-t border-border px-2 py-3">
+            <span className="text-[11px] font-medium text-muted-foreground">
                 Page {page} of {totalPages} ({total} projects)
             </span>
             <div className="flex items-center gap-1">
                 <button onClick={() => onPage(Math.max(1, page - 1))} disabled={page === 1}
-                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition-all">
+                    className="h-7 rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40">
                     Prev
                 </button>
                 {pages.map(p => (
                     <button key={p} onClick={() => onPage(p)}
-                        className={`w-7 h-7 rounded-lg text-[11px] font-semibold transition-all ${page === p ? 'bg-indigo-600 text-white shadow-sm' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                        className={`h-7 w-7 rounded-md text-xs font-medium transition-colors ${page === p ? 'bg-primary text-primary-foreground' : 'border border-border text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
                         {p}
                     </button>
                 ))}
                 <button onClick={() => onPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}
-                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-[11px] font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-50 transition-all">
+                    className="h-7 rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40">
                     Next
                 </button>
             </div>
@@ -265,9 +328,6 @@ function Pagination(props: any) {
 export default function ProjectsPage() {
     const { data: session } = useSession()
     const userRole = (session?.user as any)?.role || ''
-    const userName = (session?.user as any)?.name || 'User'
-    const userEmail = (session?.user as any)?.email || 'user@example.com'
-    const userImage = (session?.user as any)?.image
     const [projects, setProjects] = useState<PreSalesProject[]>([])
     const [customers, setCustomers] = useState<Customer[]>([])
     const [loading, setLoading] = useState(true)
@@ -281,7 +341,6 @@ export default function ProjectsPage() {
     const [companyProfile, setCompanyProfile] = useState<any>(null)
     const [pdfProject, setPdfProject] = useState<{ project: PreSalesProject, stats: any } | null>(null)
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid')
-    const [activePage, setActivePage] = useState('projects')
 
     useEffect(() => {
         const saved = localStorage.getItem('project_view_mode') as any
@@ -312,7 +371,7 @@ export default function ProjectsPage() {
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const projectsUrl = selectedBusinessCategoryId 
+            const projectsUrl = selectedBusinessCategoryId
                 ? `${process.env.NEXT_PUBLIC_API_URL}/api/projects?businessCategoryId=${selectedBusinessCategoryId}`
                 : `${process.env.NEXT_PUBLIC_API_URL}/api/projects`
 
@@ -441,274 +500,198 @@ export default function ProjectsPage() {
             : 0
     };
 
-    return (
-        <div className="w-full bg-white">
-            <AnimatePresence>
-                {toast && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -50, scale: 0.9 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -50, scale: 0.9 }}
-                        className={`fixed top-4 left-1/2 -translate-x-1/2 w-[90%] md:w-auto md:min-w-80 z-300 flex items-center gap-2 px-3.5 py-2.5 rounded-xl shadow-lg text-xs font-semibold border ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                            toast.type === 'error' ? 'bg-rose-50 text-rose-800 border-rose-200' :
-                                'bg-blue-50 text-blue-800 border-blue-200'
-                            }`}>
-                        {toast.type === 'success' ? <CheckCircle2 size={14} /> :
-                            toast.type === 'error' ? <AlertCircle size={14} /> :
-                                <Activity size={14} />}
-                        <span className="flex-1">{toast.msg}</span>
-                        <button onClick={() => setToast(null)} className="p-1 hover:bg-black/5 rounded-full">
-                            <X size={16} />
-                        </button>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+    const statusOptions = ['ALL', ...Object.keys(STATUS_CONFIG)].map(s => ({
+        value: s,
+        label: s === 'ALL' ? 'All' : STATUS_CONFIG[s].label,
+    }))
 
-            {/* Header */}
-            <header className="sticky top-16 lg:top-0 z-40 bg-white border-b border-slate-200 px-4 lg:px-5 py-3">
-                <div className="flex items-center justify-between">
+    const priorityOptions = ['ALL', 'HIGH', 'MEDIUM', 'LOW'].map(p => ({ value: p, label: p }))
+
+    const periodOptions = [
+        { id: 'today', label: 'Today' },
+        { id: 'week', label: 'Week' },
+        { id: 'month', label: 'Month' },
+        { id: 'all', label: 'All' },
+    ]
+
+    const sortOptions = [
+        { id: 'no_so', label: '🔴 Belum SO First' },
+        { id: 'date', label: 'Date' },
+        { id: 'name', label: 'Name' },
+        { id: 'revenue', label: 'Revenue' },
+    ]
+
+    return (
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                <AnimatePresence>
+                    {toast && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+                            className="fixed left-1/2 top-4 z-[100] flex w-[90%] items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-medium text-foreground shadow-lg md:w-auto md:min-w-80"
+                        >
+                            {toast.type === 'success' ? <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" /> :
+                                toast.type === 'error' ? <AlertCircle size={14} className="text-rose-600 dark:text-rose-400" /> :
+                                    <Activity size={14} className="text-primary" />}
+                            <span className="flex-1">{toast.msg}</span>
+                            <button onClick={() => setToast(null)} className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                <X size={14} />
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Header */}
+                <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => useUIStore.getState().toggleMobileMenu()}
-                            className="lg:hidden w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+                            aria-label="Open menu"
                         >
-                            <Menu size={16} className="text-slate-600" />
+                            <Menu size={16} />
                         </button>
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm">
-                                <Briefcase size={20} className="text-white" />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 mb-1">
-                                    <span className="hover:text-slate-600 transition-colors cursor-pointer">Dashboard</span>
-                                    <span className="text-slate-300">›</span>
-                                    <span className="hover:text-slate-600 transition-colors cursor-pointer">Sales</span>
-                                    <span className="text-slate-300">›</span>
-                                    <span className="text-indigo-600 font-semibold">Projects</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <h1 className="text-lg font-bold text-slate-900 leading-none">Projects</h1>
-                                    <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                        {filtered.length} projects
-                                    </span>
-                                </div>
-                            </div>
+                        <div>
+                            <h1 className="text-xl font-semibold tracking-tight text-foreground">Projects</h1>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                {filtered.length} {filtered.length === 1 ? 'project' : 'projects'} · Sales pipeline, revenue and profitability
+                            </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => { setEditing(null); setModalOpen(true) }}
-                            className="hidden lg:inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all text-sm font-semibold shadow-sm"
-                        >
-                            <Plus size={16} />
-                            New Project
+                    <Button
+                        onClick={() => { setEditing(null); setModalOpen(true) }}
+                        className="h-9 rounded-lg px-4 text-sm font-medium"
+                    >
+                        <Plus size={16} className="mr-1.5" />
+                        New Project
+                    </Button>
+                </header>
+
+                {/* Search & Filters bar */}
+                <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+                    <div className="relative flex-1 lg:max-w-xs">
+                        <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            placeholder="Search projects or customers..."
+                            className={`${inputClass} pl-9`}
+                        />
+                    </div>
+                    <select
+                        value={selectedBusinessCategoryId}
+                        onChange={e => setSelectedBusinessCategoryId(e.target.value)}
+                        className={`${inputClass} cursor-pointer lg:w-48`}
+                    >
+                        <option value="">All Units</option>
+                        {businessCategories.map(biz => (
+                            <option key={biz.id} value={biz.id}>{biz.name}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`inline-flex h-10 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${showFilters ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+                    >
+                        <Filter size={14} />
+                        <span className="hidden sm:inline">Filters</span>
+                    </button>
+                    <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1 lg:ml-auto" role="toolbar" aria-label="View options">
+                        <button onClick={() => handleViewModeChange('grid')}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${viewMode === 'grid' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            aria-label="Grid view" aria-pressed={viewMode === 'grid'}>
+                            <LayoutGrid size={15} />
+                        </button>
+                        <button onClick={() => handleViewModeChange('list')}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${viewMode === 'list' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            aria-label="List view" aria-pressed={viewMode === 'list'}>
+                            <List size={15} />
+                        </button>
+                        <button onClick={() => handleViewModeChange('table')}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${viewMode === 'table' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                            aria-label="Table view" aria-pressed={viewMode === 'table'}>
+                            <Menu size={15} />
                         </button>
                     </div>
                 </div>
-            </header>
 
-            {/* Search & Filters bar */}
-            <div className="bg-white border-b border-slate-100 px-4 lg:px-5 py-3">
-                <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1 relative">
-                            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                placeholder="Search projects or customers..."
-                                className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 text-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all placeholder:text-slate-400"
-                            />
-                        </div>
-                        <select
-                            value={selectedBusinessCategoryId}
-                            onChange={e => setSelectedBusinessCategoryId(e.target.value)}
-                            className="h-9 px-3 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
+                <AnimatePresence>
+                    {showFilters && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mb-4 overflow-hidden"
                         >
-                            <option value="">All Units</option>
-                            {businessCategories.map(biz => (
-                                <option key={biz.id} value={biz.id}>{biz.name}</option>
-                            ))}
-                        </select>
-                        <button
-                            onClick={() => setShowFilters(!showFilters)}
-                            className={`h-9 px-3 rounded-lg border transition-all flex items-center gap-1.5 text-xs font-semibold ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                        >
-                            <Filter size={14} />
-                            <span className="hidden sm:inline">Filters</span>
-                        </button>
-                        <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5" role="toolbar" aria-label="View options">
-                            <button onClick={() => handleViewModeChange('grid')}
-                                className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                                aria-label="Grid view" aria-pressed={viewMode === 'grid'}>
-                                <LayoutGrid size={15} />
-                            </button>
-                            <button onClick={() => handleViewModeChange('list')}
-                                className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                                aria-label="List view" aria-pressed={viewMode === 'list'}>
-                                <List size={15} />
-                            </button>
-                            <button onClick={() => handleViewModeChange('table')}
-                                className={`p-1.5 rounded-md transition-all ${viewMode === 'table' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                                aria-label="Table view" aria-pressed={viewMode === 'table'}>
-                                <Menu size={15} />
-                            </button>
-                        </div>
-                    </div>
-
-                    <AnimatePresence>
-                        {showFilters && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="bg-slate-50 rounded-xl border border-slate-200 p-4 overflow-hidden"
-                            >
-                                <div className="flex flex-wrap gap-6">
-                                    <div>
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Status</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {['ALL', ...Object.keys(STATUS_CONFIG)].map(s => (
-                                                <button key={s} onClick={() => setFilterStatus(s)} aria-pressed={filterStatus === s}
-                                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${filterStatus === s ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
-                                                    {s === 'ALL' ? 'All' : STATUS_CONFIG[s].label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Priority</p>
-                                        <div className="flex gap-1.5">
-                                            {['ALL', 'HIGH', 'MEDIUM', 'LOW'].map(p => (
-                                                <button key={p} onClick={() => setSelectedPriority(p)} aria-pressed={selectedPriority === p}
-                                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${selectedPriority === p ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
-                                                    {p}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Period</p>
-                                        <div className="flex gap-1.5">
-                                            {[{ id: 'today', label: 'Today' }, { id: 'week', label: 'Week' }, { id: 'month', label: 'Month' }, { id: 'all', label: 'All' }].map(r => (
-                                                <button key={r.id} onClick={() => setDateRange(r.id as any)} aria-pressed={dateRange === r.id}
-                                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${dateRange === r.id ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
-                                                    {r.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Sort</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {[
-                                                { id: 'no_so', label: '🔴 Belum SO First' },
-                                                { id: 'date', label: 'Date' },
-                                                { id: 'name', label: 'Name' },
-                                                { id: 'revenue', label: 'Revenue' }
-                                            ].map(s => (
-                                                <button key={s.id} onClick={() => { if (sortBy === s.id) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc'); else { setSortBy(s.id as any); setSortOrder('desc'); } }} aria-pressed={sortBy === s.id}
-                                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all flex items-center gap-1 ${sortBy === s.id ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
-                                                    {s.label}
-                                                    {sortBy === s.id && <ChevronDown size={10} className={`transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                            <div className="flex flex-wrap gap-5 rounded-xl border border-border bg-muted/20 p-4">
+                                <div>
+                                    <p className="mb-2 text-xs font-medium text-muted-foreground">Status</p>
+                                    <Segmented options={statusOptions} value={filterStatus} onChange={setFilterStatus} />
                                 </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-            </div>
+                                <div>
+                                    <p className="mb-2 text-xs font-medium text-muted-foreground">Priority</p>
+                                    <Segmented options={priorityOptions} value={selectedPriority} onChange={setSelectedPriority} />
+                                </div>
+                                <div>
+                                    <p className="mb-2 text-xs font-medium text-muted-foreground">Period</p>
+                                    <Segmented
+                                        options={periodOptions.map(r => ({ value: r.id, label: r.label }))}
+                                        value={dateRange}
+                                        onChange={(value) => setDateRange(value as any)}
+                                    />
+                                </div>
+                                <div>
+                                    <p className="mb-2 text-xs font-medium text-muted-foreground">Sort</p>
+                                    <Segmented
+                                        options={sortOptions.map(s => ({
+                                            value: s.id,
+                                            label: s.label,
+                                            icon: sortBy === s.id
+                                                ? <ChevronDown size={11} className={`transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                                                : undefined,
+                                        }))}
+                                        value={sortBy}
+                                        onChange={(value) => {
+                                            if (sortBy === value) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+                                            else { setSortBy(value as any); setSortOrder('desc') }
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-            {/* Main Content */}
-            <div className="w-full px-4 lg:px-5 py-5">
-                    <PullToRefresh onRefresh={load}>
-
+                {/* Main Content */}
+                <PullToRefresh onRefresh={load}>
                     {/* Stats Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
-                        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Total Revenue</p>
-                                    <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{formatCurrencyCompact(stats.revenue)}</h3>
-                                </div>
-                                <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                                    <DollarSign size={18} />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Est. HPP / Modal (Penawaran)</p>
-                                    <h3 className="text-2xl font-bold text-amber-600 tracking-tight">{formatCurrencyCompact(stats.quotationHpp)}</h3>
-                                </div>
-                                <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                                    <Package size={18} />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Active Projects</p>
-                                    <h3 className="text-2xl font-bold text-slate-900 tracking-tight">{stats.active}</h3>
-                                </div>
-                                <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                    <Activity size={18} />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Avg Margin</p>
-                                    <h3 className="text-2xl font-bold text-blue-600 tracking-tight">{stats.avgMargin.toFixed(1)}%</h3>
-                                </div>
-                                <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                                    <TrendingUp size={18} />
-                                </div>
-                            </div>
-                        </div>
+                    <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <StatCard label="Total Revenue" value={formatCurrencyCompact(stats.revenue)} icon={DollarSign} />
+                        <StatCard label="Est. HPP / Modal (Penawaran)" value={formatCurrencyCompact(stats.quotationHpp)} icon={Package} />
+                        <StatCard label="Active Projects" value={String(stats.active)} icon={Activity} />
+                        <StatCard label="Avg Margin" value={`${stats.avgMargin.toFixed(1)}%`} icon={TrendingUp} />
                     </div>
 
                     {/* Projects Views */}
                     {loading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {[1, 2, 3, 4, 5, 6].map(i => (
-                                <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 animate-pulse shadow-sm">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="space-y-2 flex-1">
-                                            <div className="h-3 w-16 bg-slate-200 rounded-md"></div>
-                                            <div className="h-4 w-3/4 bg-slate-200 rounded-md"></div>
-                                        </div>
-                                        <div className="h-6 w-16 bg-slate-200 rounded-full"></div>
-                                    </div>
-                                    <div className="space-y-3 mb-4"><div className="flex items-center gap-2"><div className="w-5 h-5 bg-slate-200 rounded-full"></div><div className="h-3 w-1/2 bg-slate-200 rounded-md"></div></div></div>
-                                    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-100">
-                                        <div className="h-8 bg-slate-100 rounded-lg"></div>
-                                        <div className="h-8 bg-slate-100 rounded-lg"></div>
-                                        <div className="h-8 bg-slate-100 rounded-lg"></div>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+                            <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
                         </div>
                     ) : filtered.length === 0 ? (
-                        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                            className="bg-white rounded-xl border border-slate-200 py-20 px-6 flex flex-col items-center text-center shadow-sm">
-                            <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
-                                <Briefcase size={28} className="text-indigo-500" />
+                        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+                            className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-20 text-center">
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                <Briefcase size={22} />
                             </div>
-                            <h3 className="font-bold text-slate-900 text-base mb-1">No projects found</h3>
-                            <p className="text-sm text-slate-500 mb-6 max-w-sm">
+                            <h3 className="text-sm font-medium text-foreground">No projects found</h3>
+                            <p className="mt-1 max-w-sm text-xs text-muted-foreground">
                                 {hasActiveFilters
                                     ? "Try adjusting your filters."
                                     : "Create your first project to get started."}
                             </p>
                             <button onClick={() => { if (hasActiveFilters) { setSearch(''); setSearchTerm(''); setFilterStatus('ALL'); setDateRange('all'); setSelectedPriority('ALL'); } else { setEditing(null); setModalOpen(true); } }}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 py-2.5 text-sm font-semibold transition-all flex items-center gap-2">
+                                className="mt-5 inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
                                 {hasActiveFilters ? <><RefreshCw size={14} /> Clear Filters</> : <><Plus size={14} /> Create First Project</>}
                             </button>
                         </motion.div>
@@ -717,455 +700,410 @@ export default function ProjectsPage() {
                             {/* Mobile Cards */}
                             <div className="lg:hidden">
                                 {viewMode === 'grid' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {paginated.map((p, idx) => {
-                                const stats = calcProjectStats(p)
-                                const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.PROSPECTING
-                                const StatusIcon = sc.icon
-                                const priority = p.priority ? PRIORITY_CONFIG[p.priority] : null
-                                const PriorityIcon = priority?.icon
-                                const hasSalesOrder = Boolean(p.salesOrders && p.salesOrders.length > 0)
-                                const hasInvoice = Boolean(p.invoices && p.invoices.length > 0)
+                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        {paginated.map((p, idx) => {
+                                            const stats = calcProjectStats(p)
+                                            const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.PROSPECTING
+                                            const priority = p.priority ? PRIORITY_CONFIG[p.priority] : null
+                                            const hasSalesOrder = Boolean(p.salesOrders && p.salesOrders.length > 0)
+                                            const hasInvoice = Boolean(p.invoices && p.invoices.length > 0)
 
-                                return (
-                                    <motion.div
-                                        key={p.id}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: idx * 0.03 }}
-                                        className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all overflow-hidden group"
-                                    >
-                                        <div className="p-4 border-b border-slate-100">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                                                        <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider bg-indigo-50 px-1.5 py-0.5 rounded-md">{p.number}</span>
-                                                        {PriorityIcon && (
-                                                            <span className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider ${priority.color}`}>
-                                                                <PriorityIcon size={8} />
-                                                                {p.priority}
-                                                            </span>
-                                                        )}
-                                                        {!hasSalesOrder && (
-                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200" title="Project belum memiliki Pesanan Penjualan (Sales Order)">
-                                                                <span className="relative flex h-2 w-2 shrink-0">
-                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.9)]"></span>
-                                                                </span>
-                                                                <span>Belum SO</span>
-                                                            </span>
-                                                        )}
-                                                        {!hasInvoice && (
-                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-amber-50 text-amber-600 border border-amber-200" title="Project belum diinvoice (No Invoice)">
-                                                                <span className="relative flex h-2 w-2 shrink-0">
-                                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.9)]"></span>
-                                                                </span>
-                                                                <span>Belum INV</span>
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <h3 className="font-semibold text-slate-900 text-sm leading-tight group-hover:text-indigo-600 transition-colors">{p.name}</h3>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className="text-[9px] text-slate-500 font-medium truncate">{p.customer?.name || 'Unknown'}</span>
-                                                        <span className="text-[8px] text-rose-500 font-semibold uppercase bg-rose-50 px-1 py-0.5 rounded">
-                                                            {p.businessCategory?.name || 'GENERIC'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[8px] font-bold uppercase tracking-wider border shrink-0 ${sc.color}`}>
-                                                    <StatusIcon size={8} />
-                                                    <span>{sc.label}</span>
-                                                </div>
-                                            </div>
-                                            <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden mt-3">
-                                                <motion.div initial={{ width: 0 }} animate={{ width: `${sc.progress}%` }} transition={{ duration: 0.8, delay: 0.1 }}
-                                                    className="h-full bg-indigo-600 rounded-full" />
-                                            </div>
-                                        </div>
-                                        <div className="p-4 space-y-3">
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div className="bg-slate-50 rounded-lg px-2.5 py-2">
-                                                    <p className="text-[8px] font-semibold text-slate-400 uppercase tracking-wider">Revenue</p>
-                                                    <p className="text-[11px] font-bold text-slate-900 truncate">{formatCurrencyCompact(stats.revenue)}</p>
-                                                </div>
-                                                <div className="bg-slate-50 rounded-lg px-2.5 py-2">
-                                                    <p className="text-[8px] font-semibold text-slate-400 uppercase tracking-wider">Expense</p>
-                                                    <p className="text-[11px] font-bold text-rose-600 truncate">{formatCurrencyCompact(stats.cogs + stats.operationalExpenses)}</p>
-                                                </div>
-                                                <div className="bg-slate-50 rounded-lg px-2.5 py-2">
-                                                    <p className="text-[8px] font-semibold text-slate-400 uppercase tracking-wider">Profit</p>
-                                                    <p className={`text-[11px] font-bold truncate ${stats.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-{stats.profit > 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-1.5">
-                                                    <div className={`w-5 h-5 rounded flex items-center justify-center ${stats.margin > 20 ? 'bg-emerald-100' : stats.margin > 10 ? 'bg-amber-100' : 'bg-rose-100'}`}>
-                                                        <Percent size={9} className={stats.margin > 20 ? 'text-emerald-600' : stats.margin > 10 ? 'text-amber-600' : 'text-rose-600'} />
-                                                    </div>
-                                                    <span className={`text-[10px] font-bold ${stats.margin > 20 ? 'text-emerald-600' : stats.margin > 10 ? 'text-amber-600' : 'text-rose-600'}`}>{stats.margin.toFixed(1)}%</span>
-                                                </div>
-                                                <span className="text-[9px] text-slate-400 font-medium">{fmtDate(p.createdAt)}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between bg-amber-50/60 border border-amber-100 rounded-lg px-2.5 py-1.5">
-                                                <span className="text-[8px] font-semibold text-amber-500 uppercase tracking-wider">Est. HPP Penawaran</span>
-                                                <span className="text-[10px] font-bold text-amber-700">{formatCurrencyCompact(stats.quotationHpp)}</span>
-                                                <span className={`text-[10px] font-bold ${stats.quotationProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                    {stats.quotationMargin.toFixed(1)}% est. margin
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5 pt-1">
-                                                <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} className="flex-1 flex items-center justify-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 py-2 rounded-lg text-[9px] font-semibold transition-all">
-                                                    <Eye size={11} /> View
-                                                </button>
-                                                <button onClick={() => window.location.href = `/dashboard/sales/projects/${p.id}/resume`} aria-label={`Resume ${p.name}`} className="flex-1 flex items-center justify-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-600 py-2 rounded-lg text-[9px] font-semibold transition-all">
-                                                    <BarChart3 size={11} /> Resume
-                                                </button>
-                                                <button onClick={() => { setEditing(p); setModalOpen(true) }} aria-label={`Edit ${p.name}`} className="w-9 h-8 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg transition-all">
-                                                    <Edit size={12} />
-                                                </button>
-                                                <button onClick={() => setPdfProject({ project: p, stats })} className="w-9 h-8 flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-all">
-                                                    <FileText size={13} />
-                                                </button>
-                                                <button onClick={() => setDeleteConfirm({ id: p.id, name: p.name })} className="w-9 h-8 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-all">
-                                                    <Trash2 size={13} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        // List View - Compact
-                        <div className="space-y-1.5">
-                            {paginated.map((p, idx) => {
-                                const stats = calcProjectStats(p)
-                                const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.PROSPECTING
-                                const StatusIcon = sc.icon
-                                const hasSalesOrder = Boolean(p.salesOrders && p.salesOrders.length > 0)
-                                const hasInvoice = Boolean(p.invoices && p.invoices.length > 0)
-
-                                return (
-                                    <motion.div
-                                        key={p.id}
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: idx * 0.03 }}
-                                        className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 shadow-sm hover:shadow-md transition-all flex items-center gap-3 group"
-                                    >
-                                        <div className={`w-8 h-8 rounded-lg ${sc.color.replace('text-', 'bg-').replace('border-', '')} flex items-center justify-center shrink-0`}>
-                                            <StatusIcon size={14} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                                                <span className="text-[8px] font-bold text-indigo-600 uppercase tracking-wider">{p.number}</span>
-                                                <span className="text-[8px] text-slate-400">•</span>
-                                                <span className="text-[8px] text-slate-500 font-medium">{fmtDate(p.createdAt)}</span>
-                                                {!hasSalesOrder && (
-                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200" title="Project belum memiliki Pesanan Penjualan (Sales Order)">
-                                                        <span className="relative flex h-2 w-2 shrink-0">
-                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.9)]"></span>
-                                                        </span>
-                                                        <span>Belum SO</span>
-                                                    </span>
-                                                )}
-                                                {!hasInvoice && (
-                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-amber-50 text-amber-600 border border-amber-200" title="Project belum diinvoice (No Invoice)">
-                                                        <span className="relative flex h-2 w-2 shrink-0">
-                                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.9)]"></span>
-                                                        </span>
-                                                        <span>Belum INV</span>
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <h3 className="font-semibold text-slate-900 text-xs truncate group-hover:text-indigo-600 transition-colors">{p.name}</h3>
-                                                <span className="text-[9px] text-slate-500 truncate hidden sm:inline">{p.customer?.name}</span>
-                                            </div>
-                                        </div>
-                                        <div className="text-right hidden sm:block pr-2">
-                                            <p className="text-[9px] font-semibold text-slate-400 uppercase">Rev</p>
-                                            <p className="text-[9px] font-semibold text-slate-400 uppercase">Exp</p>
-                                        </div>
-                                        <div className="text-right hidden sm:block">
-                                            <p className="text-xs font-bold text-slate-900">{formatCurrencyCompact(stats.revenue)}</p>
-                                            <p className="text-[10px] font-bold text-rose-600">{formatCurrencyCompact(stats.cogs + stats.operationalExpenses)}</p>
-                                        </div>
-                                        <div className="text-right hidden sm:block border-l border-slate-200 pl-3 ml-1">
-                                            <p className="text-[9px] font-semibold text-slate-400 uppercase">Profit</p>
-                                            <p className={`text-[11px] font-bold ${stats.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                {stats.profit >= 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
-                                            </p>
-                                            <p className={'text-[9px] font-semibold ' + (stats.quotationProfit >= 0 ? 'text-emerald-500' : 'text-rose-500')}>
-                                                Est. {formatCurrencyCompact(stats.quotationHpp)} ({stats.quotationMargin.toFixed(0)}%)
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="View">
-                                                <Eye size={13} className="text-slate-400" />
-                                            </button>
-                                            <button onClick={() => window.location.href = `/dashboard/sales/projects/${p.id}/resume`} aria-label={`Resume ${p.name}`} className="p-1.5 hover:bg-amber-50 rounded-lg transition-colors" title="Resume">
-                                                <BarChart3 size={13} className="text-amber-500" />
-                                            </button>
-                                            <button onClick={() => { setEditing(p); setModalOpen(true); }} aria-label={`Edit ${p.name}`} className="p-1.5 hover:bg-indigo-50 rounded-lg transition-colors" title="Edit">
-                                                <Edit size={13} className="text-indigo-400" />
-                                            </button>
-                                            <button onClick={() => setPdfProject({ project: p, stats })} aria-label={`Export PDF ${p.name}`} className="p-1.5 hover:bg-emerald-50 rounded-lg transition-colors" title="PDF">
-                                                <FileText size={13} className="text-emerald-400" />
-                                            </button>
-                                            <button onClick={() => setDeleteConfirm({ id: p.id, name: p.name })} aria-label={`Delete ${p.name}`} className="p-1.5 hover:bg-rose-50 rounded-lg transition-colors" title="Delete">
-                                                <Trash2 size={13} className="text-rose-400" />
-                                            </button>
-                                        </div>
-                                    </motion.div>
-                                )
-                            })}
-                        </div>
-                    )}
-                </div>
-
-                            {/* Desktop Table */}
-                            <div className="hidden lg:block bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200">
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Project</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Customer</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-center">Status</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-center">Priority</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Revenue</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Expenses</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Est. HPP (Quo)</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Est. Margin (Quo)</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Margin</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginated.map((p, idx) => {
-                                        const stats = calcProjectStats(p)
-                                        const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.PROSPECTING
-                                        const StatusIcon = sc.icon
-                                        const priority = p.priority ? PRIORITY_CONFIG[p.priority] : null
-                                        const PriorityIcon = priority?.icon
-                                        const hasSalesOrder = Boolean(p.salesOrders && p.salesOrders.length > 0)
-                                        const hasInvoice = Boolean(p.invoices && p.invoices.length > 0)
-
-                                        return (
-                                            <motion.tr
-                                                key={p.id}
-                                                initial={{ opacity: 0, y: 5 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: idx * 0.02 }}
-                                                className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
-                                            >
-                                                <td className="px-4 py-3">
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider">{p.number}</span>
-                                                            {!hasSalesOrder && (
-                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200" title="Project belum memiliki Pesanan Penjualan (SO)">
-                                                                    <span className="relative flex h-2 w-2 shrink-0">
-                                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.9)]"></span>
+                                            return (
+                                                <motion.div
+                                                    key={p.id}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: idx * 0.03 }}
+                                                    className="group overflow-hidden rounded-xl border border-border bg-card transition-colors hover:bg-muted/20"
+                                                >
+                                                    <div className="border-b border-border p-3">
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                                                                    <span className="font-mono text-[11px] font-medium text-muted-foreground">{p.number}</span>
+                                                                    {priority && (
+                                                                        <PriorityPill label={p.priority!} dot={priority.dot} />
+                                                                    )}
+                                                                    {!hasSalesOrder && (
+                                                                        <FlagPill tone="rose" label="Belum SO" title="Project belum memiliki Pesanan Penjualan (Sales Order)" />
+                                                                    )}
+                                                                    {!hasInvoice && (
+                                                                        <FlagPill tone="amber" label="Belum INV" title="Project belum diinvoice (No Invoice)" />
+                                                                    )}
+                                                                </div>
+                                                                <h3 className="truncate text-sm font-medium text-foreground">{p.name}</h3>
+                                                                <div className="mt-0.5 flex items-center gap-2">
+                                                                    <span className="truncate text-[11px] text-muted-foreground">{p.customer?.name || 'Unknown'}</span>
+                                                                    <span className="inline-flex items-center rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                                        {p.businessCategory?.name || 'GENERIC'}
                                                                     </span>
-                                                                    <span>Belum SO</span>
-                                                                </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="shrink-0">
+                                                                <StatusPill label={sc.label} dot={sc.dot} />
+                                                            </div>
+                                                        </div>
+                                                        <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted">
+                                                            <motion.div initial={{ width: 0 }} animate={{ width: `${sc.progress}%` }} transition={{ duration: 0.8, delay: 0.1 }}
+                                                                className="h-full rounded-full bg-primary" />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-3 p-3">
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            <div className="rounded-lg bg-muted/40 px-2.5 py-2">
+                                                                <p className="text-[10px] font-medium text-muted-foreground">Revenue</p>
+                                                                <p className="truncate text-[11px] font-medium text-foreground tabular-nums">{formatCurrencyCompact(stats.revenue)}</p>
+                                                            </div>
+                                                            <div className="rounded-lg bg-muted/40 px-2.5 py-2">
+                                                                <p className="text-[10px] font-medium text-muted-foreground">Expense</p>
+                                                                <p className="truncate text-[11px] font-medium text-rose-600 tabular-nums dark:text-rose-400">{formatCurrencyCompact(stats.cogs + stats.operationalExpenses)}</p>
+                                                            </div>
+                                                            <div className="rounded-lg bg-muted/40 px-2.5 py-2">
+                                                                <p className="text-[10px] font-medium text-muted-foreground">Profit</p>
+                                                                <p className={`truncate text-[11px] font-medium tabular-nums ${stats.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                                    {stats.profit > 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className={`flex h-5 w-5 items-center justify-center rounded ${stats.margin > 20 ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' : stats.margin > 10 ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400'}`}>
+                                                                    <Percent size={11} />
+                                                                </div>
+                                                                <span className={`text-[11px] font-medium ${stats.margin > 20 ? 'text-emerald-600 dark:text-emerald-400' : stats.margin > 10 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>{stats.margin.toFixed(1)}%</span>
+                                                            </div>
+                                                            <span className="text-[11px] text-muted-foreground">{fmtDate(p.createdAt)}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-2.5 py-1.5">
+                                                            <span className="text-[10px] font-medium text-muted-foreground">Est. HPP Penawaran</span>
+                                                            <span className="text-[11px] font-medium text-foreground tabular-nums">{formatCurrencyCompact(stats.quotationHpp)}</span>
+                                                            <span className={`text-[11px] font-medium ${stats.quotationProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                                {stats.quotationMargin.toFixed(1)}% est. margin
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 pt-0.5">
+                                                            <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-background text-xs font-medium text-foreground transition-colors hover:bg-muted">
+                                                                <Eye size={13} /> View
+                                                            </button>
+                                                            <button onClick={() => window.location.href = `/dashboard/sales/projects/${p.id}/resume`} aria-label={`Resume ${p.name}`} className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-background text-xs font-medium text-foreground transition-colors hover:bg-muted">
+                                                                <BarChart3 size={13} /> Resume
+                                                            </button>
+                                                            <button onClick={() => { setEditing(p); setModalOpen(true) }} aria-label={`Edit ${p.name}`} title="Edit" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                                                <Edit size={14} />
+                                                            </button>
+                                                            <button onClick={() => setPdfProject({ project: p, stats })} title="PDF" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                                                <FileText size={14} />
+                                                            </button>
+                                                            <button onClick={() => setDeleteConfirm({ id: p.id, name: p.name })} title="Delete" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40">
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            )
+                                        })}
+                                    </div>
+                                ) : (
+                                    // List View - Compact
+                                    <div className="space-y-1.5">
+                                        {paginated.map((p, idx) => {
+                                            const stats = calcProjectStats(p)
+                                            const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.PROSPECTING
+                                            const StatusIcon = sc.icon
+                                            const hasSalesOrder = Boolean(p.salesOrders && p.salesOrders.length > 0)
+                                            const hasInvoice = Boolean(p.invoices && p.invoices.length > 0)
+
+                                            return (
+                                                <motion.div
+                                                    key={p.id}
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: idx * 0.03 }}
+                                                    className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:bg-muted/30"
+                                                >
+                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                                        <StatusIcon size={14} />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
+                                                            <span className="font-mono text-[11px] text-muted-foreground">{p.number}</span>
+                                                            <span className="text-[11px] text-muted-foreground">•</span>
+                                                            <span className="text-[11px] text-muted-foreground">{fmtDate(p.createdAt)}</span>
+                                                            {!hasSalesOrder && (
+                                                                <FlagPill tone="rose" label="Belum SO" title="Project belum memiliki Pesanan Penjualan (Sales Order)" />
                                                             )}
                                                             {!hasInvoice && (
-                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[8px] font-extrabold bg-amber-50 text-amber-600 border border-amber-200" title="Project belum diinvoice (No Invoice)">
-                                                                    <span className="relative flex h-2 w-2 shrink-0">
-                                                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.9)]"></span>
-                                                                    </span>
-                                                                    <span>Belum INV</span>
-                                                                </span>
+                                                                <FlagPill tone="amber" label="Belum INV" title="Project belum diinvoice (No Invoice)" />
                                                             )}
                                                         </div>
-                                                        <span className="font-semibold text-slate-900 text-xs leading-tight group-hover:text-indigo-600 transition-colors">{p.name}</span>
                                                         <div className="flex items-center gap-2">
-                                                            <span className="text-[9px] text-slate-400 flex items-center gap-0.5"><Calendar size={8} /> {fmtDate(p.createdAt)}</span>
-                                                            <span className="text-[8px] text-rose-500 font-semibold uppercase bg-rose-50 px-1 py-0.5 rounded">{p.businessCategory?.name || 'GENERIC'}</span>
+                                                            <h3 className="truncate text-sm font-medium text-foreground">{p.name}</h3>
+                                                            <span className="hidden truncate text-[11px] text-muted-foreground sm:inline">{p.customer?.name}</span>
                                                         </div>
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
-                                                            <Building2 size={10} />
-                                                        </div>
-                                                        <span className="font-semibold text-slate-600 text-xs">{p.customer?.name || 'Unknown'}</span>
+                                                    <div className="hidden pr-2 text-right sm:block">
+                                                        <p className="text-[11px] text-muted-foreground">Rev</p>
+                                                        <p className="text-[11px] text-muted-foreground">Exp</p>
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex justify-center">
-                                                        <div className={`flex items-center gap-1 px-2 py-1 rounded-[20px] text-[9px] font-semibold border ${sc.color}`}>
-                                                            <StatusIcon size={9} />
-                                                            <span>{sc.label}</span>
-                                                        </div>
+                                                    <div className="hidden text-right sm:block">
+                                                        <p className="text-sm font-medium text-foreground tabular-nums">{formatCurrencyCompact(stats.revenue)}</p>
+                                                        <p className="text-[11px] font-medium text-rose-600 tabular-nums dark:text-rose-400">{formatCurrencyCompact(stats.cogs + stats.operationalExpenses)}</p>
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex justify-center">
-                                                        {PriorityIcon && (
-                                                            <span className={`flex items-center gap-1 px-2 py-1 rounded-[20px] text-[9px] font-semibold ${priority.color}`}>
-                                                                <PriorityIcon size={9} />
-                                                                {p.priority}
-                                                            </span>
-                                                        )}
+                                                    <div className="ml-1 hidden border-l border-border pl-3 text-right sm:block">
+                                                        <p className="text-[11px] text-muted-foreground">Profit</p>
+                                                        <p className={`text-sm font-medium tabular-nums ${stats.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                            {stats.profit >= 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
+                                                        </p>
+                                                        <p className={'text-[11px] font-medium ' + (stats.quotationProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400')}>
+                                                            Est. {formatCurrencyCompact(stats.quotationHpp)} ({stats.quotationMargin.toFixed(0)}%)
+                                                        </p>
                                                     </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <span className="font-semibold text-slate-900 text-xs">{formatCurrencyCompact(stats.revenue)}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <span className="font-semibold text-rose-600 text-xs">{formatCurrencyCompact(stats.cogs + stats.operationalExpenses)}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <span className="font-semibold text-amber-600 text-xs">{formatCurrencyCompact(stats.quotationHpp)}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex flex-col items-end leading-tight">
-                                                        <span className={`font-semibold text-xs ${stats.quotationProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                            {stats.quotationProfit > 0 ? '+' : ''}{formatCurrencyCompact(stats.quotationProfit)}
-                                                        </span>
-                                                        <span className={'text-[9px] font-medium ' + (stats.quotationMargin > 20 ? 'text-emerald-500' : stats.quotationMargin > 10 ? 'text-amber-500' : 'text-rose-500')}>
-                                                            {stats.quotationMargin.toFixed(1)}%
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex flex-col items-end leading-tight">
-                                                        <span className={`font-semibold text-xs ${stats.profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-{stats.profit > 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
-                                                        </span>
-                                                        <span className={'text-[9px] font-medium ' + (stats.margin > 20 ? 'text-emerald-500' : stats.margin > 10 ? 'text-amber-500' : 'text-rose-500')}>
-                                                            {stats.margin.toFixed(1)}%
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} className="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all" title="Details">
-                                                            <Eye size={12} />
+                                                    <div className="flex items-center gap-0.5">
+                                                        <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} title="View" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                                            <Eye size={14} />
                                                         </button>
-                                                        <button onClick={() => window.location.href = `/dashboard/sales/projects/${p.id}/resume`} aria-label={`Resume ${p.name}`} className="w-7 h-7 flex items-center justify-center bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-600 hover:text-white transition-all" title="Resume">
-                                                            <BarChart3 size={12} />
+                                                        <button onClick={() => window.location.href = `/dashboard/sales/projects/${p.id}/resume`} aria-label={`Resume ${p.name}`} title="Resume" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                                            <BarChart3 size={14} />
                                                         </button>
-                                                        <button onClick={() => { setEditing(p); setModalOpen(true) }} aria-label={`Edit ${p.name}`} className="w-7 h-7 flex items-center justify-center bg-slate-100 text-slate-500 rounded-lg hover:bg-indigo-600 hover:text-white transition-all" title="Edit">
-                                                            <Edit size={12} />
+                                                        <button onClick={() => { setEditing(p); setModalOpen(true); }} aria-label={`Edit ${p.name}`} title="Edit" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                                            <Edit size={14} />
                                                         </button>
-                                                        <button onClick={() => setPdfProject({ project: p, stats })} aria-label={`Export PDF ${p.name}`} className="w-7 h-7 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all" title="Report">
-                                                            <FileText size={12} />
+                                                        <button onClick={() => setPdfProject({ project: p, stats })} aria-label={`Export PDF ${p.name}`} title="PDF" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                                            <FileText size={14} />
                                                         </button>
-                                                        <button onClick={() => setDeleteConfirm({ id: p.id, name: p.name })} aria-label={`Delete ${p.name}`} className="w-7 h-7 flex items-center justify-center bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all" title="Delete">
-                                                            <Trash2 size={12} />
+                                                        <button onClick={() => setDeleteConfirm({ id: p.id, name: p.name })} aria-label={`Delete ${p.name}`} title="Delete" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40">
+                                                            <Trash2 size={14} />
                                                         </button>
                                                     </div>
-                                                </td>
-                                            </motion.tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </>
-                )}
-                </PullToRefresh>
-            </div>
+                                                </motion.div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
 
-            {/* Pagination */}
-            {totalPages > 0 && <Pagination page={page} totalPages={totalPages} total={filtered.length} onPage={setPage} />}
+                            {/* Desktop Table */}
+                            <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse text-left text-sm">
+                                        <thead>
+                                            <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                                <th className="px-3 py-2.5 font-medium">Project</th>
+                                                <th className="px-3 py-2.5 font-medium">Customer</th>
+                                                <th className="px-3 py-2.5 text-center font-medium">Status</th>
+                                                <th className="px-3 py-2.5 text-center font-medium">Priority</th>
+                                                <th className="px-3 py-2.5 text-right font-medium">Revenue</th>
+                                                <th className="px-3 py-2.5 text-right font-medium">Expenses</th>
+                                                <th className="px-3 py-2.5 text-right font-medium">Est. HPP (Quo)</th>
+                                                <th className="px-3 py-2.5 text-right font-medium">Est. Margin (Quo)</th>
+                                                <th className="px-3 py-2.5 text-right font-medium">Margin</th>
+                                                <th className="px-3 py-2.5 text-right font-medium">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border">
+                                            {paginated.map((p, idx) => {
+                                                const stats = calcProjectStats(p)
+                                                const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.PROSPECTING
+                                                const priority = p.priority ? PRIORITY_CONFIG[p.priority] : null
+                                                const hasSalesOrder = Boolean(p.salesOrders && p.salesOrders.length > 0)
+                                                const hasInvoice = Boolean(p.invoices && p.invoices.length > 0)
 
-            {/* Modals */}
-            <AnimatePresence>
-                {modalOpen && (
-                    <ProjectFormModal
-                        project={editing}
-                        customers={customers}
-                        businessCategories={businessCategories}
-                        onClose={() => setModalOpen(false)}
-                        onSuccess={() => {
-                            setModalOpen(false);
-                            load();
-                            showToast('success', editing ? 'Project updated!' : 'Project created!')
-                        }}
-                    />
-                )}
-                {viewing && (
-                    <ProjectDetailModal
-                        project={viewing}
-                        stats={calcProjectStats(viewing)}
-                        onClose={() => setViewing(null)}
-                    />
-                )}
-                {pdfProject && (
-                    <ProjectPDFModal
-                        isOpen={!!pdfProject}
-                        onClose={() => setPdfProject(null)}
-                        project={pdfProject.project}
-                        stats={pdfProject.stats}
-                        companyProfile={companyProfile}
-                    />
-                )}
-                {deleteConfirm && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
-                        onClick={() => setDeleteConfirm(null)}
-                    >
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            onClick={e => e.stopPropagation()}
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-xs overflow-hidden"
-                        >
-                            <div className="p-5 text-center">
-                                <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center mx-auto mb-3">
-                                    <Trash2 size={20} className="text-rose-600" />
-                                </div>
-                                <h3 className="font-bold text-slate-900 text-sm mb-1">Delete Project?</h3>
-                                <p className="text-xs text-slate-500 mb-1">
-                                    Permanently delete:
-                                </p>
-                                <p className="font-bold text-slate-800 text-xs mb-3">
-                                    {deleteConfirm.name}
-                                </p>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => setDeleteConfirm(null)}
-                                        className="flex-1 py-2.5 rounded-lg border border-slate-200 text-slate-600 font-bold text-[10px] uppercase tracking-wider hover:bg-slate-50 transition-colors"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleDelete}
-                                        className="flex-1 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] uppercase tracking-wider shadow-sm transition-all"
-                                    >
-                                        Delete
-                                    </button>
+                                                return (
+                                                    <motion.tr
+                                                        key={p.id}
+                                                        initial={{ opacity: 0, y: 5 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: idx * 0.02 }}
+                                                        className="group transition-colors hover:bg-muted/30"
+                                                    >
+                                                        <td className="px-3 py-2.5">
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                                    <span className="font-mono text-[11px] font-medium text-muted-foreground">{p.number}</span>
+                                                                    {!hasSalesOrder && (
+                                                                        <FlagPill tone="rose" label="Belum SO" title="Project belum memiliki Pesanan Penjualan (SO)" />
+                                                                    )}
+                                                                    {!hasInvoice && (
+                                                                        <FlagPill tone="amber" label="Belum INV" title="Project belum diinvoice (No Invoice)" />
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-sm font-medium leading-tight text-foreground">{p.name}</span>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground"><Calendar size={11} /> {fmtDate(p.createdAt)}</span>
+                                                                    <span className="inline-flex items-center rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{p.businessCategory?.name || 'GENERIC'}</span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                                                    <Building2 size={11} />
+                                                                </div>
+                                                                <span className="text-xs font-medium text-foreground">{p.customer?.name || 'Unknown'}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            <div className="flex justify-center">
+                                                                <StatusPill label={sc.label} dot={sc.dot} />
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            <div className="flex justify-center">
+                                                                {priority ? (
+                                                                    <PriorityPill label={p.priority!} dot={priority.dot} />
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground">—</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right">
+                                                            <span className="text-sm font-medium text-foreground tabular-nums">{formatCurrencyCompact(stats.revenue)}</span>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right">
+                                                            <span className="text-sm font-medium text-rose-600 tabular-nums dark:text-rose-400">{formatCurrencyCompact(stats.cogs + stats.operationalExpenses)}</span>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right">
+                                                            <span className="text-sm font-medium text-amber-600 tabular-nums dark:text-amber-400">{formatCurrencyCompact(stats.quotationHpp)}</span>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right">
+                                                            <div className="flex flex-col items-end leading-tight">
+                                                                <span className={`text-sm font-medium tabular-nums ${stats.quotationProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                                    {stats.quotationProfit > 0 ? '+' : ''}{formatCurrencyCompact(stats.quotationProfit)}
+                                                                </span>
+                                                                <span className={'text-[11px] font-medium ' + (stats.quotationMargin > 20 ? 'text-emerald-500' : stats.quotationMargin > 10 ? 'text-amber-500' : 'text-rose-500')}>
+                                                                    {stats.quotationMargin.toFixed(1)}%
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right">
+                                                            <div className="flex flex-col items-end leading-tight">
+                                                                <span className={`text-sm font-medium tabular-nums ${stats.profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                                    {stats.profit > 0 ? '+' : ''}{formatCurrencyCompact(stats.profit)}
+                                                                </span>
+                                                                <span className={'text-[11px] font-medium ' + (stats.margin > 20 ? 'text-emerald-500' : stats.margin > 10 ? 'text-amber-500' : 'text-rose-500')}>
+                                                                    {stats.margin.toFixed(1)}%
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            <div className="flex items-center justify-end gap-0.5">
+                                                                <button onClick={() => setViewing(p)} aria-label={`View ${p.name}`} title="Details" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                                                    <Eye size={15} />
+                                                                </button>
+                                                                <button onClick={() => window.location.href = `/dashboard/sales/projects/${p.id}/resume`} aria-label={`Resume ${p.name}`} title="Resume" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                                                    <BarChart3 size={15} />
+                                                                </button>
+                                                                <button onClick={() => { setEditing(p); setModalOpen(true) }} aria-label={`Edit ${p.name}`} title="Edit" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                                                    <Edit size={15} />
+                                                                </button>
+                                                                <button onClick={() => setPdfProject({ project: p, stats })} aria-label={`Export PDF ${p.name}`} title="Report" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                                                    <FileText size={15} />
+                                                                </button>
+                                                                <button onClick={() => setDeleteConfirm({ id: p.id, name: p.name })} aria-label={`Delete ${p.name}`} title="Delete" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40">
+                                                                    <Trash2 size={15} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </motion.tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                        </>
+                    )}
+                </PullToRefresh>
 
-            {/* FAB for mobile */}
-            <button
-                onClick={() => { setEditing(null); setModalOpen(true) }}
-                className="lg:hidden fixed bottom-20 right-4 w-12 h-12 rounded-full bg-linear-to-br from-indigo-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 active:scale-95 transition-transform z-50"
-            >
-                <Plus size={20} />
-            </button>
+                {/* Pagination */}
+                {totalPages > 0 && <Pagination page={page} totalPages={totalPages} total={filtered.length} onPage={setPage} />}
+
+                {/* Modals */}
+                <AnimatePresence>
+                    {modalOpen && (
+                        <ProjectFormModal
+                            project={editing}
+                            customers={customers}
+                            businessCategories={businessCategories}
+                            onClose={() => setModalOpen(false)}
+                            onSuccess={() => {
+                                setModalOpen(false);
+                                load();
+                                showToast('success', editing ? 'Project updated!' : 'Project created!')
+                            }}
+                        />
+                    )}
+                    {viewing && (
+                        <ProjectDetailModal
+                            project={viewing}
+                            stats={calcProjectStats(viewing)}
+                            onClose={() => setViewing(null)}
+                        />
+                    )}
+                    {pdfProject && (
+                        <ProjectPDFModal
+                            isOpen={!!pdfProject}
+                            onClose={() => setPdfProject(null)}
+                            project={pdfProject.project}
+                            stats={pdfProject.stats}
+                            companyProfile={companyProfile}
+                        />
+                    )}
+                    {deleteConfirm && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
+                        >
+                            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
+                            <motion.div
+                                initial={{ opacity: 0, y: 24 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 24 }}
+                                className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-sm sm:rounded-2xl"
+                            >
+                                <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
+                                        <Trash2 size={16} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h3 className="text-sm font-semibold text-foreground">Delete Project?</h3>
+                                        <p className="text-[11px] text-muted-foreground">This action cannot be undone.</p>
+                                    </div>
+                                </div>
+                                <div className="px-4 py-4">
+                                    <p className="text-xs text-muted-foreground">Permanently delete:</p>
+                                    <p className="mt-1 text-sm font-medium text-foreground">{deleteConfirm.name}</p>
+                                </div>
+                                <div className="flex gap-2 border-t border-border px-4 py-3">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setDeleteConfirm(null)}
+                                        className="h-9 flex-1 rounded-lg text-sm font-medium"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        onClick={handleDelete}
+                                        className="h-9 flex-1 rounded-lg bg-rose-600 text-sm font-medium text-white hover:bg-rose-700"
+                                    >
+                                        Delete
+                                    </Button>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* FAB for mobile */}
+                <button
+                    onClick={() => { setEditing(null); setModalOpen(true) }}
+                    className="fixed bottom-20 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 lg:hidden"
+                >
+                    <Plus size={20} />
+                </button>
+            </div>
         </div>
     )
 }
@@ -1205,58 +1143,60 @@ function ProjectFormModal(props: any) {
     }
 
     return (
-        <div className="fixed inset-0 z-100 flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-md">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
             <motion.div
                 initial={{ opacity: 0, y: 50 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 50 }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+                className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-md sm:rounded-2xl"
             >
-                <div className="md:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mt-3" />
-
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                    <div>
-                        <h2 className="font-bold text-slate-900 text-sm">
+                <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                        <Briefcase size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h2 className="text-sm font-semibold text-foreground">
                             {isEdit ? 'Edit Project' : 'New Project'}
                         </h2>
-                        <p className="text-[9px] text-slate-400 mt-0.5">
+                        <p className="text-[11px] text-muted-foreground">
                             {isEdit ? 'Update project details' : 'Create a new sales project'}
                         </p>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
-                        <X size={14} className="text-slate-500" />
+                    <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                        <X size={15} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="px-4 py-4 max-h-[60vh] overflow-y-auto space-y-3.5">
+                <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                    <div className="space-y-3.5 overflow-y-auto px-4 py-4">
                         <div>
-                            <label className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">
+                            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                                 Project Name <span className="text-rose-500">*</span>
                             </label>
                             <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                                 placeholder="e.g., Network Upgrade - PT. ABC"
-                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all" />
+                                className={inputClass} />
                         </div>
 
                         <div>
-                            <label className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">
+                            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                                 Customer <span className="text-rose-500">*</span>
                             </label>
                             <select required value={form.customerId} onChange={e => setForm({ ...form, customerId: e.target.value })}
-                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all appearance-none">
+                                className={`${inputClass} cursor-pointer`}>
                                 <option value="">Select customer</option>
                                 {customers.map((c: any) => <option key={c.id} value={c.id}>{c.code} - {c.name}</option>)}
                             </select>
                         </div>
 
                         <div>
-                            <label className="text-[8px] font-bold uppercase tracking-wider text-rose-500 mb-1.5 block">
+                            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                                 Business Unit <span className="text-rose-500">*</span>
                             </label>
                             <select required value={form.businessCategoryId} onChange={e => setForm({ ...form, businessCategoryId: e.target.value })}
-                                className="w-full bg-rose-50/30 border border-slate-200 rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all appearance-none">
+                                className={`${inputClass} cursor-pointer`}>
                                 <option value="">Select business unit</option>
                                 {businessCategories.map((biz: any) => <option key={biz.id} value={biz.id}>{biz.name}</option>)}
                             </select>
@@ -1264,29 +1204,29 @@ function ProjectFormModal(props: any) {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Status</label>
+                                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Status</label>
                                 <select required value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}
-                                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all appearance-none">
+                                    className={`${inputClass} cursor-pointer`}>
                                     {Object.entries(STATUS_CONFIG).map(([key, config]) => <option key={key} value={key}>{config.label}</option>)}
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Deadline</label>
+                                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Deadline</label>
                                 <input type="date" value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })}
-                                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all" />
+                                    className={inputClass} />
                             </div>
                         </div>
 
                         <div>
-                            <label className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Priority</label>
+                            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Priority</label>
                             <div className="grid grid-cols-3 gap-1.5">
                                 {([
-                                    { value: 'HIGH', label: 'High', cls: 'bg-rose-600 text-white border-rose-600' },
-                                    { value: 'MEDIUM', label: 'Medium', cls: 'bg-amber-600 text-white border-amber-600' },
-                                    { value: 'LOW', label: 'Low', cls: 'bg-emerald-600 text-white border-emerald-600' },
+                                    { value: 'HIGH', label: 'High' },
+                                    { value: 'MEDIUM', label: 'Medium' },
+                                    { value: 'LOW', label: 'Low' },
                                 ]).map(p => (
                                     <button key={p.value} type="button" onClick={() => setForm({ ...form, priority: p.value })}
-                                        className={'py-2 rounded-lg border text-[8px] font-bold uppercase tracking-wider transition-all ' + (form.priority === p.value ? p.cls : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100')}>
+                                        className={'h-9 rounded-lg border text-xs font-medium transition-colors ' + (form.priority === p.value ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground')}>
                                         {p.label}
                                     </button>
                                 ))}
@@ -1294,13 +1234,13 @@ function ProjectFormModal(props: any) {
                         </div>
                     </div>
 
-                    <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/50 flex gap-2">
+                    <div className="flex gap-2 border-t border-border px-4 py-3">
                         <Button type="button" variant="outline" onClick={onClose}
-                            className="flex-1 rounded-lg h-10 font-bold text-[10px] uppercase tracking-wider border-slate-200 hover:bg-slate-100">
+                            className="h-9 flex-1 rounded-lg text-sm font-medium">
                             Cancel
                         </Button>
                         <Button type="submit" disabled={saving}
-                            className="flex-1 rounded-lg h-10 bg-linear-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white font-bold text-[10px] uppercase tracking-wider shadow-sm disabled:opacity-50">
+                            className="h-9 flex-1 rounded-lg text-sm font-medium disabled:opacity-50">
                             {saving ? 'Saving...' : (isEdit ? 'Update' : 'Create')}
                         </Button>
                     </div>
@@ -1309,4 +1249,3 @@ function ProjectFormModal(props: any) {
         </div>
     )
 }
-

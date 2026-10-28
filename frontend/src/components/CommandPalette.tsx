@@ -193,65 +193,56 @@ export function CommandPalette() {
 
                     {/* Palette */}
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.96, y: -12 }}
+                        initial={{ opacity: 0, scale: 0.98, y: -8 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.96, y: -12 }}
-                        transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-                        className="relative w-full max-w-xl z-10 flex flex-col"
+                        exit={{ opacity: 0, scale: 0.98, y: -8 }}
+                        transition={{ duration: 0.15, ease: 'easeOut' }}
+                        className="relative w-full max-w-xl z-10 flex flex-col bg-[#0b0f17] border border-slate-800 rounded-lg shadow-2xl shadow-black/80 overflow-hidden"
                         style={{
-                            background: '#0D1117',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            borderRadius: 24,
-                            boxShadow: '0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,201,167,0.08)',
                             maxHeight: '70vh',
-                            overflow: 'hidden'
                         }}
                     >
-                        {/* Search */}
-                        <div className="flex items-center gap-3 px-5 py-4 shrink-0"
-                            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                            <Search size={18} style={{ color: 'rgba(255,255,255,0.35)' }} className="shrink-0" />
+                        {/* Search Bar */}
+                        <div className="flex items-center gap-3 px-4 py-3 shrink-0 border-b border-slate-800/80 bg-slate-950/60">
+                            <Search size={16} className="text-slate-400 shrink-0" />
                             <input
                                 ref={inputRef}
                                 type="text"
-                                placeholder="Cari menu, halaman... (ketik apapun)"
+                                placeholder="Execute command or jump to module... (type to filter)"
                                 value={query}
                                 onChange={e => setQuery(e.target.value)}
-                                className="flex-1 bg-transparent outline-none text-white text-sm font-medium"
-                                style={{ caretColor: '#00C9A7' }}
+                                className="flex-1 bg-transparent outline-none text-slate-100 text-sm font-sans placeholder:text-slate-500"
+                                style={{ caretColor: '#3b82f6' }}
                                 autoComplete="off"
                                 spellCheck={false}
                             />
                             {query && (
                                 <button onClick={() => setQuery("")}
-                                    className="p-1 rounded-lg hover:bg-white/10 transition-colors"
-                                    style={{ color: 'rgba(255,255,255,0.3)' }}>
+                                    className="p-1 rounded hover:bg-slate-800 transition-colors text-slate-400 hover:text-slate-200">
                                     <X size={14} />
                                 </button>
                             )}
-                            <kbd className="hidden sm:flex items-center px-2 py-1 rounded-lg text-[10px] font-bold shrink-0"
-                                style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <kbd className="hidden sm:flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shrink-0 bg-slate-900 text-slate-400 border border-slate-750">
                                 ESC
                             </kbd>
                         </div>
 
                         {/* Results */}
-                        <div ref={listRef} className="overflow-y-auto flex-1 p-2"
-                            style={{ scrollbarWidth: 'none' }}>
+                        <div ref={listRef} className="overflow-y-auto flex-1 p-2 space-y-1"
+                            style={{ scrollbarWidth: 'thin' }}>
                             {results.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-12 gap-3">
-                                    <Search size={28} style={{ color: 'rgba(255,255,255,0.08)' }} />
-                                    <p className="text-sm" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                                        Tidak ada hasil untuk <strong className="text-white/40">&ldquo;{query}&rdquo;</strong>
+                                <div className="flex flex-col items-center justify-center py-12 gap-2">
+                                    <Search size={22} className="text-slate-600" />
+                                    <p className="text-xs text-slate-400 font-mono">
+                                        NO MATCH FOUND FOR &ldquo;{query}&rdquo;
                                     </p>
                                 </div>
                             ) : (
                                 Object.entries(grouped).map(([group, items]) => (
-                                    <div key={group} className="mb-1">
-                                        <div className="px-3 pt-3 pb-1">
-                                            <span className="text-[9px] font-black uppercase tracking-[0.2em]"
-                                                style={{ color: 'rgba(0,201,167,0.55)' }}>
-                                                {isDefaultMode ? '⚡ Menu Tersedia' : group}
+                                    <div key={group} className="mb-2">
+                                        <div className="px-2.5 pt-2 pb-1">
+                                            <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-slate-400">
+                                                {isDefaultMode ? '// AVAILABLE MODULES' : `// ${group}`}
                                             </span>
                                         </div>
                                         {items.map(item => {
@@ -264,39 +255,36 @@ export function CommandPalette() {
                                                     key={item.id}
                                                     onClick={() => navigate(item.path)}
                                                     onMouseEnter={() => setSelectedIdx(flatIdx)}
-                                                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-100 mb-0.5"
-                                                    style={{
-                                                        background: isSelected ? 'rgba(0,201,167,0.1)' : 'transparent',
-                                                        border: `1px solid ${isSelected ? 'rgba(0,201,167,0.18)' : 'transparent'}`,
-                                                    }}
+                                                    className={`flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors duration-75 text-xs ${
+                                                        isSelected
+                                                            ? 'bg-blue-600/15 border border-blue-500/35 text-white'
+                                                            : 'hover:bg-slate-900/60 border border-transparent text-slate-300'
+                                                    }`}
                                                 >
-                                                    <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all"
-                                                        style={{ background: isSelected ? 'rgba(0,201,167,0.18)' : 'rgba(255,255,255,0.05)' }}>
-                                                        <Icon size={15} style={{ color: isSelected ? '#00C9A7' : 'rgba(255,255,255,0.4)' }} />
+                                                    <div className={`w-7 h-7 rounded flex items-center justify-center shrink-0 transition-colors ${
+                                                        isSelected ? 'bg-blue-600/25 text-blue-400' : 'bg-slate-900 text-slate-400'
+                                                    }`}>
+                                                        <Icon size={14} />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-[13px] font-semibold truncate"
-                                                            style={{ color: isSelected ? '#fff' : 'rgba(255,255,255,0.65)' }}>
+                                                        <p className={`text-xs font-medium truncate ${isSelected ? 'text-white' : 'text-slate-200'}`}>
                                                             <HighlightMatch text={item.label} query={query} />
                                                         </p>
-                                                        <p className="text-[10px] truncate mt-0.5 font-mono"
-                                                            style={{ color: 'rgba(255,255,255,0.22)' }}>
+                                                        <p className="text-[10px] font-mono truncate text-slate-400">
                                                             {item.path}
                                                         </p>
                                                     </div>
                                                     <div className="flex items-center gap-2 shrink-0">
                                                         {isCurrentPage && (
-                                                            <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
-                                                                style={{ background: 'rgba(0,201,167,0.12)', color: '#00C9A7' }}>
-                                                                Halaman ini
+                                                            <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                                                CURRENT
                                                             </span>
                                                         )}
                                                         {isSelected
-                                                            ? <kbd className="flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                                                style={{ background: 'rgba(0,201,167,0.15)', color: '#00C9A7', border: '1px solid rgba(0,201,167,0.2)' }}>
+                                                            ? <kbd className="flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-600/20 text-blue-300 border border-blue-500/30">
                                                                 <CornerDownLeft size={9} />
                                                               </kbd>
-                                                            : <ArrowRight size={13} style={{ color: 'rgba(255,255,255,0.1)' }} />
+                                                            : <ArrowRight size={12} className="text-slate-600" />
                                                         }
                                                     </div>
                                                 </div>
@@ -307,23 +295,21 @@ export function CommandPalette() {
                             )}
                         </div>
 
-                        {/* Footer hints */}
-                        <div className="px-5 py-3 flex items-center justify-between shrink-0"
-                            style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div className="flex items-center gap-4 text-[10px]"
-                                style={{ color: 'rgba(255,255,255,0.25)' }}>
-                                {[{ k: '↑↓', v: 'Navigasi' }, { k: '↵', v: 'Buka' }, { k: 'ESC', v: 'Tutup' }].map(({ k, v }) => (
+                        {/* Footer Hints */}
+                        <div className="px-4 py-2.5 flex items-center justify-between shrink-0 border-t border-slate-800/80 bg-slate-950/60 font-mono text-[10px] text-slate-400">
+                            <div className="flex items-center gap-3">
+                                {[{ k: '↑↓', v: 'Navigate' }, { k: '↵', v: 'Execute' }, { k: 'ESC', v: 'Close' }].map(({ k, v }) => (
                                     <span key={k} className="flex items-center gap-1">
-                                        <kbd className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <kbd className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-900 text-slate-400 border border-slate-750">
                                             {k}
                                         </kbd>
-                                        {v}
+                                        <span>{v}</span>
                                     </span>
                                 ))}
                             </div>
-                            <span className="text-[9px] font-black tracking-wider"
-                                style={{ color: 'rgba(0,201,167,0.35)' }}>AXON NAV</span>
+                            <span className="text-[9px] font-mono font-semibold tracking-wider text-slate-400">
+                                AXON // ROUTER
+                            </span>
                         </div>
                     </motion.div>
                 </div>
@@ -340,32 +326,18 @@ export function CommandPaletteTrigger({ isCollapsed }: { isCollapsed: boolean })
     return (
         <button
             onClick={open}
-            className="w-full flex items-center gap-2.5 rounded-xl transition-all duration-200"
+            className="w-full flex items-center gap-2 rounded-md transition-colors bg-slate-900/60 hover:bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200"
             style={{
-                padding: isCollapsed ? '8px' : '8px 12px',
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.07)',
-                color: 'rgba(255,255,255,0.35)',
+                padding: isCollapsed ? '6px' : '6px 10px',
                 justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
-            onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(0,201,167,0.08)'
-                e.currentTarget.style.borderColor = 'rgba(0,201,167,0.2)'
-                e.currentTarget.style.color = 'rgba(0,201,167,0.8)'
-            }}
-            onMouseLeave={e => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'
-                e.currentTarget.style.color = 'rgba(255,255,255,0.35)'
-            }}
-            title="Cari menu (Ctrl+K)"
+            title="Command Console (Ctrl+K)"
         >
-            <Search size={14} className="shrink-0" />
+            <Search size={13} className="shrink-0 text-slate-500" />
             {!isCollapsed && (
                 <>
-                    <span className="flex-1 text-left text-[11px] font-medium truncate">Cari menu...</span>
-                    <kbd className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.25)' }}>
+                    <span className="flex-1 text-left text-xs font-mono truncate text-slate-400">Search commands...</span>
+                    <kbd className="flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-mono font-bold shrink-0 bg-slate-800 border border-slate-700 text-slate-400">
                         Ctrl K
                     </kbd>
                 </>

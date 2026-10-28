@@ -21,7 +21,7 @@ import {
     DollarSign,
     Search,
     X,
-    Image
+    ImageIcon
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
@@ -491,7 +491,7 @@ export default function OperationalExpensesPage() {
                                     </div>
                                     {expense.attachment && (
                                         <button onClick={() => setSelectedImage(`${process.env.NEXT_PUBLIC_API_URL}${expense.attachment}`)} className="text-[10px] font-black text-indigo-600 uppercase flex items-center gap-1">
-                                            <Image size={12} className="text-indigo-500" /> Lihat Bukti
+                                            <ImageIcon size={12} className="text-indigo-500" /> Lihat Bukti
                                         </button>
                                     )}
                                 </div>
@@ -689,7 +689,7 @@ export default function OperationalExpensesPage() {
                                             />
                                             <div className="w-full bg-slate-50 px-4 py-3 rounded-lg border-2 border-dashed border-slate-200 group-hover:border-indigo-400 group-hover:bg-indigo-50/30 transition-all flex items-center justify-center gap-3">
                                                 <div className="w-7 h-7 rounded-md bg-white shadow-sm flex items-center justify-center text-slate-400 group-hover:text-indigo-500 transition-colors">
-                                                    <Image size={14} />
+                                                    <ImageIcon size={14} />
                                                 </div>
                                                 <span className="text-[10px] font-black text-slate-400 group-hover:text-indigo-600 transition-colors uppercase tracking-widest text-center">
                                                     {newExpense.attachment ? newExpense.attachment.name : 'Pilih File Gambar (webp, jpg, png)'}

@@ -3,13 +3,20 @@
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-    Plus, Search, Eye, Edit, Trash2, X, Save,
-    CheckCircle2, AlertCircle, RefreshCw,
-    MapPin, Clock, Check, Ban, Receipt,
-    Briefcase, Users, DollarSign, ChevronRight,
-    Filter, SlidersHorizontal, ArrowLeft, MoreVertical,
-    Home, ChevronRight as ArrowRight, Building2, Calendar
+    Plus,
+    Search,
+    Edit,
+    Trash2,
+    X,
+    CheckCircle2,
+    AlertCircle,
+    RefreshCw,
+    MapPin,
+    Receipt,
+    Briefcase,
+    ChevronRight,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 interface Customer { id: string; name: string; code: string }
@@ -22,18 +29,27 @@ interface FieldSurvey {
     latitude?: number | null; longitude?: number | null
 }
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string; icon: React.ElementType }> = {
-    PLANNED: { label: 'Planned', bg: 'bg-slate-200', text: 'text-slate-700', dot: 'bg-slate-400', icon: Clock },
-    IN_PROGRESS: { label: 'In Progress', bg: 'bg-blue-100', text: 'text-blue-800', dot: 'bg-blue-500', icon: MapPin },
-    COMPLETED: { label: 'Completed', bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500', icon: CheckCircle2 },
-    CANCELLED: { label: 'Cancelled', bg: 'bg-rose-100', text: 'text-rose-800', dot: 'bg-rose-400', icon: Ban },
-}
-
-const EXPENSE_STATUS: Record<string, { label: string; bg: string; text: string }> = {
-    PENDING: { label: 'Pending', bg: 'bg-amber-100', text: 'text-amber-800' },
-    APPROVED: { label: 'Approved', bg: 'bg-emerald-100', text: 'text-emerald-800' },
-    REJECTED: { label: 'Rejected', bg: 'bg-rose-100', text: 'text-rose-800' },
-    POSTED: { label: 'Posted', bg: 'bg-indigo-100', text: 'text-indigo-800' },
+const STATUS_CONFIG: Record<string, { label: string; pill: string; dot: string }> = {
+    PLANNED: {
+        label: 'Planned',
+        pill: 'border-border bg-muted text-muted-foreground',
+        dot: 'bg-muted-foreground/60',
+    },
+    IN_PROGRESS: {
+        label: 'In Progress',
+        pill: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-400',
+        dot: 'bg-blue-500',
+    },
+    COMPLETED: {
+        label: 'Completed',
+        pill: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400',
+        dot: 'bg-emerald-500',
+    },
+    CANCELLED: {
+        label: 'Cancelled',
+        pill: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400',
+        dot: 'bg-rose-500',
+    },
 }
 
 const EXPENSE_CATEGORIES = ['TRANSPORT', 'MEAL', 'ACCOMMODATION', 'OFFICE', 'OTHER']
@@ -43,24 +59,35 @@ const CATEGORY_EMOJI: Record<string, string> = {
 
 const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+
+const inputClass = "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
+
+// ─── STATUS PILL ──────────────────────────────────────────────────────────────
+function StatusPill({ status }: { status: string }) {
+    const sc = STATUS_CONFIG[status] || STATUS_CONFIG.PLANNED
+    return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${sc.pill}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${sc.dot}`} />
+            {sc.label}
+        </span>
+    )
+}
+
 // ─── TOAST ────────────────────────────────────────────────────────────────────
 function Toast({ toast }: { toast: { type: 'success' | 'error'; msg: string } | null }) {
     return (
         <AnimatePresence>
             {toast && (
                 <motion.div
-                    initial={{ opacity: 0, y: 80, scale: 0.9 }}
+                    initial={{ opacity: 0, y: 24, scale: 0.96 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 80, scale: 0.9 }}
+                    exit={{ opacity: 0, y: 24, scale: 0.96 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                    className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-500 flex items-center gap-2.5 px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold whitespace-nowrap
-                        ${toast.type === 'success'
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-rose-600 text-white'}`}
+                    className="fixed bottom-24 left-1/2 z-[200] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm font-medium text-foreground shadow-2xl"
                 >
                     {toast.type === 'success'
-                        ? <CheckCircle2 size={16} className="text-emerald-400" />
-                        : <AlertCircle size={16} />}
+                        ? <CheckCircle2 size={16} className="text-emerald-500" />
+                        : <AlertCircle size={16} className="text-rose-500" />}
                     {toast.msg}
                 </motion.div>
             )}
@@ -118,75 +145,70 @@ export default function SurveysPage() {
     const completedCount = surveys.filter(s => s.status === 'COMPLETED').length
 
     return (
-        <div className="min-h-screen bg-white">
-            {/* ─── HEADER ─── */}
-            <header className="sticky top-16 lg:top-0 z-40 bg-white border-b border-slate-200 px-4 lg:px-5 py-3">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm">
-                                <MapPin size={20} className="text-white" />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 mb-1">
-                                    <span className="hover:text-slate-600 transition-colors cursor-pointer">Dashboard</span>
-                                    <span className="text-slate-300">›</span>
-                                    <span className="hover:text-slate-600 transition-colors cursor-pointer">Sales</span>
-                                    <span className="text-slate-300">›</span>
-                                    <span className="text-indigo-600 font-semibold">Field Surveys</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <h1 className="text-lg font-bold text-slate-900 leading-none">Surveys</h1>
-                                    <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                        {surveys.length} survei
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                {/* ─── HEADER ─── */}
+                <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground">Surveys</h1>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            Field survey records, locations and operational costs
+                        </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => { setEditing(null); setModalOpen(true) }}
-                            className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-all text-sm font-semibold shadow-sm"
-                        >
-                            <Plus size={16} />
-                            Survei Baru
-                        </button>
-                        <button
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
                             onClick={() => setShowSearch(!showSearch)}
-                            className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                            title="Search"
+                            className="h-9 w-9 rounded-lg"
                         >
                             <Search size={16} />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
                             onClick={load}
-                            className="w-9 h-9 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                            title="Refresh"
+                            className="h-9 w-9 rounded-lg"
                         >
                             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                        </button>
+                        </Button>
+                        <Button
+                            onClick={() => { setEditing(null); setModalOpen(true) }}
+                            className="h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            <Plus size={16} className="mr-1.5" />
+                            Survei Baru
+                        </Button>
                     </div>
-                </div>
+                </header>
 
-                {/* Search bar */}
+                {/* ─── SEARCH ─── */}
                 <AnimatePresence>
                     {showSearch && (
                         <motion.div
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden mt-3"
+                            className="mb-4 overflow-hidden"
                         >
                             <div className="relative">
-                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                                 <input
                                     autoFocus
                                     value={search}
                                     onChange={e => setSearch(e.target.value)}
                                     placeholder="Cari nomor, lokasi, pelanggan..."
-                                    className="w-full pl-10 pr-10 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all placeholder:text-slate-400"
+                                    className={`${inputClass} pl-9 pr-9`}
                                 />
                                 {search && (
-                                    <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 p-0.5">
+                                    <button
+                                        onClick={() => setSearch('')}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                    >
                                         <X size={14} />
                                     </button>
                                 )}
@@ -195,8 +217,24 @@ export default function SurveysPage() {
                     )}
                 </AnimatePresence>
 
-                {/* Status filter pills */}
-                <div className="flex items-center gap-2 mt-3">
+                {/* ─── STATS ─── */}
+                <div className="mb-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-border bg-card p-3.5">
+                        <p className="text-xs font-medium text-muted-foreground">Total Survei</p>
+                        <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">{surveys.length}</p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">{completedCount} selesai</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-card p-3.5">
+                        <p className="text-xs font-medium text-muted-foreground">Total Biaya</p>
+                        <p className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+                            {totalExpAll > 0 ? `${(totalExpAll / 1_000_000).toFixed(1)}M` : '0'}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">Rp</p>
+                    </div>
+                </div>
+
+                {/* ─── STATUS FILTER ─── */}
+                <div className="mb-4 flex flex-wrap items-center gap-1.5">
                     {['ALL', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map(s => {
                         const isActive = filterStatus === s
                         const label = s === 'ALL' ? 'Semua' : STATUS_CONFIG[s]?.label || s
@@ -204,145 +242,210 @@ export default function SurveysPage() {
                             <button
                                 key={s}
                                 onClick={() => setFilterStatus(s)}
-                                className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap
-                                    ${isActive
-                                        ? 'bg-indigo-600 text-white shadow-sm'
-                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${
+                                    isActive
+                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+                                }`}
                             >
                                 {label}
                                 {s !== 'ALL' && (
-                                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                    <span className={`rounded px-1 text-[10px] ${isActive ? 'bg-primary-foreground/20' : 'bg-muted text-muted-foreground'}`}>
                                         {surveys.filter(sv => sv.status === s).length}
                                     </span>
                                 )}
                             </button>
                         )
                     })}
-                </div>
-            </header>
-
-            {/* ─── CONTENT ─── */}
-            <div className="px-4 lg:px-5 pt-4 pb-32 space-y-4">
-
-                {/* Stats row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-white rounded-xl p-4 border border-slate-200">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Total Survei</p>
-                        <p className="text-xl font-black text-slate-900">{surveys.length}</p>
-                        <p className="text-[10px] text-slate-500 mt-1 font-medium">{completedCount} selesai</p>
-                    </div>
-                    <div className="bg-indigo-600 rounded-xl p-4">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/60 mb-1">Total Biaya</p>
-                        <p className="text-xl font-black text-white">{totalExpAll > 0 ? `${(totalExpAll / 1_000_000).toFixed(1)}M` : '0'}</p>
-                        <p className="text-[10px] text-white/60 mt-1 font-medium">Rp</p>
-                    </div>
+                    <span className="ml-auto text-xs text-muted-foreground">
+                        {filtered.length} survei
+                    </span>
                 </div>
 
-                {/* Table */}
+                {/* ─── CONTENT ─── */}
                 {loading ? (
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                        <div className="p-6 text-center text-sm text-slate-400 animate-pulse">Memuat...</div>
+                    <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+                        <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
                     </div>
                 ) : filtered.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 text-center">
-                        <div className="w-16 h-16 bg-slate-100 rounded-xl flex items-center justify-center mb-4">
-                            <MapPin size={28} className="text-slate-300" />
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-20 text-center">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <MapPin size={22} />
                         </div>
-                        <p className="font-semibold text-slate-500 text-sm">Tidak ada survei ditemukan</p>
-                        <p className="text-xs text-slate-400 mt-1">Coba ubah filter atau kata kunci pencarian</p>
+                        <p className="text-sm font-medium text-foreground">Tidak ada survei ditemukan</p>
+                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                            Coba ubah filter atau kata kunci pencarian
+                        </p>
+                        <Button
+                            onClick={() => { setEditing(null); setModalOpen(true) }}
+                            className="mt-5 h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            <Plus size={16} className="mr-1.5" />
+                            Survei Baru
+                        </Button>
                     </div>
                 ) : (
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 border-b border-slate-200">
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Survey</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Pelanggan</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Lokasi</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-center">Status</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-center">Proyek</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Biaya</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Tanggal</th>
-                                        <th className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filtered.map((s, idx) => {
-                                        const sc = STATUS_CONFIG[s.status] || STATUS_CONFIG.PLANNED
-                                        const StatusIcon = sc.icon
-                                        const totalExp = s.expenses?.reduce((a, e) => a + e.amount, 0) || 0
-                                        return (
-                                            <motion.tr
-                                                key={s.id}
-                                                initial={{ opacity: 0, y: 5 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: idx * 0.02 }}
-                                                className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0"
-                                            >
-                                                <td className="px-4 py-3">
-                                                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-100">
-                                                        {s.number}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className="font-semibold text-slate-800 text-sm">{s.customer?.name || '-'}</span>
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-1">
-                                                        <MapPin size={11} className="text-slate-400 shrink-0" />
-                                                        <span className="text-sm text-slate-600 truncate max-w-45">{s.location}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-[20px] text-[10px] font-semibold ${sc.bg} ${sc.text}`}>
-                                                        <StatusIcon size={10} />
-                                                        {sc.label}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    {s.project ? (
-                                                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md border border-indigo-100">
-                                                            <Briefcase size={9} />
-                                                            {s.project.number}
+                    <>
+                        {/* Desktop table */}
+                        <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                            <th className="px-3 py-2.5 font-medium">Survey</th>
+                                            <th className="px-3 py-2.5 font-medium">Pelanggan</th>
+                                            <th className="px-3 py-2.5 font-medium">Lokasi</th>
+                                            <th className="px-3 py-2.5 text-center font-medium">Status</th>
+                                            <th className="px-3 py-2.5 text-center font-medium">Proyek</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Biaya</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Tanggal</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {filtered.map((s, idx) => {
+                                            const totalExp = s.expenses?.reduce((a, e) => a + e.amount, 0) || 0
+                                            return (
+                                                <motion.tr
+                                                    key={s.id}
+                                                    initial={{ opacity: 0, y: 4 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: idx * 0.02 }}
+                                                    className="group transition-colors hover:bg-muted/30"
+                                                >
+                                                    <td className="px-3 py-2.5">
+                                                        <span className="inline-flex items-center rounded-md border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+                                                            {s.number}
                                                         </span>
-                                                    ) : (
-                                                        <span className="text-[10px] text-slate-400">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <span className="font-semibold text-slate-800 text-sm">{totalExp > 0 ? fmt(totalExp) : '—'}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <span className="text-sm text-slate-500">{fmtDate(s.date)}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <button onClick={() => { setEditing(s); setModalOpen(true) }} aria-label="Edit" className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-indigo-600 hover:text-white transition-all">
-                                                            <Edit size={11} />
-                                                        </button>
-                                                        <button onClick={() => handleDelete(s.id)} aria-label="Delete" className="w-7 h-7 flex items-center justify-center rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all">
-                                                            <Trash2 size={11} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </motion.tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <span className="text-sm font-medium text-foreground">{s.customer?.name || '-'}</span>
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <MapPin size={12} className="flex-shrink-0 text-muted-foreground" />
+                                                            <span className="max-w-[220px] truncate text-sm text-muted-foreground">{s.location}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-center">
+                                                        <StatusPill status={s.status} />
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-center">
+                                                        {s.project ? (
+                                                            <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                                                <Briefcase size={10} />
+                                                                {s.project.number}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <span className="text-sm tabular-nums text-foreground">{totalExp > 0 ? fmt(totalExp) : '—'}</span>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <span className="text-xs text-muted-foreground">{fmtDate(s.date)}</span>
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex items-center justify-end gap-0.5">
+                                                            <Button
+                                                                onClick={() => { setEditing(s); setModalOpen(true) }}
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                title="Edit survey"
+                                                                className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                            >
+                                                                <Edit size={15} />
+                                                            </Button>
+                                                            <Button
+                                                                onClick={() => handleDelete(s.id)}
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                title="Delete survey"
+                                                                className="h-8 w-8 rounded-md text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </Button>
+                                                        </div>
+                                                    </td>
+                                                </motion.tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
+
+                        {/* Mobile cards */}
+                        <div className="grid grid-cols-1 gap-3 lg:hidden">
+                            {filtered.map((s, idx) => {
+                                const totalExp = s.expenses?.reduce((a, e) => a + e.amount, 0) || 0
+                                return (
+                                    <motion.div
+                                        key={s.id}
+                                        initial={{ opacity: 0, y: 4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: idx * 0.02 }}
+                                        className="rounded-xl border border-border bg-card p-3"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <span className="inline-flex items-center rounded-md border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+                                                    {s.number}
+                                                </span>
+                                                <p className="mt-1.5 truncate text-sm font-medium text-foreground">{s.customer?.name || '-'}</p>
+                                            </div>
+                                            <StatusPill status={s.status} />
+                                        </div>
+
+                                        <div className="mt-2 space-y-1.5">
+                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                <MapPin size={12} className="flex-shrink-0" />
+                                                <span className="truncate">{s.location}</span>
+                                            </div>
+                                            {s.project && (
+                                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                    <Briefcase size={12} className="flex-shrink-0" />
+                                                    <span className="truncate">{s.project.number}</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-[11px] text-muted-foreground">
+                                            <span>
+                                                Biaya{' '}
+                                                <span className="font-medium text-foreground">{totalExp > 0 ? fmt(totalExp) : '—'}</span>
+                                            </span>
+                                            <span>{fmtDate(s.date)}</span>
+                                        </div>
+
+                                        <div className="mt-2 flex items-center justify-end gap-0.5">
+                                            <Button
+                                                onClick={() => { setEditing(s); setModalOpen(true) }}
+                                                variant="ghost"
+                                                size="icon"
+                                                title="Edit survey"
+                                                className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                            >
+                                                <Edit size={14} />
+                                            </Button>
+                                            <Button
+                                                onClick={() => handleDelete(s.id)}
+                                                variant="ghost"
+                                                size="icon"
+                                                title="Delete survey"
+                                                className="h-8 w-8 rounded-md text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                            >
+                                                <Trash2 size={14} />
+                                            </Button>
+                                        </div>
+                                    </motion.div>
+                                )
+                            })}
+                        </div>
+                    </>
                 )}
             </div>
-
-            {/* ─── FAB (mobile) ─── */}
-            <button
-                onClick={() => { setEditing(null); setModalOpen(true) }}
-                className="md:hidden fixed bottom-6 right-4 w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-600/30 active:bg-indigo-700 z-200"
-            >
-                <Plus size={24} className="text-white" />
-            </button>
 
             {/* ─── TOAST ─── */}
             <Toast toast={toast} />
@@ -371,8 +474,8 @@ function SurveyMap({ lat, lon, className = "" }: { lat: number; lon: number; cla
     if (!lat || !lon) return null
     const mapUrl = `https://maps.google.com/maps?ll=${lat},${lon}&q=${lat},${lon}&hl=id&t=&z=16&ie=UTF8&iwloc=&output=embed`
     return (
-        <div className={`overflow-hidden rounded-xl border border-slate-200 bg-slate-100 ${className}`}>
-            <iframe key={`${lat}-${lon}`} src={mapUrl} title="Peta Lokasi Survey" className="w-full h-full" loading="lazy" />
+        <div className={`overflow-hidden rounded-lg border border-border bg-muted ${className}`}>
+            <iframe key={`${lat}-${lon}`} src={mapUrl} title="Peta Lokasi Survey" className="h-full w-full" loading="lazy" />
         </div>
     )
 }
@@ -483,56 +586,63 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
 
     const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0)
 
-    const inputCls = "w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:bg-white transition-all text-slate-800 placeholder:text-slate-400"
-    const labelCls = "block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1"
+    const labelCls = "block text-xs font-medium text-muted-foreground"
 
     return (
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-100 bg-slate-900/40 backdrop-blur-sm flex flex-col justify-end sm:justify-center sm:items-center sm:p-4"
-            onClick={onClose}
+            className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
         >
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onClose}
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            />
             <motion.div
                 initial={{ y: '100%' }}
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', stiffness: 350, damping: 35, mass: 0.8 }}
                 onClick={e => e.stopPropagation()}
-                className="w-full sm:max-w-lg lg:max-w-xl bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden max-h-[90vh] sm:max-h-[85vh] flex flex-col shadow-2xl border border-slate-200"
+                className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-xl sm:rounded-2xl"
             >
-                {/* Handle bar (mobile) */}
-                <div className="flex justify-center pt-3 pb-2 sm:hidden bg-white">
-                    <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
-                </div>
-
                 {/* Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-white">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm">
-                            <MapPin size={16} className="text-white" />
+                <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                            <MapPin size={16} />
                         </div>
                         <div>
-                            <h2 className="font-bold text-slate-900 text-base leading-none">{isEdit ? 'Edit Survey' : 'Survei Baru'}</h2>
-                            <p className="text-[11px] text-slate-500 mt-0.5">{isEdit ? survey?.number : 'Buat catatan survei lapangan'}</p>
+                            <h2 className="text-sm font-semibold text-foreground">{isEdit ? 'Edit Survey' : 'Survei Baru'}</h2>
+                            <p className="text-[11px] text-muted-foreground">{isEdit ? survey?.number : 'Buat catatan survei lapangan'}</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={onClose}
+                        className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground"
+                    >
                         <X size={16} />
-                    </button>
-                </div>
+                    </Button>
+                </header>
 
                 {/* Step tabs */}
-                <div className="flex border-b border-slate-200 bg-white px-5">
+                <div className="flex border-b border-border px-4">
                     {(['info', 'expenses'] as const).map(s => (
                         <button
                             key={s}
                             onClick={() => setStep(s)}
-                            className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px
-                                ${step === s
-                                    ? 'border-indigo-500 text-indigo-600'
-                                    : 'border-transparent text-slate-400'}`}
+                            className={`h-9 flex-1 border-b-2 text-xs font-medium transition-colors ${
+                                step === s
+                                    ? 'border-primary text-foreground'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                            }`}
                         >
                             {s === 'info' ? 'Info Survei' : `Biaya (${expenses.length})`}
                         </button>
@@ -542,14 +652,14 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto overscroll-contain">
                     {step === 'info' ? (
-                        <div className="p-5 space-y-4">
-                            <div>
+                        <div className="space-y-4 p-4 sm:p-5">
+                            <div className="space-y-1.5">
                                 <label className={labelCls}>Pelanggan *</label>
                                 <select
                                     required
                                     value={form.customerId}
                                     onChange={e => setForm({ ...form, customerId: e.target.value, projectId: '' })}
-                                    className={inputCls}
+                                    className={`${inputClass} cursor-pointer`}
                                 >
                                     <option value="">-- Pilih Pelanggan --</option>
                                     {Array.isArray(customers) && customers.map(c => (
@@ -558,12 +668,12 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                                 </select>
                             </div>
 
-                            <div>
+                            <div className="space-y-1.5">
                                 <label className={labelCls}>Proyek (Opsional)</label>
                                 <select
                                     value={form.projectId}
                                     onChange={e => setForm({ ...form, projectId: e.target.value })}
-                                    className={inputCls}
+                                    className={`${inputClass} cursor-pointer`}
                                 >
                                     <option value="">-- Tanpa Proyek --</option>
                                     {Array.isArray(projects) && projects
@@ -572,46 +682,46 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                                 </select>
                             </div>
 
-                            <div>
+                            <div className="space-y-1.5">
                                 <label className={labelCls}>Lokasi *</label>
                                 <input
                                     required
                                     value={form.location}
                                     onChange={e => setForm({ ...form, location: e.target.value })}
                                     placeholder="Kota, Nama Kantor..."
-                                    className={inputCls}
+                                    className={inputClass}
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <div>
+                                <div className="space-y-1.5">
                                     <label className={labelCls}>Latitude</label>
                                     <input
                                         value={form.latitude}
                                         onChange={e => setForm({ ...form, latitude: e.target.value })}
                                         placeholder="-6.200000"
-                                        className={inputCls}
+                                        className={inputClass}
                                     />
                                 </div>
-                                <div>
+                                <div className="space-y-1.5">
                                     <label className={labelCls}>Longitude</label>
                                     <input
                                         value={form.longitude}
                                         onChange={e => setForm({ ...form, longitude: e.target.value })}
                                         placeholder="106.800000"
-                                        className={inputCls}
+                                        className={inputClass}
                                     />
                                 </div>
                             </div>
 
-                            <div className="flex items-center justify-between gap-3">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Peta Lokasi</p>
-                                <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-medium text-muted-foreground">Peta Lokasi</p>
+                                <div className="flex items-center gap-3">
                                     <button
                                         type="button"
                                         onClick={applyGeo}
                                         disabled={geoBusy || !form.location.trim()}
-                                        className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 hover:text-indigo-800 flex items-center gap-1 disabled:opacity-50"
+                                        className="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:underline disabled:opacity-50"
                                     >
                                         <RefreshCw size={12} className={geoBusy ? 'animate-spin' : ''} /> Cari dari Lokasi
                                     </button>
@@ -619,7 +729,7 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                                         type="button"
                                         onClick={useMyLocation}
                                         disabled={geoBusy}
-                                        className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 hover:text-indigo-800 flex items-center gap-1 disabled:opacity-50"
+                                        className="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:underline disabled:opacity-50"
                                     >
                                         <MapPin size={12} /> Pakai Lokasi Saya
                                     </button>
@@ -632,21 +742,21 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                             />
 
                             <div className="grid grid-cols-2 gap-3">
-                                <div>
+                                <div className="space-y-1.5">
                                     <label className={labelCls}>Tanggal</label>
                                     <input
                                         type="date"
                                         value={form.date}
                                         onChange={e => setForm({ ...form, date: e.target.value })}
-                                        className={inputCls}
+                                        className={inputClass}
                                     />
                                 </div>
-                                <div>
+                                <div className="space-y-1.5">
                                     <label className={labelCls}>Status</label>
                                     <select
                                         value={form.status}
                                         onChange={e => setForm({ ...form, status: e.target.value })}
-                                        className={inputCls}
+                                        className={`${inputClass} cursor-pointer`}
                                     >
                                         {Object.entries(STATUS_CONFIG).map(([k, v]) => (
                                             <option key={k} value={k}>{v.label}</option>
@@ -655,58 +765,58 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                                 </div>
                             </div>
 
-                            <div>
+                            <div className="space-y-1.5">
                                 <label className={labelCls}>Temuan / Kebutuhan</label>
                                 <textarea
                                     rows={4}
                                     value={form.findings}
                                     onChange={e => setForm({ ...form, findings: e.target.value })}
                                     placeholder="Hasil survei, catatan lapangan..."
-                                    className={inputCls + " resize-none"}
+                                    className={`${inputClass} h-auto resize-none py-2.5`}
                                 />
                             </div>
 
                             <button
                                 onClick={() => setStep('expenses')}
-                                className="w-full flex items-center justify-between px-4 py-3 bg-indigo-50 rounded-lg text-indigo-600 font-semibold text-sm hover:bg-indigo-100 transition-colors"
+                                className="flex w-full items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                             >
                                 <span>Lanjut ke Biaya Operasional</span>
-                                <ChevronRight size={18} />
+                                <ChevronRight size={16} className="text-muted-foreground" />
                             </button>
                         </div>
                     ) : (
-                        <div className="p-5 space-y-3">
+                        <div className="space-y-3 p-4 sm:p-5">
                             {expenses.length > 0 && (
-                                <div className="bg-slate-50 rounded-lg p-3.5 flex items-center justify-between border border-slate-100 mb-1">
-                                    <p className="text-xs text-slate-500 font-medium">Total biaya</p>
-                                    <p className="text-base font-bold text-slate-900">{fmt(totalExpenses)}</p>
+                                <div className="mb-1 flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+                                    <p className="text-xs font-medium text-muted-foreground">Total biaya</p>
+                                    <p className="text-sm font-semibold tabular-nums text-foreground">{fmt(totalExpenses)}</p>
                                 </div>
                             )}
 
                             {expenses.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-xl border border-slate-100">
-                                    <Receipt size={32} className="text-slate-300 mb-3" />
-                                    <p className="text-xs text-slate-400 font-medium">Belum ada biaya</p>
+                                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 py-10">
+                                    <Receipt size={24} className="text-muted-foreground" />
+                                    <p className="mt-2 text-xs text-muted-foreground">Belum ada biaya</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
                                     {expenses.map((exp, idx) => (
-                                        <div key={idx} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <span className="text-lg">{CATEGORY_EMOJI[exp.category || 'OTHER'] || '📦'}</span>
+                                        <div key={idx} className="rounded-lg border border-border bg-muted/30 p-3">
+                                            <div className="mb-2 flex items-center gap-2">
+                                                <span className="text-base">{CATEGORY_EMOJI[exp.category || 'OTHER'] || '📦'}</span>
                                                 <select
                                                     value={exp.category}
                                                     onChange={e => {
                                                         const newE = [...expenses]; newE[idx].category = e.target.value; setExpenses(newE)
                                                     }}
-                                                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-semibold uppercase outline-none"
+                                                    className={`${inputClass} h-9 flex-1 cursor-pointer`}
                                                 >
                                                     {EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
                                                 </select>
                                                 {(!exp.status || exp.status === 'PENDING') && (
                                                     <button
                                                         onClick={() => removeExpense(idx)}
-                                                        className="w-8 h-8 flex items-center justify-center rounded-lg text-rose-400 hover:bg-rose-50 active:bg-rose-100 transition-colors"
+                                                        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
                                                     >
                                                         <X size={14} />
                                                     </button>
@@ -718,10 +828,10 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                                                     const newE = [...expenses]; newE[idx].description = e.target.value; setExpenses(newE)
                                                 }}
                                                 placeholder="Keterangan..."
-                                                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none mb-2 text-slate-700 placeholder:text-slate-400"
+                                                className={`${inputClass} mb-2`}
                                             />
                                             <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">Rp</span>
                                                 <input
                                                     type="number"
                                                     value={exp.amount || ''}
@@ -729,7 +839,7 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                                                         const newE = [...expenses]; newE[idx].amount = +e.target.value; setExpenses(newE)
                                                     }}
                                                     placeholder="0"
-                                                    className="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm font-bold outline-none text-slate-800 placeholder:text-slate-300"
+                                                    className={`${inputClass} pl-9 font-medium`}
                                                 />
                                             </div>
                                         </div>
@@ -739,7 +849,7 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
 
                             <button
                                 onClick={addExpense}
-                                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-lg text-sm font-semibold text-slate-500 hover:border-indigo-300 hover:text-indigo-500 transition-colors active:bg-slate-50 flex items-center justify-center gap-2"
+                                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground active:bg-muted/30"
                             >
                                 <Plus size={16} /> Tambah Biaya
                             </button>
@@ -748,18 +858,24 @@ function SurveyFormModal({ survey, customers, projects, onClose, onSuccess }: {
                 </div>
 
                 {/* Footer CTA */}
-                <div className="px-5 py-4 border-t border-slate-200 bg-white flex gap-3">
-                    <button onClick={onClose} className="flex-none px-5 py-3 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                <footer className="flex items-center gap-2 border-t border-border px-4 py-3">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onClose}
+                        className="h-9 rounded-lg px-4 text-sm font-medium"
+                    >
                         Batal
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        type="button"
                         onClick={handleSubmit}
                         disabled={saving || !form.customerId || !form.location}
-                        className="flex-1 py-3 rounded-lg bg-indigo-600 text-white text-sm font-semibold shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        className="h-9 flex-1 rounded-lg px-4 text-sm font-medium"
                     >
                         {saving ? 'Menyimpan...' : isEdit ? 'Perbarui Survey' : 'Buat Survey'}
-                    </button>
-                </div>
+                    </Button>
+                </footer>
             </motion.div>
             <Toast toast={modalToast} />
         </motion.div>

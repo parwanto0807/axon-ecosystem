@@ -1,232 +1,665 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-    Database, Plus, Edit, Trash2, X, CheckCircle2,
-    AlertCircle, RefreshCw, MapPin, Phone, User, Package
+    Database,
+    Plus,
+    Edit,
+    Trash2,
+    X,
+    CheckCircle2,
+    AlertCircle,
+    RefreshCw,
+    MapPin,
+    Phone,
+    User,
+    Package,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface Warehouse {
-    id: string; code: string; name: string; location?: string; type: string;
-    managedBy?: string; phone?: string; isActive: boolean;
-    _count?: { stocks: number }; stocks?: { quantity: number; sku: { purchasePrice: number } }[]
-    createdAt: string;
-    businessCategoryId: string | null; businessCategory?: { id: string; name: string }
+    id: string
+    code: string
+    name: string
+    location?: string
+    type: string
+    managedBy?: string
+    phone?: string
+    isActive: boolean
+    _count?: { stocks: number }
+    stocks?: { quantity: number; sku: { purchasePrice: number } }[]
+    createdAt: string
+    businessCategoryId: string | null
+    businessCategory?: { id: string; name: string }
+}
+
+interface BusinessCategory {
+    id: string
+    name: string
 }
 
 const TYPE_CFG: Record<string, string> = {
-    MAIN: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    BRANCH: 'bg-violet-50 text-violet-700 border-violet-200',
-    VIRTUAL: 'bg-slate-50 text-slate-600 border-slate-200'
+    MAIN: "border-primary/25 bg-primary/10 text-primary",
+    BRANCH: "border-border bg-muted text-foreground",
+    VIRTUAL: "border-border bg-background text-muted-foreground",
 }
 
-const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
-const defaultForm = { code: '', name: '', location: '', type: 'MAIN', managedBy: '', phone: '', isActive: true, businessCategoryId: '' }
+const fmt = (n: number) => `Rp ${n.toLocaleString("id-ID")}`
+const defaultForm = {
+    code: "",
+    name: "",
+    location: "",
+    type: "MAIN",
+    managedBy: "",
+    phone: "",
+    isActive: true,
+    businessCategoryId: "",
+}
+
+const inputClass =
+    "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
+
+function Field({
+    label,
+    required,
+    children,
+    className = "",
+}: {
+    label: string
+    required?: boolean
+    children: React.ReactNode
+    className?: string
+}) {
+    return (
+        <div className={`space-y-1.5 ${className}`}>
+            <label className="block text-xs font-medium text-muted-foreground">
+                {label}
+                {required && <span className="ml-0.5 text-rose-500">*</span>}
+            </label>
+            {children}
+        </div>
+    )
+}
+
+function TypePill({ type }: { type: string }) {
+    return (
+        <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                TYPE_CFG[type] || "border-border bg-muted text-muted-foreground"
+            }`}
+        >
+            <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                    type === "MAIN" ? "bg-primary" : "bg-muted-foreground/60"
+                }`}
+            />
+            {type}
+        </span>
+    )
+}
+
+function StatusPill({ active }: { active: boolean }) {
+    return (
+        <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                active
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400"
+                    : "border-border bg-muted text-muted-foreground"
+            }`}
+        >
+            <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-muted-foreground/50"}`} />
+            {active ? "Aktif" : "Nonaktif"}
+        </span>
+    )
+}
 
 export default function WarehousesPage() {
     const [warehouses, setWarehouses] = useState<Warehouse[]>([])
     const [loading, setLoading] = useState(true)
     const [modalOpen, setModalOpen] = useState(false)
     const [editing, setEditing] = useState<Warehouse | null>(null)
-    const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+    const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null)
     const [form, setForm] = useState(defaultForm)
     const [saving, setSaving] = useState(false)
-    const [businessCategories, setBusinessCategories] = useState<any[]>([])
+    const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
     const [filterBusinessCategory, setFilterBusinessCategory] = useState("ALL")
 
-    const showToast = (type: 'success' | 'error', msg: string) => {
-        setToast({ type, msg }); setTimeout(() => setToast(null), 4000)
+    const showToast = (type: "success" | "error", msg: string) => {
+        setToast({ type, msg })
+        setTimeout(() => setToast(null), 4000)
     }
+
     const load = useCallback(async () => {
         setLoading(true)
         try {
             const [wR, bcR] = await Promise.all([
                 fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`)
+                fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`),
             ])
             setWarehouses(await wR.json())
             setBusinessCategories(await bcR.json())
-        } catch { showToast('error', 'Gagal memuat data') }
-        finally { setLoading(false) }
+        } catch {
+            showToast("error", "Gagal memuat data")
+        } finally {
+            setLoading(false)
+        }
     }, [])
 
-    useEffect(() => { load() }, [load])
+    useEffect(() => {
+        load()
+    }, [load])
 
-    const openCreate = () => { setEditing(null); setForm(defaultForm); setModalOpen(true) }
-    const openEdit = (w: Warehouse) => { setEditing(w); setForm({ code: w.code, name: w.name, location: w.location || '', type: w.type, managedBy: w.managedBy || '', phone: w.phone || '', isActive: w.isActive, businessCategoryId: w.businessCategoryId || '' }); setModalOpen(true) }
+    const openCreate = () => {
+        setEditing(null)
+        setForm(defaultForm)
+        setModalOpen(true)
+    }
+
+    const openEdit = (w: Warehouse) => {
+        setEditing(w)
+        setForm({
+            code: w.code,
+            name: w.name,
+            location: w.location || "",
+            type: w.type,
+            managedBy: w.managedBy || "",
+            phone: w.phone || "",
+            isActive: w.isActive,
+            businessCategoryId: w.businessCategoryId || "",
+        })
+        setModalOpen(true)
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault(); setSaving(true)
+        e.preventDefault()
+        setSaving(true)
         try {
-            const url = editing ? `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/${editing.id}` : `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`
-            const res = await fetch(url, { method: editing ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-            if (res.ok) { setModalOpen(false); showToast('success', editing ? 'Gudang diperbarui' : 'Gudang dibuat'); load() }
-        } finally { setSaving(false) }
+            const url = editing
+                ? `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/${editing.id}`
+                : `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`
+            const res = await fetch(url, {
+                method: editing ? "PUT" : "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+            })
+            if (res.ok) {
+                setModalOpen(false)
+                showToast("success", editing ? "Gudang diperbarui" : "Gudang dibuat")
+                load()
+            }
+        } finally {
+            setSaving(false)
+        }
     }
 
     const handleDelete = async (id: string, name: string) => {
         if (!confirm(`Hapus gudang "${name}"?`)) return
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/${id}`, { method: 'DELETE' })
-        showToast('success', 'Gudang dihapus'); load()
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/${id}`, { method: "DELETE" })
+        showToast("success", "Gudang dihapus")
+        load()
     }
 
-    const ic = "w-full bg-white border border-slate-200 rounded-xl px-4 py-3 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm text-sm"
-    const lc = "text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block"
-
-    const filtered = warehouses.filter(w => 
-        filterBusinessCategory === 'ALL' || w.businessCategoryId === filterBusinessCategory
+    const filtered = warehouses.filter(
+        (w) => filterBusinessCategory === "ALL" || w.businessCategoryId === filterBusinessCategory
     )
 
     return (
-        <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-6 md:py-8 space-y-5 md:space-y-6 font-inter w-full pb-24 md:pb-8">
-            <AnimatePresence>
-                {toast && (
-                    <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        className={`fixed top-6 right-6 z-[300] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl text-sm font-semibold border ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-                        {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />} {toast.msg}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                <AnimatePresence>
+                    {toast && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -12 }}
+                            className={`fixed right-4 top-4 z-[300] flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium shadow-lg sm:right-6 sm:top-6 ${
+                                toast.type === "success"
+                                    ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-300"
+                                    : "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/80 dark:text-rose-300"
+                            }`}
+                        >
+                            {toast.type === "success" ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                            {toast.msg}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-600/20 shrink-0">
-                        <Database size={20} className="text-white md:w-6 md:h-6" />
-                    </div>
+                <header className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Manajemen Gudang</h1>
-                        <p className="text-[10px] md:text-[11px] font-semibold text-slate-400 uppercase tracking-widest leading-none mt-1">Kelola Lokasi Penyimpanan Stok</p>
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground">Manajemen Gudang</h1>
+                        <p className="mt-0.5 text-xs text-muted-foreground">Kelola Lokasi Penyimpanan Stok</p>
                     </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
-                    <select value={filterBusinessCategory} onChange={e => setFilterBusinessCategory(e.target.value)}
-                        className="bg-white border border-slate-200 rounded-xl px-4 h-11 md:h-10 text-[10px] md:text-xs font-bold text-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none shadow-sm min-w-[140px]">
-                        <option value="ALL">All Business Units</option>
-                        {Array.isArray(businessCategories) && businessCategories.map(bc => <option key={bc.id} value={bc.id}>{bc.name}</option>)}
-                    </select>
-                    <Button variant="outline" onClick={load} className="flex-1 md:flex-none rounded-xl border-slate-200 text-slate-600 h-11 md:h-10 px-4 text-[10px] md:text-xs font-bold uppercase tracking-wider">
-                        <RefreshCw size={13} className={`mr-1.5 md:mr-2 ${loading ? 'animate-spin' : ''}`} /> Reload
+                    <Button onClick={openCreate} className="h-9 rounded-lg px-4 text-sm font-medium">
+                        <Plus size={16} className="mr-1.5" />
+                        Tambah Gudang
                     </Button>
-                    <Button onClick={openCreate} className="flex-[2] md:flex-none rounded-xl bg-violet-600 hover:bg-violet-700 text-white h-11 md:h-10 px-4 md:px-5 text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-lg shadow-violet-600/20">
-                        <Plus size={14} className="mr-1.5 md:mr-2" /> Tambah Gudang
-                    </Button>
-                </div>
-            </header>
+                </header>
 
-            {loading ? (
-                <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600" /></div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {filtered.map((w, idx) => {
-                        const totalValue = w.stocks?.reduce((s, ws) => s + ws.quantity * ws.sku.purchasePrice, 0) || 0
-                        return (
-                            <motion.div key={w.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
-                                className={`bg-white rounded-2xl md:rounded-3xl border shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col ${!w.isActive ? 'opacity-60' : 'border-slate-100'}`}>
-                                <div className="p-4 md:p-6 space-y-4 flex-1 flex flex-col">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[9px] md:text-[10px] font-black text-violet-600 uppercase tracking-widest mb-1">{w.code}</p>
-                                            <h3 className="font-black text-slate-900 text-[15px] md:text-lg leading-tight break-words whitespace-normal">{w.name}</h3>
-                                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                                <span className={`inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border ${TYPE_CFG[w.type]}`}>{w.type}</span>
-                                                {w.businessCategory && (
-                                                    <span className="inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border border-indigo-200 bg-indigo-50 text-indigo-700">
-                                                        {w.businessCategory.name}
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <select
+                        value={filterBusinessCategory}
+                        onChange={(e) => setFilterBusinessCategory(e.target.value)}
+                        className={`${inputClass} cursor-pointer sm:w-56`}
+                    >
+                        <option value="ALL">All Business Units</option>
+                        {Array.isArray(businessCategories) &&
+                            businessCategories.map((bc) => (
+                                <option key={bc.id} value={bc.id}>
+                                    {bc.name}
+                                </option>
+                            ))}
+                    </select>
+                    <Button
+                        variant="outline"
+                        onClick={load}
+                        className="h-10 rounded-lg px-3 text-sm font-medium"
+                    >
+                        <RefreshCw size={15} className={`mr-1.5 ${loading ? "animate-spin" : ""}`} />
+                        Reload
+                    </Button>
+                    <span className="text-xs text-muted-foreground sm:ml-auto">
+                        {filtered.length} gudang
+                    </span>
+                </div>
+
+                {loading ? (
+                    <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+                        <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                    </div>
+                ) : filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-20 text-center">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <Database size={22} />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">Belum ada gudang</p>
+                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                            {filterBusinessCategory !== "ALL"
+                                ? "Tidak ada gudang pada unit bisnis ini. Coba pilih unit bisnis lain."
+                                : "Tambahkan gudang pertama Anda untuk mulai mengelola stok."}
+                        </p>
+                        <Button onClick={openCreate} className="mt-5 h-9 rounded-lg px-4 text-sm font-medium">
+                            <Plus size={16} className="mr-1.5" />
+                            Tambah Gudang
+                        </Button>
+                    </div>
+                ) : (
+                    <>
+                        {/* Desktop table */}
+                        <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                            <th className="px-3 py-2.5 font-medium">Gudang</th>
+                                            <th className="px-3 py-2.5 font-medium">Tipe</th>
+                                            <th className="px-3 py-2.5 font-medium">Unit bisnis</th>
+                                            <th className="px-3 py-2.5 font-medium">Lokasi</th>
+                                            <th className="px-3 py-2.5 font-medium">Penanggung jawab</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">SKU</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Nilai aset</th>
+                                            <th className="px-3 py-2.5 font-medium">Status</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {filtered.map((w) => {
+                                            const totalValue =
+                                                w.stocks?.reduce(
+                                                    (s, ws) => s + ws.quantity * ws.sku.purchasePrice,
+                                                    0
+                                                ) || 0
+                                            return (
+                                                <tr key={w.id} className="transition-colors hover:bg-muted/30">
+                                                    <td className="px-3 py-2.5">
+                                                        <p className="font-mono text-[11px] text-muted-foreground">
+                                                            {w.code}
+                                                        </p>
+                                                        <p className="text-sm font-medium text-foreground">
+                                                            {w.name}
+                                                        </p>
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <TypePill type={w.type} />
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        {w.businessCategory ? (
+                                                            <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                                                {w.businessCategory.name}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="max-w-[220px] px-3 py-2.5">
+                                                        {w.location ? (
+                                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                                <MapPin size={13} className="shrink-0" />
+                                                                <span className="truncate">{w.location}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        {w.managedBy ? (
+                                                            <>
+                                                                <p className="text-xs text-foreground">{w.managedBy}</p>
+                                                                {w.phone && (
+                                                                    <p className="font-mono text-[11px] text-muted-foreground">
+                                                                        {w.phone}
+                                                                    </p>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <span className="tabular-nums text-foreground">
+                                                            {w._count?.stocks || 0}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-2.5 text-right">
+                                                        <span className="tabular-nums text-foreground">
+                                                            {fmt(totalValue)}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <StatusPill active={w.isActive} />
+                                                    </td>
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex items-center justify-end gap-0.5">
+                                                            <Button
+                                                                onClick={() => openEdit(w)}
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                title="Edit gudang"
+                                                                className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                            >
+                                                                <Edit size={15} />
+                                                            </Button>
+                                                            <Button
+                                                                onClick={() => handleDelete(w.id, w.name)}
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                title="Hapus gudang"
+                                                                className="h-8 w-8 rounded-md text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Mobile cards */}
+                        <div className="grid grid-cols-1 gap-3 lg:hidden">
+                            {filtered.map((w) => {
+                                const totalValue =
+                                    w.stocks?.reduce(
+                                        (s, ws) => s + ws.quantity * ws.sku.purchasePrice,
+                                        0
+                                    ) || 0
+                                return (
+                                    <div
+                                        key={w.id}
+                                        className="rounded-xl border border-border bg-card p-3"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <p className="font-mono text-[11px] text-muted-foreground">
+                                                    {w.code}
+                                                </p>
+                                                <p className="truncate text-sm font-medium text-foreground">
+                                                    {w.name}
+                                                </p>
+                                            </div>
+                                            <StatusPill active={w.isActive} />
+                                        </div>
+
+                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                            <TypePill type={w.type} />
+                                            {w.businessCategory && (
+                                                <span className="inline-flex items-center rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                                    {w.businessCategory.name}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="mt-2.5 space-y-1.5 border-t border-border pt-2.5">
+                                            {w.location && (
+                                                <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                                                    <MapPin size={13} className="mt-0.5 shrink-0" />
+                                                    <span className="leading-snug">{w.location}</span>
+                                                </div>
+                                            )}
+                                            {w.managedBy && (
+                                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                    <User size={13} className="shrink-0" />
+                                                    <span className="truncate">{w.managedBy}</span>
+                                                </div>
+                                            )}
+                                            {w.phone && (
+                                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                    <Phone size={13} className="shrink-0" />
+                                                    <span className="truncate">{w.phone}</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="mt-2.5 flex items-center justify-between border-t border-border pt-2">
+                                            <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                                                <span className="inline-flex items-center gap-1">
+                                                    <Package size={12} />
+                                                    <span className="font-medium text-foreground">
+                                                        {w._count?.stocks || 0}
                                                     </span>
-                                                )}
-                                                {!w.isActive && <span className="inline-flex px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest border bg-rose-50 text-rose-600 border-rose-200">Nonaktif</span>}
+                                                    SKU
+                                                </span>
+                                                <span>
+                                                    Nilai{" "}
+                                                    <span className="font-medium text-foreground">
+                                                        {fmt(totalValue)}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-0.5">
+                                                <Button
+                                                    onClick={() => openEdit(w)}
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    title="Edit gudang"
+                                                    className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                >
+                                                    <Edit size={14} />
+                                                </Button>
+                                                <Button
+                                                    onClick={() => handleDelete(w.id, w.name)}
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    title="Hapus gudang"
+                                                    className="h-8 w-8 rounded-md text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </Button>
                                             </div>
                                         </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Nilai Aset</p>
-                                            <p className="font-black text-emerald-700 text-sm md:text-base">{fmt(totalValue)}</p>
-                                        </div>
                                     </div>
-
-                                    <div className="space-y-2.5 py-4 border-y border-slate-50 flex-1">
-                                        {w.location && <div className="flex items-start gap-2 text-[11px] md:text-[12px] text-slate-500"><MapPin size={14} className="text-slate-400 shrink-0 mt-0.5" /><span className="leading-snug">{w.location}</span></div>}
-                                        {w.managedBy && <div className="flex items-center gap-2 text-[11px] md:text-[12px] text-slate-500"><User size={14} className="text-slate-400 shrink-0" /><span className="truncate">{w.managedBy}</span></div>}
-                                        {w.phone && <div className="flex items-center gap-2 text-[11px] md:text-[12px] text-slate-500"><Phone size={14} className="text-slate-400 shrink-0" /><span className="truncate">{w.phone}</span></div>}
-                                    </div>
-
-                                    <div className="flex items-center justify-between pt-1">
-                                        <span className="flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg">
-                                            <Package size={13} className="text-indigo-400" /> {w._count?.stocks || 0} SKU
-                                        </span>
-                                        <div className="flex gap-1.5">
-                                            <button onClick={() => openEdit(w)} className="w-8 h-8 md:w-9 md:h-9 rounded-xl text-indigo-600 bg-indigo-50/50 hover:bg-indigo-100 flex items-center justify-center transition-colors"><Edit size={14} /></button>
-                                            <button onClick={() => handleDelete(w.id, w.name)} className="w-8 h-8 md:w-9 md:h-9 rounded-xl text-rose-500 bg-rose-50/50 hover:bg-rose-100 flex items-center justify-center transition-colors"><Trash2 size={14} /></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )
-                    })}
-                </div>
-            )}
+                                )
+                            })}
+                        </div>
+                    </>
+                )}
+            </div>
 
             {/* Modal */}
             <AnimatePresence>
                 {modalOpen && (
-                    <div className="fixed inset-0 z-[100] flex flex-col justify-end sm:justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-sm shadow-2xl overflow-hidden">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setModalOpen(false)} className="absolute inset-0" />
-                        
-                        <motion.div initial={{ y: '100%', scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: '100%', scale: 0.95 }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="bg-white rounded-t-[1.5rem] sm:rounded-3xl shadow-2xl w-full max-w-lg mx-auto relative flex flex-col max-h-[90vh] sm:max-h-[85vh]">
-                            
-                            {/* Handle bar (mobile) */}
-                            <div className="flex justify-center pt-3 pb-2 sm:hidden bg-white shrink-0 rounded-t-[1.5rem]">
-                                <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
-                            </div>
+                    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setModalOpen(false)}
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                        />
 
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-white">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shadow-md shadow-violet-600/20"><Database size={16} className="text-white" /></div>
-                                    <h2 className="font-extrabold text-slate-900 text-sm md:text-base uppercase tracking-wider">{editing ? 'Edit Gudang' : 'Tambah Gudang'}</h2>
+                        <motion.div
+                            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                            className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-lg sm:rounded-2xl"
+                        >
+                            <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                                <div className="flex min-w-0 items-center gap-2.5">
+                                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                                        <Database size={16} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h2 className="truncate text-sm font-semibold text-foreground">
+                                            {editing ? "Edit Gudang" : "Tambah Gudang"}
+                                        </h2>
+                                        <p className="truncate text-[11px] text-muted-foreground">
+                                            {editing
+                                                ? "Perbarui informasi gudang"
+                                                : "Tambahkan gudang baru"}
+                                        </p>
+                                    </div>
                                 </div>
-                                <button type="button" onClick={() => setModalOpen(false)} className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors"><X size={18} /></button>
-                            </div>
-                            
-                            <div className="overflow-y-auto w-full">
-                                <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="md:col-span-1"><label className={lc}>Kode <span className="text-rose-500">*</span></label><input required maxLength={10} value={form.code} onChange={e => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="GDG-01" className={ic} /></div>
-                                        <div className="md:col-span-1"><label className={lc}>Tipe</label>
-                                            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className={ic}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => setModalOpen(false)}
+                                    className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground"
+                                >
+                                    <X size={16} />
+                                </Button>
+                            </header>
+
+                            <div className="flex-1 overflow-y-auto p-4">
+                                <form id="warehouse-form" onSubmit={handleSubmit} className="space-y-3">
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <Field label="Kode" required>
+                                            <input
+                                                required
+                                                maxLength={10}
+                                                value={form.code}
+                                                onChange={(e) =>
+                                                    setForm({ ...form, code: e.target.value.toUpperCase() })
+                                                }
+                                                placeholder="GDG-01"
+                                                className={`${inputClass} font-mono uppercase`}
+                                            />
+                                        </Field>
+                                        <Field label="Tipe">
+                                            <select
+                                                value={form.type}
+                                                onChange={(e) => setForm({ ...form, type: e.target.value })}
+                                                className={`${inputClass} cursor-pointer`}
+                                            >
                                                 <option value="MAIN">Main (Utama)</option>
                                                 <option value="BRANCH">Branch (Cabang)</option>
                                                 <option value="VIRTUAL">Virtual</option>
                                             </select>
-                                        </div>
-                                        <div className="md:col-span-1"><label className={lc}>Unit Bisnis / Kategori</label>
-                                            <select value={form.businessCategoryId} onChange={e => setForm({ ...form, businessCategoryId: e.target.value })} className={ic + " font-bold text-indigo-600"}>
+                                        </Field>
+                                        <Field label="Unit Bisnis / Kategori" className="sm:col-span-2">
+                                            <select
+                                                value={form.businessCategoryId}
+                                                onChange={(e) =>
+                                                    setForm({ ...form, businessCategoryId: e.target.value })
+                                                }
+                                                className={`${inputClass} cursor-pointer`}
+                                            >
                                                 <option value="">-- Generic / Shared --</option>
-                                                {Array.isArray(businessCategories) && businessCategories.map(bc => <option key={bc.id} value={bc.id}>{bc.name}</option>)}
+                                                {Array.isArray(businessCategories) &&
+                                                    businessCategories.map((bc) => (
+                                                        <option key={bc.id} value={bc.id}>
+                                                            {bc.name}
+                                                        </option>
+                                                    ))}
                                             </select>
-                                        </div>
-                                        <div className="col-span-1 md:col-span-2"><label className={lc}>Nama Gudang <span className="text-rose-500">*</span></label><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Gudang Utama Jakarta" className={ic} /></div>
-                                        <div className="col-span-1 md:col-span-2"><label className={lc}>Lokasi / Alamat</label><input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="Jl. Contoh No. 1, Jakarta" className={ic} /></div>
-                                        <div className="md:col-span-1"><label className={lc}>Penanggung Jawab</label><input value={form.managedBy} onChange={e => setForm({ ...form, managedBy: e.target.value })} placeholder="Nama PIC" className={ic} /></div>
-                                        <div className="md:col-span-1"><label className={lc}>Telepon</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="08xxxx" className={ic} /></div>
-                                        
-                                        <div className="col-span-1 md:col-span-2 flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 mt-2">
-                                            <input type="checkbox" id="isActive" checked={form.isActive} onChange={e => setForm({ ...form, isActive: e.target.checked })} className="w-4 h-4 rounded text-violet-600 focus:ring-violet-500" />
-                                            <label htmlFor="isActive" className="text-xs font-bold text-slate-700 tracking-wide uppercase cursor-pointer">Gudang Aktif</label>
+                                        </Field>
+                                        <Field label="Nama Gudang" required className="sm:col-span-2">
+                                            <input
+                                                required
+                                                value={form.name}
+                                                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                                placeholder="Gudang Utama Jakarta"
+                                                className={inputClass}
+                                            />
+                                        </Field>
+                                        <Field label="Lokasi / Alamat" className="sm:col-span-2">
+                                            <input
+                                                value={form.location}
+                                                onChange={(e) => setForm({ ...form, location: e.target.value })}
+                                                placeholder="Jl. Contoh No. 1, Jakarta"
+                                                className={inputClass}
+                                            />
+                                        </Field>
+                                        <Field label="Penanggung Jawab">
+                                            <input
+                                                value={form.managedBy}
+                                                onChange={(e) =>
+                                                    setForm({ ...form, managedBy: e.target.value })
+                                                }
+                                                placeholder="Nama PIC"
+                                                className={inputClass}
+                                            />
+                                        </Field>
+                                        <Field label="Telepon">
+                                            <input
+                                                value={form.phone}
+                                                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                                                placeholder="08xxxx"
+                                                className={inputClass}
+                                            />
+                                        </Field>
+                                        <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5 sm:col-span-2">
+                                            <input
+                                                type="checkbox"
+                                                id="isActive"
+                                                checked={form.isActive}
+                                                onChange={(e) =>
+                                                    setForm({ ...form, isActive: e.target.checked })
+                                                }
+                                                className="h-4 w-4 rounded border-border accent-primary"
+                                            />
+                                            <label
+                                                htmlFor="isActive"
+                                                className="cursor-pointer text-xs font-medium text-foreground"
+                                            >
+                                                Gudang Aktif
+                                            </label>
                                         </div>
                                     </div>
                                 </form>
                             </div>
 
-                            <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-100 shrink-0 safe-area-bottom">
-                                <div className="flex gap-3">
-                                    <Button type="button" variant="outline" onClick={() => setModalOpen(false)} className="flex-[1] bg-white rounded-xl md:rounded-2xl h-12 md:h-14 font-black uppercase tracking-wider text-[10px] md:text-xs">Batal</Button>
-                                    <Button onClick={handleSubmit} disabled={saving} className="flex-[2] rounded-xl md:rounded-2xl h-12 md:h-14 bg-violet-600 hover:bg-violet-700 text-white font-black uppercase tracking-wider text-[10px] md:text-xs shadow-lg shadow-violet-600/20 disabled:opacity-70 disabled:shadow-none">
-                                        {saving ? 'Menyimpan...' : editing ? 'Update Gudang' : 'Buat Gudang'}
-                                    </Button>
-                                </div>
-                            </div>
+                            <footer className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setModalOpen(false)}
+                                    className="h-9 rounded-lg px-4 text-sm font-medium"
+                                >
+                                    Batal
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    form="warehouse-form"
+                                    disabled={saving}
+                                    className="h-9 rounded-lg px-4 text-sm font-medium"
+                                >
+                                    {saving ? "Menyimpan..." : editing ? "Update Gudang" : "Buat Gudang"}
+                                </Button>
+                            </footer>
                         </motion.div>
                     </div>
                 )}

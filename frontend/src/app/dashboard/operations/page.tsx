@@ -1,22 +1,17 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { motion } from "framer-motion"
 import {
     Wrench,
     Clock,
     CheckCircle2,
     AlertCircle,
     Calendar,
-    ArrowRight,
     PlusCircle,
     ClipboardList,
-    Package,
     MapPin,
-    User,
     ChevronRight,
     RefreshCw,
-    Search
 } from "lucide-react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
@@ -32,6 +27,43 @@ interface DashboardData {
     myTasks: any[];
     serviceReminders: any[];
     recentReports: any[];
+}
+
+function StatusPill({ status }: { status: string }) {
+    const styles =
+        status === "IN_PROGRESS"
+            ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-400"
+            : status === "COMPLETED"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400"
+                : status === "ON_HOLD"
+                    ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400"
+                    : status === "CONFIRMED"
+                        ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-400"
+                        : "border-border bg-muted text-muted-foreground"
+
+    const dot =
+        status === "IN_PROGRESS"
+            ? "bg-amber-500"
+            : status === "COMPLETED"
+                ? "bg-emerald-500"
+                : status === "ON_HOLD"
+                    ? "bg-rose-500"
+                    : status === "CONFIRMED"
+                        ? "bg-blue-500"
+                        : "bg-muted-foreground/50"
+
+    return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${styles}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+            {status}
+        </span>
+    )
+}
+
+function priorityDot(priority: string) {
+    if (priority === "HIGH") return "bg-rose-500"
+    if (priority === "MEDIUM") return "bg-amber-500"
+    return "bg-blue-500"
 }
 
 export default function OperatorDashboard() {
@@ -65,175 +97,214 @@ export default function OperatorDashboard() {
 
     if (!session) return null
 
+    const berjalan = (data?.stats?.IN_PROGRESS || 0) + (data?.stats?.ON_HOLD || 0)
+    const antrean = data?.stats?.CONFIRMED || 0
+    const selesai = data?.stats?.COMPLETED || 0
+    const total = berjalan + antrean + selesai
+
+    const kpis = [
+        { label: "Berjalan", value: berjalan, icon: Wrench },
+        { label: "Antrean", value: antrean, icon: Clock },
+        { label: "Selesai", value: selesai, icon: CheckCircle2 },
+        { label: "Total Tugas", value: total, icon: ClipboardList },
+    ]
+
+    const quickActions = [
+        { label: 'Tugas Saya', icon: Wrench, link: '/dashboard/operations/work-orders' },
+        { label: 'Buat Laporan', icon: PlusCircle, link: '/dashboard/operations/work-orders' },
+        { label: 'Jadwal Servis', icon: Calendar, link: '/dashboard/management/assets' },
+        { label: 'Cek Progress', icon: ClipboardList, link: '/dashboard/operations/reports' },
+    ]
+
     return (
-        <div className="max-w-screen mx-auto px-4 md:px-8 py-6 md:py-10 space-y-8 font-inter bg-slate-50/30 min-h-screen pb-32">
-            {/* Hero Welcome Section */}
-            <section className="relative overflow-hidden bg-indigo-600 rounded-[2.5rem] p-8 md:p-12 text-white shadow-2xl shadow-indigo-600/20">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl" />
-                <div className="absolute bottom-0 left-0 w-40 h-40 bg-indigo-400/20 rounded-full -ml-10 -mb-10 blur-2xl" />
-                
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-                    <div className="space-y-2">
-                        <h1 className="text-3xl md:text-4xl font-black tracking-tighter uppercase leading-tight">
-                            Halo, <span className="text-indigo-200">{session.user.name?.split(' ')[0]}</span>!
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                            Halo, <span className="text-primary">{session.user.name?.split(' ')[0]}</span>!
                         </h1>
-                        <p className="text-indigo-100/80 font-bold uppercase tracking-[0.2em] text-[10px] md:text-sm">
+                        <p className="mt-0.5 text-xs text-muted-foreground">
                             Dashboard Kendali Operasional Lapangan
                         </p>
                     </div>
+                </header>
 
-                    <div className="grid grid-cols-3 gap-4 md:gap-8 bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10">
-                        <div className="text-center">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Berjalan</p>
-                            <p className="text-2xl font-black">{(data?.stats?.IN_PROGRESS || 0) + (data?.stats?.ON_HOLD || 0)}</p>
-                        </div>
-                        <div className="text-center border-x border-white/10 px-4 md:px-8">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Antrean</p>
-                            <p className="text-2xl font-black">{data?.stats?.CONFIRMED || 0}</p>
-                        </div>
-                        <div className="text-center text-emerald-300">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">Selesai</p>
-                            <p className="text-2xl font-black">{data?.stats?.COMPLETED || 0}</p>
-                        </div>
-                    </div>
+                <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {kpis.map((kpi) => {
+                        const Icon = kpi.icon
+                        return (
+                            <div key={kpi.label} className="rounded-xl border border-border bg-card p-4">
+                                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                    <Icon size={16} />
+                                </div>
+                                <p className="text-2xl font-semibold tabular-nums text-foreground">{kpi.value}</p>
+                                <p className="mt-0.5 text-[11px] text-muted-foreground">{kpi.label}</p>
+                            </div>
+                        )
+                    })}
                 </div>
-            </section>
 
-            {/* Quick Actions Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                    { label: 'Tugas Saya', icon: Wrench, color: 'text-amber-600 bg-amber-50', link: '/dashboard/operations/work-orders' },
-                    { label: 'Buat Laporan', icon: PlusCircle, color: 'text-emerald-600 bg-emerald-50', link: '/dashboard/operations/work-orders' },
-                    { label: 'Jadwal Servis', icon: Calendar, color: 'text-indigo-600 bg-indigo-50', link: '/dashboard/management/assets' },
-                    { label: 'Cek Progress', icon: ClipboardList, color: 'text-blue-600 bg-blue-50', link: '/dashboard/operations/reports' }
-                ].map((action, i) => (
-                    <Link key={i} href={action.link}>
-                        <motion.div 
-                            whileHover={{ y: -4 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center gap-3 transition-all hover:shadow-md h-full text-center"
-                        >
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${action.color}`}>
-                                <action.icon size={24} />
-                            </div>
-                            <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{action.label}</span>
-                        </motion.div>
-                    </Link>
-                ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* My Assignments Section */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                            <Wrench className="text-indigo-600" size={18} />
-                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Tugas Utama Saya</h2>
-                        </div>
-                        <Link href="/dashboard/operations/work-orders" className="text-[10px] font-black text-indigo-600 uppercase hover:underline">Lihat Semua</Link>
-                    </div>
-
-                    <div className="space-y-3">
-                        {loading ? (
-                            Array(3).fill(0).map((_, i) => (
-                                <div key={i} className="bg-white h-24 rounded-3xl border border-slate-100 animate-pulse" />
-                            ))
-                        ) : data?.myTasks.length === 0 ? (
-                            <div className="bg-white p-10 rounded-3xl border border-dashed border-slate-200 text-center">
-                                <CheckCircle2 className="mx-auto text-slate-200 mb-3" size={32} />
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Semua Tugas Sudah Selesai!</p>
-                            </div>
-                        ) : data?.myTasks.map((wo: any) => (
-                            <Link key={wo.id} href={`/dashboard/operations/work-orders?id=${wo.id}`}>
-                                <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:border-indigo-300 transition-all group relative overflow-hidden flex items-center gap-4">
-                                    <div className={`w-2 h-full absolute left-0 top-0 ${wo.priority === 'HIGH' ? 'bg-rose-500' : wo.priority === 'MEDIUM' ? 'bg-amber-500' : 'bg-blue-500'}`} />
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1.5">
-                                            <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{wo.number}</span>
-                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${wo.status === 'IN_PROGRESS' ? 'bg-amber-50 text-amber-700' : 'bg-slate-50 text-slate-500'}`}>
-                                                {wo.status}
-                                            </span>
-                                        </div>
-                                        <h3 className="font-black text-slate-800 text-sm truncate uppercase tracking-tighter leading-none mb-1 group-hover:text-indigo-600 transition-colors">{wo.title}</h3>
-                                        <div className="flex items-center gap-3 text-slate-400">
-                                            <p className="flex items-center gap-1.5 text-[10px] font-bold"><MapPin size={10} /> {wo.location || 'Lokasi Belum Ditentukan'}</p>
-                                        </div>
+                <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {quickActions.map((action) => {
+                        const Icon = action.icon
+                        return (
+                            <Link key={action.label} href={action.link}>
+                                <div className="flex h-full items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:bg-muted/30">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                        <Icon size={16} />
                                     </div>
-                                    <div className="shrink-0 w-10 h-10 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                                        <ChevronRight size={20} />
-                                    </div>
+                                    <span className="text-xs font-medium text-foreground">{action.label}</span>
                                 </div>
                             </Link>
-                        ))}
-                    </div>
+                        )
+                    })}
                 </div>
 
-                {/* Service Reminders Section */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                            <Clock className="text-indigo-600" size={18} />
-                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Jadwal Servis Unit</h2>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                        <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-2.5">
+                            <div className="flex items-center gap-2">
+                                <Wrench size={15} className="text-muted-foreground" />
+                                <h2 className="text-sm font-semibold text-foreground">Tugas Utama Saya</h2>
+                            </div>
+                            <Link
+                                href="/dashboard/operations/work-orders"
+                                className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                                Lihat Semua
+                            </Link>
                         </div>
-                        <Link href="/dashboard/management/assets" className="text-[10px] font-black text-indigo-600 uppercase hover:underline">Kelola Aset</Link>
+
+                        {loading ? (
+                            <div className="flex h-48 items-center justify-center">
+                                <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                            </div>
+                        ) : data?.myTasks.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                    <CheckCircle2 size={22} />
+                                </div>
+                                <p className="text-sm font-medium text-foreground">Semua Tugas Sudah Selesai!</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Tidak ada tugas aktif saat ini.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-border">
+                                {data?.myTasks.map((wo: any) => (
+                                    <Link key={wo.id} href={`/dashboard/operations/work-orders?id=${wo.id}`}>
+                                        <div className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/30">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${priorityDot(wo.priority)}`} title={wo.priority} />
+                                                    <span className="font-mono text-[11px] text-muted-foreground">{wo.number}</span>
+                                                    <StatusPill status={wo.status} />
+                                                </div>
+                                                <p className="mt-1 truncate text-sm font-medium text-foreground">{wo.title}</p>
+                                                <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
+                                                    <MapPin size={11} className="shrink-0" />
+                                                    {wo.location || 'Lokasi Belum Ditentukan'}
+                                                </p>
+                                            </div>
+                                            <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
-                    <div className="space-y-3">
-                        {loading ? (
-                            Array(3).fill(0).map((_, i) => (
-                                <div key={i} className="bg-white h-24 rounded-3xl border border-slate-100 animate-pulse" />
-                            ))
-                        ) : data?.serviceReminders.length === 0 ? (
-                            <div className="bg-white p-10 rounded-3xl border border-dashed border-slate-200 text-center">
-                                <AlertCircle className="mx-auto text-slate-200 mb-3" size={32} />
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tidak ada jadwal servis mendesak.</p>
-                            </div>
-                        ) : data?.serviceReminders.map((asset: any) => (
-                            <div key={asset.id} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-slate-50 flex flex-col items-center justify-center shrink-0 border border-slate-100">
-                                    <span className="text-[8px] font-black text-slate-400 uppercase leading-none mb-0.5">Servis</span>
-                                    <span className="text-xs font-black text-indigo-600">{fmtDate(asset.nextServiceDate)}</span>
+                    <div className="space-y-4">
+                        <div className="overflow-hidden rounded-xl border border-border bg-card">
+                            <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-2.5">
+                                <div className="flex items-center gap-2">
+                                    <Clock size={15} className="text-muted-foreground" />
+                                    <h2 className="text-sm font-semibold text-foreground">Jadwal Servis Unit</h2>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-black text-slate-800 text-sm truncate uppercase tracking-tighter leading-none mb-1">{asset.name}</h3>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase truncate">Customer: {asset.customer.name}</p>
-                                </div>
-                                <Link href="/dashboard/operations/work-orders">
-                                    <button className="h-9 px-4 rounded-xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all">
-                                        BUAT WO
-                                    </button>
+                                <Link
+                                    href="/dashboard/management/assets"
+                                    className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                                >
+                                    Kelola Aset
                                 </Link>
                             </div>
-                        ))}
-                    </div>
 
-                    {/* Today's Stats & Summary (Minor) */}
-                    {!loading && data && (
-                        <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <RefreshCw size={14} className="text-emerald-400 animate-spin-slow" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ringkasan Aktivitas</span>
-                            </div>
-                            <div className="flex items-end justify-between">
-                                <div>
-                                    <p className="text-3xl font-black">{data.recentReports.length}</p>
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Laporan Baru (Baru-baru ini)</p>
+                            {loading ? (
+                                <div className="flex h-48 items-center justify-center">
+                                    <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
                                 </div>
-                                <div className="flex -space-x-2">
-                                     {data.recentReports.slice(0, 3).map((r: any, i: number) => (
-                                         <div key={i} className="w-8 h-8 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center text-[10px] font-black">
-                                             {r.reportedBy?.substring(0, 1)}
-                                         </div>
-                                     ))}
+                            ) : data?.serviceReminders.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                        <AlertCircle size={22} />
+                                    </div>
+                                    <p className="text-sm font-medium text-foreground">Tidak ada jadwal servis mendesak.</p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Semua unit dalam kondisi terjadwal.
+                                    </p>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="divide-y divide-border">
+                                    {data?.serviceReminders.map((asset: any) => (
+                                        <div
+                                            key={asset.id}
+                                            className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/30"
+                                        >
+                                            <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                                                <span className="text-[10px] leading-none">Servis</span>
+                                                <span className="mt-0.5 text-[11px] font-semibold text-foreground">
+                                                    {fmtDate(asset.nextServiceDate)}
+                                                </span>
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-medium text-foreground">{asset.name}</p>
+                                                <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                                    Customer: {asset.customer.name}
+                                                </p>
+                                            </div>
+                                            <Link href="/dashboard/operations/work-orders">
+                                                <Button size="sm" className="h-8 rounded-lg px-3 text-xs">
+                                                    Buat WO
+                                                </Button>
+                                            </Link>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    )}
+
+                        {!loading && data && (
+                            <div className="rounded-xl border border-border bg-card p-4">
+                                <div className="flex items-center gap-2">
+                                    <RefreshCw size={14} className="text-muted-foreground" />
+                                    <h2 className="text-sm font-semibold text-foreground">Ringkasan Aktivitas</h2>
+                                </div>
+                                <div className="mt-3 flex items-end justify-between">
+                                    <div>
+                                        <p className="text-2xl font-semibold tabular-nums text-foreground">
+                                            {data.recentReports.length}
+                                        </p>
+                                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                            Laporan Baru (Baru-baru ini)
+                                        </p>
+                                    </div>
+                                    <div className="flex -space-x-2">
+                                        {data.recentReports.slice(0, 3).map((r: any, i: number) => (
+                                            <div
+                                                key={i}
+                                                className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-card bg-muted text-[10px] font-medium text-muted-foreground"
+                                            >
+                                                {r.reportedBy?.substring(0, 1)}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
-
-            {/* Bottom Mobile Toggle Spacer */}
-            <div className="h-10 md:hidden" />
         </div>
     )
 }

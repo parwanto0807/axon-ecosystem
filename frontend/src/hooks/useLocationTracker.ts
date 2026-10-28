@@ -126,6 +126,5 @@ export function useLocationTracker() {
             if (pollTimerRef.current) clearInterval(pollTimerRef.current)
             document.removeEventListener('visibilitychange', handleVisibilityChange)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [shouldTrack, employeeId])
 }

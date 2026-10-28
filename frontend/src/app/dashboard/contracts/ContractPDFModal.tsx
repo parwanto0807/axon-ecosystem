@@ -252,7 +252,7 @@ export default function ContractPDFModal({ contract, company, onClose }: { contr
                             </div>
 
                             <p className="text-[13px] italic text-slate-500">
-                                Secara bersama-sama disebut <strong>"PARA PIHAK"</strong>. Terlebih dahulu menerangkan bahwa PARA PIHAK telah bermusyawarah dan sepakat mengadakan Perjanjian Kerja dengan ketentuan sebagai berikut:
+                                Secara bersama-sama disebut <strong>&quot;PARA PIHAK&quot;</strong>. Terlebih dahulu menerangkan bahwa PARA PIHAK telah bermusyawarah dan sepakat mengadakan Perjanjian Kerja dengan ketentuan sebagai berikut:
                             </p>
 
                             {contract.clauses.map((clause, i) => (

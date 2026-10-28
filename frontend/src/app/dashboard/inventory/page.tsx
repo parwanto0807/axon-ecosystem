@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, Fragment } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-    Package, Warehouse, TrendingDown, DollarSign,
-    RefreshCw, Search, AlertTriangle, CheckCircle2,
-    ChevronDown, ChevronUp, ArrowUpDown, Building2,
+    Package, Warehouse, DollarSign,
+    RefreshCw, Search, AlertTriangle,
+    ChevronDown, ChevronUp, Building2,
     History, X, ArrowUpRight, ArrowDownLeft, Repeat, ClipboardList
 } from "lucide-react"
 
@@ -30,12 +30,35 @@ interface Movement {
 
 const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 
+const inputClass =
+    "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
+
+const filters: { value: string; label: string }[] = [
+    { value: "ALL", label: "Semua" },
+    { value: "LOW", label: "Stok Menipis" },
+]
+
+function StockPill({ low }: { low: boolean }) {
+    return (
+        <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                low
+                    ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400"
+            }`}
+        >
+            <span className={`h-1.5 w-1.5 rounded-full ${low ? "bg-rose-500" : "bg-emerald-500"}`} />
+            {low ? "Low" : "OK"}
+        </span>
+    )
+}
+
 export default function InventoryPage() {
     const [skus, setSkus] = useState<SKU[]>([])
     const [warehouses, setWarehouses] = useState<Warehouse[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
-    const [filter, setFilter] = useState("ALL") // ALL | LOW
+    const [filter, setFilter] = useState("ALL")
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [historyOpen, setHistoryOpen] = useState(false)
     const [selectedSku, setSelectedSku] = useState<SKU | null>(null)
@@ -79,376 +102,501 @@ export default function InventoryPage() {
     const lowStockCount = skus.filter(s => s.isLowStock).length
     const activeWarehouses = warehouses.filter(w => w.isActive).length
 
-    const summaryCards = [
-        { label: 'Total SKU Aktif', value: totalSKUs, icon: Package, color: 'bg-indigo-600', suffix: ' SKU' },
-        { label: 'Total Nilai Aset', value: fmt(totalValue), icon: DollarSign, color: 'bg-emerald-600', raw: true },
-        { label: 'Stok Menipis', value: lowStockCount, icon: AlertTriangle, color: 'bg-amber-500', suffix: ' item' },
-        { label: 'Gudang Aktif', value: activeWarehouses, icon: Building2, color: 'bg-violet-600', suffix: ' gudang' },
+    const summaryCards: { label: string; value: string | number; icon: typeof Package; suffix?: string; raw?: boolean }[] = [
+        { label: 'Total SKU Aktif', value: totalSKUs, icon: Package, suffix: ' SKU' },
+        { label: 'Total Nilai Aset', value: fmt(totalValue), icon: DollarSign, raw: true },
+        { label: 'Stok Menipis', value: lowStockCount, icon: AlertTriangle, suffix: ' item' },
+        { label: 'Gudang Aktif', value: activeWarehouses, icon: Building2, suffix: ' gudang' },
     ]
 
     return (
-        <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-6 md:py-8 md:max-w-screen space-y-5 md:space-y-6 w-full font-inter pb-24 md:pb-8">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 shrink-0">
-                        <Package size={20} className="text-white md:w-6 md:h-6" />
-                    </div>
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px] space-y-5">
+                <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Inventory</h1>
-                        <p className="text-[10px] md:text-[11px] font-semibold text-slate-400 uppercase tracking-widest leading-none mt-1">Multi-Warehouse Stock</p>
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground">Inventory</h1>
+                        <p className="mt-0.5 text-xs text-muted-foreground">Multi-Warehouse Stock</p>
                     </div>
-                </div>
-                <button onClick={load} className="flex items-center justify-center gap-2 w-full md:w-auto px-4 py-2.5 md:py-2 text-xs font-bold uppercase tracking-wider border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600 shadow-sm">
-                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Reload
-                </button>
-            </header>
+                    <button
+                        onClick={load}
+                        className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted sm:w-auto"
+                    >
+                        <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Reload
+                    </button>
+                </header>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-                {summaryCards.map((card, i) => (
-                    <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                        className="bg-white rounded-2xl md:rounded-3xl p-4 md:p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col items-start gap-2">
-                        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl ${card.color} flex items-center justify-center shadow-md`}>
-                            <card.icon size={16} className="text-white md:w-[18px] md:h-[18px]" />
-                        </div>
-                        <div className="mt-1 md:mt-2">
-                            <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{card.label}</p>
-                            <p className="text-base md:text-xl font-black text-slate-900 tracking-tight leading-none">{card.raw ? card.value : `${card.value}${card.suffix}`}</p>
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-
-            {/* Warehouse Strip */}
-            {warehouses.length > 0 && (
-                <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                    {warehouses.filter(w => w.isActive).map(w => {
-                        const wStock = skus.reduce((sum, s) => {
-                            const ws = s.warehouseStocks.find(whs => whs.warehouse?.id === w.id)
-                            return sum + (ws?.quantity || 0) * s.purchasePrice
-                        }, 0)
-                        return (
-                            <div key={w.id} className="flex-shrink-0 bg-white rounded-2xl md:rounded-3xl px-4 md:px-5 py-3 border border-slate-100 shadow-sm min-w-[140px]">
-                                <p className="text-[9px] md:text-[10px] font-black text-indigo-600 uppercase tracking-widest">{w.code}</p>
-                                <p className="font-bold text-slate-800 text-xs md:text-sm mt-0.5 whitespace-nowrap">{w.name}</p>
-                                <p className="text-[11px] md:text-xs font-bold text-emerald-600 mt-1">{fmt(wStock)}</p>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    {summaryCards.map((card) => (
+                        <div key={card.label} className="rounded-xl border border-border bg-card p-4">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <p className="text-[11px] text-muted-foreground">{card.label}</p>
+                                    <p className="mt-1 truncate text-lg font-semibold tabular-nums text-foreground">
+                                        {card.raw ? card.value : `${card.value}${card.suffix ?? ''}`}
+                                    </p>
+                                </div>
+                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                    <card.icon size={15} />
+                                </div>
                             </div>
-                        )
-                    })}
-                </div>
-            )}
-
-            {/* Filter Bar */}
-            <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 md:flex-wrap">
-                <div className="relative w-full md:w-auto md:flex-1">
-                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari SKU, produk..."
-                        className="w-full pl-10 pr-4 py-3 md:py-2.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm" />
-                </div>
-                <div className="flex items-center gap-1.5 p-1 bg-slate-100/50 rounded-xl border border-slate-200 w-full md:w-auto overflow-x-auto no-scrollbar">
-                    {[['ALL', 'Semua'], ['LOW', '⚠ Stok Menipis']].map(([v, l]) => (
-                        <button key={v} onClick={() => setFilter(v)}
-                            className={`flex-1 md:flex-none px-4 py-2 md:py-1.5 rounded-lg text-[10px] md:text-[11px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${filter === v ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
-                            {l}
-                        </button>
+                        </div>
                     ))}
                 </div>
-            </div>
 
-            {/* Table / List Container */}
-            {loading ? (
-                <div className="flex items-center justify-center h-48 md:h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" /></div>
-            ) : (
-                <>
-                    {/* Desktop Table View */}
-                    <div className="hidden md:block bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/50">
-                                    <th className="px-6 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Kode SKU</th>
-                                    <th className="px-6 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Produk</th>
-                                    <th className="px-6 py-3.5 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest">Harga Beli</th>
-                                    <th className="px-6 py-3.5 text-right text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50/50">Mutasi IN</th>
-                                    <th className="px-6 py-3.5 text-right text-[9px] font-black text-rose-500 uppercase tracking-widest bg-rose-50/50">Mutasi OUT</th>
-                                    <th className="px-6 py-3.5 text-right text-[9px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50/50">Stock Akhir</th>
-                                    <th className="px-6 py-3.5 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Nilai</th>
-                                    <th className="px-6 py-3.5 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                                    <th className="px-6 py-3.5"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {filtered.map((s) => {
-                                    const totalVal = s.totalQty * s.purchasePrice
-                                    const isExpanded = expandedId === s.id
-                                    return (
-                                        <Fragment key={s.id}>
-                                            <tr className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <p className="font-black text-xs text-indigo-600">{s.code}</p>
-                                                    <p className="text-[10px] text-slate-400">{s.product?.category?.name || '—'}</p>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className="font-semibold text-slate-800">{s.product?.name}</p>
-                                                    <p className="text-[11px] text-slate-400">{s.name || ''}</p>
-                                                </td>
-                                                <td className="px-6 py-4 text-right font-semibold text-slate-700">{fmt(s.purchasePrice)}</td>
-
-                                                {/* Mutasi IN */}
-                                                <td className="px-6 py-4 text-right bg-emerald-50/10">
-                                                    <div className="flex items-center justify-end gap-1.5 min-w-[60px]">
-                                                        {s.totalIn > 0 && <ArrowDownLeft size={12} className="text-emerald-500" />}
-                                                        <span className={`font-black text-xs ${s.totalIn > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>{s.totalIn > 0 ? `+${s.totalIn}` : '-'}</span>
-                                                    </div>
-                                                </td>
-
-                                                {/* Mutasi OUT */}
-                                                <td className="px-6 py-4 text-right bg-rose-50/10">
-                                                    <div className="flex items-center justify-end gap-1.5 min-w-[60px]">
-                                                        {s.totalOut > 0 && <ArrowUpRight size={12} className="text-rose-400" />}
-                                                        <span className={`font-black text-xs ${s.totalOut > 0 ? 'text-rose-500' : 'text-slate-300'}`}>{s.totalOut > 0 ? `-${s.totalOut}` : '-'}</span>
-                                                    </div>
-                                                </td>
-
-                                                <td className="px-6 py-4 text-right bg-indigo-50/10">
-                                                    <span className={`font-black text-sm ${s.isLowStock ? 'text-rose-600' : 'text-indigo-700'}`}>{s.totalQty}</span>
-                                                    {s.minStock > 0 && <p className="text-[10px] text-slate-400">min {s.minStock}</p>}
-                                                </td>
-                                                <td className="px-6 py-4 text-right font-bold text-emerald-700">{fmt(totalVal)}</td>
-                                                <td className="px-6 py-4 text-center">
-                                                    {s.isLowStock
-                                                        ? <span className="px-2 py-1 bg-rose-50 text-rose-600 border border-rose-200 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 justify-center w-fit mx-auto"><AlertTriangle size={10} /> Low</span>
-                                                        : <span className="px-2 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 justify-center w-fit mx-auto"><CheckCircle2 size={10} /> OK</span>
-                                                    }
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <button onClick={() => openHistory(s)}
-                                                            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all title='Riwayat Stok (Kartu Stok)'">
-                                                            <History size={16} />
-                                                        </button>
-                                                        {s.warehouseStocks.length > 0 && (
-                                                            <button onClick={() => setExpandedId(isExpanded ? null : s.id)}
-                                                                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all">
-                                                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {isExpanded && s.warehouseStocks.map(ws => (
-                                                <tr key={ws.id} className="bg-indigo-50/30">
-                                                    <td colSpan={3} className="px-8 py-2.5">
-                                                        <div className="flex items-center gap-2">
-                                                            <Warehouse size={12} className="text-indigo-400" />
-                                                            <span className="text-[11px] font-bold text-indigo-700">{ws.warehouse?.name || '?'}</span>
-                                                            <span className="text-[10px] text-slate-400">({ws.warehouse?.code})</span>
-                                                        </div>
-                                                    </td>
-                                                    <td colSpan={2} className="px-6 py-2.5 text-center text-[10px] font-bold text-slate-400 italic">Distribusi per Gudang</td>
-                                                    <td className="px-6 py-2.5 text-right font-bold text-slate-800 text-[11px]">{ws.quantity}</td>
-                                                    <td className="px-6 py-2.5 text-right text-[11px] font-bold text-emerald-600">{fmt(ws.quantity * s.purchasePrice)}</td>
-                                                    <td colSpan={2}></td>
-                                                </tr>
-                                            ))}
-                                        </Fragment>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
-                        {filtered.length === 0 && (
-                            <div className="py-20 text-center border-t border-slate-100 bg-white">
-                                <Package size={48} className="text-slate-200 mx-auto mb-3" />
-                                <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Tidak ada data stok</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Mobile Cards View */}
-                    <div className="md:hidden space-y-4">
-                        {filtered.map((s) => {
-                            const totalVal = s.totalQty * s.purchasePrice;
-                            const isExpanded = expandedId === s.id;
+                {warehouses.length > 0 && (
+                    <div className="flex gap-3 overflow-x-auto pb-1">
+                        {warehouses.filter(w => w.isActive).map(w => {
+                            const wStock = skus.reduce((sum, s) => {
+                                const ws = s.warehouseStocks.find(whs => whs.warehouse?.id === w.id)
+                                return sum + (ws?.quantity || 0) * s.purchasePrice
+                            }, 0)
                             return (
-                                <motion.div key={s.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md">{s.code}</p>
-                                                {s.isLowStock
-                                                    ? <span className="px-1.5 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1"><AlertTriangle size={10} /> Low</span>
-                                                    : <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded text-[9px] font-black uppercase tracking-wider flex items-center gap-1"><CheckCircle2 size={10} /> OK</span>
-                                                }
-                                            </div>
-                                            <h3 className="font-bold text-slate-800 text-[15px] leading-tight break-words whitespace-normal">{s.product?.name}</h3>
-                                            <p className="text-[11px] text-slate-400 mt-0.5">{s.product?.category?.name || 'Uncategorized'} • {s.name || ''}</p>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-0.5">Stok</p>
-                                            <p className={`text-xl font-black leading-none ${s.isLowStock ? 'text-rose-600' : 'text-indigo-700'}`}>{s.totalQty}</p>
-                                            {s.minStock > 0 && <p className="text-[9px] text-slate-400 mt-1">Min: {s.minStock}</p>}
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2 mt-1">
-                                        <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between">
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Harga Beli</span>
-                                            <span className="text-xs font-bold text-slate-700">{fmt(s.purchasePrice)}</span>
-                                        </div>
-                                        <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between">
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Nilai Total</span>
-                                            <span className="text-xs font-bold text-emerald-600">{fmt(totalVal)}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="bg-emerald-50/50 rounded-xl p-2.5 border border-emerald-100/50 flex flex-col justify-center items-center h-16">
-                                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Barang Masuk</span>
-                                            <div className="flex items-center gap-1 mt-1">
-                                                {s.totalIn > 0 && <ArrowDownLeft size={12} className="text-emerald-500" />}
-                                                <span className={`text-sm font-black ${s.totalIn > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>{s.totalIn > 0 ? `+${s.totalIn}` : '-'}</span>
-                                            </div>
-                                        </div>
-                                        <div className="bg-rose-50/50 rounded-xl p-2.5 border border-rose-100/50 flex flex-col justify-center items-center h-16">
-                                            <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Barang Keluar</span>
-                                            <div className="flex items-center gap-1 mt-1">
-                                                {s.totalOut > 0 && <ArrowUpRight size={12} className="text-rose-400" />}
-                                                <span className={`text-sm font-black ${s.totalOut > 0 ? 'text-rose-600' : 'text-slate-400'}`}>{s.totalOut > 0 ? `-${s.totalOut}` : '-'}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 mt-1 border-t border-slate-100 pt-3">
-                                        <button onClick={() => openHistory(s)} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors">
-                                            <History size={14} /> Kartu Stok
-                                        </button>
-                                        {s.warehouseStocks.length > 0 && (
-                                            <button onClick={() => setExpandedId(isExpanded ? null : s.id)} className={`px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center ${isExpanded ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                                                Lokasi {isExpanded ? <ChevronUp size={14} className="ml-1" /> : <ChevronDown size={14} className="ml-1" />}
-                                            </button>
-                                        )}
-                                    </div>
-
-                                    {isExpanded && (
-                                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="flex flex-col gap-1.5 pt-2 border-t border-slate-100 overflow-hidden">
-                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 pl-1">Distribusi Gudang</p>
-                                            {s.warehouseStocks.map(ws => (
-                                                <div key={ws.id} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-100">
-                                                    <div className="flex items-center gap-2">
-                                                        <Warehouse size={12} className="text-indigo-400" />
-                                                        <span className="text-[10px] font-bold text-slate-700">{ws.warehouse?.name || '?'} <span className="text-[9px] font-normal text-slate-400">({ws.warehouse?.code})</span></span>
-                                                    </div>
-                                                    <span className="text-[11px] font-black text-indigo-600 bg-white px-2 py-0.5 rounded shadow-sm border border-slate-100">{ws.quantity}</span>
-                                                </div>
-                                            ))}
-                                        </motion.div>
-                                    )}
-                                </motion.div>
+                                <div
+                                    key={w.id}
+                                    className="min-w-[150px] flex-shrink-0 rounded-xl border border-border bg-card px-4 py-3"
+                                >
+                                    <p className="text-[11px] font-medium text-muted-foreground">{w.code}</p>
+                                    <p className="mt-0.5 truncate text-sm font-medium text-foreground">{w.name}</p>
+                                    <p className="mt-1 text-xs font-medium tabular-nums text-foreground">{fmt(wStock)}</p>
+                                </div>
                             )
                         })}
-
-                        {filtered.length === 0 && (
-                            <div className="py-20 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white">
-                                <Package size={48} className="text-slate-200 mx-auto mb-3" />
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tidak ada data stok</p>
-                            </div>
-                        )}
                     </div>
-                </>
-            )}
+                )}
 
-            {/* Stock Card History Drawer */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="relative w-full sm:max-w-xs">
+                        <Search
+                            size={15}
+                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Cari SKU, produk..."
+                            className={`${inputClass} pl-9`}
+                        />
+                    </div>
+                    <div className="inline-flex items-center gap-1 self-start rounded-lg border border-border bg-muted/50 p-1">
+                        {filters.map(f => (
+                            <button
+                                key={f.value}
+                                onClick={() => setFilter(f.value)}
+                                className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors ${
+                                    filter === f.value
+                                        ? "bg-background text-foreground shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                {f.value === "LOW" && <AlertTriangle size={12} />}
+                                {f.label}
+                            </button>
+                        ))}
+                    </div>
+                    <span className="hidden text-xs text-muted-foreground sm:ml-auto sm:block">
+                        {filtered.length} SKU
+                    </span>
+                </div>
+
+                {loading ? (
+                    <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+                        <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                    </div>
+                ) : filtered.length > 0 ? (
+                    <>
+                        <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border bg-muted/40">
+                                            <th className="px-3 py-2.5 text-xs font-medium text-muted-foreground">Kode SKU</th>
+                                            <th className="px-3 py-2.5 text-xs font-medium text-muted-foreground">Produk</th>
+                                            <th className="px-3 py-2.5 text-right text-xs font-medium text-muted-foreground">Harga Beli</th>
+                                            <th className="px-3 py-2.5 text-right text-xs font-medium text-muted-foreground">Mutasi IN</th>
+                                            <th className="px-3 py-2.5 text-right text-xs font-medium text-muted-foreground">Mutasi OUT</th>
+                                            <th className="px-3 py-2.5 text-right text-xs font-medium text-muted-foreground">Stock Akhir</th>
+                                            <th className="px-3 py-2.5 text-right text-xs font-medium text-muted-foreground">Total Nilai</th>
+                                            <th className="px-3 py-2.5 text-center text-xs font-medium text-muted-foreground">Status</th>
+                                            <th className="w-20 px-3 py-2.5" />
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {filtered.map((s) => {
+                                            const totalVal = s.totalQty * s.purchasePrice
+                                            const isExpanded = expandedId === s.id
+                                            return (
+                                                <Fragment key={s.id}>
+                                                    <tr
+                                                        className={`transition-colors ${
+                                                            isExpanded ? "bg-muted/30" : "hover:bg-muted/30"
+                                                        }`}
+                                                    >
+                                                        <td className="px-3 py-2.5">
+                                                            <p className="font-mono text-[11px] font-medium text-foreground">{s.code}</p>
+                                                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                                                {s.product?.category?.name || '—'}
+                                                            </p>
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            <p className="text-sm font-medium text-foreground">{s.product?.name}</p>
+                                                            <p className="mt-0.5 text-[11px] text-muted-foreground">{s.name || ''}</p>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right text-xs tabular-nums text-foreground">
+                                                            {fmt(s.purchasePrice)}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right">
+                                                            <span className="inline-flex items-center justify-end gap-1 text-xs font-medium tabular-nums">
+                                                                {s.totalIn > 0 && <ArrowDownLeft size={12} className="text-emerald-600 dark:text-emerald-400" />}
+                                                                <span className={s.totalIn > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}>
+                                                                    {s.totalIn > 0 ? `+${s.totalIn}` : '-'}
+                                                                </span>
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right">
+                                                            <span className="inline-flex items-center justify-end gap-1 text-xs font-medium tabular-nums">
+                                                                {s.totalOut > 0 && <ArrowUpRight size={12} className="text-rose-600 dark:text-rose-400" />}
+                                                                <span className={s.totalOut > 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"}>
+                                                                    {s.totalOut > 0 ? `-${s.totalOut}` : '-'}
+                                                                </span>
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right">
+                                                            <span className={`text-sm font-semibold tabular-nums ${s.isLowStock ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'}`}>
+                                                                {s.totalQty}
+                                                            </span>
+                                                            {s.minStock > 0 && (
+                                                                <p className="text-[10px] text-muted-foreground">min {s.minStock}</p>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-right text-xs tabular-nums text-foreground">
+                                                            {fmt(totalVal)}
+                                                        </td>
+                                                        <td className="px-3 py-2.5 text-center">
+                                                            <StockPill low={s.isLowStock} />
+                                                        </td>
+                                                        <td className="px-3 py-2.5">
+                                                            <div className="flex items-center justify-end gap-0.5">
+                                                                <button
+                                                                    onClick={() => openHistory(s)}
+                                                                    title="Riwayat Stok (Kartu Stok)"
+                                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                >
+                                                                    <History size={15} />
+                                                                </button>
+                                                                {s.warehouseStocks.length > 0 && (
+                                                                    <button
+                                                                        onClick={() => setExpandedId(isExpanded ? null : s.id)}
+                                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                                    >
+                                                                        {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                    {isExpanded && s.warehouseStocks.map(ws => (
+                                                        <tr key={ws.id} className="bg-muted/20">
+                                                            <td colSpan={3} className="px-3 py-2 pl-6">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Warehouse size={12} className="text-muted-foreground" />
+                                                                    <span className="text-[11px] font-medium text-foreground">
+                                                                        {ws.warehouse?.name || '?'}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-muted-foreground">
+                                                                        ({ws.warehouse?.code})
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td colSpan={2} className="px-3 py-2 text-center text-[11px] text-muted-foreground">
+                                                                Distribusi per Gudang
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right text-[11px] font-medium tabular-nums text-foreground">
+                                                                {ws.quantity}
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right text-[11px] font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                                                                {fmt(ws.quantity * s.purchasePrice)}
+                                                            </td>
+                                                            <td colSpan={2} />
+                                                        </tr>
+                                                    ))}
+                                                </Fragment>
+                                            )
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 md:hidden">
+                            {filtered.map((s) => {
+                                const totalVal = s.totalQty * s.purchasePrice
+                                const isExpanded = expandedId === s.id
+                                return (
+                                    <motion.div
+                                        key={s.id}
+                                        initial={{ opacity: 0, y: 8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="rounded-xl border border-border bg-card p-3"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <span className="font-mono text-[11px] text-muted-foreground">{s.code}</span>
+                                                    <StockPill low={s.isLowStock} />
+                                                </div>
+                                                <p className="mt-1 break-words text-sm font-medium text-foreground">
+                                                    {s.product?.name}
+                                                </p>
+                                                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                                    {s.product?.category?.name || 'Uncategorized'} • {s.name || ''}
+                                                </p>
+                                            </div>
+                                            <div className="shrink-0 text-right">
+                                                <p className="text-[11px] text-muted-foreground">Stok</p>
+                                                <p className={`text-lg font-semibold leading-none tabular-nums ${s.isLowStock ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'}`}>
+                                                    {s.totalQty}
+                                                </p>
+                                                {s.minStock > 0 && (
+                                                    <p className="mt-1 text-[10px] text-muted-foreground">Min: {s.minStock}</p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 grid grid-cols-2 gap-2">
+                                            <div className="rounded-lg border border-border bg-muted/30 p-2">
+                                                <p className="text-[10px] text-muted-foreground">Harga Beli</p>
+                                                <p className="mt-0.5 text-xs font-medium tabular-nums text-foreground">{fmt(s.purchasePrice)}</p>
+                                            </div>
+                                            <div className="rounded-lg border border-border bg-muted/30 p-2">
+                                                <p className="text-[10px] text-muted-foreground">Nilai Total</p>
+                                                <p className="mt-0.5 text-xs font-medium tabular-nums text-foreground">{fmt(totalVal)}</p>
+                                            </div>
+                                            <div className="rounded-lg border border-border bg-muted/30 p-2">
+                                                <p className="text-[10px] text-muted-foreground">Barang Masuk</p>
+                                                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium tabular-nums">
+                                                    {s.totalIn > 0 && <ArrowDownLeft size={12} className="text-emerald-600 dark:text-emerald-400" />}
+                                                    <span className={s.totalIn > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}>
+                                                        {s.totalIn > 0 ? `+${s.totalIn}` : '-'}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                            <div className="rounded-lg border border-border bg-muted/30 p-2">
+                                                <p className="text-[10px] text-muted-foreground">Barang Keluar</p>
+                                                <p className="mt-0.5 inline-flex items-center gap-1 text-xs font-medium tabular-nums">
+                                                    {s.totalOut > 0 && <ArrowUpRight size={12} className="text-rose-600 dark:text-rose-400" />}
+                                                    <span className={s.totalOut > 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground"}>
+                                                        {s.totalOut > 0 ? `-${s.totalOut}` : '-'}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
+                                            <button
+                                                onClick={() => openHistory(s)}
+                                                className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                                            >
+                                                <History size={14} /> Kartu Stok
+                                            </button>
+                                            {s.warehouseStocks.length > 0 && (
+                                                <button
+                                                    onClick={() => setExpandedId(isExpanded ? null : s.id)}
+                                                    className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium transition-colors ${
+                                                        isExpanded ? "bg-muted text-foreground" : "bg-background text-foreground hover:bg-muted"
+                                                    }`}
+                                                >
+                                                    Lokasi {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {isExpanded && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                className="mt-3 overflow-hidden border-t border-border pt-3"
+                                            >
+                                                <div className="space-y-1.5 rounded-lg border border-border bg-muted/20 p-2">
+                                                    {s.warehouseStocks.map(ws => (
+                                                        <div
+                                                            key={ws.id}
+                                                            className="flex items-center justify-between gap-2 rounded-md bg-background px-2 py-1.5"
+                                                        >
+                                                            <div className="flex min-w-0 items-center gap-1.5">
+                                                                <Warehouse size={12} className="shrink-0 text-muted-foreground" />
+                                                                <span className="truncate text-[11px] font-medium text-foreground">
+                                                                    {ws.warehouse?.name || '?'}
+                                                                </span>
+                                                                <span className="text-[10px] text-muted-foreground">
+                                                                    ({ws.warehouse?.code})
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-[11px] font-medium tabular-nums text-foreground">
+                                                                {ws.quantity}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </motion.div>
+                                )
+                            })}
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card px-6 py-16 text-center">
+                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <Package size={22} />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">Tidak ada data stok</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {search || filter !== 'ALL'
+                                ? "Coba ubah pencarian atau filter untuk menemukan data."
+                                : "Belum ada data stok yang tersedia."}
+                        </p>
+                    </div>
+                )}
+            </div>
+
             <AnimatePresence>
                 {historyOpen && selectedSku && (
-                    <div className="fixed inset-0 z-[300] flex justify-end">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setHistoryOpen(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-                        <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="relative w-full md:max-w-md lg:max-w-2xl bg-white shadow-2xl h-[100dvh] flex flex-col overflow-hidden">
-
-                            {/* Drawer Header */}
-                            <div className="p-4 md:p-6 border-b border-slate-100 flex items-start justify-between font-inter bg-white safe-area-top">
-                                <div className="flex-1 min-w-0 pr-4">
-                                    <p className="text-[9px] font-black text-indigo-600 uppercase tracking-widest mb-1.5">Kartu Stok / Riwayat Mutasi</p>
-                                    <h2 className="text-lg md:text-xl font-black text-slate-900 leading-tight md:leading-none break-words whitespace-normal">{selectedSku.product.name}</h2>
-                                    <p className="text-[10px] md:text-xs text-slate-400 mt-1.5 font-medium line-clamp-2 md:line-clamp-none">{selectedSku.code} — {selectedSku.name || ''}</p>
+                    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setHistoryOpen(false)}
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, y: 24 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 24 }}
+                            className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-2xl sm:rounded-2xl"
+                        >
+                            <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                        <History size={16} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[11px] text-muted-foreground">Kartu Stok / Riwayat Mutasi</p>
+                                        <h2 className="truncate text-sm font-semibold text-foreground">
+                                            {selectedSku.product.name}
+                                        </h2>
+                                        <p className="truncate text-[11px] text-muted-foreground">
+                                            {selectedSku.code} — {selectedSku.name || ''}
+                                        </p>
+                                    </div>
                                 </div>
-                                <button onClick={() => setHistoryOpen(false)} className="w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all"><X size={18} /></button>
-                            </div>
+                                <button
+                                    onClick={() => setHistoryOpen(false)}
+                                    className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </header>
 
-                            {/* Drawer Content */}
-                            <div className="flex-1 overflow-y-auto p-6 space-y-6 font-inter">
+                            <div className="flex-1 overflow-y-auto p-4">
                                 {loadingHistory ? (
-                                    <div className="flex flex-col items-center justify-center h-64 space-y-4">
-                                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600" />
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Memuat riwayat...</p>
+                                    <div className="flex h-64 items-center justify-center">
+                                        <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
                                     </div>
                                 ) : movements.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-64 space-y-4 opacity-50">
-                                        <History size={48} className="text-slate-200" />
-                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Belum ada riwayat mutasi</p>
+                                    <div className="flex h-64 flex-col items-center justify-center text-center">
+                                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                            <History size={22} />
+                                        </div>
+                                        <p className="text-sm font-medium text-foreground">Belum ada riwayat mutasi</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Mutasi stok akan muncul di sini.
+                                        </p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-4">
-                                        {movements.map((m, i) => {
+                                    <div className="space-y-2">
+                                        {movements.map((m) => {
                                             const type = m.movement.type
 
-                                            let icon = <Repeat size={14} className="text-slate-400" />
-                                            let color = 'bg-slate-50 text-slate-600'
-                                            if (type === 'IN' || type === 'BEGINNING') { icon = <ArrowDownLeft size={14} />; color = 'bg-emerald-50 text-emerald-700 border-emerald-100' }
-                                            if (type === 'OUT') { icon = <ArrowUpRight size={14} />; color = 'bg-rose-50 text-rose-700 border-rose-100' }
-                                            if (type === 'TRANSFER') { icon = <RefreshCw size={14} />; color = 'bg-indigo-50 text-indigo-700 border-indigo-100' }
-                                            if (type === 'OPNAME') { icon = <ClipboardList size={14} />; color = 'bg-amber-50 text-amber-700 border-amber-100' }
+                                            let icon = <Repeat size={14} />
+                                            let color = 'border-border bg-muted text-muted-foreground'
+                                            if (type === 'IN' || type === 'BEGINNING') {
+                                                icon = <ArrowDownLeft size={14} />
+                                                color = 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                            }
+                                            if (type === 'OUT') {
+                                                icon = <ArrowUpRight size={14} />
+                                                color = 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400'
+                                            }
+                                            if (type === 'TRANSFER') {
+                                                icon = <RefreshCw size={14} />
+                                                color = 'border-border bg-primary/10 text-primary'
+                                            }
+                                            if (type === 'OPNAME') {
+                                                icon = <ClipboardList size={14} />
+                                                color = 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-400'
+                                            }
 
                                             return (
-                                                <motion.div key={m.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
-                                                    className="group relative flex gap-4 p-4 rounded-2xl border border-slate-100 hover:border-indigo-100 hover:shadow-md hover:shadow-indigo-500/5 transition-all bg-white">
-
-                                                    {/* Type Badge / Icon */}
-                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${color}`}>
+                                                <div
+                                                    key={m.id}
+                                                    className="flex gap-3 rounded-lg border border-border p-3"
+                                                >
+                                                    <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border ${color}`}>
                                                         {icon}
                                                     </div>
 
-                                                    {/* Body */}
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center justify-between gap-2 mb-1">
-                                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{new Date(m.movement.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                                                            <p className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">{m.movement.number}</p>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="text-[11px] text-muted-foreground">
+                                                                {new Date(m.movement.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                            </p>
+                                                            <p className="rounded-md border border-border bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                                                                {m.movement.number}
+                                                            </p>
                                                         </div>
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <div>
-                                                                <p className="text-xs font-black text-slate-800 uppercase tracking-tight">
+                                                        <div className="mt-1 flex items-start justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs font-medium text-foreground">
                                                                     {m.movement.type} — {m.movement.warehouse.name}
-                                                                    {m.movement.toWarehouse && <span className="text-indigo-400 mx-1">➜ {m.movement.toWarehouse.name}</span>}
+                                                                    {m.movement.toWarehouse && (
+                                                                        <span className="mx-1 text-muted-foreground">
+                                                                            → {m.movement.toWarehouse.name}
+                                                                        </span>
+                                                                    )}
                                                                 </p>
                                                                 {(m.movement.referenceType || m.movement.notes) && (
-                                                                    <p className="text-[10px] text-slate-500 mt-1 italic font-medium">
+                                                                    <p className="mt-0.5 text-[11px] text-muted-foreground">
                                                                         {m.movement.referenceType && `[${m.movement.referenceType}] `}
                                                                         {m.movement.referenceNumber && `${m.movement.referenceNumber} — `}
                                                                         {m.movement.notes || m.notes}
                                                                     </p>
                                                                 )}
                                                             </div>
-                                                            <div className="text-right shrink-0">
-                                                                <p className={`text-sm font-black ${type === 'OUT' ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                            <div className="shrink-0 text-right">
+                                                                <p className={`text-sm font-semibold tabular-nums ${type === 'OUT' ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                                                     {type === 'OUT' ? '-' : '+'}{m.qty}
                                                                 </p>
-                                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">PCS</p>
+                                                                <p className="text-[10px] text-muted-foreground">PCS</p>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </motion.div>
+                                                </div>
                                             )
                                         })}
                                     </div>
                                 )}
                             </div>
 
-                            {/* Drawer Footer */}
-                            <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-100 font-inter safe-area-bottom">
+                            <footer className="border-t border-border px-4 py-3">
                                 <div className="flex items-center justify-between">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Total Qty Saat Ini</p>
-                                    <p className="text-xl md:text-2xl font-black text-slate-900 tracking-tight shrink-0">{selectedSku.totalQty} <span className="text-[10px] md:text-xs font-bold text-slate-400">PCS</span></p>
+                                    <p className="text-[11px] text-muted-foreground">Total Qty Saat Ini</p>
+                                    <p className="text-sm font-semibold tabular-nums text-foreground">
+                                        {selectedSku.totalQty}{' '}
+                                        <span className="text-[11px] font-normal text-muted-foreground">PCS</span>
+                                    </p>
                                 </div>
-                            </div>
+                            </footer>
                         </motion.div>
                     </div>
                 )}

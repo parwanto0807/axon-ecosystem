@@ -22,11 +22,32 @@ interface Movement {
 interface FormItem { skuId: string; qty: number; unitCost: number; availableQty: number }
 
 const STATUS_CFG: Record<string, string> = {
-    DRAFT: 'bg-amber-50 text-amber-700 border-amber-200',
-    CONFIRMED: 'bg-violet-50 text-violet-700 border-violet-200',
-    CANCELLED: 'bg-slate-50 text-slate-500 border-slate-200'
+    DRAFT: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900',
+    CONFIRMED: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900',
+    CANCELLED: 'bg-muted text-muted-foreground border-border'
+}
+const STATUS_DOT: Record<string, string> = {
+    DRAFT: 'bg-amber-500',
+    CONFIRMED: 'bg-emerald-500',
+    CANCELLED: 'bg-muted-foreground/50'
 }
 const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
+
+const inputClass =
+    "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
+const itemInputClass =
+    "h-9 w-full rounded-lg border border-border bg-background px-2.5 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
+
+function StatusPill({ status }: { status: string }) {
+    const cfg = STATUS_CFG[status] || STATUS_CFG.DRAFT
+    const dot = STATUS_DOT[status] || STATUS_DOT.DRAFT
+    return (
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${cfg}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+            {status}
+        </span>
+    )
+}
 
 export default function TransferPage() {
     const [movements, setMovements] = useState<Movement[]>([])
@@ -97,182 +118,211 @@ export default function TransferPage() {
         else { const d = await res.json(); showToast('error', d.message) }
     }
 
-    const ic = "w-full bg-white border border-slate-200 rounded-xl px-3 py-2 focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 outline-none transition-all text-sm"
-    const lc = "text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block"
-
     return (
-        <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-6 md:py-8 md:max-w-screen space-y-5 md:space-y-6 font-inter w-full bg-slate-50/30 min-h-screen pb-24 md:pb-8">
-            <AnimatePresence>
-                {toast && (
-                    <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        className={`fixed top-6 right-6 z-[300] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl text-sm font-semibold border ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-                        {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />} {toast.msg}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-600/20 shrink-0">
-                        <ArrowLeftRight size={20} className="text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-none">Transfer Gudang</h1>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Perpindahan Stok Antar Gudang</p>
-                    </div>
-                </div>
-                <div className="flex gap-2 w-full md:w-auto mt-1 md:mt-0">
-                    <Button variant="outline" onClick={load} className="flex-1 md:flex-none rounded-xl border-slate-200 text-slate-600 h-11 px-4 text-[10px] font-black uppercase tracking-wider">
-                        <RefreshCw size={13} className="mr-1.5" /> Reload
-                    </Button>
-                    <Button onClick={() => setModalOpen(true)} className="flex-[2] md:flex-none rounded-xl bg-violet-600 hover:bg-violet-700 text-white h-11 px-5 text-[10px] font-black uppercase tracking-wider shadow-lg shadow-violet-600/20">
-                        <Plus size={14} className="mr-1.5" /> Transfer Baru
-                    </Button>
-                </div>
-            </header>
-
-            {/* Desktop Table */}
-            <div className="hidden md:block bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b border-slate-100">
-                            <th className="px-6 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Nomor</th>
-                            <th className="px-6 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Dari Gudang</th>
-                            <th className="px-6 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Ke Gudang</th>
-                            <th className="px-6 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Tanggal</th>
-                            <th className="px-6 py-3.5 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest">Nilai Transfer</th>
-                            <th className="px-6 py-3.5 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                            <th className="px-6 py-3.5"></th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                        {movements.map(m => {
-                            const totalVal = m.items.reduce((s, i) => s + i.qty * i.unitCost, 0)
-                            return (
-                                <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="px-6 py-4 font-black text-xs text-violet-600">{m.number}</td>
-                                    <td className="px-6 py-4 font-semibold text-slate-700">{m.warehouse?.name}</td>
-                                    <td className="px-6 py-4 font-semibold text-slate-700">{m.toWarehouse?.name}</td>
-                                    <td className="px-6 py-4 text-slate-500 text-xs">{new Date(m.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                                    <td className="px-6 py-4 text-right font-bold text-violet-700">{fmt(totalVal)}</td>
-                                    <td className="px-6 py-4 text-center">
-                                        <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest border ${STATUS_CFG[m.status]}`}>{m.status}</span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {m.status === 'DRAFT' && (
-                                            <button onClick={() => handleConfirm(m.id)} className="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 flex items-center justify-center" title="Konfirmasi Transfer"><Check size={13} /></button>
-                                        )}
-                                    </td>
-                                </tr>
-                            )
-                        })}
-                    </tbody>
-                </table>
-                {movements.length === 0 && !loading && (
-                    <div className="py-20 text-center"><ArrowLeftRight size={48} className="text-slate-200 mx-auto mb-3" /><p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Belum ada transfer gudang</p></div>
-                )}
-            </div>
-
-            {/* Mobile Card List */}
-            <div className="md:hidden space-y-4">
-                {loading ? (
-                    [1, 2, 3].map(i => <div key={i} className="animate-pulse bg-white rounded-2xl p-4 h-28 border border-slate-100" />)
-                ) : movements.length === 0 ? (
-                    <div className="py-16 text-center bg-white rounded-2xl border border-slate-100 shadow-sm">
-                        <ArrowLeftRight size={48} className="text-slate-200 mx-auto mb-3" />
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Belum ada transfer gudang</p>
-                    </div>
-                ) : movements.map(m => {
-                    const totalVal = m.items.reduce((s, i) => s + i.qty * i.unitCost, 0)
-                    const stColor = STATUS_CFG[m.status] || STATUS_CFG.DRAFT
-                    return (
-                        <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                            className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3 relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-1 h-full bg-violet-500" />
-                            <div className="flex items-start justify-between pl-2">
-                                <div>
-                                    <span className="text-[10px] font-black text-violet-600 uppercase tracking-widest block mb-0.5">{m.number}</span>
-                                    <span className="text-xs font-bold text-slate-500">{new Date(m.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                                </div>
-                                <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border ${stColor}`}>{m.status}</span>
-                            </div>
-                            <div className="flex items-center gap-2 pl-2">
-                                <div className="flex-1 bg-slate-50 border border-slate-100 rounded-xl p-2.5 text-center">
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Dari</p>
-                                    <p className="text-[11px] font-black text-slate-700 leading-tight">{m.warehouse?.name}</p>
-                                </div>
-                                <ArrowLeftRight size={14} className="text-violet-400 shrink-0" />
-                                <div className="flex-1 bg-violet-50 border border-violet-100 rounded-xl p-2.5 text-center">
-                                    <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest mb-1">Ke</p>
-                                    <p className="text-[11px] font-black text-violet-700 leading-tight">{m.toWarehouse?.name}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between pl-2 pt-2 border-t border-slate-50">
-                                <div>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">{m.items.length} item &bull; Total Nilai</span>
-                                    <span className="text-sm font-black text-violet-700">{fmt(totalVal)}</span>
-                                </div>
-                                {m.status === 'DRAFT' && (
-                                    <button onClick={() => handleConfirm(m.id)} className="h-9 px-3 rounded-xl bg-violet-50 text-violet-600 hover:bg-violet-100 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-violet-100 active:scale-95 transition-all">
-                                        <Check size={13} /> Konfirmasi
-                                    </button>
-                                )}
-                            </div>
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                <AnimatePresence>
+                    {toast && (
+                        <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                            className={`fixed right-6 top-6 z-[300] flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm font-medium shadow-lg ${toast.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400' : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-400'}`}>
+                            {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />} {toast.msg}
                         </motion.div>
-                    )
-                })}
+                    )}
+                </AnimatePresence>
+
+                <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground">Transfer Gudang</h1>
+                        <p className="mt-0.5 text-xs text-muted-foreground">Perpindahan Stok Antar Gudang</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={load} className="h-9 rounded-lg px-4 text-sm font-medium">
+                            <RefreshCw size={15} className="mr-1.5" /> Reload
+                        </Button>
+                        <Button onClick={() => setModalOpen(true)} className="h-9 rounded-lg px-4 text-sm font-medium">
+                            <Plus size={16} className="mr-1.5" /> Buat transfer
+                        </Button>
+                    </div>
+                </header>
+
+                {/* Desktop table */}
+                <div className="hidden overflow-hidden rounded-xl border border-border bg-card md:block">
+                    {loading ? (
+                        <div className="flex h-64 items-center justify-center">
+                            <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                        </div>
+                    ) : movements.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="w-full border-collapse text-left text-sm">
+                                <thead>
+                                    <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                        <th className="px-3 py-2.5 font-medium">Nomor</th>
+                                        <th className="px-3 py-2.5 font-medium">Dari Gudang</th>
+                                        <th className="px-3 py-2.5 font-medium">Ke Gudang</th>
+                                        <th className="px-3 py-2.5 font-medium">Tanggal</th>
+                                        <th className="px-3 py-2.5 text-right font-medium">Nilai Transfer</th>
+                                        <th className="px-3 py-2.5 text-center font-medium">Status</th>
+                                        <th className="px-3 py-2.5" />
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {movements.map(m => {
+                                        const totalVal = m.items.reduce((s, i) => s + i.qty * i.unitCost, 0)
+                                        return (
+                                            <tr key={m.id} className="transition-colors hover:bg-muted/30">
+                                                <td className="px-3 py-2.5">
+                                                    <span className="font-mono text-xs font-medium text-foreground">{m.number}</span>
+                                                </td>
+                                                <td className="px-3 py-2.5 font-medium text-foreground">{m.warehouse?.name}</td>
+                                                <td className="px-3 py-2.5 font-medium text-foreground">{m.toWarehouse?.name}</td>
+                                                <td className="px-3 py-2.5 text-xs text-muted-foreground">{new Date(m.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                                <td className="px-3 py-2.5 text-right text-sm font-medium tabular-nums text-foreground">{fmt(totalVal)}</td>
+                                                <td className="px-3 py-2.5 text-center">
+                                                    <StatusPill status={m.status} />
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <div className="flex items-center justify-end">
+                                                        {m.status === 'DRAFT' && (
+                                                            <Button onClick={() => handleConfirm(m.id)} variant="ghost" size="icon" title="Konfirmasi Transfer" className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+                                                                <Check size={15} />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                <ArrowLeftRight size={22} />
+                            </div>
+                            <p className="text-sm font-medium text-foreground">Belum ada transfer gudang</p>
+                            <p className="mt-1 max-w-sm text-xs text-muted-foreground">Buat transfer untuk memindahkan stok antar gudang.</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Mobile cards */}
+                <div className="space-y-3 md:hidden">
+                    {loading ? (
+                        [1, 2, 3].map(i => <div key={i} className="h-24 animate-pulse rounded-xl border border-border bg-card" />)
+                    ) : movements.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                <ArrowLeftRight size={22} />
+                            </div>
+                            <p className="text-sm font-medium text-foreground">Belum ada transfer gudang</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Buat transfer untuk memindahkan stok antar gudang.</p>
+                        </div>
+                    ) : movements.map(m => {
+                        const totalVal = m.items.reduce((s, i) => s + i.qty * i.unitCost, 0)
+                        return (
+                            <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                className="rounded-xl border border-border bg-card p-3">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="font-mono text-xs font-medium text-foreground">{m.number}</p>
+                                        <p className="mt-0.5 text-[11px] text-muted-foreground">{new Date(m.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                                    </div>
+                                    <StatusPill status={m.status} />
+                                </div>
+                                <div className="mt-3 flex items-center gap-2">
+                                    <div className="flex-1 rounded-lg border border-border bg-muted/40 p-2 text-center">
+                                        <p className="text-[10px] text-muted-foreground">Dari</p>
+                                        <p className="mt-0.5 truncate text-[11px] font-medium text-foreground">{m.warehouse?.name}</p>
+                                    </div>
+                                    <ArrowLeftRight size={14} className="shrink-0 text-muted-foreground" />
+                                    <div className="flex-1 rounded-lg border border-border bg-muted/40 p-2 text-center">
+                                        <p className="text-[10px] text-muted-foreground">Ke</p>
+                                        <p className="mt-0.5 truncate text-[11px] font-medium text-foreground">{m.toWarehouse?.name}</p>
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground">{m.items.length} item &bull; Total Nilai</p>
+                                        <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{fmt(totalVal)}</p>
+                                    </div>
+                                    {m.status === 'DRAFT' && (
+                                        <Button onClick={() => handleConfirm(m.id)} variant="outline" className="h-8 rounded-md px-2.5 text-xs font-medium">
+                                            <Check size={13} className="mr-1.5" /> Konfirmasi
+                                        </Button>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )
+                    })}
+                </div>
             </div>
 
             <AnimatePresence>
                 {modalOpen && (
-                    <div className="fixed inset-0 z-[100] flex flex-col justify-end md:justify-center p-0 md:p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setModalOpen(false)} className="absolute inset-0" />
-                        <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="bg-white rounded-t-[1.5rem] md:rounded-3xl shadow-2xl w-full max-w-3xl mx-auto relative flex flex-col max-h-[95vh] md:max-h-[85vh]">
-                            <div className="flex justify-center pt-3 pb-2 md:hidden bg-slate-50/50 shrink-0 rounded-t-[1.5rem]">
-                                <div className="w-12 h-1.5 bg-slate-300/50 rounded-full" />
-                            </div>
-                            <div className="flex items-center justify-between px-6 md:px-8 py-4 md:py-5 border-b border-slate-100 bg-slate-50/50 shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-violet-600 flex items-center justify-center"><ArrowLeftRight size={16} className="text-white" /></div>
-                                    <h2 className="font-extrabold text-slate-900 text-base md:text-lg uppercase tracking-wider">Transfer Antar Gudang</h2>
+                    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setModalOpen(false)} className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                        <motion.div initial={{ opacity: 0, y: 24, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                            className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-2xl sm:rounded-2xl">
+                            <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                        <ArrowLeftRight size={16} />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h2 className="truncate text-sm font-semibold text-foreground">Transfer Antar Gudang</h2>
+                                        <p className="truncate text-[11px] text-muted-foreground">Perpindahan stok antar gudang</p>
+                                    </div>
                                 </div>
-                                <button type="button" onClick={() => setModalOpen(false)} className="w-8 h-8 rounded-full bg-white hover:bg-rose-50 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm"><X size={18} /></button>
-                            </div>
-                            <div className="overflow-y-auto flex-1">
-                                <form onSubmit={handleSubmit} className="p-5 md:p-8 space-y-5 md:space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div>
-                                            <label className={lc}>Dari Gudang <span className="text-rose-500">*</span></label>
-                                            <select required value={form.warehouseId} onChange={e => setForm({ ...form, warehouseId: e.target.value })} className={ic}>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => setModalOpen(false)} className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+                                    <X size={16} />
+                                </Button>
+                            </header>
+
+                            <form id="transfer-form" onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
+                                <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div className="space-y-1.5">
+                                            <label className="block text-xs font-medium text-muted-foreground">Dari Gudang <span className="text-rose-500">*</span></label>
+                                            <select required value={form.warehouseId} onChange={e => setForm({ ...form, warehouseId: e.target.value })} className={`${inputClass} cursor-pointer`}>
                                                 <option value="">-- Gudang Asal --</option>
                                                 {warehouses.filter(w => w.id !== form.toWarehouseId).map(w => <option key={w.id} value={w.id}>{w.code} - {w.name}</option>)}
                                             </select>
                                         </div>
-                                        <div>
-                                            <label className={lc}>Ke Gudang <span className="text-rose-500">*</span></label>
-                                            <select required value={form.toWarehouseId} onChange={e => setForm({ ...form, toWarehouseId: e.target.value })} className={ic}>
+                                        <div className="space-y-1.5">
+                                            <label className="block text-xs font-medium text-muted-foreground">Ke Gudang <span className="text-rose-500">*</span></label>
+                                            <select required value={form.toWarehouseId} onChange={e => setForm({ ...form, toWarehouseId: e.target.value })} className={`${inputClass} cursor-pointer`}>
                                                 <option value="">-- Gudang Tujuan --</option>
                                                 {warehouses.filter(w => w.id !== form.warehouseId).map(w => <option key={w.id} value={w.id}>{w.code} - {w.name}</option>)}
                                             </select>
                                         </div>
-                                        <div><label className={lc}>Tanggal</label><input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={ic} /></div>
-                                        <div><label className={lc}>Catatan</label><input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Alasan transfer..." className={ic} /></div>
+                                        <div className="space-y-1.5">
+                                            <label className="block text-xs font-medium text-muted-foreground">Tanggal</label>
+                                            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="block text-xs font-medium text-muted-foreground">Catatan</label>
+                                            <input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Alasan transfer..." className={inputClass} />
+                                        </div>
                                     </div>
 
                                     <div>
-                                        <div className="flex items-center justify-between mb-3">
-                                            <h3 className="text-xs font-black uppercase tracking-widest text-slate-700">Barang yang Ditransfer</h3>
-                                            <button type="button" onClick={addItem} className="text-[10px] font-bold uppercase tracking-wider text-violet-600 hover:text-violet-800 bg-violet-50 px-3 py-1.5 rounded-lg transition-colors">+ Tambah Barang</button>
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <h3 className="text-xs font-medium text-muted-foreground">Barang yang Ditransfer</h3>
+                                            <Button type="button" variant="outline" onClick={addItem} className="h-8 rounded-md px-2.5 text-xs font-medium">
+                                                <Plus size={13} className="mr-1" /> Tambah Barang
+                                            </Button>
                                         </div>
-                                        <div className="space-y-3">
+                                        <div className="space-y-2">
                                             {items.length === 0 ? (
-                                                <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200"><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pilih barang yang akan ditransfer</p></div>
+                                                <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center">
+                                                    <p className="text-xs text-muted-foreground">Pilih barang yang akan ditransfer</p>
+                                                </div>
                                             ) : (
                                                 items.map((item, idx) => (
-                                                    <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100 items-start md:items-center">
+                                                    <div key={idx} className="flex flex-col gap-2 rounded-lg border border-border bg-muted/30 p-2.5 md:grid md:grid-cols-12 md:items-center">
                                                         <div className="w-full md:col-span-5">
-                                                            <select value={item.skuId} onChange={e => updateItem(idx, 'skuId', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs outline-none font-medium">
+                                                            <select value={item.skuId} onChange={e => updateItem(idx, 'skuId', e.target.value)} className={`${itemInputClass} cursor-pointer`}>
                                                                 <option value="">-- Pilih SKU --</option>
                                                                 {skus.map(s => {
                                                                     const avail = form.warehouseId ? s.warehouseStocks.find(ws => ws.warehouse?.id === form.warehouseId)?.quantity || 0 : s.totalQty
@@ -280,39 +330,50 @@ export default function TransferPage() {
                                                                 })}
                                                             </select>
                                                         </div>
-                                                        <div className="w-full grid grid-cols-3 md:contents gap-2">
-                                                            <div className="md:col-span-2"><input type="number" min="0.01" step="any" placeholder="Qty" value={item.qty} onChange={e => updateItem(idx, 'qty', +e.target.value)} className="w-full text-center bg-white border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold outline-none" /></div>
-                                                            <div className="md:col-span-3 relative">
-                                                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">Rp</span>
-                                                                <input type="number" min="0" value={item.unitCost} onChange={e => updateItem(idx, 'unitCost', +e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg pl-7 pr-2 py-2 text-xs font-bold outline-none" />
+                                                        <div className="grid w-full grid-cols-3 gap-2 md:contents">
+                                                            <div className="md:col-span-2">
+                                                                <input type="number" min="0.01" step="any" placeholder="Qty" value={item.qty} onChange={e => updateItem(idx, 'qty', +e.target.value)} className={`${itemInputClass} text-center`} />
                                                             </div>
-                                                            <div className="md:col-span-1 flex items-center justify-between md:justify-end">
-                                                                <p className="text-[10px] font-bold text-violet-600 md:hidden">{fmt(item.qty * item.unitCost)}</p>
-                                                                <button type="button" onClick={() => removeItem(idx)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                                                            <div className="relative md:col-span-3">
+                                                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">Rp</span>
+                                                                <input type="number" min="0" value={item.unitCost} onChange={e => updateItem(idx, 'unitCost', +e.target.value)} className={`${itemInputClass} pl-7`} />
+                                                            </div>
+                                                            <div className="flex items-center justify-between md:col-span-1 md:justify-end">
+                                                                <p className="text-[11px] font-medium text-foreground md:hidden">{fmt(item.qty * item.unitCost)}</p>
+                                                                <button type="button" onClick={() => removeItem(idx)} title="Hapus barang" className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40">
+                                                                    <Trash2 size={14} />
+                                                                </button>
                                                             </div>
                                                         </div>
-                                                        <div className="hidden md:flex md:col-span-1 justify-end"><p className="text-[10px] font-bold text-violet-600">{fmt(item.qty * item.unitCost)}</p></div>
+                                                        <div className="hidden justify-end md:col-span-1 md:flex">
+                                                            <p className="text-[11px] font-medium tabular-nums text-foreground">{fmt(item.qty * item.unitCost)}</p>
+                                                        </div>
                                                     </div>
                                                 ))
                                             )}
                                         </div>
                                     </div>
-                                </form>
-                            </div>
-                            <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-100 shrink-0">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                                    <div>
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Nilai Transfer</span>
-                                        <p className="text-lg font-black text-violet-700 mt-0.5 flex items-center gap-1"><DollarSign size={15} />{fmt(totalValue)}</p>
-                                    </div>
-                                    <div className="flex gap-2 w-full md:w-auto">
-                                        <Button type="button" variant="outline" onClick={() => setModalOpen(false)} className="flex-1 md:flex-none rounded-xl h-12 font-bold uppercase tracking-wider text-xs">Batal</Button>
-                                        <Button onClick={handleSubmit} disabled={saving || items.length === 0} className="flex-[2] md:flex-none rounded-xl h-12 md:px-8 bg-violet-600 hover:bg-violet-700 text-white font-bold uppercase tracking-wider text-xs shadow-lg shadow-violet-600/20 disabled:opacity-60 active:scale-95 transition-all">
-                                            {saving ? 'Menyimpan...' : 'Buat Transfer'}
-                                        </Button>
-                                    </div>
                                 </div>
-                            </div>
+
+                                <footer className="border-t border-border px-4 py-3">
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <p className="text-[11px] text-muted-foreground">Total Nilai Transfer</p>
+                                            <p className="mt-0.5 flex items-center gap-1 text-sm font-semibold tabular-nums text-foreground">
+                                                <DollarSign size={15} className="text-muted-foreground" />{fmt(totalValue)}
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-2 sm:justify-end">
+                                            <Button type="button" variant="outline" onClick={() => setModalOpen(false)} className="h-9 flex-1 rounded-lg px-4 text-sm font-medium sm:flex-none">
+                                                Batal
+                                            </Button>
+                                            <Button type="submit" disabled={saving || items.length === 0} className="h-9 flex-1 rounded-lg px-4 text-sm font-medium sm:flex-none">
+                                                {saving ? 'Menyimpan...' : 'Buat Transfer'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </footer>
+                            </form>
                         </motion.div>
                     </div>
                 )}

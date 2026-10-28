@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import {
-    CheckCircle2, AlertCircle, RefreshCw, DollarSign, Package, Info
-} from "lucide-react"
+import { CheckCircle2, AlertCircle, RefreshCw, DollarSign, Package, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface Warehouse { id: string; code: string; name: string }
@@ -15,6 +13,12 @@ interface SKU {
 interface Item { skuId: string; qty: number; unitCost: number; _name: string; _code: string }
 
 const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
+
+const inputClass =
+    "h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
+
+const numInputClass =
+    "h-9 rounded-md border border-border bg-background px-2 text-right text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
 
 export default function BeginningStockPage() {
     const [warehouses, setWarehouses] = useState<Warehouse[]>([])
@@ -88,102 +92,185 @@ export default function BeginningStockPage() {
     }
 
     return (
-        <div className="px-4 py-6 space-y-6 font-inter w-full">
-            <AnimatePresence>
-                {toast && (
-                    <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        className={`fixed top-6 right-6 z-[300] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl text-sm font-semibold border ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-                        {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />} {toast.msg}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1200px]">
+                <AnimatePresence>
+                    {toast && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            className={`fixed right-4 top-4 z-[300] flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-lg ${
+                                toast.type === 'success'
+                                    ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-400'
+                                    : 'border-rose-200 text-rose-700 dark:border-rose-900 dark:text-rose-400'
+                            }`}
+                        >
+                            {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                            {toast.msg}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-            <header className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-700 flex items-center justify-center shadow-lg shadow-indigo-700/20">
-                        <Package size={20} className="text-white" />
-                    </div>
+                <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Beginning Stock</h1>
-                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest leading-none mt-1">Input Stok Awal per Gudang</p>
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground">Beginning Stock</h1>
+                        <p className="mt-0.5 text-xs text-muted-foreground">Input Stok Awal per Gudang</p>
                     </div>
-                </div>
-                <Button variant="outline" onClick={load} className="rounded-xl border-slate-200 text-slate-600 h-10 px-4 text-xs font-bold uppercase tracking-wider"><RefreshCw size={13} className="mr-2" /> Reload</Button>
-            </header>
+                    <Button
+                        onClick={handleSave}
+                        disabled={saving || !selectedWh || itemsWithQty.length === 0}
+                        className="h-9 rounded-lg px-4 text-sm font-medium"
+                    >
+                        {saving ? 'Menyimpan...' : `Simpan Beginning Stock (${itemsWithQty.length} SKU)`}
+                    </Button>
+                </header>
 
-            <div className="bg-indigo-50 border border-indigo-200 rounded-2xl flex items-start gap-3 px-5 py-4">
-                <Info size={16} className="text-indigo-600 mt-0.5 flex-shrink-0" />
-                <p className="text-xs font-semibold text-indigo-700">Pilih gudang, kemudian masukkan kuantitas stok awal untuk setiap SKU. Klik <strong>Simpan Beginning Stock</strong> untuk mengaplikasikannya ke sistem.</p>
-            </div>
-
-            <div className="flex gap-4 items-end flex-wrap">
-                <div className="flex-1 min-w-48">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">Pilih Gudang <span className="text-rose-500">*</span></label>
-                    <select value={selectedWh} onChange={e => setSelectedWh(e.target.value)} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm">
-                        <option value="">-- Pilih Gudang --</option>
-                        {warehouses.map(w => <option key={w.id} value={w.id}>{w.code} - {w.name}</option>)}
-                    </select>
+                <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-border bg-muted/40 px-3 py-2.5">
+                    <Info size={15} className="mt-0.5 flex-shrink-0 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                        Pilih gudang, kemudian masukkan kuantitas stok awal untuk setiap SKU. Klik{' '}
+                        <span className="font-medium text-foreground">Simpan Beginning Stock</span> untuk mengaplikasikannya ke sistem.
+                    </p>
                 </div>
-                <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">Tanggal Efektif</label>
-                    <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm" />
-                </div>
-            </div>
 
-            {selectedWh && (
-                <>
-                    {/* Summary */}
-                    <div className="flex items-center gap-4 flex-wrap">
-                        <div className="bg-white rounded-2xl border border-slate-100 px-5 py-3">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">SKU dengan Stok</p>
-                            <p className="font-black text-slate-900">{itemsWithQty.length} SKU</p>
+                <div className="mb-4 rounded-xl border border-border bg-card p-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div className="flex-1 space-y-1.5 sm:max-w-sm">
+                            <label className="block text-xs font-medium text-muted-foreground">
+                                Pilih Gudang <span className="text-rose-500">*</span>
+                            </label>
+                            <select
+                                value={selectedWh}
+                                onChange={e => setSelectedWh(e.target.value)}
+                                className={`${inputClass} w-full cursor-pointer`}
+                            >
+                                <option value="">-- Pilih Gudang --</option>
+                                {warehouses.map(w => <option key={w.id} value={w.id}>{w.code} - {w.name}</option>)}
+                            </select>
                         </div>
-                        <div className="bg-white rounded-2xl border border-slate-100 px-5 py-3">
-                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total Nilai Aset</p>
-                            <p className="font-black text-emerald-700 flex items-center gap-1"><DollarSign size={13} />{fmt(totalValue)}</p>
+                        <div className="space-y-1.5">
+                            <label className="block text-xs font-medium text-muted-foreground">Tanggal Efektif</label>
+                            <input
+                                type="date"
+                                value={date}
+                                onChange={e => setDate(e.target.value)}
+                                className={`${inputClass} w-full sm:w-auto`}
+                            />
                         </div>
-                    </div>
-
-                    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/50">
-                                    <th className="px-6 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Kode SKU</th>
-                                    <th className="px-6 py-3.5 text-left text-[9px] font-black text-slate-400 uppercase tracking-widest">Nama Produk</th>
-                                    <th className="px-6 py-3.5 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest w-36">Harga Beli (Rp)</th>
-                                    <th className="px-6 py-3.5 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest w-32">Qty Awal</th>
-                                    <th className="px-6 py-3.5 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest">Nilai</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {items.map((item, idx) => (
-                                    <tr key={item.skuId} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-6 py-3 font-black text-xs text-indigo-600">{item._code}</td>
-                                        <td className="px-6 py-3 font-medium text-slate-700">{item._name}</td>
-                                        <td className="px-6 py-3">
-                                            <input type="number" min="0" value={item.unitCost}
-                                                onChange={e => { const ni = [...items]; ni[idx].unitCost = +e.target.value; setItems(ni) }}
-                                                className="w-full text-right bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
-                                        </td>
-                                        <td className="px-6 py-3">
-                                            <input type="number" min="0" step="any" value={item.qty}
-                                                onChange={e => { const ni = [...items]; ni[idx].qty = +e.target.value; setItems(ni) }}
-                                                className={`w-full text-center border rounded-lg px-3 py-1.5 text-xs font-bold outline-none focus:ring-2 transition-all ${item.qty > 0 ? 'bg-indigo-50 border-indigo-300 text-indigo-800 focus:ring-indigo-100' : 'bg-white border-slate-200 focus:border-indigo-400 focus:ring-indigo-100'}`} />
-                                        </td>
-                                        <td className="px-6 py-3 text-right font-bold text-emerald-700 text-xs">{item.qty > 0 ? fmt(item.qty * item.unitCost) : '—'}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className="flex justify-end">
-                        <Button onClick={handleSave} disabled={saving || itemsWithQty.length === 0} className="rounded-xl h-12 bg-indigo-700 hover:bg-indigo-800 text-white font-bold uppercase tracking-wider text-xs px-8 shadow-lg shadow-indigo-700/20">
-                            {saving ? 'Menyimpan...' : `Simpan Beginning Stock (${itemsWithQty.length} SKU)`}
+                        <Button
+                            variant="outline"
+                            onClick={load}
+                            className="h-10 rounded-lg px-3 text-sm font-medium"
+                        >
+                            <RefreshCw size={14} className="mr-1.5" />
+                            Reload
                         </Button>
                     </div>
-                </>
-            )}
+                </div>
+
+                {loading ? (
+                    <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+                        <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                    </div>
+                ) : selectedWh && items.length > 0 ? (
+                    <>
+                        <div className="overflow-hidden rounded-xl border border-border bg-card">
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                            <th className="px-3 py-2.5 font-medium">Kode SKU</th>
+                                            <th className="px-3 py-2.5 font-medium">Nama Produk</th>
+                                            <th className="w-36 px-3 py-2.5 text-right font-medium">Harga Beli (Rp)</th>
+                                            <th className="w-32 px-3 py-2.5 text-right font-medium">Qty Awal</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Nilai</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {items.map((item, idx) => (
+                                            <tr key={item.skuId} className="transition-colors hover:bg-muted/30">
+                                                <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">{item._code}</td>
+                                                <td className="px-3 py-2.5 text-sm text-foreground">{item._name}</td>
+                                                <td className="px-3 py-2.5 text-right">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={item.unitCost}
+                                                        onChange={e => {
+                                                            const ni = [...items]
+                                                            ni[idx].unitCost = +e.target.value
+                                                            setItems(ni)
+                                                        }}
+                                                        className={`${numInputClass} w-28`}
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="any"
+                                                        value={item.qty}
+                                                        onChange={e => {
+                                                            const ni = [...items]
+                                                            ni[idx].qty = +e.target.value
+                                                            setItems(ni)
+                                                        }}
+                                                        className={`${numInputClass} w-24 ${
+                                                            item.qty > 0 ? 'border-primary/40 bg-primary/5' : ''
+                                                        }`}
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2.5 text-right text-sm tabular-nums text-foreground">
+                                                    {item.qty > 0 ? fmt(item.qty * item.unitCost) : '—'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="sticky bottom-0 z-20 mt-4 border-t border-border bg-card px-4 py-3">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5">
+                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <Package size={13} />
+                                        <span>SKU dengan Stok</span>
+                                        <span className="font-medium text-foreground">{itemsWithQty.length} SKU</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <DollarSign size={13} />
+                                        <span>Total Nilai Aset</span>
+                                        <span className="font-medium tabular-nums text-foreground">{fmt(totalValue)}</span>
+                                    </div>
+                                </div>
+                                <Button
+                                    onClick={handleSave}
+                                    disabled={saving || itemsWithQty.length === 0}
+                                    className="h-9 rounded-lg px-4 text-sm font-medium"
+                                >
+                                    {saving ? 'Menyimpan...' : `Simpan Beginning Stock (${itemsWithQty.length} SKU)`}
+                                </Button>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-16 text-center">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <Package size={22} />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">
+                            {selectedWh ? 'Tidak ada SKU' : 'Pilih gudang'}
+                        </p>
+                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                            {selectedWh
+                                ? 'Belum ada SKU yang tersedia untuk gudang ini.'
+                                : 'Pilih gudang terlebih dahulu untuk menampilkan daftar SKU.'}
+                        </p>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }
