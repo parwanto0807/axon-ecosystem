@@ -13,7 +13,7 @@ export function FinancePageShell({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 p-4 sm:p-6 lg:p-8",
+        "flex flex-col gap-3 p-3 sm:gap-4 sm:p-5 lg:p-8",
         "bg-slate-50 dark:bg-slate-900/40 min-h-screen",
         className
       )}
@@ -71,7 +71,7 @@ export function FinancePageHeader({
           )}
         </div>
         {actions && (
-          <div className="hidden items-center gap-2 lg:flex">{actions}</div>
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
         )}
       </div>
     </div>
