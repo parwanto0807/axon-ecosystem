@@ -6,6 +6,7 @@ import {
     LayoutGrid, RefreshCw, Calendar,
     AlertCircle, CheckCircle2, Plus, Trash2, Edit2, X, Send
 } from "lucide-react"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 
 interface BalanceItem {
     id: string
@@ -138,30 +139,14 @@ export default function OpeningBalancePage() {
     }
 
     return (
-        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-6 md:space-y-8 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-xl shadow-indigo-600/20 shrink-0">
-                        <LayoutGrid size={20} className="text-white md:w-6 md:h-6" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl md:text-3xl font-black text-slate-900 tracking-tight">Saldo Awal</h1>
-                        <p className="text-[9px] md:text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mt-0.5 md:mt-1">Opening Balance Draft Initialization</p>
-                    </div>
-                </div>
+        <FinancePageShell>
+            <FinancePageHeader
+                title="Saldo Awal"
+                description="Opening Balance Draft Initialization"
+                icon={<LayoutGrid className="h-5 w-5" />}
+            />
 
-                <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className="bg-white px-3 md:px-4 py-2 w-full md:w-auto justify-between md:justify-start rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
-                        <Calendar size={16} className="text-indigo-500 shrink-0" />
-                        <input
-                            type="date"
-                            value={date}
-                            onChange={e => setDate(e.target.value)}
-                            className="text-sm font-black text-slate-900 focus:outline-none bg-transparent w-full md:w-auto text-right md:text-left"
-                        />
-                    </div>
-                </div>
-            </header>
+            {/* content tetap di bawah */}
 
             <AnimatePresence>
                 {message && (
@@ -427,6 +412,6 @@ export default function OpeningBalancePage() {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </FinancePageShell>
     )
 }

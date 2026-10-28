@@ -6,6 +6,7 @@ import {
     BookOpen, Plus, Search, Calendar, Edit2, Trash2,
     RefreshCw, Download, FileText, Check, AlertCircle, X, Paperclip, Save, PlusCircle, Ban
 } from "lucide-react"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 
 interface Account {
     id: string
@@ -201,32 +202,32 @@ export default function JournalsPage() {
     }
 
     return (
-        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-6 md:space-y-8 w-full font-inter bg-slate-50/30 min-h-screen pb-24 md:pb-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <BookOpen className="w-6 h-6 text-blue-600" />
-                        Jurnal Umum
-                    </h1>
-                    <p className="text-gray-500 mt-1">Kelola entri jurnal manual (multi-line) dan penyesuaian</p>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={fetchJournals}
-                        className="p-2 text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-lg shadow-sm"
-                    >
-                        <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                        onClick={() => setIsFormOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Buat Jurnal
-                    </button>
-                </div>
-            </div>
+        <FinancePageShell>
+            <FinancePageHeader
+                title="Jurnal Umum"
+                description="Kelola entri jurnal manual (multi-line) dan penyesuaian"
+                icon={<BookOpen className="h-5 w-5" />}
+                actions={
+                    <>
+                        <button
+                            onClick={fetchJournals}
+                            className="flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-slate-500 transition-colors hover:bg-slate-100 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                            aria-label="Muat ulang"
+                        >
+                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                        <button
+                            onClick={() => setIsFormOpen(true)}
+                            className="flex h-9 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-indigo-600/20 transition-colors hover:bg-indigo-700"
+                        >
+                            <Plus className="w-4 h-4" /> Buat Jurnal
+                        </button>
+                    </>
+                }
+            />
+
+            {/* content tetap di bawah */}
+
 
             {/* Search Bar */}
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
@@ -548,6 +549,6 @@ export default function JournalsPage() {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </FinancePageShell>
     )
 }
