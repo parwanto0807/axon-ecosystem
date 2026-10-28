@@ -7,6 +7,7 @@ import {
     RefreshCw, X, Check, AlertCircle, Info,
     ArrowRightLeft, Link as LinkIcon
 } from "lucide-react"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 
 interface COA {
     id: string
@@ -114,33 +115,14 @@ export default function SystemAccountsPage() {
     }
 
     return (
-        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-6 w-full font-inter max-w-7xl mx-auto pb-24 md:pb-8">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3 md:gap-4">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-[1rem] md:rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 shrink-0">
-                        <Settings size={20} className="text-white md:w-6 md:h-6" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">System Accounts</h1>
-                        <p className="text-[9px] md:text-[11px] font-semibold text-slate-400 uppercase tracking-widest leading-none mt-1">Pemetaan Akun Otomatis Sistem</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 w-full md:w-auto mt-2 md:mt-0">
-                    <button onClick={load} className="flex-1 md:flex-none flex justify-center items-center h-11 md:h-auto md:p-2.5 text-slate-400 bg-slate-50 md:bg-transparent hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-slate-100 md:border-transparent">
-                        <RefreshCw size={18} />
-                    </button>
-                    <button
-                        onClick={() => {
-                            setEditingAccount(null)
-                            setForm({ key: '', coaId: '', description: '' })
-                            setIsModalOpen(true)
-                        }}
-                        className="flex-auto md:flex-none flex items-center justify-center gap-2 px-4 h-11 md:h-auto md:py-2.5 bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20"
-                    >
-                        <Plus size={16} /> Tambah Mapping
-                    </button>
-                </div>
-            </header>
+        <FinancePageShell>
+            <FinancePageHeader
+                title="System Accounts"
+                description="Pemetaan Akun Otomatis Sistem"
+                icon={<Settings className="h-5 w-5" />}
+            />
+
+            {/* content tetap di bawah */}
 
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-4">
                 <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
@@ -314,6 +296,6 @@ export default function SystemAccountsPage() {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </FinancePageShell>
     )
 }
