@@ -1,10 +1,35 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { motion } from "framer-motion"
+import { useState, useEffect, useRef, type ReactNode } from "react"
 import { Plus, Trash2, Save, FileText, ArrowLeft, Loader2, Search, Calculator, Receipt } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+
+const inputClass =
+    "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
+
+const itemInputClass =
+    "h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
+
+const textareaClass =
+    "min-h-[80px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15 resize-none"
+
+function Field({
+    label,
+    children,
+    className = "",
+}: {
+    label: string
+    children: ReactNode
+    className?: string
+}) {
+    return (
+        <div className={`space-y-1.5 ${className}`}>
+            <label className="block text-xs font-medium text-muted-foreground">{label}</label>
+            {children}
+        </div>
+    )
+}
 
 export default function NewPurchaseOrderPage() {
     const router = useRouter()
@@ -149,372 +174,410 @@ export default function NewPurchaseOrderPage() {
     }
 
     return (
-        <div className="p-6 lg:p-8 space-y-6 w-full font-inter">
-            <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <Link
-                        href="/dashboard/purchasing/orders"
-                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
-                    >
-                        <ArrowLeft size={24} />
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Create Purchase Order</h1>
-                        <p className="text-sm font-medium text-slate-500">Draft a new order to your supplier.</p>
-                    </div>
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        type="button"
-                        disabled
-                        title="Save PO first to create expenses"
-                        className="flex items-center gap-2 bg-slate-100 text-slate-400 px-6 py-2.5 rounded-xl font-bold cursor-not-allowed border border-slate-200"
-                    >
-                        <Receipt size={18} />
-                        Create Expense
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={submitting}
-                        className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-70"
-                    >
-                        {submitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                        Create PO
-                    </button>
-                </div>
-            </header>
-
-            {error && (
-                <div className="p-4 bg-rose-50 text-rose-700 border border-rose-100 rounded-xl text-sm font-bold">
-                    {error}
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-                {/* Left Column: Order Items + Notes */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="xl:col-span-9 space-y-6">
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                        <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
-                            <FileText size={18} className="text-indigo-600" />
-                            <h2 className="font-bold text-slate-800">Order Items</h2>
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1200px]">
+                <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                        <Link
+                            href="/dashboard/purchasing/orders"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <ArrowLeft size={16} />
+                        </Link>
+                        <div>
+                            <h1 className="text-xl font-semibold tracking-tight text-foreground">Create Purchase Order</h1>
+                            <p className="mt-0.5 text-xs text-muted-foreground">Draft a new order to your supplier.</p>
                         </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            disabled
+                            title="Save PO first to create expenses"
+                            className="inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm font-medium text-muted-foreground opacity-60"
+                        >
+                            <Receipt size={16} />
+                            Create Expense
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={submitting}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                        >
+                            {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                            Create PO
+                        </button>
+                    </div>
+                </header>
 
-                        <div className="space-y-4">
-                            {items.map((item, index) => (
-                                <div key={item.id} className="bg-slate-50 p-5 rounded-2xl relative group border border-slate-100 hover:border-indigo-200 transition-colors">
-                                    <div className="flex items-center gap-4 mb-4">
-                                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-sm font-black flex-shrink-0">
-                                            {index + 1}
+                {error && (
+                    <div className="mb-4 rounded-lg border border-border bg-muted px-3 py-2 text-xs font-medium text-rose-600">
+                        {error}
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_320px]">
+                    {/* Main column */}
+                    <div className="space-y-4">
+                        <section className="overflow-hidden rounded-xl border border-border bg-card">
+                            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                                <FileText size={15} className="text-muted-foreground" />
+                                <h2 className="text-sm font-semibold text-foreground">Order Items</h2>
+                            </div>
+                            <div className="space-y-3 p-4">
+                                {items.map((item, index) => (
+                                    <div key={item.id} className="rounded-lg border border-border bg-background p-3">
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <span className="text-xs font-medium text-muted-foreground">
+                                                Item {index + 1}
+                                            </span>
+                                            <button
+                                                onClick={() => removeItem(item.id)}
+                                                disabled={items.length === 1}
+                                                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-rose-600 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                                                title="Remove item"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
-                                        <div className="flex-1 min-w-0">
-                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Product Description</label>
-                                            <SkuSelect
-                                                value={item.description}
-                                                skus={availableSkus}
-                                                onChange={code => {
-                                                    const selectedSku = availableSkus.find(s => s.code === code);
 
-                                                    setItems(items.map(i => {
-                                                        if (i.id === item.id) {
-                                                            const updated = { ...i, description: code };
-                                                            if (selectedSku) {
-                                                                updated.unitPrice = selectedSku.purchasePrice || selectedSku.salePrice || 0;
-                                                                if (selectedSku.unit?.name) {
-                                                                    updated.unit = selectedSku.unit.name;
-                                                                } else if (selectedSku.purchaseUnit?.name) {
-                                                                    updated.unit = selectedSku.purchaseUnit.name;
+                                        <div className="space-y-3">
+                                            <Field label="Product Description">
+                                                <SkuSelect
+                                                    value={item.description}
+                                                    skus={availableSkus}
+                                                    onChange={code => {
+                                                        const selectedSku = availableSkus.find(s => s.code === code);
+
+                                                        setItems(items.map(i => {
+                                                            if (i.id === item.id) {
+                                                                const updated = { ...i, description: code };
+                                                                if (selectedSku) {
+                                                                    updated.unitPrice = selectedSku.purchasePrice || selectedSku.salePrice || 0;
+                                                                    if (selectedSku.unit?.name) {
+                                                                        updated.unit = selectedSku.unit.name;
+                                                                    } else if (selectedSku.purchaseUnit?.name) {
+                                                                        updated.unit = selectedSku.purchaseUnit.name;
+                                                                    }
+                                                                    const sub = updated.qty * updated.unitPrice;
+                                                                    const disc = (sub * (updated.discount / 100));
+                                                                    updated.amount = sub - disc;
                                                                 }
-                                                                const sub = updated.qty * updated.unitPrice;
-                                                                const disc = (sub * (updated.discount / 100));
-                                                                updated.amount = sub - disc;
+                                                                return updated;
                                                             }
-                                                            return updated;
-                                                        }
-                                                        return i;
-                                                    }));
-                                                }}
-                                            />
+                                                            return i;
+                                                        }));
+                                                    }}
+                                                />
+                                            </Field>
+
+                                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                                <Field label="Qty">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        step="0.01"
+                                                        value={item.qty}
+                                                        onChange={e => handleItemChange(item.id, 'qty', parseFloat(e.target.value) || 0)}
+                                                        className={`${itemInputClass} text-center`}
+                                                    />
+                                                </Field>
+                                                <Field label="Unit">
+                                                    <input
+                                                        type="text"
+                                                        value={item.unit}
+                                                        onChange={e => handleItemChange(item.id, 'unit', e.target.value)}
+                                                        className={`${itemInputClass} text-center`}
+                                                        placeholder="pcs"
+                                                    />
+                                                </Field>
+                                                <Field label="Unit Price (Rp)">
+                                                    <input
+                                                        type="number"
+                                                        value={item.unitPrice}
+                                                        onChange={e => handleItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                                        className={`${itemInputClass} text-right`}
+                                                    />
+                                                </Field>
+                                                <Field label="Discount (%)">
+                                                    <input
+                                                        type="number"
+                                                        value={item.discount}
+                                                        onChange={e => handleItemChange(item.id, 'discount', parseFloat(e.target.value) || 0)}
+                                                        className={`${itemInputClass} text-center`}
+                                                    />
+                                                </Field>
+                                            </div>
+
+                                            <div className="flex items-center justify-between border-t border-border pt-2">
+                                                <span className="text-xs text-muted-foreground">Amount</span>
+                                                <span className="text-sm font-medium tabular-nums text-foreground">
+                                                    Rp {item.amount.toLocaleString('id-ID')}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Qty</label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                step="0.01"
-                                                value={item.qty}
-                                                onChange={e => handleItemChange(item.id, 'qty', parseFloat(e.target.value) || 0)}
-                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-center font-bold"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Unit</label>
-                                            <input
-                                                type="text"
-                                                value={item.unit}
-                                                onChange={e => handleItemChange(item.id, 'unit', e.target.value)}
-                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-center"
-                                                placeholder="pcs"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Unit Price (Rp)</label>
-                                            <input
-                                                type="number"
-                                                value={item.unitPrice}
-                                                onChange={e => handleItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-mono text-right"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Discount (%)</label>
-                                            <input
-                                                type="number"
-                                                value={item.discount}
-                                                onChange={e => handleItemChange(item.id, 'discount', parseFloat(e.target.value) || 0)}
-                                                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-center"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-200/60">
-                                        <div className="font-mono font-bold text-indigo-700 bg-indigo-50 px-4 py-1.5 rounded-lg text-sm">
-                                            Rp {item.amount.toLocaleString('id-ID')}
-                                        </div>
-                                        <button
-                                            onClick={() => removeItem(item.id)}
-                                            className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                                            disabled={items.length === 1}
+                                ))}
+
+                                <button
+                                    onClick={addItem}
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    <Plus size={15} /> Add Item
+                                </button>
+                            </div>
+                        </section>
+
+                        <section className="overflow-hidden rounded-xl border border-border bg-card">
+                            <div className="border-b border-border px-4 py-3">
+                                <h2 className="text-sm font-semibold text-foreground">Notes</h2>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
+                                <Field label="Terms & Conditions">
+                                    <textarea
+                                        value={poData.terms}
+                                        onChange={e => setPoData({ ...poData, terms: e.target.value })}
+                                        className={textareaClass}
+                                        rows={3}
+                                        placeholder="Payment terms, delivery requirements..."
+                                    />
+                                </Field>
+                                <Field label="Internal Notes">
+                                    <textarea
+                                        value={poData.notes}
+                                        onChange={e => setPoData({ ...poData, notes: e.target.value })}
+                                        className={textareaClass}
+                                        rows={3}
+                                        placeholder="Internal memo..."
+                                    />
+                                </Field>
+                            </div>
+                        </section>
+
+                        {expenses.length > 0 && (
+                            <section className="overflow-hidden rounded-xl border border-border bg-card">
+                                <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                                    <Receipt size={15} className="text-muted-foreground" />
+                                    <h2 className="text-sm font-semibold text-foreground">Related Expenses</h2>
+                                </div>
+                                <div className="space-y-2 p-4">
+                                    {expenses.map((exp: any) => (
+                                        <div
+                                            key={exp.id}
+                                            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-3"
                                         >
-                                            <Trash2 size={16} />
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                                                    <Receipt size={14} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-medium text-foreground">{exp.category}</p>
+                                                    <p className="truncate text-xs text-muted-foreground">{exp.description}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex-shrink-0 text-right">
+                                                <p className="text-sm font-medium tabular-nums text-foreground">
+                                                    Rp {exp.amount.toLocaleString('id-ID')}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">{exp.status}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div className="flex items-center justify-between border-t border-border pt-3">
+                                        <span className="text-xs font-medium text-muted-foreground">Total Expenses</span>
+                                        <span className="text-sm font-semibold tabular-nums text-foreground">
+                                            Rp {expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString('id-ID')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
+                        <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
+                            <Link
+                                href="/dashboard/purchasing/orders"
+                                className="inline-flex h-9 items-center rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                            >
+                                Cancel
+                            </Link>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={submitting}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                            >
+                                {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                Create PO
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Sidebar */}
+                    <aside className="space-y-4 lg:sticky lg:top-4">
+                        <section className="overflow-hidden rounded-xl border border-border bg-card">
+                            <div className="border-b border-border px-4 py-3">
+                                <h2 className="text-sm font-semibold text-foreground">Initial Details</h2>
+                            </div>
+                            <div className="space-y-4 p-4">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-medium text-muted-foreground">Tipe Pembayaran</label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPoData({ ...poData, paymentType: 'CREDIT' })}
+                                            className={`h-9 rounded-lg border text-xs font-medium transition-colors ${
+                                                poData.paymentType === 'CREDIT'
+                                                    ? 'border-primary bg-primary text-primary-foreground'
+                                                    : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+                                            }`}
+                                        >
+                                            Tempo (Credit)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPoData({ ...poData, paymentType: 'CASH' })}
+                                            className={`h-9 rounded-lg border text-xs font-medium transition-colors ${
+                                                poData.paymentType === 'CASH'
+                                                    ? 'border-primary bg-primary text-primary-foreground'
+                                                    : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
+                                            }`}
+                                        >
+                                            Tunai (Cash)
                                         </button>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
-                        <button
-                            onClick={addItem}
-                            className="mt-4 w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-500 font-bold hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors"
-                        >
-                            <Plus size={18} /> Add Item
-                        </button>
-                    </div>
 
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Terms & Conditions</label>
-                                <textarea
-                                    value={poData.terms}
-                                    onChange={e => setPoData({ ...poData, terms: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
-                                    rows={3}
-                                    placeholder="Payment terms, delivery requirements..."
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase">Internal Notes</label>
-                                <textarea
-                                    value={poData.notes}
-                                    onChange={e => setPoData({ ...poData, notes: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
-                                    rows={3}
-                                    placeholder="Internal memo..."
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </motion.div>
+                                <Field label="Select Vendor *">
+                                    <select
+                                        value={poData.vendorId}
+                                        onChange={e => setPoData({ ...poData, vendorId: e.target.value })}
+                                        className={inputClass}
+                                    >
+                                        <option value="">-- Choose Vendor --</option>
+                                        {vendors.map(v => (
+                                            <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
+                                        ))}
+                                    </select>
+                                </Field>
 
-                {/* Right Column: Details + Summary */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="xl:col-span-3 space-y-6">
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-4">
-                        <h2 className="font-bold text-slate-800 mb-4">Initial Details</h2>
+                                <Field label="Unit Bisnis / Kategori *">
+                                    <select
+                                        value={poData.businessCategoryId}
+                                        onChange={e => setPoData({ ...poData, businessCategoryId: e.target.value })}
+                                        className={inputClass}
+                                    >
+                                        <option value="">-- Generic / Shared --</option>
+                                        {businessCategories.map(bc => (
+                                            <option key={bc.id} value={bc.id}>{bc.name}</option>
+                                        ))}
+                                    </select>
+                                </Field>
 
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Tipe Pembayaran</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setPoData({ ...poData, paymentType: 'CREDIT' })}
-                                    className={`py-2.5 text-xs font-bold rounded-xl border-2 transition-all ${poData.paymentType === 'CREDIT'
-                                        ? 'bg-indigo-50 border-indigo-600 text-indigo-700'
-                                        : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'
-                                        }`}
-                                >
-                                    Tempo (Credit)
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setPoData({ ...poData, paymentType: 'CASH' })}
-                                    className={`py-2.5 text-xs font-bold rounded-xl border-2 transition-all ${poData.paymentType === 'CASH'
-                                        ? 'bg-emerald-50 border-emerald-600 text-emerald-700'
-                                        : 'bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100'
-                                        }`}
-                                >
-                                    Tunai (Cash)
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase">Select Vendor *</label>
-                            <select
-                                value={poData.vendorId}
-                                onChange={e => setPoData({ ...poData, vendorId: e.target.value })}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold"
-                            >
-                                <option value="">-- Choose Vendor --</option>
-                                {vendors.map(v => (
-                                    <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase italic text-violet-600">Unit Bisnis / Kategori *</label>
-                            <select
-                                value={poData.businessCategoryId}
-                                onChange={e => setPoData({ ...poData, businessCategoryId: e.target.value })}
-                                className="w-full px-4 py-3 bg-violet-50/30 border border-violet-100 rounded-xl font-bold text-violet-700"
-                            >
-                                <option value="">-- Generic / Shared --</option>
-                                {businessCategories.map(bc => (
-                                    <option key={bc.id} value={bc.id}>{bc.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500 uppercase">PO Date</label>
-                            <input
-                                type="date"
-                                value={poData.date}
-                                onChange={e => setPoData({ ...poData, date: e.target.value })}
-                                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium"
-                            />
-                        </div>
-
-                        <div className="pt-4 mt-4 border-t border-slate-100 flex flex-col gap-4">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase italic text-indigo-600">Source Work Order (Opsional)</label>
-                                <select
-                                    value={poData.workOrderId}
-                                    onChange={e => {
-                                        const woId = e.target.value;
-                                        const wo = workOrders.find(w => w.id === woId);
-                                        setPoData({
-                                            ...poData,
-                                            workOrderId: woId,
-                                            projectId: wo?.projectId || '',
-                                            salesOrderId: wo?.salesOrderId || ''
-                                        });
-                                    }}
-                                    className="w-full px-4 py-3 bg-indigo-50/30 border border-indigo-100 rounded-xl font-bold text-indigo-700"
-                                >
-                                    <option value="">-- No Source Work Order --</option>
-                                    {workOrders.map(w => (
-                                        <option key={w.id} value={w.id}>[{w.number}] {w.customer?.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {poData.workOrderId && (
-                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
-                                    <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                                        <span>Linked Info</span>
-                                        <div className="h-px bg-slate-200 flex-1 ml-3"></div>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] text-slate-400 font-bold uppercase">Project</span>
-                                            <span className="text-xs font-bold text-slate-600">
-                                                {workOrders.find(w => w.id === poData.workOrderId)?.project?.name || "N/A"}
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] text-slate-400 font-bold uppercase">Sales Order</span>
-                                            <span className="text-xs font-bold text-slate-600">
-                                                {(() => {
-                                                    const wo = workOrders.find(w => w.id === poData.workOrderId);
-                                                    if (!wo?.salesOrder) return "N/A";
-                                                    return `[${wo.salesOrder.number}] ${wo.salesOrder.subject || ''}`;
-                                                })()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {expenses.length > 0 && (
-                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                            <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
-                                <Receipt size={18} className="text-amber-600" />
-                                <h2 className="font-bold text-slate-800">Related Expenses</h2>
-                            </div>
-                            <div className="space-y-3">
-                                {expenses.map((exp: any) => (
-                                    <div key={exp.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                        <div className="flex items-center gap-4">
-                                            <div className={`p-2 rounded-xl ${exp.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
-                                                <Receipt size={16} />
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-slate-900 text-sm">{exp.category}</p>
-                                                <p className="text-xs text-slate-500">{exp.description}</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="font-black text-slate-900">Rp {exp.amount.toLocaleString('id-ID')}</p>
-                                            <p className={`text-[10px] font-bold uppercase tracking-widest ${exp.status === 'APPROVED' ? 'text-emerald-500' : 'text-amber-500'}`}>{exp.status}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                                <div className="pt-4 mt-4 border-t border-slate-100 flex justify-between items-center px-2">
-                                    <span className="text-sm font-bold text-slate-500">Total Expenses</span>
-                                    <span className="font-black text-rose-600">Rp {expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString('id-ID')}</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                        <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-4">
-                            <Calculator size={18} className="text-emerald-600" />
-                            <h2 className="font-bold text-slate-800">Summary</h2>
-                        </div>
-
-                        <div className="space-y-3 text-sm">
-                            <div className="flex justify-between text-slate-500">
-                                <span>Subtotal</span>
-                                <span className="font-mono text-slate-900">Rp {subtotal.toLocaleString('id-ID')}</span>
-                            </div>
-
-                            <div className="flex justify-between items-center text-slate-500">
-                                <div className="flex items-center gap-2">
-                                    <span>PPN/Tax</span>
+                                <Field label="PO Date">
                                     <input
-                                        type="number"
-                                        value={poData.tax}
-                                        onChange={e => setPoData({ ...poData, tax: parseFloat(e.target.value) || 0 })}
-                                        className="w-14 px-1 py-1 bg-slate-50 border border-slate-200 rounded text-center text-xs"
+                                        type="date"
+                                        value={poData.date}
+                                        onChange={e => setPoData({ ...poData, date: e.target.value })}
+                                        className={inputClass}
                                     />
-                                    <span>%</span>
-                                </div>
-                                <span className="font-mono text-slate-900">Rp {taxAmt.toLocaleString('id-ID')}</span>
-                            </div>
+                                </Field>
 
-                            <div className="pt-4 mt-4 border-t border-slate-100 flex justify-between items-center">
-                                <span className="font-extrabold text-slate-900">Grand Total</span>
-                                <span className="text-xl font-black font-mono text-indigo-600">
-                                    Rp {grandTotal.toLocaleString('id-ID')}
-                                </span>
+                                <div className="space-y-4 border-t border-border pt-4">
+                                    <Field label="Source Work Order (Opsional)">
+                                        <select
+                                            value={poData.workOrderId}
+                                            onChange={e => {
+                                                const woId = e.target.value;
+                                                const wo = workOrders.find(w => w.id === woId);
+                                                setPoData({
+                                                    ...poData,
+                                                    workOrderId: woId,
+                                                    projectId: wo?.projectId || '',
+                                                    salesOrderId: wo?.salesOrderId || ''
+                                                });
+                                            }}
+                                            className={inputClass}
+                                        >
+                                            <option value="">-- No Source Work Order --</option>
+                                            {workOrders.map(w => (
+                                                <option key={w.id} value={w.id}>[{w.number}] {w.customer?.name}</option>
+                                            ))}
+                                        </select>
+                                    </Field>
+
+                                    {poData.workOrderId && (
+                                        <div className="space-y-3 rounded-lg border border-border bg-background p-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-medium text-muted-foreground">Linked Info</span>
+                                                <div className="h-px flex-1 bg-border" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs text-muted-foreground">Project</span>
+                                                    <span className="text-xs font-medium text-foreground">
+                                                        {workOrders.find(w => w.id === poData.workOrderId)?.project?.name || "N/A"}
+                                                    </span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs text-muted-foreground">Sales Order</span>
+                                                    <span className="text-xs font-medium text-foreground">
+                                                        {(() => {
+                                                            const wo = workOrders.find(w => w.id === poData.workOrderId);
+                                                            if (!wo?.salesOrder) return "N/A";
+                                                            return `[${wo.salesOrder.number}] ${wo.salesOrder.subject || ''}`;
+                                                        })()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                </motion.div>
+                        </section>
+
+                        <section className="overflow-hidden rounded-xl border border-border bg-card">
+                            <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                                <Calculator size={15} className="text-muted-foreground" />
+                                <h2 className="text-sm font-semibold text-foreground">Summary</h2>
+                            </div>
+                            <div className="space-y-3 p-4 text-sm">
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                    <span>Subtotal</span>
+                                    <span className="tabular-nums text-foreground">Rp {subtotal.toLocaleString('id-ID')}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-muted-foreground">
+                                    <div className="flex items-center gap-1.5">
+                                        <span>PPN/Tax</span>
+                                        <input
+                                            type="number"
+                                            value={poData.tax}
+                                            onChange={e => setPoData({ ...poData, tax: parseFloat(e.target.value) || 0 })}
+                                            className="h-7 w-12 rounded-md border border-border bg-background px-1.5 text-center text-xs text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+                                        />
+                                        <span>%</span>
+                                    </div>
+                                    <span className="tabular-nums text-foreground">Rp {taxAmt.toLocaleString('id-ID')}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between border-t border-border pt-3">
+                                    <span className="font-semibold text-foreground">Grand Total</span>
+                                    <span className="text-base font-semibold tabular-nums text-foreground">
+                                        Rp {grandTotal.toLocaleString('id-ID')}
+                                    </span>
+                                </div>
+
+                                <button
+                                    onClick={handleSubmit}
+                                    disabled={submitting}
+                                    className="mt-1 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                                >
+                                    {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                    Create PO
+                                </button>
+                            </div>
+                        </section>
+                    </aside>
+                </div>
             </div>
         </div>
     )
@@ -542,34 +605,45 @@ function SkuSelect({ value, skus, onChange }: { value: string; skus: any[]; onCh
                 type="button"
                 onClick={() => setOpen(o => !o)}
                 disabled={!skus.length}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-left flex items-center justify-between gap-2 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
+                className="flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-left text-sm text-foreground outline-none transition-colors hover:bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:opacity-50"
             >
-                <span className={selected ? 'text-slate-900' : 'text-slate-400'}>{selected?.displayLabel || '-- Choose Product SKU --'}</span>
-                <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                <span className={`truncate ${selected ? 'text-foreground' : 'text-muted-foreground/60'}`}>
+                    {selected?.displayLabel || '-- Choose Product SKU --'}
+                </span>
+                <svg
+                    className="h-4 w-4 flex-shrink-0 text-muted-foreground"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
             </button>
 
             {open && (
-                <div className="absolute z-30 mt-1 w-full min-w-[400px] bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden">
-                    <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 bg-slate-50">
-                        <Search size={16} className="text-slate-400 flex-shrink-0" />
+                <div className="absolute z-30 mt-1 w-full min-w-[360px] overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                    <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-2">
+                        <Search size={14} className="flex-shrink-0 text-muted-foreground" />
                         <input
                             autoFocus
                             value={query}
                             onChange={e => setQuery(e.target.value)}
                             placeholder="Cari product / SKU..."
-                            className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+                            className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
                         />
                     </div>
-                    <div className="max-h-64 overflow-y-auto">
+                    <div className="max-h-60 overflow-y-auto">
                         {filtered.length === 0 && (
-                            <div className="px-4 py-4 text-sm text-slate-400 text-center">No product found</div>
+                            <div className="px-3 py-4 text-center text-sm text-muted-foreground">No product found</div>
                         )}
                         {filtered.map(sku => (
                             <button
                                 key={sku.id}
                                 type="button"
                                 onClick={() => { onChange(sku.code); setOpen(false); setQuery('') }}
-                                className={`w-full text-left px-4 py-3 text-sm hover:bg-indigo-50 transition-colors border-b border-slate-50 last:border-0 ${sku.code === value ? 'bg-indigo-50 font-semibold' : ''}`}
+                                className={`w-full border-b border-border/60 px-3 py-2 text-left text-sm transition-colors last:border-0 hover:bg-muted ${
+                                    sku.code === value ? 'bg-muted font-medium text-foreground' : 'text-foreground'
+                                }`}
                             >
                                 {sku.displayLabel}
                             </button>

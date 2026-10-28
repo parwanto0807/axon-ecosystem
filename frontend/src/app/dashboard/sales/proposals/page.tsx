@@ -1,13 +1,23 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, type ReactNode, type FormEvent } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-    Plus, Search, Eye, Edit, Trash2, X, Save,
-    CheckCircle2, AlertCircle, RefreshCw,
-    FileText, ClipboardList, User, ArrowRight,
-    Briefcase, Calendar, MoreVertical,
-    Download, Printer, Send
+    Plus,
+    Search,
+    Eye,
+    Edit,
+    Trash2,
+    X,
+    CheckCircle2,
+    AlertCircle,
+    RefreshCw,
+    FileText,
+    User,
+    Briefcase,
+    Calendar,
+    Download,
+    Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -47,6 +57,59 @@ interface Proposal {
 
 const fmt = (n: number) => `Rp ${n.toLocaleString('id-ID')}`
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+
+const inputClass =
+    "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
+
+const textareaClass =
+    "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15 resize-none"
+
+const selectClass =
+    "h-10 w-full cursor-pointer rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+
+function Field({
+    label,
+    required,
+    children,
+    className = "",
+}: {
+    label: string
+    required?: boolean
+    children: ReactNode
+    className?: string
+}) {
+    return (
+        <div className={`space-y-1.5 ${className}`}>
+            <label className="block text-xs font-medium text-muted-foreground">
+                {label}
+                {required && <span className="ml-0.5 text-rose-500">*</span>}
+            </label>
+            {children}
+        </div>
+    )
+}
+
+function StatusPill({ status }: { status: string }) {
+    const isDraft = status === "DRAFT"
+    return (
+        <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                isDraft
+                    ? "border-border bg-muted text-muted-foreground"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400"
+            }`}
+        >
+            <span className={`h-1.5 w-1.5 rounded-full ${isDraft ? "bg-muted-foreground/50" : "bg-emerald-500"}`} />
+            {status}
+        </span>
+    )
+}
+
+function SectionHeading({ children }: { children: ReactNode }) {
+    return (
+        <h3 className="mb-3 border-b border-border pb-2 text-xs font-semibold text-foreground">{children}</h3>
+    )
+}
 
 export default function ProposalsPage() {
     const [proposals, setProposals] = useState<Proposal[]>([])
@@ -100,127 +163,268 @@ export default function ProposalsPage() {
         }
     }
 
-    const filtered = proposals.filter(p => 
+    const filtered = proposals.filter(p =>
         p.number.toLowerCase().includes(search.toLowerCase()) ||
         p.title.toLowerCase().includes(search.toLowerCase()) ||
         p.customer?.name?.toLowerCase().includes(search.toLowerCase())
     )
 
     return (
-        <div className="px-4 py-6 space-y-6 w-full max-w-[1600px] mx-auto">
-            <AnimatePresence>
-                {toast && (
-                    <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                        className={`fixed top-6 right-6 z-[300] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl text-sm font-semibold border ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-rose-50 text-rose-800 border-rose-200'}`}>
-                        {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />} {toast.msg}
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            <header className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
-                        <ClipboardList size={24} className="text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-black text-slate-900 tracking-tight">Sales Proposals</h1>
-                        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">Crafting Professional Solutions</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={loadData} className="rounded-xl border-slate-200 text-slate-600 h-11 px-4 text-xs font-bold uppercase tracking-wider">
-                        <RefreshCw size={14} className="mr-2" /> Reload
-                    </Button>
-                    <Button onClick={() => { setEditing(null); setModalOpen(true) }}
-                        className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-11 px-6 text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20">
-                        <Plus size={16} className="mr-2" /> Create Proposal
-                    </Button>
-                </div>
-            </header>
-
-            <div className="flex items-center justify-between gap-4">
-                <div className="relative flex-1 max-w-md">
-                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                        value={search} 
-                        onChange={e => setSearch(e.target.value)} 
-                        placeholder="Search proposals, customers..."
-                        className="w-full pl-11 pr-4 py-3 text-sm border border-slate-200 rounded-2xl bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all shadow-sm font-medium" 
-                    />
-                </div>
-            </div>
-
-            {loading ? (
-                <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600" />
-                </div>
-            ) : filtered.length === 0 ? (
-                <div className="bg-white border-2 border-dashed border-slate-200 rounded-[2.5rem] py-32 flex flex-col items-center">
-                    <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mb-6">
-                        <FileText size={40} className="text-slate-200" />
-                    </div>
-                    <p className="font-bold text-slate-400 uppercase tracking-[0.2em] text-sm">No proposals found</p>
-                    <Button variant="ghost" className="mt-4 text-indigo-600 hover:text-indigo-700 font-bold" onClick={() => setModalOpen(true)}>
-                        Create your first proposal
-                    </Button>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filtered.map((p) => (
-                        <motion.div 
-                            key={p.id}
-                            initial={{ opacity: 0, y: 20 }}
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                <AnimatePresence>
+                    {toast && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -12 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden hover:border-indigo-200 transition-all group"
+                            exit={{ opacity: 0, y: -12 }}
+                            className={`fixed right-4 top-4 z-[300] flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium shadow-lg ${
+                                toast.type === 'success'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-400'
+                                    : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-400'
+                            }`}
                         >
-                            <div className="p-6 space-y-4">
-                                <div className="flex items-start justify-between">
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{p.number}</p>
-                                        <h3 className="font-bold text-slate-900 text-lg leading-tight group-hover:text-indigo-600 transition-colors line-clamp-2">{p.title}</h3>
-                                    </div>
-                                    <div className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${p.status === 'DRAFT' ? 'bg-slate-50 text-slate-500 border-slate-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'}`}>
-                                        {p.status}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3 pt-2">
-                                    <div className="flex items-center gap-3 text-slate-500">
-                                        <User size={14} className="text-slate-400" />
-                                        <span className="text-xs font-semibold truncate">{p.customer?.name || 'No Customer'}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-slate-500">
-                                        <Calendar size={14} className="text-slate-400" />
-                                        <span className="text-xs font-semibold">{fmtDate(p.date)}</span>
-                                    </div>
-                                    {p.project && (
-                                        <div className="flex items-center gap-3 text-indigo-600">
-                                            <Briefcase size={14} className="text-indigo-400" />
-                                            <span className="text-xs font-bold truncate">{p.project.number} - {p.project.name}</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="pt-4 flex items-center gap-2 border-t border-slate-50">
-                                    <Button onClick={() => setViewing(p)} className="flex-1 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl h-10 text-[10px] font-bold uppercase tracking-wider border-none shadow-none">
-                                        <Eye size={14} className="mr-2" /> Preview
-                                    </Button>
-                                    <Button onClick={() => { setEditing(p); setModalOpen(true) }} className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl h-10 text-[10px] font-bold uppercase tracking-wider border-none shadow-none">
-                                        <Edit size={14} className="mr-2" /> Edit
-                                    </Button>
-                                    <button onClick={() => handleDelete(p.id)} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all">
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            </div>
+                            {toast.type === 'success' ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+                            {toast.msg}
                         </motion.div>
-                    ))}
+                    )}
+                </AnimatePresence>
+
+                <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground">Sales Proposals</h1>
+                        <p className="mt-0.5 text-xs text-muted-foreground">Crafting professional solutions</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={loadData}
+                            className="h-9 rounded-lg px-3 text-sm font-medium"
+                        >
+                            <RefreshCw size={15} className="mr-1.5" />
+                            Reload
+                        </Button>
+                        <Button
+                            onClick={() => { setEditing(null); setModalOpen(true) }}
+                            className="h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            <Plus size={16} className="mr-1.5" />
+                            Create Proposal
+                        </Button>
+                    </div>
+                </header>
+
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="relative flex-1 sm:max-w-xs">
+                        <Search
+                            size={15}
+                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <input
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Search proposals, customers..."
+                            className={`${inputClass} pl-9`}
+                        />
+                    </div>
+                    <span className="text-xs text-muted-foreground sm:ml-auto">
+                        {filtered.length} {filtered.length === 1 ? "proposal" : "proposals"}
+                    </span>
                 </div>
-            )}
+
+                {loading ? (
+                    <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+                        <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
+                    </div>
+                ) : filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-20 text-center">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <FileText size={22} />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">No proposals found</p>
+                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                            {search
+                                ? "Try adjusting your search to find what you are looking for."
+                                : "Create your first proposal to get started."}
+                        </p>
+                        <Button
+                            onClick={() => { setEditing(null); setModalOpen(true) }}
+                            className="mt-5 h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            <Plus size={16} className="mr-1.5" />
+                            Create your first proposal
+                        </Button>
+                    </div>
+                ) : (
+                    <>
+                        {/* Desktop table */}
+                        <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                            <th className="px-3 py-2.5 font-medium">Proposal</th>
+                                            <th className="px-3 py-2.5 font-medium">Customer</th>
+                                            <th className="px-3 py-2.5 font-medium">Project</th>
+                                            <th className="px-3 py-2.5 font-medium">Date</th>
+                                            <th className="px-3 py-2.5 font-medium">Status</th>
+                                            <th className="px-3 py-2.5 text-right font-medium">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {filtered.map((p) => (
+                                            <tr key={p.id} className="transition-colors hover:bg-muted/30">
+                                                <td className="px-3 py-2.5">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                                                            <FileText size={16} />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="font-mono text-[11px] text-muted-foreground">{p.number}</p>
+                                                            <p className="truncate text-sm font-medium text-foreground">{p.title}</p>
+                                                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                                                {p.options?.length || 0} option{(p.options?.length || 0) !== 1 ? "s" : ""}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <div className="flex items-center gap-1.5 text-xs">
+                                                        <User size={12} className="flex-shrink-0 text-muted-foreground" />
+                                                        <span className="max-w-[180px] truncate text-foreground">
+                                                            {p.customer?.name || 'No Customer'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    {p.project ? (
+                                                        <div className="flex items-center gap-1.5 text-xs">
+                                                            <Briefcase size={12} className="flex-shrink-0 text-muted-foreground" />
+                                                            <span className="max-w-[200px] truncate text-foreground">
+                                                                {p.project.number} - {p.project.name}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                        <Calendar size={12} className="flex-shrink-0" />
+                                                        <span>{fmtDate(p.date)}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <StatusPill status={p.status} />
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <div className="flex items-center justify-end gap-0.5">
+                                                        <Button
+                                                            onClick={() => setViewing(p)}
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            title="Preview proposal"
+                                                            className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                        >
+                                                            <Eye size={15} />
+                                                        </Button>
+                                                        <Button
+                                                            onClick={() => { setEditing(p); setModalOpen(true) }}
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            title="Edit proposal"
+                                                            className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                        >
+                                                            <Edit size={15} />
+                                                        </Button>
+                                                        <Button
+                                                            onClick={() => handleDelete(p.id)}
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            title="Delete proposal"
+                                                            className="h-8 w-8 rounded-md text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                                        >
+                                                            <Trash2 size={15} />
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Mobile cards */}
+                        <div className="grid grid-cols-1 gap-3 lg:hidden">
+                            {filtered.map((p) => (
+                                <div key={p.id} className="rounded-xl border border-border bg-card p-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <p className="font-mono text-[11px] text-muted-foreground">{p.number}</p>
+                                            <p className="truncate text-sm font-medium text-foreground">{p.title}</p>
+                                        </div>
+                                        <StatusPill status={p.status} />
+                                    </div>
+
+                                    <div className="mt-2.5 space-y-1.5">
+                                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                            <User size={11} className="flex-shrink-0" />
+                                            <span className="truncate">{p.customer?.name || 'No Customer'}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                            <Calendar size={11} className="flex-shrink-0" />
+                                            <span>{fmtDate(p.date)}</span>
+                                        </div>
+                                        {p.project && (
+                                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                <Briefcase size={11} className="flex-shrink-0" />
+                                                <span className="truncate">{p.project.number} - {p.project.name}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-3 flex items-center justify-between border-t border-border pt-2">
+                                        <span className="text-[11px] text-muted-foreground">
+                                            {p.options?.length || 0} option{(p.options?.length || 0) !== 1 ? "s" : ""}
+                                        </span>
+                                        <div className="flex items-center gap-0.5">
+                                            <Button
+                                                onClick={() => setViewing(p)}
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                            >
+                                                <Eye size={15} />
+                                            </Button>
+                                            <Button
+                                                onClick={() => { setEditing(p); setModalOpen(true) }}
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                            >
+                                                <Edit size={15} />
+                                            </Button>
+                                            <Button
+                                                onClick={() => handleDelete(p.id)}
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 rounded-md text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                            >
+                                                <Trash2 size={15} />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </div>
 
             <AnimatePresence>
                 {modalOpen && (
-                    <ProposalFormModal 
+                    <ProposalFormModal
                         proposal={editing}
                         customers={customers}
                         projects={projects}
@@ -229,7 +433,7 @@ export default function ProposalsPage() {
                     />
                 )}
                 {viewing && (
-                    <ProposalPreviewModal 
+                    <ProposalPreviewModal
                         proposal={viewing}
                         company={company}
                         onClose={() => setViewing(null)}
@@ -240,12 +444,12 @@ export default function ProposalsPage() {
     )
 }
 
-function ProposalFormModal({ proposal, customers, projects, onClose, onSuccess }: { 
-    proposal: Proposal | null; 
-    customers: Customer[]; 
+function ProposalFormModal({ proposal, customers, projects, onClose, onSuccess }: {
+    proposal: Proposal | null;
+    customers: Customer[];
     projects: Project[];
-    onClose: () => void; 
-    onSuccess: () => void 
+    onClose: () => void;
+    onSuccess: () => void
 }) {
     const isEdit = !!proposal
     const [form, setForm] = useState({
@@ -266,7 +470,7 @@ function ProposalFormModal({ proposal, customers, projects, onClose, onSuccess }
     })
     const [loading, setLoading] = useState(false)
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault()
         setLoading(true)
         try {
@@ -302,214 +506,300 @@ function ProposalFormModal({ proposal, customers, projects, onClose, onSuccess }
     }
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl my-8 overflow-hidden flex flex-col max-h-[90vh]">
-                
-                <header className="px-10 py-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 flex-shrink-0">
-                    <div className="flex items-center gap-4">
-                        <div>
-                            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">{isEdit ? 'Edit Proposal' : 'New Proposal'}</h2>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Define your project details</p>
+        <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                            />
+            <motion.div
+                initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-4xl sm:rounded-2xl"
+            >
+                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                            <FileText size={16} />
                         </div>
+                        <div className="min-w-0">
+                            <h2 className="truncate text-sm font-semibold text-foreground">
+                                {isEdit ? 'Edit Proposal' : 'New Proposal'}
+                            </h2>
+                            <p className="truncate text-[11px] text-muted-foreground">Define your project details</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
                         {!isEdit && (
-                            <Button type="button" variant="outline" size="sm" onClick={() => setForm({
-                                ...form,
-                                title: 'PROPOSAL PENGAMBILALIHAN DAN PENINGKATAN KONEKSI RADIO POINT-TO-POINT',
-                                recipientName: 'Bapak Ismanto',
-                                subject: 'Permohonan Izin Pengambilalihan dan Peningkatan Kualitas Koneksi Radio Point-to-Point Gedung 2 – Gedung 1',
-                                salutation: 'Selamat Sore, Bapak Ismanto.',
-                                background: 'Kami ingin menyampaikan perhatian terhadap kondisi koneksi Radio Point-to-Point (PTP) yang saat ini menghubungkan Gedung 2 ke Gedung 1. Berdasarkan pengamatan, koneksi tersebut sering mengalami kendala teknis yang signifikan, berdampak pada terputusnya jaringan secara berkala.',
-                                impact: 'Masalah ini diperparah dengan respons teknisi dari vendor saat ini yang cenderung lambat (>5 jam), terutama karena jarak lokasi. Situasi ini secara langsung menyebabkan lost koneksi yang sering terjadi, mengganggu efektivitas pekerjaan karyawan, dan berpotensi menimbulkan kerugian operasional yang berkelanjutan.',
-                                solution: 'Untuk mengatasi masalah kritis ini dan memastikan stabilitas operasional, kami mengajukan permohonan untuk mengambil alih secara penuh kontrol dan pemantauan Koneksi Point-to-Point dari Gedung 1 ke Gedung 2.\n\nTujuan Pengambilalihan Kontrol:\n- Memastikan pemantauan koneksi secara real-time dan proaktif.\n- Mempercepat waktu respons dan penanganan masalah secara drastis.\n- Meningkatkan stabilitas dan keandalan koneksi jaringan antar gedung.',
-                                conclusion: 'Mengingat urgensi masalah dan dampak negatifnya terhadap produktivitas kerja, serta untuk memanfaatkan waktu luang operasional, kami memohon Bapak untuk dapat memberikan keputusan secepatnya.\n\nKami berencana untuk melakukan tindakan perbaikan dan instalasi di masa Libur Lebaran ini agar transisi dan gangguan terhadap aktivitas operasional kerja dapat dimulai.',
-                                options: [
-                                    { name: 'Opsi 1', provider: 'PT. Grafindo Mitrasemesta', description: 'Disesuaikan dengan biaya pengadaan perangkat baru dan operasional internal.', estimatedCost: 11500000, details: 'Estimasi Biaya Pengadaan' },
-                                    { name: 'Opsi 2', provider: 'CV Intech Mitra Abadi', description: 'Sistem sewa bulanan dengan nilai yang sama dengan biaya vendor sebelumnya.', estimatedCost: 500000, details: 'Rp. 500.000/bulan' }
-                                ]
-                            })} className="h-8 text-[9px] font-black uppercase tracking-widest bg-indigo-50 border-indigo-100 text-indigo-600 hover:bg-indigo-100">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setForm({
+                                    ...form,
+                                    title: 'PROPOSAL PENGAMBILALIHAN DAN PENINGKATAN KONEKSI RADIO POINT-TO-POINT',
+                                    recipientName: 'Bapak Ismanto',
+                                    subject: 'Permohonan Izin Pengambilalihan dan Peningkatan Kualitas Koneksi Radio Point-to-Point Gedung 2 – Gedung 1',
+                                    salutation: 'Selamat Sore, Bapak Ismanto.',
+                                    background: 'Kami ingin menyampaikan perhatian terhadap kondisi koneksi Radio Point-to-Point (PTP) yang saat ini menghubungkan Gedung 2 ke Gedung 1. Berdasarkan pengamatan, koneksi tersebut sering mengalami kendala teknis yang signifikan, berdampak pada terputusnya jaringan secara berkala.',
+                                    impact: 'Masalah ini diperparah dengan respons teknisi dari vendor saat ini yang cenderung lambat (>5 jam), terutama karena jarak lokasi. Situasi ini secara langsung menyebabkan lost koneksi yang sering terjadi, mengganggu efektivitas pekerjaan karyawan, dan berpotensi menimbulkan kerugian operasional yang berkelanjutan.',
+                                    solution: 'Untuk mengatasi masalah kritis ini dan memastikan stabilitas operasional, kami mengajukan permohonan untuk mengambil alih secara penuh kontrol dan pemantauan Koneksi Point-to-Point dari Gedung 1 ke Gedung 2.\n\nTujuan Pengambilalihan Kontrol:\n- Memastikan pemantauan koneksi secara real-time dan proaktif.\n- Mempercepat waktu respons dan penanganan masalah secara drastis.\n- Meningkatkan stabilitas dan keandalan koneksi jaringan antar gedung.',
+                                    conclusion: 'Mengingat urgensi masalah dan dampak negatifnya terhadap produktivitas kerja, serta untuk memanfaatkan waktu luang operasional, kami memohon Bapak untuk dapat memberikan keputusan secepatnya.\n\nKami berencana untuk melakukan tindakan perbaikan dan instalasi di masa Libur Lebaran ini agar transisi dan gangguan terhadap aktivitas operasional kerja dapat dimulai.',
+                                    options: [
+                                        { name: 'Opsi 1', provider: 'PT. Grafindo Mitrasemesta', description: 'Disesuaikan dengan biaya pengadaan perangkat baru dan operasional internal.', estimatedCost: 11500000, details: 'Estimasi Biaya Pengadaan' },
+                                        { name: 'Opsi 2', provider: 'CV Intech Mitra Abadi', description: 'Sistem sewa bulanan dengan nilai yang sama dengan biaya vendor sebelumnya.', estimatedCost: 500000, details: 'Rp. 500.000/bulan' }
+                                    ]
+                                })}
+                                className="h-8 rounded-lg px-2.5 text-[11px] font-medium sm:px-3 sm:text-xs"
+                            >
                                 Load Sample Data
                             </Button>
                         )}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={onClose}
+                            className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground"
+                        >
+                            <X size={16} />
+                        </Button>
                     </div>
-                    <button onClick={onClose} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-white transition-all"><X size={20} /></button>
                 </header>
 
-                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-                    {/* Basic Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <section className="space-y-6">
-                            <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest border-b border-indigo-100 pb-2">Recipient Information</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Recipient Name (Kepada Yth.)</label>
-                                    <input required value={form.recipientName} onChange={e => setForm({ ...form, recipientName: e.target.value })}
-                                        placeholder="e.g., Bapak Ismanto" className="form-input" />
+                <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-5">
+                    <div className="space-y-6">
+                        {/* Basic Info */}
+                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                            <section>
+                                <SectionHeading>Recipient Information</SectionHeading>
+                                <div className="space-y-3">
+                                    <Field label="Recipient Name (Kepada Yth.)" required>
+                                        <input
+                                            required
+                                            value={form.recipientName}
+                                            onChange={e => setForm({ ...form, recipientName: e.target.value })}
+                                            placeholder="e.g., Bapak Ismanto"
+                                            className={inputClass}
+                                        />
+                                    </Field>
+                                    <Field label="Subject (Perihal)" required>
+                                        <input
+                                            required
+                                            value={form.subject}
+                                            onChange={e => setForm({ ...form, subject: e.target.value })}
+                                            placeholder="e.g., Permohonan Izin Pengambilalihan..."
+                                            className={inputClass}
+                                        />
+                                    </Field>
+                                    <Field label="Salutation (Salam Pembuka)">
+                                        <input
+                                            value={form.salutation}
+                                            onChange={e => setForm({ ...form, salutation: e.target.value })}
+                                            placeholder="e.g., Selamat Sore, Bapak Ismanto."
+                                            className={inputClass}
+                                        />
+                                    </Field>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Subject (Perihal)</label>
-                                    <input required value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })}
-                                        placeholder="e.g., Permohonan Izin Pengambilalihan..." className="form-input" />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Salutation (Salam Pembuka)</label>
-                                    <input value={form.salutation} onChange={e => setForm({ ...form, salutation: e.target.value })}
-                                        placeholder="e.g., Selamat Sore, Bapak Ismanto." className="form-input" />
-                                </div>
-                            </div>
-                        </section>
+                            </section>
 
-                        <section className="space-y-6">
-                            <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest border-b border-indigo-100 pb-2">Proposal Metadata</h3>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Proposal Title</label>
-                                    <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
-                                        placeholder="Full context title..." className="form-input" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Linked Customer</label>
-                                        <select value={form.customerId} onChange={e => setForm({ ...form, customerId: e.target.value })} className="form-select">
-                                            <option value="">-- No Customer --</option>
-                                            {Array.isArray(customers) && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
+                            <section>
+                                <SectionHeading>Proposal Metadata</SectionHeading>
+                                <div className="space-y-3">
+                                    <Field label="Proposal Title" required>
+                                        <input
+                                            required
+                                            value={form.title}
+                                            onChange={e => setForm({ ...form, title: e.target.value })}
+                                            placeholder="Full context title..."
+                                            className={inputClass}
+                                        />
+                                    </Field>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <Field label="Linked Customer">
+                                            <select
+                                                value={form.customerId}
+                                                onChange={e => setForm({ ...form, customerId: e.target.value })}
+                                                className={selectClass}
+                                            >
+                                                <option value="">-- No Customer --</option>
+                                                {Array.isArray(customers) && customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                            </select>
+                                        </Field>
+                                        <Field label="Linked Project">
+                                            <select
+                                                value={form.projectId}
+                                                onChange={e => setForm({ ...form, projectId: e.target.value })}
+                                                className={selectClass}
+                                            >
+                                                <option value="">-- No Project --</option>
+                                                {Array.isArray(projects) && projects.map(p => <option key={p.id} value={p.id}>{p.number} - {p.name}</option>)}
+                                            </select>
+                                        </Field>
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Linked Project</label>
-                                        <select value={form.projectId} onChange={e => setForm({ ...form, projectId: e.target.value })} className="form-select">
-                                            <option value="">-- No Project --</option>
-                                            {Array.isArray(projects) && projects.map(p => <option key={p.id} value={p.id}>{p.number} - {p.name}</option>)}
-                                        </select>
-                                    </div>
                                 </div>
-                            </div>
-                        </section>
-                    </div>
+                            </section>
+                        </div>
 
-                    {/* Content Sections */}
-                    <div className="space-y-8">
-                        <section className="space-y-6">
-                            <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest border-b border-indigo-100 pb-2">Narrative Content</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">1. Latar Belakang Masalah (Background)</label>
-                                        <textarea rows={4} value={form.background} onChange={e => setForm({ ...form, background: e.target.value })} className="form-textarea" />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">2. Dampak Permasalahan (Impact)</label>
-                                        <textarea rows={4} value={form.impact} onChange={e => setForm({ ...form, impact: e.target.value })} className="form-textarea" />
-                                    </div>
+                        {/* Content Sections */}
+                        <section>
+                            <SectionHeading>Narrative Content</SectionHeading>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="space-y-3">
+                                    <Field label="1. Latar Belakang Masalah (Background)">
+                                        <textarea
+                                            rows={4}
+                                            value={form.background}
+                                            onChange={e => setForm({ ...form, background: e.target.value })}
+                                            className={textareaClass}
+                                        />
+                                    </Field>
+                                    <Field label="2. Dampak Permasalahan (Impact)">
+                                        <textarea
+                                            rows={4}
+                                            value={form.impact}
+                                            onChange={e => setForm({ ...form, impact: e.target.value })}
+                                            className={textareaClass}
+                                        />
+                                    </Field>
                                 </div>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">3. Usulan Solusi (Proposed Solution)</label>
-                                        <textarea rows={4} value={form.solution} onChange={e => setForm({ ...form, solution: e.target.value })} className="form-textarea" />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">5. Permohonan Keputusan (Closing/CTA)</label>
-                                        <textarea rows={4} value={form.conclusion} onChange={e => setForm({ ...form, conclusion: e.target.value })} className="form-textarea" />
-                                    </div>
+                                <div className="space-y-3">
+                                    <Field label="3. Usulan Solusi (Proposed Solution)">
+                                        <textarea
+                                            rows={4}
+                                            value={form.solution}
+                                            onChange={e => setForm({ ...form, solution: e.target.value })}
+                                            className={textareaClass}
+                                        />
+                                    </Field>
+                                    <Field label="5. Permohonan Keputusan (Closing/CTA)">
+                                        <textarea
+                                            rows={4}
+                                            value={form.conclusion}
+                                            onChange={e => setForm({ ...form, conclusion: e.target.value })}
+                                            className={textareaClass}
+                                        />
+                                    </Field>
                                 </div>
                             </div>
                         </section>
 
                         {/* Options Table */}
-                        <section className="space-y-6">
-                            <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
-                                <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest">4. Skema Penawaran Kerjasama (Pricing Options)</h3>
-                                <Button type="button" onClick={addOption} variant="ghost" className="h-8 text-[10px] font-bold uppercase tracking-wider text-indigo-600 hover:bg-indigo-50">
+                        <section>
+                            <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
+                                <h3 className="text-xs font-semibold text-foreground">4. Skema Penawaran Kerjasama (Pricing Options)</h3>
+                                <Button
+                                    type="button"
+                                    onClick={addOption}
+                                    variant="ghost"
+                                    className="h-8 rounded-md px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                                >
                                     <Plus size={14} className="mr-1.5" /> Add Option
                                 </Button>
                             </div>
-                            
-                            <div className="space-y-4">
+
+                            <div className="space-y-3">
                                 {form.options.map((opt, idx) => (
-                                    <div key={idx} className="p-6 bg-slate-50/50 rounded-2xl border border-slate-100 relative group/opt">
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                            <div className="md:col-span-1">
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Option Name</label>
-                                                <input value={opt.name} onChange={e => updateOption(idx, 'name', e.target.value)} className="form-input bg-white" placeholder="Opsi 1" />
-                                            </div>
-                                            <div className="md:col-span-1">
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Provider / Agent</label>
-                                                <input value={opt.provider} onChange={e => updateOption(idx, 'provider', e.target.value)} className="form-input bg-white" placeholder="PT. Grafindo..." />
-                                            </div>
-                                            <div className="md:col-span-1">
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Estimated Cost</label>
-                                                <input type="number" value={opt.estimatedCost} onChange={e => updateOption(idx, 'estimatedCost', e.target.value)} className="form-input bg-white" />
-                                            </div>
-                                            <div className="md:col-span-1">
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Cost Details</label>
-                                                <input value={opt.details} onChange={e => updateOption(idx, 'details', e.target.value)} className="form-input bg-white" placeholder="Sistem sewa bulanan..." />
-                                            </div>
-                                            <div className="md:col-span-4">
-                                                <label className="text-[9px] font-bold text-slate-400 uppercase mb-1 block">Description / Notes</label>
-                                                <textarea rows={2} value={opt.description} onChange={e => updateOption(idx, 'description', e.target.value)} className="form-textarea bg-white" />
-                                            </div>
+                                    <div key={idx} className="rounded-xl border border-border bg-muted/20 p-3">
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <span className="text-[11px] font-medium text-muted-foreground">Option {idx + 1}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeOption(idx)}
+                                                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                            >
+                                                <X size={14} />
+                                            </button>
                                         </div>
-                                        <button type="button" onClick={() => removeOption(idx)} className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-white border border-rose-100 text-rose-500 shadow-sm opacity-0 group-hover/opt:opacity-100 transition-all flex items-center justify-center hover:bg-rose-50">
-                                            <X size={14} />
-                                        </button>
+                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                                            <Field label="Option Name">
+                                                <input
+                                                    value={opt.name}
+                                                    onChange={e => updateOption(idx, 'name', e.target.value)}
+                                                    className={inputClass}
+                                                    placeholder="Opsi 1"
+                                                />
+                                            </Field>
+                                            <Field label="Provider / Agent">
+                                                <input
+                                                    value={opt.provider}
+                                                    onChange={e => updateOption(idx, 'provider', e.target.value)}
+                                                    className={inputClass}
+                                                    placeholder="PT. Grafindo..."
+                                                />
+                                            </Field>
+                                            <Field label="Estimated Cost">
+                                                <input
+                                                    type="number"
+                                                    value={opt.estimatedCost}
+                                                    onChange={e => updateOption(idx, 'estimatedCost', e.target.value)}
+                                                    className={inputClass}
+                                                />
+                                            </Field>
+                                            <Field label="Cost Details">
+                                                <input
+                                                    value={opt.details}
+                                                    onChange={e => updateOption(idx, 'details', e.target.value)}
+                                                    className={inputClass}
+                                                    placeholder="Sistem sewa bulanan..."
+                                                />
+                                            </Field>
+                                            <Field label="Description / Notes" className="md:col-span-4">
+                                                <textarea
+                                                    rows={2}
+                                                    value={opt.description}
+                                                    onChange={e => updateOption(idx, 'description', e.target.value)}
+                                                    className={textareaClass}
+                                                />
+                                            </Field>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         </section>
 
-                        <section className="space-y-6">
-                            <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest border-b border-indigo-100 pb-2">Signature</h3>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Signatory Name</label>
-                                    <input value={form.signatoryName} onChange={e => setForm({ ...form, signatoryName: e.target.value })} className="form-input" />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">Signatory Role</label>
-                                    <input value={form.signatoryRole} onChange={e => setForm({ ...form, signatoryRole: e.target.value })} className="form-input" />
-                                </div>
+                        <section>
+                            <SectionHeading>Signature</SectionHeading>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <Field label="Signatory Name">
+                                    <input
+                                        value={form.signatoryName}
+                                        onChange={e => setForm({ ...form, signatoryName: e.target.value })}
+                                        className={inputClass}
+                                    />
+                                </Field>
+                                <Field label="Signatory Role">
+                                    <input
+                                        value={form.signatoryRole}
+                                        onChange={e => setForm({ ...form, signatoryRole: e.target.value })}
+                                        className={inputClass}
+                                    />
+                                </Field>
                             </div>
                         </section>
                     </div>
                 </form>
 
-                <footer className="px-10 py-6 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-3 flex-shrink-0">
-                    <Button type="button" variant="outline" onClick={onClose} className="rounded-xl h-11 px-6 font-bold uppercase tracking-wider text-xs">Cancel</Button>
-                    <Button type="submit" disabled={loading} onClick={handleSubmit} className="rounded-xl h-11 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase tracking-wider text-xs shadow-lg shadow-indigo-600/20">
+                <footer className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onClose}
+                        className="h-9 rounded-lg px-4 text-sm font-medium"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={loading}
+                        onClick={handleSubmit}
+                        className="h-9 rounded-lg px-4 text-sm font-medium"
+                    >
                         {loading ? 'Saving...' : (isEdit ? 'Update Proposal' : 'Save Proposal')}
                     </Button>
                 </footer>
-
-                <style jsx>{`
-                    .form-input, .form-select, .form-textarea {
-                        width: 100%;
-                        background: #f8fafc;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 1rem;
-                        padding: 0.75rem 1rem;
-                        font-size: 0.875rem;
-                        transition: all 0.2s;
-                    }
-                    .form-input:focus, .form-select:focus, .form-textarea:focus {
-                        outline: none;
-                        background: white;
-                        border-color: #6366f1;
-                        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
-                    }
-                    .custom-scrollbar::-webkit-scrollbar {
-                        width: 6px;
-                    }
-                    .custom-scrollbar::-webkit-scrollbar-track {
-                        background: transparent;
-                    }
-                    .custom-scrollbar::-webkit-scrollbar-thumb {
-                        background: #e2e8f0;
-                        border-radius: 10px;
-                    }
-                    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                        background: #cbd5e1;
-                    }
-                `}</style>
             </motion.div>
         </div>
     )
@@ -605,7 +895,7 @@ function ProposalPreviewModal({ proposal, company, onClose }: { proposal: Propos
             ]
 
             doc.setFont('helvetica', 'normal').setFontSize(9).setTextColor(...dark)
-            
+
             for (const s of sections) {
                 if (y > 255) { doc.addPage(); y = 20 }
                 doc.setFont('helvetica', 'bold').setFontSize(10).setTextColor(...dark).text(s.t, M, y); y += 6
@@ -650,7 +940,7 @@ function ProposalPreviewModal({ proposal, company, onClose }: { proposal: Propos
             doc.text('Disetujui oleh,', M, y)
             doc.text('Hormat kami,', M + sw + 10, y)
             doc.text(`${comp.city || 'Tanjung Morawa'}, ${fmtDate(proposal.date)}`, M + sw + 10, y + 4)
-            
+
             // TTD Image - Proportional Scaling
             try {
                 const ttdImg = new Image(); ttdImg.crossOrigin = 'anonymous'
@@ -659,7 +949,7 @@ function ProposalPreviewModal({ proposal, company, onClose }: { proposal: Propos
                     const tcv = document.createElement('canvas')
                     tcv.width = ttdImg.naturalWidth; tcv.height = ttdImg.naturalHeight
                     tcv.getContext('2d')!.drawImage(ttdImg, 0, 0)
-                    
+
                     const ratio = ttdImg.naturalHeight / ttdImg.naturalWidth
                     const dw = 45; const dh = dw * ratio
                     doc.addImage(tcv.toDataURL('image/png'), 'PNG', M + sw + 10, y + 2, dw, dh)
@@ -667,7 +957,7 @@ function ProposalPreviewModal({ proposal, company, onClose }: { proposal: Propos
                 } else {
                     y += 25
                 }
-            } catch { 
+            } catch {
                 y += 25
             }
 
@@ -696,44 +986,71 @@ function ProposalPreviewModal({ proposal, company, onClose }: { proposal: Propos
     }
 
     return (
-        <div className="fixed inset-0 z-[300] flex items-start justify-center p-4 bg-slate-900/80 backdrop-blur-md overflow-y-auto pt-10 pb-10">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-[950px] overflow-hidden flex flex-col relative">
-                
-                <header className="sticky top-0 z-[10] px-10 py-5 border-b border-slate-100 flex items-center justify-between no-print bg-white/90 backdrop-blur-md">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20">
-                            <FileText size={16} className="text-white" />
+        <div className="fixed inset-0 z-[300] flex items-end justify-center sm:items-center sm:p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <motion.div
+                initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-[1000px] sm:rounded-2xl print:max-h-none print:overflow-visible print:rounded-none print:border-0 print:shadow-none"
+            >
+                <header className="no-print flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                            <FileText size={16} />
                         </div>
-                        <span className="text-sm font-bold text-slate-700 uppercase tracking-wider">Proposal Preview</span>
+                        <div className="min-w-0">
+                            <h2 className="truncate text-sm font-semibold text-foreground">Proposal Preview</h2>
+                            <p className="truncate font-mono text-[11px] text-muted-foreground">{proposal.number}</p>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <Button variant="outline" className="h-10 rounded-xl gap-2 text-xs font-bold uppercase tracking-wider text-slate-600 border-slate-200" 
-                            onClick={() => window.print()}>
-                            <Printer size={14} /> Print
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => window.print()}
+                            className="h-9 rounded-lg px-3 text-sm font-medium"
+                        >
+                            <Printer size={15} className="mr-1.5" /> Print
                         </Button>
-                        <Button className="h-10 rounded-xl gap-2 text-xs font-bold uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20"
-                            onClick={generatePDF} disabled={busy}>
-                            {busy ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />} 
+                        <Button
+                            onClick={generatePDF}
+                            disabled={busy}
+                            className="h-9 rounded-lg px-4 text-sm font-medium"
+                        >
+                            {busy ? <RefreshCw size={15} className="mr-1.5 animate-spin" /> : <Download size={15} className="mr-1.5" />}
                             {busy ? 'Generating...' : 'Download PDF'}
                         </Button>
-                        <div className="w-px h-6 bg-slate-200 mx-1" />
-                        <button onClick={onClose} className="w-10 h-10 rounded-xl hover:bg-slate-200 flex items-center justify-center transition-all text-slate-400">
-                            <X size={20} />
-                        </button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onClose}
+                            className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground"
+                        >
+                            <X size={16} />
+                        </Button>
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-y-auto p-0 bg-slate-100/50 print:bg-white">
-                    <div id="proposal-paper" className="w-[210mm] min-h-[297mm] mx-auto my-12 bg-white shadow-2xl p-[15mm] print:m-0 print:shadow-none print:w-full font-sans text-slate-900 leading-relaxed relative rounded-xl">
-                        
-                        {/* Professional Header - Quotation Style */}
-                        <div className="flex justify-between items-start border-b-[3px] border-indigo-600 pb-6 mb-0">
-                            <div className="flex gap-6 items-start">
-                                {comp.logo && <img src={`${process.env.NEXT_PUBLIC_API_URL}${comp.logo}`} alt="logo" className="h-16 w-auto object-contain" />}
+                <div className="flex-1 overflow-y-auto bg-muted/30 p-4 sm:p-6 print:bg-card print:p-0">
+                    <div
+                        id="proposal-paper"
+                        className="relative mx-auto my-2 w-[210mm] min-h-[297mm] bg-card p-[15mm] font-sans leading-relaxed text-foreground shadow-xl print:m-0 print:w-full print:shadow-none"
+                    >
+                        {/* Header */}
+                        <div className="mb-0 flex items-start justify-between border-b-2 border-primary pb-5">
+                            <div className="flex items-start gap-5">
+                                {comp.logo && (
+                                    <img
+                                        src={`${process.env.NEXT_PUBLIC_API_URL}${comp.logo}`}
+                                        alt="logo"
+                                        className="h-16 w-auto object-contain"
+                                    />
+                                )}
                                 <div>
-                                    <div className="font-black text-xl text-slate-900 mb-1 tracking-tight uppercase">{comp.name || 'PT. Axon Ecosystem'}</div>
-                                    <div className="text-[10px] text-slate-500 max-w-[300px] leading-relaxed">
+                                    <div className="mb-1 text-lg font-semibold tracking-tight text-foreground">
+                                        {comp.name || 'PT. Axon Ecosystem'}
+                                    </div>
+                                    <div className="max-w-[300px] text-[10px] leading-relaxed text-muted-foreground">
                                         {comp.address}
                                         {comp.city && <span>, {comp.city}</span>}
                                         {comp.phone && <div className="mt-1">Tel: {comp.phone} | Email: {comp.email}</div>}
@@ -741,106 +1058,104 @@ function ProposalPreviewModal({ proposal, company, onClose }: { proposal: Propos
                                 </div>
                             </div>
                             <div className="text-right">
-                                <table className="ml-auto text-[10px] border-collapse">
+                                <table className="ml-auto border-collapse text-[10px]">
                                     <tbody>
                                         <tr>
-                                            <td className="text-right text-slate-400 font-bold pr-2 pb-1">No. Proposal :</td>
-                                            <td className="text-right text-slate-900 font-bold pb-1">{proposal.number}</td>
+                                            <td className="pb-1 pr-2 text-right font-medium text-muted-foreground">No. Proposal :</td>
+                                            <td className="pb-1 text-right font-medium text-foreground">{proposal.number}</td>
                                         </tr>
                                         <tr>
-                                            <td className="text-right text-slate-400 font-bold pr-2">Tanggal :</td>
-                                            <td className="text-right text-slate-900 font-bold">{fmtDate(proposal.date)}</td>
+                                            <td className="pr-2 text-right font-medium text-muted-foreground">Tanggal :</td>
+                                            <td className="text-right font-medium text-foreground">{fmtDate(proposal.date)}</td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
                         </div>
 
-                        {/* Centered Title */}
-                        <div className="text-center py-4 border-b border-slate-100 mb-10">
-                            <span className="font-black text-sm uppercase tracking-[0.2em] text-indigo-600">Surat Proposal</span>
+                        {/* Document label */}
+                        <div className="border-b border-border py-4 text-center">
+                            <span className="text-sm font-semibold text-primary">Surat Proposal</span>
                         </div>
 
-                        {/* Title Section (Project Name) */}
-                        <div className="text-center mb-12">
-                            <h1 className="text-2xl font-black uppercase text-slate-900 tracking-tight underline decoration-indigo-600/30 underline-offset-[12px] decoration-4">
-                                {proposal.title}
-                            </h1>
+                        {/* Proposal title */}
+                        <div className="mb-10 mt-8 text-center">
+                            <h1 className="text-xl font-semibold tracking-tight text-foreground">{proposal.title}</h1>
                         </div>
 
                         {/* Recipient & Meta */}
-                        <div className="mb-10 space-y-6">
-                            <div className="pb-4 border-b border-slate-100">
-                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Kepada Yth.</p>
-                                <p className="text-sm font-black text-slate-900">{proposal.recipientName}</p>
+                        <div className="mb-8 space-y-5">
+                            <div className="border-b border-border pb-4">
+                                <p className="mb-1.5 text-[10px] font-medium text-muted-foreground">Kepada Yth.</p>
+                                <p className="text-sm font-semibold text-foreground">{proposal.recipientName}</p>
                             </div>
 
-                            <div className="space-y-3">
-                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Detail Proposal</p>
-                                <div className="grid grid-cols-[120px_1fr] text-sm gap-y-2">
-                                    <span className="font-bold text-slate-500">Perihal</span>
-                                    <span className="font-bold text-slate-900">: {proposal.subject}</span>
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-medium text-muted-foreground">Detail Proposal</p>
+                                <div className="grid grid-cols-[120px_1fr] gap-y-2 text-sm">
+                                    <span className="font-medium text-muted-foreground">Perihal</span>
+                                    <span className="font-medium text-foreground">: {proposal.subject}</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Salutation */}
                         <div className="mb-8">
-                            <p className="font-bold text-base mb-2">{proposal.salutation},</p>
-                            <p className="italic text-slate-600 text-sm">Dengan hormat,</p>
+                            <p className="mb-2 text-sm font-semibold text-foreground">{proposal.salutation},</p>
+                            <p className="text-sm italic text-muted-foreground">Dengan hormat,</p>
                         </div>
 
                         {/* Main Content */}
-                        <div className="space-y-10 text-[14px]">
-                            <section className="space-y-4">
-                                <h2 className="text-base font-bold text-slate-900 flex items-center gap-3">
-                                    <span className="w-6 h-6 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold">1</span>
+                        <div className="space-y-8 text-sm">
+                            <section className="space-y-3">
+                                <h2 className="flex items-center gap-2.5 text-sm font-semibold text-foreground">
+                                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-foreground">1</span>
                                     Latar Belakang Masalah
                                 </h2>
-                                <p className="whitespace-pre-wrap pl-9 text-slate-600 leading-relaxed text-justify">{proposal.background}</p>
+                                <p className="whitespace-pre-wrap pl-8 text-justify leading-relaxed text-muted-foreground">{proposal.background}</p>
                             </section>
 
-                            <section className="space-y-4">
-                                <h2 className="text-base font-bold text-slate-900 flex items-center gap-3">
-                                    <span className="w-6 h-6 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold">2</span>
+                            <section className="space-y-3">
+                                <h2 className="flex items-center gap-2.5 text-sm font-semibold text-foreground">
+                                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-foreground">2</span>
                                     Dampak Permasalahan
                                 </h2>
-                                <p className="whitespace-pre-wrap pl-9 text-slate-600 leading-relaxed text-justify">{proposal.impact}</p>
+                                <p className="whitespace-pre-wrap pl-8 text-justify leading-relaxed text-muted-foreground">{proposal.impact}</p>
                             </section>
 
-                            <section className="space-y-4">
-                                <h2 className="text-base font-bold text-slate-900 flex items-center gap-3">
-                                    <span className="w-6 h-6 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold">3</span>
+                            <section className="space-y-3">
+                                <h2 className="flex items-center gap-2.5 text-sm font-semibold text-foreground">
+                                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-foreground">3</span>
                                     Usulan Solusi
                                 </h2>
-                                <p className="whitespace-pre-wrap pl-9 text-slate-600 leading-relaxed text-justify">{proposal.solution}</p>
+                                <p className="whitespace-pre-wrap pl-8 text-justify leading-relaxed text-muted-foreground">{proposal.solution}</p>
                             </section>
 
-                            <section className="space-y-4">
-                                <h2 className="text-base font-bold text-slate-900 flex items-center gap-3">
-                                    <span className="w-6 h-6 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold">4</span>
+                            <section className="space-y-3">
+                                <h2 className="flex items-center gap-2.5 text-sm font-semibold text-foreground">
+                                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-foreground">4</span>
                                     Skema Penawaran Kerjasama
                                 </h2>
-                                <div className="ml-9 overflow-hidden border border-slate-200 rounded-2xl shadow-sm">
+                                <div className="ml-8 overflow-hidden rounded-lg border border-border">
                                     <table className="w-full border-collapse">
                                         <thead>
-                                            <tr className="bg-indigo-600 text-[8px] font-black uppercase tracking-widest text-white">
-                                                <th className="p-3 text-center border-r border-indigo-500 w-12">No</th>
-                                                <th className="p-3 text-left border-r border-indigo-500">Pengadaan Perangkat / Jasa</th>
-                                                <th className="p-3 text-right w-48">Estimasi Biaya</th>
+                                            <tr className="border-b border-border bg-muted/40 text-[10px] font-medium text-muted-foreground">
+                                                <th className="w-12 border-r border-border p-2.5 text-center font-medium">No</th>
+                                                <th className="border-r border-border p-2.5 text-left font-medium">Pengadaan Perangkat / Jasa</th>
+                                                <th className="w-48 p-2.5 text-right font-medium">Estimasi Biaya</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody className="divide-y divide-border">
                                             {proposal.options.map((opt, i) => (
-                                                <tr key={i} className={`align-top border-b border-slate-100 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
-                                                    <td className="p-3 text-center border-r border-slate-100 text-xs font-bold text-slate-400">{i + 1}</td>
-                                                    <td className="p-3 border-r border-slate-100">
-                                                        <p className="font-bold text-slate-900 text-xs">{opt.provider}</p>
-                                                        <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{opt.description}</p>
+                                                <tr key={i} className="align-top">
+                                                    <td className="border-r border-border p-2.5 text-center text-[11px] font-medium text-muted-foreground">{i + 1}</td>
+                                                    <td className="border-r border-border p-2.5">
+                                                        <p className="text-xs font-medium text-foreground">{opt.provider}</p>
+                                                        <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">{opt.description}</p>
                                                     </td>
-                                                    <td className="p-3 text-right">
-                                                        <p className="font-bold text-indigo-600 text-sm">{fmt(opt.estimatedCost || 0)}</p>
-                                                        <p className="text-[9px] font-bold text-slate-400 mt-0.5 uppercase tracking-tight">{opt.details}</p>
+                                                    <td className="p-2.5 text-right">
+                                                        <p className="text-sm font-semibold text-foreground">{fmt(opt.estimatedCost || 0)}</p>
+                                                        <p className="mt-0.5 text-[10px] text-muted-foreground">{opt.details}</p>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -849,41 +1164,41 @@ function ProposalPreviewModal({ proposal, company, onClose }: { proposal: Propos
                                 </div>
                             </section>
 
-                            <section className="space-y-4">
-                                <h2 className="text-base font-bold text-slate-900 flex items-center gap-3">
-                                    <span className="w-6 h-6 rounded-lg bg-slate-900 text-white flex items-center justify-center text-[10px] font-bold">5</span>
+                            <section className="space-y-3">
+                                <h2 className="flex items-center gap-2.5 text-sm font-semibold text-foreground">
+                                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-foreground">5</span>
                                     Permohonan Keputusan
                                 </h2>
-                                <p className="whitespace-pre-wrap pl-9 text-slate-600 leading-relaxed text-justify">{proposal.conclusion}</p>
+                                <p className="whitespace-pre-wrap pl-8 text-justify leading-relaxed text-muted-foreground">{proposal.conclusion}</p>
                             </section>
                         </div>
 
-                        {/* Signatures - 2 Column Layout like Quotation */}
-                        <div className="mt-16 grid grid-cols-2 gap-20">
-                            <div className="text-center space-y-16">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Disetujui oleh,</p>
-                                <div className="border-t border-slate-200 pt-3 mt-12">
-                                    <p className="text-[10px] text-slate-400 mb-1">Nama / Jabatan</p>
-                                    <p className="font-bold text-slate-900 text-sm">{proposal.recipientName}</p>
+                        {/* Signatures */}
+                        <div className="mt-12 grid grid-cols-2 gap-16">
+                            <div className="space-y-16 text-center">
+                                <p className="text-[10px] font-medium text-muted-foreground">Disetujui oleh,</p>
+                                <div className="mt-12 border-t border-border pt-3">
+                                    <p className="mb-1 text-[10px] text-muted-foreground">Nama / Jabatan</p>
+                                    <p className="text-sm font-semibold text-foreground">{proposal.recipientName}</p>
                                 </div>
                             </div>
                             <div className="text-center">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Hormat kami,</p>
-                                <p className="text-[10px] text-slate-500 italic mb-2">{comp.city || 'Tanjung Morawa'}, {fmtDate(proposal.date)}</p>
-                                
-                                <div className="flex justify-center my-1 h-14">
+                                <p className="mb-1 text-[10px] font-medium text-muted-foreground">Hormat kami,</p>
+                                <p className="mb-2 text-[10px] italic text-muted-foreground">{comp.city || 'Tanjung Morawa'}, {fmtDate(proposal.date)}</p>
+
+                                <div className="my-1 flex h-14 justify-center">
                                     <img src="/TTD Fix.png" alt="Signature" className="h-full w-auto object-contain" />
                                 </div>
 
-                                <div className="border-t border-slate-200 pt-3 mt-1">
-                                    <p className="text-[10px] text-slate-400 mb-1">Nama / Jabatan</p>
-                                    <p className="font-bold text-slate-900 text-sm">{proposal.signatoryName}</p>
+                                <div className="mt-1 border-t border-border pt-3">
+                                    <p className="mb-1 text-[10px] text-muted-foreground">Nama / Jabatan</p>
+                                    <p className="text-sm font-semibold text-foreground">{proposal.signatoryName}</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Page Decoration */}
-                        <div className="absolute bottom-0 right-0 p-8 opacity-5 grayscale pointer-events-none">
+                        <div className="pointer-events-none absolute bottom-0 right-0 p-8 opacity-5 grayscale">
                             <FileText size={150} />
                         </div>
                     </div>
@@ -894,13 +1209,15 @@ function ProposalPreviewModal({ proposal, company, onClose }: { proposal: Propos
                     .no-print { display: none !important; }
                     body { background: white !important; padding: 0 !important; margin: 0 !important; }
                     .fixed { position: relative !important; background: transparent !important; backdrop-filter: none !important; }
-                    #proposal-paper { 
-                        margin: 0 !important; 
-                        box-shadow: none !important; 
+                    #proposal-paper {
+                        margin: 0 !important;
+                        box-shadow: none !important;
                         width: 100% !important;
                         height: auto !important;
                         padding: 15mm !important;
                         border-radius: 0 !important;
+                        background: white !important;
+                        color: #0f172a !important;
                     }
                     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
                 }

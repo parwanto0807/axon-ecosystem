@@ -10,8 +10,6 @@ import {
     Users,
     Mail,
     Phone,
-    MapPin,
-    FileText,
     ChevronLeft,
     Building2,
     X,
@@ -19,11 +17,11 @@ import {
     CreditCard,
     Calendar,
     Briefcase,
-    User
+    User,
+    FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 
 interface CustomerPIC {
@@ -57,6 +55,49 @@ interface Customer {
     businessCategories: BusinessCategory[]
     isActive: boolean
     pics?: CustomerPIC[]
+}
+
+const inputClass =
+    "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
+
+const textareaClass =
+    "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15 resize-none"
+
+function Field({
+    label,
+    required,
+    children,
+    className = "",
+}: {
+    label: string
+    required?: boolean
+    children: React.ReactNode
+    className?: string
+}) {
+    return (
+        <div className={`space-y-1.5 ${className}`}>
+            <label className="block text-xs font-medium text-muted-foreground">
+                {label}
+                {required && <span className="ml-0.5 text-rose-500">*</span>}
+            </label>
+            {children}
+        </div>
+    )
+}
+
+function StatusPill({ active }: { active: boolean }) {
+    return (
+        <span
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                active
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-400"
+                    : "border-border bg-muted text-muted-foreground"
+            }`}
+        >
+            <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-muted-foreground/50"}`} />
+            {active ? "Active" : "Inactive"}
+        </span>
+    )
 }
 
 export default function CustomersPage() {
@@ -112,204 +153,229 @@ export default function CustomersPage() {
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this customer?")) return
         try {
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers/${id}`, { method: 'DELETE' })
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers/${id}`, { method: "DELETE" })
             fetchCustomers()
         } catch (error) {
             console.error("Error deleting customer:", error)
         }
     }
 
-    const filteredCustomers = customers.filter(c =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (c.company && c.company.toLowerCase().includes(searchQuery.toLowerCase()))
+    const filteredCustomers = customers.filter(
+        (c) =>
+            c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (c.company && c.company.toLowerCase().includes(searchQuery.toLowerCase()))
     )
 
     const groupedCustomers = filteredCustomers.reduce((acc, customer) => {
-        const type = customer.type || 'OTHERS'
+        const type = customer.type || "OTHERS"
         if (!acc[type]) acc[type] = []
         acc[type].push(customer)
         return acc
     }, {} as Record<string, Customer[]>)
 
     const groupOrder = Object.keys(groupedCustomers).sort((a, b) => {
-        if (a === 'CORPORATE') return -1
-        if (b === 'CORPORATE') return 1
-        if (a === 'INDIVIDUAL') return -1
-        if (b === 'INDIVIDUAL') return 1
+        if (a === "CORPORATE") return -1
+        if (b === "CORPORATE") return 1
+        if (a === "INDIVIDUAL") return -1
+        if (b === "INDIVIDUAL") return 1
         return a.localeCompare(b)
     })
 
     return (
-        <div className="p-4 md:p-8">
-            <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 md:mb-12">
-                <div className="flex items-center gap-3 md:gap-4">
-                    <Link href="/dashboard/management">
-                        <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-xl border border-border">
-                            <ChevronLeft size={18} />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl md:text-4xl font-black text-foreground tracking-tighter uppercase leading-none">
-                            Master <span className="text-primary">Customer</span>
-                        </h1>
-                        <p className="text-[10px] md:text-sm text-muted-foreground font-medium uppercase tracking-widest mt-1">Enterprise Client Registry</p>
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                        <Link href="/dashboard/management">
+                            <Button variant="outline" size="icon" className="h-9 w-9 rounded-lg">
+                                <ChevronLeft size={16} />
+                            </Button>
+                        </Link>
+                        <div>
+                            <h1 className="text-xl font-semibold tracking-tight text-foreground">Customers</h1>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                Client registry, contacts and financial terms
+                            </p>
+                        </div>
                     </div>
-                </div>
+                    <Button onClick={handleCreate} className="h-9 rounded-lg px-4 text-sm font-medium">
+                        <Plus size={16} className="mr-1.5" />
+                        New customer
+                    </Button>
+                </header>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="relative flex-1 sm:max-w-xs">
+                        <Search
+                            size={15}
+                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <input
+                            type="text"
+                            placeholder="Search name, code or company"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className={`${inputClass} pl-9`}
+                        />
+                    </div>
                     <select
                         value={selectedBusinessCategoryId}
                         onChange={(e) => setSelectedBusinessCategoryId(e.target.value)}
-                        className="w-full sm:w-48 bg-white border border-border rounded-xl px-4 py-2.5 text-[11px] font-black uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-sm cursor-pointer"
+                        className={`${inputClass} cursor-pointer sm:w-52`}
                     >
-                        <option value="">All Business Units</option>
-                        {businessCategories.map(biz => (
-                            <option key={biz.id} value={biz.id}>{biz.name}</option>
+                        <option value="">All business units</option>
+                        {businessCategories.map((biz) => (
+                            <option key={biz.id} value={biz.id}>
+                                {biz.name}
+                            </option>
                         ))}
                     </select>
-
-                    <div className="relative group flex-1 sm:w-80">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-hover:text-primary transition-colors" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search name, code..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-secondary/50 border border-border rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all uppercase font-black tracking-tight"
-                        />
-                    </div>
-                    <Button
-                        onClick={handleCreate}
-                        className="rounded-xl font-bold shadow-lg shadow-indigo-600/20 bg-indigo-600 hover:bg-indigo-700 text-white active:scale-95 px-6 h-11"
-                    >
-                        <Plus size={18} className="mr-2" />
-                        New Customer
-                    </Button>
+                    <span className="text-xs text-muted-foreground sm:ml-auto">
+                        {filteredCustomers.length}{" "}
+                        {filteredCustomers.length === 1 ? "customer" : "customers"}
+                    </span>
                 </div>
-            </header>
 
-            <div>
                 {loading ? (
-                    <div className="flex items-center justify-center h-64">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                    <div className="flex h-64 items-center justify-center rounded-xl border border-border bg-card">
+                        <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-primary" />
                     </div>
                 ) : filteredCustomers.length > 0 ? (
-                    <div className="space-y-12">
+                    <div className="space-y-5">
                         {groupOrder.map((group) => {
                             const groupList = groupedCustomers[group]
                             if (!groupList || groupList.length === 0) return null
 
                             return (
-                                <section key={group} className="space-y-4">
-                                    <div className="flex items-center gap-3 px-1">
-                                        <div className="w-1.5 h-6 bg-indigo-600 rounded-full" />
-                                        <h2 className="text-xl font-black text-foreground uppercase tracking-tight">
-                                            {group === 'CORPORATE' ? 'Corporate Clients' : 'Individual Clients'}
-                                            <span className="text-indigo-600 ml-2">({groupList.length})</span>
+                                <section key={group}>
+                                    <div className="mb-2 flex items-center justify-between px-0.5">
+                                        <h2 className="text-sm font-medium text-foreground">
+                                            {group === "CORPORATE"
+                                                ? "Corporate clients"
+                                                : group === "INDIVIDUAL"
+                                                ? "Individual clients"
+                                                : group}
                                         </h2>
+                                        <span className="text-xs text-muted-foreground">{groupList.length}</span>
                                     </div>
 
-                                    <div className="bg-white rounded-3xl border border-border shadow-sm overflow-hidden">
-                                        {/* DESKTOP & TABLET: PROFESSIONAL TABLE */}
-                                        <div className="hidden md:block overflow-x-auto no-scrollbar">
-                                            <table className="w-full text-sm text-left border-collapse">
+                                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                                        {/* Desktop table */}
+                                        <div className="hidden md:block overflow-x-auto">
+                                            <table className="w-full border-collapse text-left text-sm">
                                                 <thead>
-                                                    <tr className="bg-secondary/30 border-b border-border">
-                                                        <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground w-24">Code</th>
-                                                        <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground">Entity Name & Details</th>
-                                                        <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground">Business Unit</th>
-                                                        <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground hidden lg:table-cell">Contact Info</th>
-                                                        <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground hidden xl:table-cell">Financial Terms</th>
-                                                        <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground w-32">Status</th>
-                                                        <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground text-right w-24">Actions</th>
+                                                    <tr className="border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+                                                        <th className="px-3 py-2.5 font-medium">Code</th>
+                                                        <th className="px-3 py-2.5 font-medium">Customer</th>
+                                                        <th className="px-3 py-2.5 font-medium">Business unit</th>
+                                                        <th className="hidden px-3 py-2.5 font-medium lg:table-cell">
+                                                            Contact
+                                                        </th>
+                                                        <th className="hidden px-3 py-2.5 font-medium xl:table-cell">
+                                                            Terms
+                                                        </th>
+                                                        <th className="px-3 py-2.5 font-medium">Status</th>
+                                                        <th className="px-3 py-2.5 text-right font-medium">Actions</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-border/40">
+                                                <tbody className="divide-y divide-border">
                                                     {groupList.map((c) => (
-                                                        <tr key={c.id} className="group hover:bg-secondary/10 transition-colors">
-                                                            <td className="px-6 py-5 align-top">
-                                                                <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-2 py-1 rounded-lg border border-indigo-100 uppercase tracking-tighter">
+                                                        <tr key={c.id} className="group transition-colors hover:bg-muted/30">
+                                                            <td className="px-3 py-2.5 align-top">
+                                                                <span className="font-mono text-[11px] text-muted-foreground">
                                                                     {c.code}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-6 py-5 align-top">
-                                                                <div className="flex items-start gap-4">
-                                                                    <div className="w-10 h-10 rounded-xl bg-indigo-600/5 flex items-center justify-center text-indigo-600 shrink-0 mt-0.5">
-                                                                        {c.type === 'CORPORATE' ? <Building2 size={20} /> : <User size={20} />}
+                                                            <td className="px-3 py-2.5 align-top">
+                                                                <div className="flex items-start gap-2.5">
+                                                                    <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground">
+                                                                        {c.type === "CORPORATE" ? (
+                                                                            <Building2 size={15} />
+                                                                        ) : (
+                                                                            <User size={15} />
+                                                                        )}
                                                                     </div>
                                                                     <div className="min-w-0">
-                                                                        <p className="font-black text-foreground uppercase tracking-tight text-base leading-tight group-hover:text-primary transition-colors truncate">
+                                                                        <p className="truncate text-sm font-medium text-foreground">
                                                                             {c.name}
                                                                         </p>
-                                                                        <p className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest mt-1">
-                                                                            {c.company || 'Direct Entity'}
+                                                                        <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                                                            {c.company || "Direct entity"}
                                                                         </p>
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-6 py-5 align-top">
+                                                            <td className="px-3 py-2.5 align-top">
                                                                 <div className="flex flex-wrap gap-1">
-                                                                    {c.businessCategories && c.businessCategories.length > 0 ? (
-                                                                        c.businessCategories.map(biz => (
-                                                                            <Badge key={biz.id} variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100 font-black px-2 py-0.5 text-[10px] uppercase tracking-widest">
+                                                                    {c.businessCategories &&
+                                                                    c.businessCategories.length > 0 ? (
+                                                                        c.businessCategories.map((biz) => (
+                                                                            <Badge
+                                                                                key={biz.id}
+                                                                                variant="outline"
+                                                                                className="border-border bg-muted/50 px-1.5 py-0 text-[10px] font-medium text-muted-foreground"
+                                                                            >
                                                                                 {biz.name}
                                                                             </Badge>
                                                                         ))
                                                                     ) : (
-                                                                        <Badge variant="secondary" className="bg-slate-50 text-slate-400 border-slate-200 font-black px-2 py-0.5 text-[10px] uppercase tracking-widest">
-                                                                            GENERIC
-                                                                        </Badge>
+                                                                        <span className="text-xs text-muted-foreground">
+                                                                            —
+                                                                        </span>
                                                                     )}
                                                                 </div>
                                                             </td>
-                                                            <td className="px-6 py-5 align-top hidden lg:table-cell">
-                                                                <div className="space-y-1.5">
-                                                                    <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70">
-                                                                        <Mail size={12} className="text-primary" />
-                                                                        <span className="truncate max-w-[150px]">{c.email || '—'}</span>
+                                                            <td className="hidden px-3 py-2.5 align-top lg:table-cell">
+                                                                <div className="space-y-1">
+                                                                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                                        <Mail size={11} className="flex-shrink-0" />
+                                                                        <span className="max-w-[160px] truncate">
+                                                                            {c.email || "—"}
+                                                                        </span>
                                                                     </div>
-                                                                    <div className="flex items-center gap-2 text-[11px] font-bold text-foreground/70">
-                                                                        <Phone size={12} className="text-primary" />
-                                                                        <span>{c.phone || '—'}</span>
+                                                                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                                        <Phone size={11} className="flex-shrink-0" />
+                                                                        <span>{c.phone || "—"}</span>
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-6 py-5 align-top hidden xl:table-cell">
-                                                                <div className="space-y-1.5 text-[11px] font-bold">
-                                                                    <p className="text-emerald-600 uppercase tracking-tighter flex items-center gap-1.5">
-                                                                        <CreditCard size={12} /> Limit: {c.creditLimit.toLocaleString()}
+                                                            <td className="hidden px-3 py-2.5 align-top xl:table-cell">
+                                                                <div className="space-y-1 text-[11px]">
+                                                                    <p className="flex items-center gap-1.5 text-foreground">
+                                                                        <CreditCard size={11} />
+                                                                        <span className="tabular-nums">
+                                                                            Rp {c.creditLimit.toLocaleString()}
+                                                                        </span>
                                                                     </p>
-                                                                    <p className="text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
-                                                                        <Calendar size={12} /> Terms: {c.paymentTerms || 'COD'}
+                                                                    <p className="flex items-center gap-1.5 text-muted-foreground">
+                                                                        <Calendar size={11} />
+                                                                        {c.paymentTerms || "COD"}
                                                                     </p>
                                                                 </div>
                                                             </td>
-                                                            <td className="px-6 py-5 align-top">
-                                                                <div className="flex items-center gap-2 mt-1">
-                                                                    <div className={`w-2 h-2 rounded-full ${c.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-foreground/60">
-                                                                        {c.isActive ? 'Active' : 'Disabled'}
-                                                                    </span>
-                                                                </div>
+                                                            <td className="px-3 py-2.5 align-top">
+                                                                <StatusPill active={c.isActive} />
                                                             </td>
-                                                            <td className="px-6 py-5 align-top text-right">
-                                                                <div className="flex items-center justify-end gap-1 translate-y-[-4px]">
+                                                            <td className="px-3 py-2.5 align-top">
+                                                                <div className="flex items-center justify-end gap-0.5">
                                                                     <Button
                                                                         onClick={() => handleEdit(c)}
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        className="w-9 h-9 rounded-xl hover:bg-indigo-600 hover:text-white transition-all"
+                                                                        title="Edit customer"
+                                                                        className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                                                                     >
-                                                                        <Edit size={16} />
+                                                                        <Edit size={15} />
                                                                     </Button>
                                                                     <Button
                                                                         onClick={() => handleDelete(c.id)}
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        className="w-9 h-9 rounded-xl hover:bg-rose-500 hover:text-white transition-all"
+                                                                        title="Delete customer"
+                                                                        className="h-8 w-8 rounded-md text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
                                                                     >
-                                                                        <Trash2 size={16} />
+                                                                        <Trash2 size={15} />
                                                                     </Button>
                                                                 </div>
                                                             </td>
@@ -319,56 +385,73 @@ export default function CustomersPage() {
                                             </table>
                                         </div>
 
-                                        {/* MOBILE: PROFESSIONAL LIST VIEW */}
-                                        <div className="md:hidden divide-y divide-border/40">
+                                        {/* Mobile list */}
+                                        <div className="divide-y divide-border md:hidden">
                                             {groupList.map((c) => (
-                                                <div key={c.id} className="p-5 flex flex-col gap-4 active:bg-secondary/10 transition-colors">
-                                                    <div className="flex items-start justify-between">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-10 h-10 rounded-xl bg-indigo-600/5 flex items-center justify-center text-indigo-600 shrink-0">
-                                                                {c.type === 'CORPORATE' ? <Building2 size={20} /> : <User size={20} />}
+                                                <div key={c.id} className="flex flex-col gap-3 p-3">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="flex min-w-0 items-start gap-2.5">
+                                                            <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground">
+                                                                {c.type === "CORPORATE" ? (
+                                                                    <Building2 size={15} />
+                                                                ) : (
+                                                                    <User size={15} />
+                                                                )}
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="text-[9px] font-black bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-md border border-indigo-100 uppercase tracking-tighter">
-                                                                        {c.code}
-                                                                    </span>
-                                                                    <div className={`w-1.5 h-1.5 rounded-full ${c.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-                                                                </div>
-                                                                <p className="font-black text-foreground uppercase tracking-tight text-sm leading-tight truncate">
+                                                                <p className="truncate text-sm font-medium text-foreground">
                                                                     {c.name}
+                                                                </p>
+                                                                <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                                                                    {c.code}
                                                                 </p>
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-1 shrink-0 ml-2">
-                                                            <Button onClick={() => handleEdit(c)} variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400">
+                                                        <div className="flex flex-shrink-0 items-center gap-0.5">
+                                                            <Button
+                                                                onClick={() => handleEdit(c)}
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 rounded-md text-muted-foreground"
+                                                            >
                                                                 <Edit size={14} />
                                                             </Button>
-                                                            <Button onClick={() => handleDelete(c.id)} variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400">
+                                                            <Button
+                                                                onClick={() => handleDelete(c.id)}
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-8 w-8 rounded-md text-muted-foreground"
+                                                            >
                                                                 <Trash2 size={14} />
                                                             </Button>
                                                         </div>
                                                     </div>
 
-                                                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/20">
+                                                    <div className="grid grid-cols-2 gap-3 border-t border-border pt-2.5">
                                                         <div className="space-y-1">
-                                                            <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/60 mb-1">Contact</p>
-                                                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/80 truncate">
-                                                                <Mail size={10} className="text-primary shrink-0" />
-                                                                <span className="truncate">{c.email || '—'}</span>
+                                                            <p className="text-[10px] text-muted-foreground">
+                                                                Contact
+                                                            </p>
+                                                            <div className="flex items-center gap-1.5 text-[11px] text-foreground">
+                                                                <Mail size={10} className="flex-shrink-0" />
+                                                                <span className="truncate">{c.email || "—"}</span>
                                                             </div>
-                                                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-foreground/80">
-                                                                <Phone size={10} className="text-primary shrink-0" />
-                                                                <span>{c.phone || '—'}</span>
+                                                            <div className="flex items-center gap-1.5 text-[11px] text-foreground">
+                                                                <Phone size={10} className="flex-shrink-0" />
+                                                                <span>{c.phone || "—"}</span>
                                                             </div>
                                                         </div>
                                                         <div className="space-y-1">
-                                                            <p className="text-[8px] font-black uppercase tracking-widest text-muted-foreground/60 mb-1">Terms</p>
-                                                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter flex items-center gap-1.5">
-                                                                <CreditCard size={10} className="shrink-0" /> {c.creditLimit.toLocaleString()}
+                                                            <p className="text-[10px] text-muted-foreground">
+                                                                Terms
                                                             </p>
-                                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
-                                                                <Calendar size={10} className="shrink-0" /> {c.paymentTerms || 'COD'}
+                                                            <p className="flex items-center gap-1.5 text-[11px] tabular-nums text-foreground">
+                                                                <CreditCard size={10} className="flex-shrink-0" />
+                                                                Rp {c.creditLimit.toLocaleString()}
+                                                            </p>
+                                                            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                                <Calendar size={10} className="flex-shrink-0" />
+                                                                {c.paymentTerms || "COD"}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -381,20 +464,21 @@ export default function CustomersPage() {
                         })}
                     </div>
                 ) : (
-                    <Card className="glass-card border-dashed py-24 border-2 border-border/50">
-                        <CardContent className="flex flex-col items-center justify-center">
-                            <Users size={80} className="text-muted-foreground mb-6 opacity-10 animate-pulse" />
-                            <p className="text-2xl font-black text-foreground mb-2 tracking-tight uppercase">No Customers Found</p>
-                            <p className="text-muted-foreground font-medium mb-10 max-w-sm text-center">Maintain your business relationships by adding your first enterprise client.</p>
-                            <Button
-                                onClick={handleCreate}
-                                className="rounded-2xl font-black bg-indigo-600 text-white px-10 py-6 text-lg shadow-xl shadow-indigo-600/20 hover:scale-105 transition-all"
-                            >
-                                <Plus size={24} className="mr-3" />
-                                New Customer
-                            </Button>
-                        </CardContent>
-                    </Card>
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-20 text-center">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <Users size={22} />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">No customers found</p>
+                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                            {searchQuery
+                                ? "Try adjusting your search or filter to find what you are looking for."
+                                : "Add your first customer to start managing relationships."}
+                        </p>
+                        <Button onClick={handleCreate} className="mt-5 h-9 rounded-lg px-4 text-sm font-medium">
+                            <Plus size={16} className="mr-1.5" />
+                            Add customer
+                        </Button>
+                    </div>
                 )}
             </div>
 
@@ -408,23 +492,33 @@ export default function CustomersPage() {
     )
 }
 
-function CustomerModal({ isOpen, onClose, customer, onSuccess }: { isOpen: boolean, onClose: () => void, customer: Customer | null, onSuccess: () => void }) {
+function CustomerModal({
+    isOpen,
+    onClose,
+    customer,
+    onSuccess,
+}: {
+    isOpen: boolean
+    onClose: () => void
+    customer: Customer | null
+    onSuccess: () => void
+}) {
     const [formData, setFormData] = useState<Partial<Customer>>({
-        code: '',
-        name: '',
-        type: 'CORPORATE',
-        email: '',
-        phone: '',
-        address: '',
-        taxId: '',
-        taxAddress: '',
-        company: '',
+        code: "",
+        name: "",
+        type: "CORPORATE",
+        email: "",
+        phone: "",
+        address: "",
+        taxId: "",
+        taxAddress: "",
+        company: "",
         creditLimit: 0,
-        paymentTerms: 'NET 30',
-        businessCategoryId: '',
+        paymentTerms: "NET 30",
+        businessCategoryId: "",
         businessCategories: [],
         isActive: true,
-        pics: []
+        pics: [],
     })
 
     const [businessCategories, setBusinessCategories] = useState<BusinessCategory[]>([])
@@ -449,24 +543,24 @@ function CustomerModal({ isOpen, onClose, customer, onSuccess }: { isOpen: boole
             setFormData({
                 ...customer,
                 businessCategories: customer.businessCategories || [],
-                pics: customer.pics || []
+                pics: customer.pics || [],
             })
         } else {
             setFormData({
                 code: `CUST-${Date.now().toString().slice(-6)}`,
-                name: '',
-                type: 'CORPORATE',
-                email: '',
-                phone: '',
-                address: '',
-                taxId: '',
-                taxAddress: '',
-                company: '',
+                name: "",
+                type: "CORPORATE",
+                email: "",
+                phone: "",
+                address: "",
+                taxId: "",
+                taxAddress: "",
+                company: "",
                 creditLimit: 0,
-                paymentTerms: 'NET 30',
+                paymentTerms: "NET 30",
                 businessCategories: [],
                 isActive: true,
-                pics: []
+                pics: [],
             })
         }
     }, [customer, isOpen])
@@ -474,7 +568,7 @@ function CustomerModal({ isOpen, onClose, customer, onSuccess }: { isOpen: boole
     const handleAddPIC = () => {
         setFormData({
             ...formData,
-            pics: [...(formData.pics || []), { name: '', department: '', email: '', phone: '' }]
+            pics: [...(formData.pics || []), { name: "", department: "", email: "", phone: "" }],
         })
     }
 
@@ -493,23 +587,22 @@ function CustomerModal({ isOpen, onClose, customer, onSuccess }: { isOpen: boole
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
-        const method = customer ? 'PUT' : 'POST'
-        const url = customer ? `${process.env.NEXT_PUBLIC_API_URL}/api/customers/${customer.id}` : `${process.env.NEXT_PUBLIC_API_URL}/api/customers`
+        const method = customer ? "PUT" : "POST"
+        const url = customer
+            ? `${process.env.NEXT_PUBLIC_API_URL}/api/customers/${customer.id}`
+            : `${process.env.NEXT_PUBLIC_API_URL}/api/customers`
 
         try {
-            console.log(`[FRONTEND] Submitting ${method} to ${url}`, formData)
-            
-            // Prepare payload
-            const { businessCategories, ...otherData } = formData;
+            const { businessCategories, ...otherData } = formData
             const payload = {
                 ...otherData,
-                businessCategoryIds: businessCategories?.map(b => b.id) || []
-            };
+                businessCategoryIds: businessCategories?.map((b) => b.id) || [],
+            }
 
             const res = await fetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
             })
 
             if (res.ok) {
@@ -518,7 +611,7 @@ function CustomerModal({ isOpen, onClose, customer, onSuccess }: { isOpen: boole
             } else {
                 const errorData = await res.json()
                 console.error("[FRONTEND] Server Error:", errorData)
-                alert(`Error: ${errorData.message || 'Failed to save customer'}`)
+                alert(`Error: ${errorData.message || "Failed to save customer"}`)
             }
         } catch (error) {
             console.error("[FRONTEND] Network Error:", error)
@@ -531,326 +624,342 @@ function CustomerModal({ isOpen, onClose, customer, onSuccess }: { isOpen: boole
     return (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="absolute inset-0 bg-background/80 backdrop-blur-md"
+                        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                     />
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                        className="relative w-full max-w-4xl bg-card border border-border shadow-2xl md:rounded-[2.5rem] overflow-hidden max-h-[95vh] md:max-h-[90vh] flex flex-col mx-2 md:mx-0"
+                        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                        className="relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-3xl sm:rounded-2xl"
                     >
-                        <header className="p-5 md:p-8 border-b border-border flex items-center justify-between bg-white relative z-10 shadow-sm">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg">
-                                    <Users size={24} />
+                        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
+                            <div className="flex items-center gap-2.5">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                                    <Users size={16} />
                                 </div>
                                 <div>
-                                    <h2 className="text-2xl font-black text-foreground tracking-tight uppercase">
-                                        {customer ? 'Edit' : 'New'} <span className="text-primary">Customer</span>
+                                    <h2 className="text-sm font-semibold text-foreground">
+                                        {customer ? "Edit customer" : "New customer"}
                                     </h2>
-                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Client Master Registry</p>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        {customer ? "Update client details" : "Add a client to your registry"}
+                                    </p>
                                 </div>
                             </div>
-                            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-xl hover:bg-rose-500 hover:text-white transition-all">
-                                <X size={20} />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={onClose}
+                                className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground"
+                            >
+                                <X size={16} />
                             </Button>
                         </header>
 
-                        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto no-scrollbar p-5 md:p-8 space-y-8 md:space-y-10">
-                            {/* SECTION: BASIC INFO */}
-                            <section>
-                                <div className="flex items-center gap-2 mb-4 md:mb-6">
-                                    <Briefcase size={16} className="text-primary" />
-                                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/70">Company Details</h3>
+                        <form
+                            id="customer-form"
+                            onSubmit={handleSubmit}
+                            className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-5"
+                        >
+                            <section className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <Briefcase size={14} className="text-muted-foreground" />
+                                    <h3 className="text-sm font-semibold text-foreground">Company details</h3>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Customer Code</label>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <Field label="Customer code" required>
                                         <input
                                             required
-                                            value={formData.code}
-                                            onChange={e => setFormData({ ...formData, code: e.target.value })}
-                                            className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none uppercase"
+                                            value={formData.code || ""}
+                                            onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                                            className={`${inputClass} font-mono uppercase`}
                                         />
-                                    </div>
-                                    <div className="space-y-2 sm:col-span-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Full Name / Display Name</label>
-                                        <input
-                                            required
-                                            value={formData.name}
-                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            placeholder="e.g. PT. Global Teknologi Solusi"
-                                            className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Entity Type</label>
+                                    </Field>
+                                    <Field label="Entity type">
                                         <select
-                                            value={formData.type}
-                                            onChange={e => setFormData({ ...formData, type: e.target.value })}
-                                            className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                                            value={formData.type || "CORPORATE"}
+                                            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                                            className={`${inputClass} cursor-pointer`}
                                         >
-                                            <option value="CORPORATE">CORPORATE (B2B)</option>
-                                            <option value="INDIVIDUAL">INDIVIDUAL (B2C)</option>
+                                            <option value="CORPORATE">Corporate (B2B)</option>
+                                            <option value="INDIVIDUAL">Individual (B2C)</option>
                                         </select>
-                                    </div>
-                                    <div className="space-y-2 sm:col-span-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Parent Company (Optional)</label>
+                                    </Field>
+                                    <Field label="Full name / display name" required className="sm:col-span-2">
                                         <input
-                                            value={formData.company || ''}
-                                            onChange={e => setFormData({ ...formData, company: e.target.value })}
-                                            className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                                            required
+                                            value={formData.name || ""}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            placeholder="e.g. PT Global Teknologi Solusi"
+                                            className={inputClass}
                                         />
-                                    </div>
-                                    <div className="space-y-2 col-span-full">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600 ml-1">Business Units <span className="text-rose-500">*</span></label>
-                                        <div className="flex flex-wrap gap-2 p-3 bg-secondary/20 border border-border rounded-xl min-h-[50px]">
-                                            {businessCategories.map(biz => {
-                                                const isSelected = formData.businessCategories?.some(b => b.id === biz.id);
-                                                return (
-                                                    <Badge
-                                                        key={biz.id}
-                                                        onClick={() => {
-                                                            const current = formData.businessCategories || [];
-                                                            const next = isSelected 
-                                                                ? current.filter(b => b.id !== biz.id)
-                                                                : [...current, biz];
-                                                            setFormData({ ...formData, businessCategories: next });
-                                                        }}
-                                                        variant={isSelected ? "default" : "outline"}
-                                                        className={`cursor-pointer transition-all px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest shadow-none ${
-                                                            isSelected 
-                                                                ? "bg-indigo-600 hover:bg-indigo-700 text-white border-transparent" 
-                                                                : "bg-white hover:bg-secondary text-muted-foreground border-border"
-                                                        }`}
-                                                    >
-                                                        {biz.name}
-                                                    </Badge>
-                                                );
-                                            })}
-                                        </div>
-                                        {(!formData.businessCategories || formData.businessCategories.length === 0) && (
-                                            <p className="text-[10px] text-rose-500 font-bold ml-1 uppercase tracking-tight italic">Please select at least one business unit</p>
-                                        )}
-                                    </div>
+                                    </Field>
+                                    <Field label="Parent company" className="sm:col-span-2">
+                                        <input
+                                            value={formData.company || ""}
+                                            onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                                            placeholder="Optional"
+                                            className={inputClass}
+                                        />
+                                    </Field>
                                 </div>
+
+                                <Field label="Business units" required>
+                                    <div className="flex flex-wrap gap-1.5 rounded-lg border border-border bg-muted/30 p-2.5">
+                                        {businessCategories.length === 0 && (
+                                            <span className="text-xs text-muted-foreground">
+                                                No business units available
+                                            </span>
+                                        )}
+                                        {businessCategories.map((biz) => {
+                                            const isSelected = formData.businessCategories?.some(
+                                                (b) => b.id === biz.id
+                                            )
+                                            return (
+                                                <button
+                                                    key={biz.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const current = formData.businessCategories || []
+                                                        const next = isSelected
+                                                            ? current.filter((b) => b.id !== biz.id)
+                                                            : [...current, biz]
+                                                        setFormData({ ...formData, businessCategories: next })
+                                                    }}
+                                                    className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
+                                                        isSelected
+                                                            ? "border-primary bg-primary text-primary-foreground"
+                                                            : "border-border bg-background text-muted-foreground hover:text-foreground"
+                                                    }`}
+                                                >
+                                                    {biz.name}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                    {(!formData.businessCategories || formData.businessCategories.length === 0) && (
+                                        <p className="text-[11px] text-rose-500">
+                                            Select at least one business unit
+                                        </p>
+                                    )}
+                                </Field>
                             </section>
 
-                            <hr className="border-border/40" />
-
-                            {/* SECTION: CONTACT INFO */}
-                            <section>
-                                <div className="flex items-center gap-2 mb-4 md:mb-6">
-                                    <Mail size={16} className="text-primary" />
-                                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/70">Contact Information</h3>
+                            <section className="space-y-4 border-t border-border pt-5">
+                                <div className="flex items-center gap-2">
+                                    <Mail size={14} className="text-muted-foreground" />
+                                    <h3 className="text-sm font-semibold text-foreground">Contact information</h3>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Email Address</label>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <Field label="Email address">
                                         <input
                                             type="email"
-                                            value={formData.email || ''}
-                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                            className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                                            value={formData.email || ""}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            className={inputClass}
                                         />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Phone Number</label>
+                                    </Field>
+                                    <Field label="Phone number">
                                         <input
-                                            value={formData.phone || ''}
-                                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                            className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                                            value={formData.phone || ""}
+                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                            className={inputClass}
                                         />
-                                    </div>
-                                    <div className="space-y-2 sm:col-span-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Correspondence Address</label>
+                                    </Field>
+                                    <Field label="Address" className="sm:col-span-2">
                                         <textarea
                                             rows={2}
-                                            value={formData.address || ''}
-                                            onChange={e => setFormData({ ...formData, address: e.target.value })}
-                                            className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-medium focus:ring-2 focus:ring-primary/50 outline-none resize-none"
+                                            value={formData.address || ""}
+                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                            className={textareaClass}
                                         />
-                                    </div>
+                                    </Field>
                                 </div>
                             </section>
 
-                            <hr className="border-border/40" />
-
-                            {/* SECTION: PICs */}
-                            <section>
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                            <section className="space-y-4 border-t border-border pt-5">
+                                <div className="flex items-center justify-between gap-3">
                                     <div className="flex items-center gap-2">
-                                        <User size={16} className="text-indigo-600" />
-                                        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-700">Points of Contact (PIC)</h3>
+                                        <User size={14} className="text-muted-foreground" />
+                                        <h3 className="text-sm font-semibold text-foreground">Points of contact</h3>
                                     </div>
                                     <Button
                                         type="button"
                                         onClick={handleAddPIC}
                                         variant="outline"
                                         size="sm"
-                                        className="rounded-xl font-bold border-indigo-600/20 text-indigo-600 hover:bg-indigo-50 h-10 px-4"
+                                        className="h-8 rounded-lg px-3 text-xs font-medium"
                                     >
-                                        <Plus size={14} className="mr-1.5" />
+                                        <Plus size={14} className="mr-1" />
                                         Add PIC
                                     </Button>
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-2">
                                     {formData.pics?.map((pic, index) => (
-                                        <motion.div
-                                            key={index}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="p-5 md:p-6 bg-slate-50/50 rounded-2xl border border-slate-100 relative group"
-                                        >
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRemovePIC(index)}
-                                                className="absolute top-4 right-4 p-2 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">PIC Full Name</label>
+                                        <div key={index} className="rounded-lg border border-border p-3">
+                                            <div className="mb-3 flex items-center justify-between">
+                                                <p className="text-xs font-medium text-foreground">
+                                                    Contact {index + 1}
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemovePIC(index)}
+                                                    className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                                <Field label="Full name">
                                                     <input
                                                         required
                                                         value={pic.name}
-                                                        onChange={e => handlePICChange(index, 'name', e.target.value)}
-                                                        className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                                                        onChange={(e) =>
+                                                            handlePICChange(index, "name", e.target.value)
+                                                        }
+                                                        className={inputClass}
                                                     />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Department</label>
+                                                </Field>
+                                                <Field label="Department">
                                                     <input
                                                         required
                                                         value={pic.department}
-                                                        onChange={e => handlePICChange(index, 'department', e.target.value)}
+                                                        onChange={(e) =>
+                                                            handlePICChange(index, "department", e.target.value)
+                                                        }
                                                         placeholder="e.g. Procurement"
-                                                        className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                                                        className={inputClass}
                                                     />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Work Email</label>
+                                                </Field>
+                                                <Field label="Email">
                                                     <input
                                                         type="email"
-                                                        value={pic.email || ''}
-                                                        onChange={e => handlePICChange(index, 'email', e.target.value)}
-                                                        className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                                                        value={pic.email || ""}
+                                                        onChange={(e) =>
+                                                            handlePICChange(index, "email", e.target.value)
+                                                        }
+                                                        className={inputClass}
                                                     />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Phone Number</label>
+                                                </Field>
+                                                <Field label="Phone">
                                                     <input
-                                                        value={pic.phone || ''}
-                                                        onChange={e => handlePICChange(index, 'phone', e.target.value)}
-                                                        className="w-full bg-white border border-border rounded-xl px-4 py-2.5 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none"
+                                                        value={pic.phone || ""}
+                                                        onChange={(e) =>
+                                                            handlePICChange(index, "phone", e.target.value)
+                                                        }
+                                                        className={inputClass}
                                                     />
-                                                </div>
+                                                </Field>
                                             </div>
-                                        </motion.div>
+                                        </div>
                                     ))}
 
                                     {(!formData.pics || formData.pics.length === 0) && (
-                                        <div className="py-12 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center opacity-50">
-                                            <User size={32} className="text-slate-300 mb-2" />
-                                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">No contacts registered</p>
+                                        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-8 text-muted-foreground">
+                                            <User size={22} />
+                                            <p className="mt-2 text-xs">No contacts registered</p>
                                         </div>
                                     )}
                                 </div>
                             </section>
 
-                            <hr className="border-border/40" />
-
-                            {/* SECTION: TAX & FINANCIALS */}
-                            <section>
-                                <div className="flex items-center gap-2 mb-4 md:mb-6">
-                                    <FileText size={16} className="text-primary" />
-                                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-foreground/70">Tax & Financial Terms</h3>
+                            <section className="space-y-4 border-t border-border pt-5">
+                                <div className="flex items-center gap-2">
+                                    <FileText size={14} className="text-muted-foreground" />
+                                    <h3 className="text-sm font-semibold text-foreground">Tax & financial terms</h3>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Tax ID (NPWP)</label>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <Field label="Tax ID (NPWP)">
                                         <input
-                                            value={formData.taxId || ''}
-                                            onChange={e => setFormData({ ...formData, taxId: e.target.value })}
-                                            className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-black focus:ring-2 focus:ring-primary/50 outline-none"
+                                            value={formData.taxId || ""}
+                                            onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
+                                            className={inputClass}
                                         />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Credit Limit (Rp)</label>
+                                    </Field>
+                                    <Field label="Credit limit (Rp)">
                                         <input
                                             type="number"
                                             value={formData.creditLimit ?? 0}
-                                            onChange={e => {
-                                                const val = parseFloat(e.target.value);
-                                                setFormData({ ...formData, creditLimit: isNaN(val) ? 0 : val });
+                                            onChange={(e) => {
+                                                const val = parseFloat(e.target.value)
+                                                setFormData({
+                                                    ...formData,
+                                                    creditLimit: isNaN(val) ? 0 : val,
+                                                })
                                             }}
-                                            className="w-full bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-2.5 md:py-3 text-sm font-black focus:ring-2 focus:ring-emerald-500/50 outline-none text-emerald-600"
+                                            className={inputClass}
                                         />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Payment Terms</label>
+                                    </Field>
+                                    <Field label="Payment terms">
                                         <input
-                                            value={formData.paymentTerms || ''}
-                                            onChange={e => setFormData({ ...formData, paymentTerms: e.target.value })}
+                                            value={formData.paymentTerms || ""}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, paymentTerms: e.target.value })
+                                            }
                                             placeholder="e.g. NET 30"
-                                            className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-bold focus:ring-2 focus:ring-primary/50 outline-none uppercase"
+                                            className={inputClass}
                                         />
-                                    </div>
-                                    <div className="space-y-2 sm:col-span-2 md:col-span-3">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Registered Tax Address</label>
+                                    </Field>
+                                    <Field label="Registered tax address" className="sm:col-span-2">
                                         <textarea
                                             rows={2}
-                                            value={formData.taxAddress || ''}
-                                            onChange={e => setFormData({ ...formData, taxAddress: e.target.value })}
-                                            className="w-full bg-secondary/30 border border-border rounded-xl px-4 py-2.5 md:py-3 text-sm font-medium focus:ring-2 focus:ring-primary/50 outline-none resize-none"
+                                            value={formData.taxAddress || ""}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, taxAddress: e.target.value })
+                                            }
+                                            className={textareaClass}
                                         />
-                                    </div>
+                                    </Field>
                                 </div>
                             </section>
 
-                            <section className="bg-primary/5 rounded-3xl p-6 border border-primary/10 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-3 h-3 rounded-full ${formData.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
-                                    <div>
-                                        <p className="text-xs font-black uppercase tracking-widest text-foreground">Active Partnership</p>
-                                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-tighter">Enable or disable trading for this client profile</p>
-                                    </div>
+                            <section className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                                <div>
+                                    <p className="text-xs font-medium text-foreground">Active partnership</p>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Enable or disable trading for this client
+                                    </p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
-                                    className={`w-14 h-8 rounded-full relative transition-all duration-300 ${formData.isActive ? 'bg-indigo-600' : 'bg-muted'}`}
+                                    className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
+                                        formData.isActive ? "bg-primary" : "bg-muted-foreground/30"
+                                    }`}
                                 >
-                                    <motion.div
-                                        animate={{ x: formData.isActive ? 28 : 4 }}
-                                        className="absolute top-1 w-6 h-6 rounded-full bg-white shadow-md text-indigo-600 flex items-center justify-center"
+                                    <motion.span
+                                        animate={{ x: formData.isActive ? 22 : 2 }}
+                                        className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm"
                                     />
                                 </button>
                             </section>
-
-                            {/* Hidden submit button to allow Enter key submission */}
-                            <button type="submit" className="hidden" />
                         </form>
 
-
-                        <footer className="p-5 md:p-8 border-t border-border flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-secondary/5 relative z-10">
-                            <Button variant="ghost" onClick={onClose} className="rounded-xl font-bold h-11 px-8 active:scale-95 border border-transparent hover:border-border">Cancel</Button>
+                        <footer className="flex items-center justify-end gap-2 border-t border-border px-4 py-3 sm:px-5">
                             <Button
-                                onClick={handleSubmit}
-                                disabled={loading}
-                                className="rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-600/20 h-11 px-10 active:scale-95 transition-all disabled:opacity-50"
+                                type="button"
+                                variant="outline"
+                                onClick={onClose}
+                                className="h-9 rounded-lg px-4 text-sm font-medium"
                             >
-                                <Save size={18} className="mr-2" />
-                                {loading ? 'Saving...' : (customer ? 'Update' : 'Register') + ' Customer'}
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                form="customer-form"
+                                disabled={loading}
+                                className="h-9 rounded-lg px-4 text-sm font-medium"
+                            >
+                                <Save size={15} className="mr-1.5" />
+                                {loading ? "Saving..." : customer ? "Save changes" : "Create customer"}
                             </Button>
                         </footer>
                     </motion.div>

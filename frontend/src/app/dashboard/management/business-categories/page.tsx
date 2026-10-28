@@ -2,24 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import {
-    Plus,
-    Search,
-    Edit2,
-    Trash2,
-    LayoutGrid,
-    X,
-    Save,
-    AlertCircle,
-    CheckCircle2,
-    MoreVertical,
-    Building2,
-    ChevronRight,
-    SearchX
-} from "lucide-react"
+import { Plus, Search, Edit2, Trash2, LayoutGrid, X, Save, Building2, SearchX } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { useSession } from "next-auth/react"
 
 interface BusinessCategory {
     id: string
@@ -34,8 +18,13 @@ interface BusinessCategory {
     }
 }
 
+const inputClass =
+    "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15"
+
+const textareaClass =
+    "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary focus:ring-2 focus:ring-primary/15 resize-none"
+
 export default function BusinessCategoriesPage() {
-    const { data: session } = useSession()
     const [categories, setCategories] = useState<BusinessCategory[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
@@ -63,7 +52,7 @@ export default function BusinessCategoriesPage() {
         if (!confirm("Are you sure you want to delete this business category? This might affect related records.")) return
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/business-categories/${id}`, {
-                method: 'DELETE'
+                method: "DELETE",
             })
             if (res.ok) {
                 fetchCategories()
@@ -76,134 +65,140 @@ export default function BusinessCategoriesPage() {
         }
     }
 
-    const filteredCategories = categories.filter(cat =>
-        cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (cat.description && cat.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    const filteredCategories = categories.filter(
+        (cat) =>
+            cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (cat.description && cat.description.toLowerCase().includes(searchTerm.toLowerCase()))
     )
 
     return (
-        <div className="p-4 md:p-8 space-y-8 bg-[#f8fafc] min-h-screen">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/20 text-white">
-                            <LayoutGrid size={24} />
-                        </div>
-                        <div>
-                            <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">Business Categories</h1>
-                            <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-100 font-bold px-2 py-0 text-[10px] uppercase tracking-widest">
-                                    {categories.length} TOTAL UNITS
-                                </Badge>
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">• Multi-Business Management</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <div className="relative group flex-1 md:w-80">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-indigo-600" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Find business unit..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none placeholder:text-slate-400 placeholder:font-black placeholder:uppercase placeholder:tracking-widest"
-                        />
+        <div className="p-4 md:p-6">
+            <div className="mx-auto w-full max-w-[1440px]">
+                <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground">Business Categories</h1>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                            Organize data across your business units
+                        </p>
                     </div>
                     <Button
                         onClick={() => {
                             setSelectedCategory(null)
                             setIsModalOpen(true)
                         }}
-                        className="h-14 px-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-xl shadow-indigo-600/20 active:scale-95 transition-all flex items-center gap-3 group"
+                        className="h-9 rounded-lg px-4 text-sm font-medium"
                     >
-                        <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
-                        <span className="font-black text-xs uppercase tracking-[0.2em]">New Unit</span>
+                        <Plus size={16} className="mr-1.5" />
+                        New category
                     </Button>
-                </div>
-            </div>
+                </header>
 
-            {/* Grid Section */}
-            {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="h-64 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm" />
-                    ))}
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="relative flex-1 sm:max-w-xs">
+                        <Search
+                            size={15}
+                            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        />
+                        <input
+                            type="text"
+                            placeholder="Search category"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className={`${inputClass} pl-9`}
+                        />
+                    </div>
+                    <span className="text-xs text-muted-foreground sm:ml-auto">
+                        {filteredCategories.length}{" "}
+                        {filteredCategories.length === 1 ? "category" : "categories"}
+                    </span>
                 </div>
-            ) : filteredCategories.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredCategories.map(cat => (
-                        <motion.div
-                            key={cat.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 hover:border-indigo-100 transition-all group overflow-hidden"
-                        >
-                            <div className="p-8">
-                                <div className="flex items-start justify-between mb-6">
-                                    <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors shadow-inner">
-                                        <Building2 size={28} />
+
+                {loading ? (
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="h-40 animate-pulse rounded-xl border border-border bg-muted/30" />
+                        ))}
+                    </div>
+                ) : filteredCategories.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                        {filteredCategories.map((cat) => (
+                            <motion.div
+                                key={cat.id}
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="group flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+                            >
+                                <div className="mb-3 flex items-start justify-between gap-2">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-muted/50 text-muted-foreground">
+                                        <Building2 size={17} />
                                     </div>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-0.5 opacity-60 transition-opacity group-hover:opacity-100">
                                         <Button
                                             variant="ghost"
                                             size="icon"
+                                            title="Edit category"
                                             onClick={() => {
                                                 setSelectedCategory(cat)
                                                 setIsModalOpen(true)
                                             }}
-                                            className="h-10 w-10 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                                            className="h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                                         >
-                                            <Edit2 size={16} />
+                                            <Edit2 size={15} />
                                         </Button>
                                         <Button
                                             variant="ghost"
                                             size="icon"
+                                            title="Delete category"
                                             onClick={() => handleDelete(cat.id)}
-                                            className="h-10 w-10 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                            className="h-8 w-8 rounded-md text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40"
                                         >
-                                            <Trash2 size={16} />
+                                            <Trash2 size={15} />
                                         </Button>
                                     </div>
                                 </div>
 
-                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-2 truncate group-hover:text-indigo-600 transition-colors">
-                                    {cat.name}
-                                </h3>
-                                <p className="text-sm font-medium text-slate-500 line-clamp-2 min-h-[2.5rem] mb-6 leading-relaxed">
-                                    {cat.description || "No description provided for this business unit."}
+                                <h3 className="truncate text-sm font-medium text-foreground">{cat.name}</h3>
+                                <p className="mt-1 line-clamp-2 min-h-[2rem] text-xs leading-relaxed text-muted-foreground">
+                                    {cat.description || "No description provided."}
                                 </p>
 
-                                <div className="grid grid-cols-3 gap-2 pt-6 border-t border-slate-50">
-                                    <div className="text-center">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Products</p>
-                                        <p className="text-sm font-black text-slate-900">{cat._count?.products || 0}</p>
+                                <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-3">
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground">Products</p>
+                                        <p className="mt-0.5 text-sm font-medium tabular-nums text-foreground">
+                                            {cat._count?.products || 0}
+                                        </p>
                                     </div>
-                                    <div className="text-center border-x border-slate-50 px-2">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Users</p>
-                                        <p className="text-sm font-black text-slate-900">{cat._count?.employees || 0}</p>
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground">Users</p>
+                                        <p className="mt-0.5 text-sm font-medium tabular-nums text-foreground">
+                                            {cat._count?.employees || 0}
+                                        </p>
                                     </div>
-                                    <div className="text-center">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Projects</p>
-                                        <p className="text-sm font-black text-slate-900">{cat._count?.assets || 0}</p>
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground">Assets</p>
+                                        <p className="mt-0.5 text-sm font-medium tabular-nums text-foreground">
+                                            {cat._count?.assets || 0}
+                                        </p>
                                     </div>
                                 </div>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
-            ) : (
-                <div className="bg-white p-24 rounded-[3rem] border border-dashed border-slate-200 flex flex-col items-center justify-center text-center shadow-sm">
-                    <div className="w-24 h-24 rounded-[2rem] bg-slate-50 flex items-center justify-center text-slate-300 mb-6">
-                        <SearchX size={48} />
+                            </motion.div>
+                        ))}
                     </div>
-                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">No Business Units Found</h2>
-                    <p className="text-slate-500 max-w-md mt-2 font-medium">We couldn&apos;t find any results matching your search criteria. Try adjusting your filters or creating a new unit.</p>
-                </div>
-            )}
+                ) : (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-20 text-center">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <SearchX size={22} />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">No business categories found</p>
+                        <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                            {searchTerm
+                                ? "Try adjusting your search to find what you are looking for."
+                                : "Create your first business category to start organizing data."}
+                        </p>
+                    </div>
+                )}
+            </div>
 
             <CategoryModal
                 isOpen={isModalOpen}
@@ -215,10 +210,20 @@ export default function BusinessCategoriesPage() {
     )
 }
 
-function CategoryModal({ isOpen, onClose, category, onSuccess }: { isOpen: boolean, onClose: () => void, category: BusinessCategory | null, onSuccess: () => void }) {
+function CategoryModal({
+    isOpen,
+    onClose,
+    category,
+    onSuccess,
+}: {
+    isOpen: boolean
+    onClose: () => void
+    category: BusinessCategory | null
+    onSuccess: () => void
+}) {
     const [formData, setFormData] = useState({
         name: "",
-        description: ""
+        description: "",
     })
     const [loading, setLoading] = useState(false)
 
@@ -226,12 +231,12 @@ function CategoryModal({ isOpen, onClose, category, onSuccess }: { isOpen: boole
         if (category) {
             setFormData({
                 name: category.name,
-                description: category.description || ""
+                description: category.description || "",
             })
         } else {
             setFormData({
                 name: "",
-                description: ""
+                description: "",
             })
         }
     }, [category])
@@ -240,15 +245,15 @@ function CategoryModal({ isOpen, onClose, category, onSuccess }: { isOpen: boole
         e.preventDefault()
         setLoading(true)
         try {
-            const method = category ? 'PUT' : 'POST'
+            const method = category ? "PUT" : "POST"
             const url = category
                 ? `${process.env.NEXT_PUBLIC_API_URL}/api/business-categories/${category.id}`
                 : `${process.env.NEXT_PUBLIC_API_URL}/api/business-categories`
 
             const res = await fetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formData),
             })
 
             if (res.ok) {
@@ -268,79 +273,94 @@ function CategoryModal({ isOpen, onClose, category, onSuccess }: { isOpen: boole
     return (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+                        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                     />
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                        className="relative w-full max-w-lg bg-white rounded-[3rem] shadow-2xl overflow-hidden"
+                        initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                        className="relative w-full overflow-hidden rounded-t-2xl border border-border bg-card shadow-2xl sm:max-w-md sm:rounded-2xl"
                     >
                         <form onSubmit={handleSubmit}>
-                            <div className="p-8">
-                                <div className="flex items-center justify-between mb-8">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-inner">
-                                            <LayoutGrid size={24} />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
-                                                {category ? 'Edit' : 'New'} Business Unit
-                                            </h2>
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Multi-Business Setup</p>
-                                        </div>
+                            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-muted text-muted-foreground">
+                                        <LayoutGrid size={16} />
                                     </div>
-                                    <Button type="button" variant="ghost" size="icon" onClick={onClose} className="rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-colors">
-                                        <X size={20} />
-                                    </Button>
+                                    <div>
+                                        <h2 className="text-sm font-semibold text-foreground">
+                                            {category ? "Edit category" : "New category"}
+                                        </h2>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            {category ? "Update business unit details" : "Create a business unit"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={onClose}
+                                    className="h-8 w-8 rounded-md text-muted-foreground hover:text-foreground"
+                                >
+                                    <X size={16} />
+                                </Button>
+                            </div>
+
+                            <div className="space-y-4 p-4 sm:p-5">
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-medium text-muted-foreground">
+                                        Name <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        required
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        placeholder="e.g. IT Service Solutions"
+                                        className={inputClass}
+                                    />
                                 </div>
 
-                                <div className="space-y-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Unit Name <span className="text-rose-500">*</span></label>
-                                        <input
-                                            required
-                                            value={formData.name}
-                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            placeholder="e.g. IT SERVICE SOLUTIONS"
-                                            className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none placeholder:text-slate-300 placeholder:uppercase"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Unit Description</label>
-                                        <textarea
-                                            rows={4}
-                                            value={formData.description}
-                                            onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                            placeholder="Briefly describe the business operations for this unit..."
-                                            className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-medium focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none placeholder:text-slate-300 resize-none"
-                                        />
-                                    </div>
+                                <div className="space-y-1.5">
+                                    <label className="block text-xs font-medium text-muted-foreground">
+                                        Description
+                                    </label>
+                                    <textarea
+                                        rows={4}
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        placeholder="Briefly describe the business operations for this unit..."
+                                        className={textareaClass}
+                                    />
                                 </div>
                             </div>
 
-                            <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-4">
-                                <Button type="button" variant="ghost" onClick={onClose} className="rounded-2xl font-black text-xs uppercase tracking-[0.2em] px-8 h-12 text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-all">
+                            <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3 sm:px-5">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={onClose}
+                                    className="h-9 rounded-lg px-4 text-sm font-medium"
+                                >
                                     Cancel
                                 </Button>
                                 <Button
                                     disabled={loading}
                                     type="submit"
-                                    className="rounded-2xl font-black text-xs uppercase tracking-[0.2em] px-10 h-12 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20 active:scale-95 transition-all flex items-center gap-3"
+                                    className="h-9 rounded-lg px-4 text-sm font-medium"
                                 >
                                     {loading ? (
-                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                        <span className="mr-1.5 h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
                                     ) : (
-                                        <Save size={18} />
+                                        <Save size={15} className="mr-1.5" />
                                     )}
-                                    {category ? 'Update' : 'Launch'} Unit
+                                    {category ? "Save changes" : "Create category"}
                                 </Button>
                             </div>
                         </form>
