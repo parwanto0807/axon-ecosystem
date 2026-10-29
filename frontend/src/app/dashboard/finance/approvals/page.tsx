@@ -9,6 +9,7 @@ import {
     X, ShieldCheck
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { FinancePageShell, FinancePageHeader } from "@/components/finance/FinanceUI"
 
 interface Expense {
     id: string;
@@ -156,7 +157,7 @@ export default function ApprovalsPage() {
     const totalPosted = expenses.filter(e => e.status === 'POSTED').reduce((s, e) => s + e.amount, 0)
 
     return (
-        <div className="p-4 md:px-6 md:py-4 sm:py-6 lg:py-8 space-y-6 md:space-y-8 w-full font-inter bg-slate-50/30 min-h-screen pb-24 md:pb-8">
+        <FinancePageShell className="font-inter">
             <AnimatePresence>
                 {toast && (
                     <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -166,22 +167,20 @@ export default function ApprovalsPage() {
                 )}
             </AnimatePresence>
 
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/20 shrink-0">
-                        <ShieldCheck size={20} className="text-white" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl md:text-2xl font-extrabold text-slate-900 tracking-tight text-[rgb(43,4,136)]">Operational Approvals</h1>
-                        <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest leading-none mt-1">Finance Review & Expense</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 self-start md:self-auto">
-                    <Button variant="outline" onClick={load} className="rounded-xl border-slate-200 text-slate-600 h-9 md:h-10 px-4 text-xs font-bold uppercase tracking-wider">
-                        <RefreshCw size={13} className={`mr-2 ${loading ? 'animate-spin' : ''}`} /> {isMobile ? '' : 'Reload'}
+            <FinancePageHeader
+                title="Operational Approvals"
+                description="Finance Review & Expense"
+                icon={<ShieldCheck className="h-5 w-5" />}
+                actions={
+                    <Button
+                        variant="outline"
+                        onClick={load}
+                        className="h-9 rounded-lg border-slate-200 px-3 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                    >
+                        <RefreshCw size={13} className={`mr-2 ${loading ? "animate-spin" : ""}`} /> Reload
                     </Button>
-                </div>
-            </header>
+                }
+            />
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
@@ -587,6 +586,6 @@ export default function ApprovalsPage() {
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </FinancePageShell>
     )
 }
