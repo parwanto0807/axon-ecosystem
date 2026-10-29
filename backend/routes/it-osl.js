@@ -6,7 +6,18 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const sharp = require('sharp');
-const uploadMem = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+// Foto dari kamera ponsel sering >8 MB. Batas dinaikkan dan error multer
+// selalu dibalas JSON (lihat withUploadErrors) supaya browser tidak memutus
+// koneksi di tengah upload dan memunculkan "Failed to fetch".
+const MAX_IMAGE_MB = 25;
+const uploadMem = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_IMAGE_MB * 1024 * 1024, files: 10 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype || file.mimetype.startsWith('image/')) return cb(null, true);
+    cb(new Error('Hanya file gambar yang boleh diunggah'));
+  },
+});
 const { buildRbac, isGlobalRole, isFieldRole, normalizeRole } = require('../utils/itOslRbac');
 const rbac = buildRbac(prisma);
 const requirePermission = rbac.requirePermission;
@@ -15,18 +26,41 @@ const requirePermission = rbac.requirePermission;
 router.use(rbac.attachActor);
 const itOslUploadDir = path.join(__dirname, '..', 'public', 'it-osl');
 if (!fs.existsSync(itOslUploadDir)) fs.mkdirSync(itOslUploadDir, { recursive: true });
+// Bungkus middleware multer: error upload (file terlalu besar / bukan gambar)
+// harus dibalas JSON, bukan halaman HTML default Express.
+function withUploadErrors(mw) {
+  return (req, res, next) => mw(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError) {
+      const message = err.code === 'LIMIT_FILE_SIZE'
+        ? `Ukuran foto terlalu besar. Maksimal ${MAX_IMAGE_MB} MB per foto.`
+        : err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE'
+          ? 'Jumlah atau nama field file tidak sesuai.'
+          : err.message;
+      return res.status(413).json({ message, code: err.code });
+    }
+    return res.status(400).json({ message: err.message || 'Gagal memproses file upload' });
+  });
+}
 async function processItOslImage(file){
   const name = `itosl-${Date.now()}-${Math.round(Math.random()*10000)}.webp`;
   const fp = path.join(itOslUploadDir, name);
-  await sharp(file.buffer).webp({ quality: 80 }).toFile(fp);
+  await sharp(file.buffer)
+    .rotate() // ikuti orientasi EXIF dari kamera
+    .resize({ width: 2200, height: 2200, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 82 })
+    .toFile(fp);
   return `/public/it-osl/${name}`;
 }
 
 // ── UPLOAD (Multiple & Single Images) ───────────────────────────────────────
-router.post('/upload', requirePermission('TICKET_CREATE'), uploadMem.array('files', 10), async (req, res) => {
+router.post('/upload', requirePermission('TICKET_CREATE'),
+  withUploadErrors(uploadMem.fields([{ name: 'files', maxCount: 10 }, { name: 'file', maxCount: 1 }])),
+  async (req, res) => {
   try {
-    const files = req.files || (req.file ? [req.file] : []);
-    if (!files || files.length === 0) {
+    const fields = req.files || {};
+    const files = [...(fields.files || []), ...(fields.file || [])];
+    if (files.length === 0) {
       return res.status(400).json({ message: 'Tidak ada file gambar yang diunggah' });
     }
     const urls = [];
@@ -37,7 +71,7 @@ router.post('/upload', requirePermission('TICKET_CREATE'), uploadMem.array('file
     res.json({ urls, url: urls[0] });
   } catch (e) {
     console.error('[IT-OSL upload error]', e);
-    res.status(500).json({ message: e.message });
+    res.status(400).json({ message: e.message });
   }
 });
 
@@ -1418,14 +1452,9 @@ router.post('/tickets/:id/reassign', requirePermission('TICKET_ASSIGN'), async (
 
 // ── WORK ITEMS (Item Pekerjaan per Fase: ANALISA, PENGERJAAN, HASIL) ──────
 // 1 tiket bisa punya banyak item per fase, tiap item bisa lampirkan >1 foto
-router.post('/upload', requirePermission('TICKET_CREATE'), uploadMem.single('file'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ message: 'No file' });
-    const url = await processItOslImage(req.file);
-    res.json({ url });
-  } catch(e){ res.status(500).json({ message:e.message })}
-});
-router.post('/upload-multi', requirePermission('TICKET_CREATE'), uploadMem.array('photos', 10), async (req, res) => {
+router.post('/upload-multi', requirePermission('TICKET_CREATE'),
+  withUploadErrors(uploadMem.array('photos', 10)),
+  async (req, res) => {
   try {
     if (!req.files || req.files.length===0) return res.status(400).json({ message:'No files' });
     const urls = [];
@@ -1568,7 +1597,7 @@ router.post('/tickets/:id/work-items/:workItemId/attachments', requirePermission
   }catch(e){ res.status(400).json({ message:e.message })}
 });
 
-router.post('/tickets/:id/work-items/:workItemId/photos', requirePermission('TICKET_EDIT'), uploadMem.array('photos', 10), async (req,res)=>{
+router.post('/tickets/:id/work-items/:workItemId/photos', requirePermission('TICKET_EDIT'), withUploadErrors(uploadMem.array('photos', 10)), async (req,res)=>{
   try{
     const ticket = await loadTicketForActor(req, res, req.params.id, { write: true });
     if (!ticket) return;

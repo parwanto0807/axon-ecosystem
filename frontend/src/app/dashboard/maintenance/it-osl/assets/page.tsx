@@ -18,6 +18,39 @@ import { canItOsl } from "@/lib/itOslPermissions"
 
 const API = process.env.NEXT_PUBLIC_API_URL
 
+// Batas ukuran file harus sama dengan batas di backend (backend/routes/it-osl.js).
+const MAX_UPLOAD_MB = 25
+const COMPRESS_MAX_DIMENSION = 1920
+
+/**
+ * Perkecil foto di browser sebelum diunggah. Foto kamera ponsel (5–15 MB)
+ * biasanya cukup jadi ~200–500 KB, sehingga upload tidak putus di jaringan
+ * lambat dan tidak ditolak server.
+ */
+async function compressImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/") || file.type === "image/svg+xml" || file.type === "image/gif") return file
+  try {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, COMPRESS_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
+    const width = Math.max(1, Math.round(bitmap.width * scale))
+    const height = Math.max(1, Math.round(bitmap.height * scale))
+    const canvas = document.createElement("canvas")
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return file
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    bitmap.close?.()
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85))
+    if (!blob || blob.size >= file.size) return file
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "foto"
+    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" })
+  } catch {
+    // Browser tidak bisa decode (mis. HEIC) — kirim file asli, server yang olah.
+    return file
+  }
+}
+
 type PicOpt = {
   id: string
   name: string
@@ -175,26 +208,50 @@ function ItOslAssetsContent() {
     const allowedToAdd = 5 - currentCount;
     const filesToUpload = Array.from(files).slice(0, allowedToAdd);
 
+    const oversize = filesToUpload.find(f => f.size > MAX_UPLOAD_MB * 1024 * 1024);
+    if (oversize) {
+      alert(`Foto "${oversize.name}" terlalu besar (${(oversize.size / 1024 / 1024).toFixed(1)} MB). Maksimal ${MAX_UPLOAD_MB} MB per foto.`);
+      e.target.value = "";
+      return;
+    }
+
     setUploadingPhotos(true);
     try {
+      // Kompres dulu supaya upload stabil di jaringan lambat / data seluler.
+      const prepared = await Promise.all(filesToUpload.map(compressImage));
+
       const fd = new FormData();
-      filesToUpload.forEach(f => fd.append("files", f));
+      prepared.forEach(f => fd.append("files", f));
 
       const res = await fetch(`${API}/api/it-osl/upload`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: fd
       });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.message || "Gagal mengunggah foto");
+
+      // Jangan langsung res.json(): kalau server membalas HTML (mis. error
+      // proxy), pesan errornya jadi tidak jelas.
+      const raw = await res.text();
+      let d: { message?: string; urls?: string[]; url?: string } = {};
+      try { d = raw ? JSON.parse(raw) : {}; } catch { d = {}; }
+
+      if (!res.ok) {
+        throw new Error(d.message || `Gagal mengunggah foto (HTTP ${res.status}). Silakan coba lagi.`);
+      }
 
       const newUrls = d.urls || (d.url ? [d.url] : []);
+      if (newUrls.length === 0) throw new Error("Server tidak mengembalikan URL foto.");
+
       setForm(prev => ({
         ...prev,
         photos: [...prev.photos, ...newUrls].slice(0, 5)
       }));
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Gagal mengunggah foto");
+      const message = err instanceof Error ? err.message : "Gagal mengunggah foto";
+      const isNetworkError = ["Failed to fetch", "Load failed", "NetworkError when attempting to fetch resource.", "Network request failed"].includes(message);
+      alert(isNetworkError
+        ? "Koneksi ke server terputus saat mengunggah foto. Periksa jaringan Anda lalu coba lagi."
+        : message);
     } finally {
       setUploadingPhotos(false);
       e.target.value = "";
@@ -2505,6 +2562,7 @@ function ItOslAssetsContent() {
                       </div>
                       <p className="text-[11px] text-slate-500 mt-0.5">
                         Disarankan <b>3–5 foto</b> dari berbagai sudut (Tampak Depan, Belakang, Stiker SN, Port/Kabel).
+                        Foto otomatis dikompres, maksimal {MAX_UPLOAD_MB} MB per file.
                       </p>
                     </div>
                   </div>
