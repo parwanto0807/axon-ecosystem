@@ -11,7 +11,7 @@ interface Invoice {
     customerId: string; customer: { name: string; code: string; address?: string };
     projectId?: string; project?: { number: string; name: string };
     contract?: { number: string; subject: string };
-    salesOrder?: { number: string };
+    salesOrder?: { number: string; grandTotal?: number };
     deliveryOrder?: { number: string };
     bankAccount?: { bankName: string; accountNumber: string; accountHolder: string; branch?: string };
     signerName?: string; signerPosition?: string;
@@ -139,9 +139,12 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
             y = Math.max(ry, dy) + 6
 
             // Items table with Project Row
+            const soTotal = invoice.salesOrder?.grandTotal
+            const showContractTotal = !!soTotal && soTotal > invoice.grandTotal
             const tableBody = [
                 [{ content: `PROJECT: ${invoice.project?.name || '-'}`, colSpan: 7, styles: { fontStyle: 'bold', fillColor: isPrintMode ? [255, 255, 255] : [248, 250, 252], halign: 'center' } }],
-                ...(invoice.items?.map(it => [it.no, it.description, it.qty, it.unit, fr(it.unitPrice), `${it.discount}%`, fr(it.amount)]) || [])
+                ...(invoice.items?.map(it => [it.no, it.description, it.qty, it.unit, fr(it.unitPrice), `${it.discount}%`, fr(it.amount)]) || []),
+                ...(showContractTotal ? [[{ content: `HARGA TOTAL PENAWARAN (${invoice.salesOrder?.number}): ${fr(soTotal!)} — nilai kontrak penuh, tidak ditagihkan pada invoice ini`, colSpan: 7, styles: { fontStyle: 'bold', fontSize: 7, halign: 'center', fillColor: isPrintMode ? [255, 255, 255] : [238, 242, 255], textColor: isPrintMode ? [0, 0, 0] : [67, 56, 202] } }]] : [])
             ]
 
             autoTable(doc, {
@@ -371,6 +374,16 @@ export default function InvoicePDFModal({ invoice, company, onClose }:
                                         <td className={`p-3 text-right font-bold ${isPrintMode ? 'text-black' : 'text-indigo-700'}`}>{fr(it.amount)}</td>
                                     </tr>
                                 ))}
+                                {invoice.salesOrder?.grandTotal && invoice.salesOrder.grandTotal > invoice.grandTotal && (
+                                    <tr className={isPrintMode ? 'bg-white' : 'bg-indigo-50/60'}>
+                                        <td colSpan={6} className={`p-3 text-[9px] font-bold uppercase tracking-widest ${isPrintMode ? 'text-black' : 'text-indigo-700'}`}>
+                                            Harga Total Penawaran ({invoice.salesOrder.number}): {fr(invoice.salesOrder.grandTotal)}
+                                            <span className={`ml-1 font-medium normal-case tracking-normal ${isPrintMode ? 'text-black' : 'text-indigo-500'}`}>
+                                                — nilai kontrak penuh, bukan nilai yang ditagihkan pada invoice ini
+                                            </span>
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
 

@@ -13,7 +13,7 @@ interface Invoice {
     customerId: string; customer: { name: string; code: string; address?: string };
     projectId?: string; project?: { number: string; name: string };
     contract?: { number: string; subject: string };
-    salesOrder?: { number: string };
+    salesOrder?: { number: string; grandTotal?: number };
     deliveryOrder?: { number: string };
     bankAccount?: { bankName: string; accountNumber: string; accountHolder: string };
     signerName?: string; signerPosition?: string;
@@ -195,6 +195,16 @@ export default function InvoiceDetailModal({ invoice, onClose, onPrint }: { invo
                                             </td>
                                         </tr>
                                     ))}
+                                    {invoice.salesOrder?.grandTotal && invoice.salesOrder.grandTotal > invoice.grandTotal && (
+                                        <tr className="bg-indigo-50/60">
+                                            <td colSpan={5} className="px-6 py-3 text-[11px] font-bold text-indigo-700">
+                                                Harga Total Penawaran ({invoice.salesOrder.number}): {fmt(invoice.salesOrder.grandTotal)}
+                                                <span className="ml-1 font-medium text-indigo-500">
+                                                    — nilai kontrak penuh, bukan nilai yang ditagihkan pada invoice ini
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
