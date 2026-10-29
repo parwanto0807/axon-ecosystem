@@ -3434,7 +3434,16 @@ app.get('/api/sales-billing-recap', async (req, res) => {
         invoices: validInvoices.map((inv) => ({
           id: inv.id, number: inv.number, date: inv.date, dueDate: inv.dueDate,
           status: inv.status, grandTotal: Number(inv.grandTotal) || 0,
-          paid: (inv.payments || []).filter((p) => p.status === 'SUCCESS').reduce((a, p) => a + (Number(p.amount) || 0), 0)
+          paid: (inv.payments || []).filter((p) => p.status === 'SUCCESS').reduce((a, p) => a + (Number(p.amount) || 0), 0),
+          payments: (inv.payments || []).map((p) => ({
+            id: p.id,
+            date: p.date,
+            amount: Number(p.amount) || 0,
+            paymentMethod: p.paymentMethod || '-',
+            status: p.status,
+            notes: p.notes || null,
+            proofOfPayment: p.proofOfPayment || null,
+          })),
         })),
         invoicedTotal,
         paidTotal,

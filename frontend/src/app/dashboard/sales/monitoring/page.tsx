@@ -38,6 +38,15 @@ export interface RecapRow {
         status: string
         grandTotal: number
         paid: number
+        payments?: {
+            id: string
+            date: string
+            amount: number
+            paymentMethod: string
+            status: string
+            notes?: string | null
+            proofOfPayment?: string | null
+        }[]
     }[]
     invoicedTotal: number
     paidTotal: number
@@ -125,6 +134,7 @@ export default function SalesBillingRecapPage() {
     const [loading, setLoading] = useState(true)
     const [lastRefresh, setLastRefresh] = useState<string>("")
     const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+    const [paymentDetailRow, setPaymentDetailRow] = useState<RecapRow | null>(null)
     const [isPdfModalOpen, setIsPdfModalOpen] = useState(false)
     const [isPrintingDirect, setIsPrintingDirect] = useState(false)
     const [isDownloadingDirect, setIsDownloadingDirect] = useState(false)
@@ -873,6 +883,15 @@ export default function SalesBillingRecapPage() {
                                                                 ({payPercent}%)
                                                             </span>
                                                         )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPaymentDetailRow(r)}
+                                                            title="Lihat detail pembayaran"
+                                                            className="mt-1 inline-flex items-center gap-1 rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-foreground transition-colors hover:bg-muted"
+                                                        >
+                                                            <CreditCard size={10} />
+                                                            Detail
+                                                        </button>
                                                     </td>
 
                                                     {/* Belum Ditagih */}
@@ -1102,6 +1121,107 @@ export default function SalesBillingRecapPage() {
                 company={company}
                 userName={session?.user?.name || 'Administrator'}
             />
+
+            {/* Payment Detail Modal */}
+            {paymentDetailRow && (() => {
+                const payments = paymentDetailRow.invoices
+                    .flatMap(inv => (inv.payments || []).map(p => ({ ...p, invoiceNumber: inv.number })))
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                const successPaid = payments
+                    .filter(p => p.status === 'SUCCESS')
+                    .reduce((s, p) => s + p.amount, 0)
+                const statusColor = (s: string) =>
+                    s === 'SUCCESS' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : s === 'FAILED' ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                            onClick={() => setPaymentDetailRow(null)}
+                        />
+                        <div className="relative z-10 flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+                            <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                        <CreditCard size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-foreground">Detail Pembayaran</h3>
+                                        <p className="text-xs text-muted-foreground">
+                                            {paymentDetailRow.soNumber} · {paymentDetailRow.customer?.name || '-'}
+                                            {paymentDetailRow.customer?.code ? ` (${paymentDetailRow.customer.code})` : ''}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPaymentDetailRow(null)}
+                                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    aria-label="Tutup"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3 border-b border-border bg-muted/20 px-5 py-3">
+                                <div>
+                                    <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Nilai Ditagih</p>
+                                    <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{fmt(paymentDetailRow.invoicedTotal)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Sudah Dibayar</p>
+                                    <p className="mt-0.5 text-sm font-semibold tabular-nums text-emerald-600">{fmt(successPaid)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Sisa Piutang</p>
+                                    <p className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{fmt(Math.max(paymentDetailRow.invoicedTotal - successPaid, 0))}</p>
+                                </div>
+                            </div>
+
+                            <div className="overflow-auto px-5 py-3">
+                                {payments.length === 0 ? (
+                                    <p className="py-8 text-center text-xs text-muted-foreground">
+                                        Belum ada pembayaran tercatat untuk SO ini.
+                                    </p>
+                                ) : (
+                                    <table className="w-full text-left text-sm">
+                                        <thead>
+                                            <tr className="border-b border-border text-[11px] font-medium text-muted-foreground">
+                                                <th className="py-2 pr-2 font-medium">No. Invoice</th>
+                                                <th className="py-2 pr-2 font-medium">Tanggal</th>
+                                                <th className="py-2 pr-2 font-medium">Metode</th>
+                                                <th className="py-2 pr-2 font-medium">Status</th>
+                                                <th className="py-2 pr-2 text-right font-medium">Nominal</th>
+                                                <th className="py-2 font-medium">Catatan</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-border">
+                                            {payments.map(p => (
+                                                <tr key={p.id}>
+                                                    <td className="py-2 pr-2 font-mono text-[11px] font-medium text-foreground">{p.invoiceNumber}</td>
+                                                    <td className="py-2 pr-2 text-xs text-muted-foreground">{fmtDate(p.date)}</td>
+                                                    <td className="py-2 pr-2 text-xs text-foreground">{p.paymentMethod}</td>
+                                                    <td className="py-2 pr-2">
+                                                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusColor(p.status)}`}>
+                                                            {p.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className={`py-2 pr-2 text-right text-xs font-medium tabular-nums ${p.status === 'SUCCESS' ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                                                        {fmt(p.amount)}
+                                                    </td>
+                                                    <td className="py-2 text-xs text-muted-foreground">{p.notes || '-'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )
+            })()}
         </div>
     )
 }
