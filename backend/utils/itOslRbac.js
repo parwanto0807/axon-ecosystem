@@ -21,6 +21,10 @@ const PERMISSIONS = Object.freeze({
 
   // Master data: customer, lokasi, kategori, PIC, aset, PM plan
   MASTER_WRITE: ['SUPER_ADMIN', 'ADMIN'],
+  // Lokasi fisik: teknisi/engineer boleh menambah lokasi baru saat mendata
+  // aset di lapangan. Ubah/hapus lokasi tetap khusus admin agar data master
+  // tidak berubah sembarangan.
+  LOCATION_WRITE: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATIONAL', 'STAFF'],
   // Registri aset: teknisi/engineer boleh menambah & mengubah data aset,
   // tetapi tetap tidak boleh menghapus aset atau mengubah master data lain.
   ASSET_WRITE: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'OPERATIONAL', 'STAFF'],

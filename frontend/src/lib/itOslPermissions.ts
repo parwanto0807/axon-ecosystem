@@ -9,6 +9,7 @@
 export type ItOslAction =
   | "view"
   | "master.write"
+  | "location.write"
   | "asset.write"
   | "pic.write"
   | "ticket.create"
@@ -34,6 +35,9 @@ export const IT_OSL_ROLES = [
 const MATRIX: Record<ItOslAction, readonly string[]> = {
   view: [...IT_OSL_ROLES],
   "master.write": ["SUPER_ADMIN", "ADMIN"],
+  // Teknisi/engineer boleh membuat lokasi baru saat input aset di lapangan;
+  // edit & hapus lokasi tetap khusus admin.
+  "location.write": [...IT_OSL_ROLES],
   "asset.write": [...IT_OSL_ROLES],
   "pic.write": [...IT_OSL_ROLES],
   "ticket.create": [...IT_OSL_ROLES],

@@ -81,6 +81,7 @@ function ItOslPicsContent() {
   const currentRole = (session?.user as { role?:string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
   const canWrite = canItOsl(currentRole, 'master.write')
+  const canLocationWrite = canItOsl(currentRole, 'location.write')
   const canPicWrite = canItOsl(currentRole, 'pic.write')
 
   const getAuthHeaders = (): Record<string, string> => ({
@@ -125,7 +126,7 @@ function ItOslPicsContent() {
   const [savingLocation, setSavingLocation] = useState(false)
 
   const submitQuickLocation = async () => {
-    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menambah lokasi")
+    if (!canLocationWrite) return alert("Role Anda tidak memiliki izin menambah lokasi")
     if (!locationForm.name.trim()) return alert("Nama lokasi wajib diisi")
     setSavingLocation(true)
     try {
@@ -1842,7 +1843,7 @@ function ItOslPicsContent() {
                   <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
                     <div className="flex items-center justify-between mb-1 h-5">
                       <label className="font-bold text-slate-700">Lokasi Kerja Fisik</label>
-                      {canWrite && (
+                      {canLocationWrite && (
                         <button
                           type="button"
                           onClick={() => {
@@ -1868,7 +1869,7 @@ function ItOslPicsContent() {
                     </select>
                     {locations.length === 0 && (
                       <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
-                        <AlertCircle size={11} /> {canWrite ? 'Belum ada lokasi. Klik Tambah Lokasi untuk membuat baru.' : 'Belum ada lokasi. Hubungi admin untuk menambahkan lokasi.'}
+                        <AlertCircle size={11} /> {canLocationWrite ? 'Belum ada lokasi. Klik Tambah Lokasi untuk membuat baru.' : 'Belum ada lokasi. Hubungi admin untuk menambahkan lokasi.'}
                       </p>
                     )}
                   </div>

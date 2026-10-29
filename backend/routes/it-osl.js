@@ -613,7 +613,7 @@ router.get('/locations', requirePermission('VIEW'), async (req, res) => {
     res.json(locs);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
-router.post('/locations', requirePermission('MASTER_WRITE'), async (req, res) => {
+router.post('/locations', requirePermission('LOCATION_WRITE'), async (req, res) => {
   try {
     const { code, name, address, customerId } = req.body;
     if (!code || !name) return res.status(400).json({ message: 'code & name wajib' });

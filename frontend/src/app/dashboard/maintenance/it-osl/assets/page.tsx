@@ -144,6 +144,8 @@ function ItOslAssetsContent() {
   const currentRole = (session?.user as { role?:string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
   const canWrite = canItOsl(currentRole, 'master.write')
+  const canLocationWrite = canItOsl(currentRole, 'location.write')
+  const canPicWrite = canItOsl(currentRole, 'pic.write')
   const canAssetWrite = canItOsl(currentRole, 'asset.write')
 
   const getAuthHeaders = (): Record<string, string> => ({
@@ -273,7 +275,7 @@ function ItOslAssetsContent() {
   const [savingPic, setSavingPic] = useState(false)
 
   const submitQuickPic = async () => {
-    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menambah PIC")
+    if (!canPicWrite) return alert("Role Anda tidak memiliki izin menambah PIC")
     if (!picForm.name.trim()) return alert("Nama PIC wajib diisi")
     setSavingPic(true)
     try {
@@ -316,7 +318,7 @@ function ItOslAssetsContent() {
   const [savingLocation, setSavingLocation] = useState(false)
 
   const submitQuickLocation = async () => {
-    if (!canWrite) return alert("Hanya Admin/SuperAdmin yang dapat menambah lokasi")
+    if (!canLocationWrite) return alert("Role Anda tidak memiliki izin menambah lokasi")
     if (!locationForm.name.trim()) return alert("Nama lokasi wajib diisi")
     setSavingLocation(true)
     try {
@@ -2426,6 +2428,7 @@ function ItOslAssetsContent() {
                     <div className="min-w-0">
                       <div className="flex items-center justify-between mb-1 h-5">
                         <label className="font-bold text-slate-700">Lokasi Fisik *</label>
+                        {canLocationWrite && (
                         <button
                           type="button"
                           onClick={() => {
@@ -2437,6 +2440,7 @@ function ItOslAssetsContent() {
                           <Plus size={12} strokeWidth={2.5} />
                           <span>Tambah Lokasi</span>
                         </button>
+                        )}
                       </div>
                       <select
                         value={form.locationId}
@@ -2786,6 +2790,7 @@ function ItOslAssetsContent() {
                 <div>
                   <div className="flex items-center justify-between mb-1 h-5">
                     <label className="font-bold text-slate-700">Lokasi Kerja Fisik</label>
+                    {canLocationWrite && (
                     <button
                       type="button"
                       onClick={() => {
@@ -2797,6 +2802,7 @@ function ItOslAssetsContent() {
                       <Plus size={12} strokeWidth={2.5} />
                       <span>Tambah Lokasi</span>
                     </button>
+                    )}
                   </div>
                   <select
                     value={picForm.locationId}
