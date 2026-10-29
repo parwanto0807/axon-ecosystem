@@ -655,11 +655,11 @@ function ProductSKUPicker({ products, value, onSelect }: {
                 ref={triggerRef}
                 type="button"
                 onClick={() => (open ? closePicker() : openPicker())}
-                title={selected ? `${selected.product.code} – ${selected.product.name}${selected.sku.name ? ' · ' + selected.sku.name : ''}` : 'Pilih produk'}
+                title={selected ? `${selected.sku.code}${selected.sku.name ? ' · ' + selected.sku.name : ''} — ${selected.product.code} ${selected.product.name}` : 'Pilih produk'}
                 className={`w-full text-left text-[10px] border rounded-lg px-2 py-1.5 flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${selected ? 'bg-indigo-50/60 border-indigo-200 text-indigo-700 font-semibold' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
             >
                 <span className="truncate flex-1">
-                    {selected ? `${selected.product.name}${selected.sku.name ? ' · ' + selected.sku.name : ''}` : 'Pick SKU...'}
+                    {selected ? (selected.sku.code || selected.sku.name || 'SKU') : 'Pick SKU...'}
                 </span>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="shrink-0 opacity-60">
                     <path d="m6 9 6 6 6-6" />
