@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Plus, FileText, Search, Eye, Edit, Trash2, X, Save,
@@ -472,6 +473,203 @@ export default function QuotationsPage() {
     )
 }
 
+// ─── SEARCHABLE PRODUCT (SKU) PICKER ──────────────────────────────────────────
+function ProductSKUPicker({ products, value, onSelect }: {
+    products: Product[]
+    value?: string
+    onSelect: (skuId: string) => void
+}) {
+    const [open, setOpen] = useState(false)
+    const [query, setQuery] = useState('')
+    const [highlight, setHighlight] = useState(0)
+    const [mounted, setMounted] = useState(false)
+    const triggerRef = useRef<HTMLButtonElement | null>(null)
+    const panelRef = useRef<HTMLDivElement | null>(null)
+    const inputRef = useRef<HTMLInputElement | null>(null)
+    const listRef = useRef<HTMLDivElement | null>(null)
+    const [pos, setPos] = useState({ up: false, top: 0, bottom: 0, left: 0, width: 340, maxHeight: 320 })
+
+    useEffect(() => { setMounted(true) }, [])
+
+    const options = useMemo(() => {
+        const q = query.trim().toLowerCase()
+        const list: Array<{ sku: ProductSKU; product: Product }> = []
+        for (const p of products || []) {
+            for (const s of p.skus || []) {
+                if (!q || `${p.code} ${p.name} ${s.code} ${s.name || ''}`.toLowerCase().includes(q)) {
+                    list.push({ sku: s, product: p })
+                }
+            }
+        }
+        return list
+    }, [products, query])
+
+    const selected = useMemo(() => {
+        for (const p of products || []) {
+            const s = p.skus?.find(x => x.id === value)
+            if (s) return { sku: s, product: p }
+        }
+        return null
+    }, [products, value])
+
+    const updatePos = useCallback(() => {
+        const el = triggerRef.current
+        if (!el) return
+        const r = el.getBoundingClientRect()
+        const width = Math.max(r.width, 360)
+        const spaceBelow = window.innerHeight - r.bottom
+        const spaceAbove = r.top
+        const up = spaceBelow < 260 && spaceAbove > spaceBelow
+        const maxHeight = Math.min(320, Math.max(140, (up ? spaceAbove : spaceBelow) - 12))
+        let left = r.left
+        if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - width - 8)
+        setPos({
+            up,
+            top: r.bottom + 4,
+            bottom: window.innerHeight - r.top + 4,
+            left,
+            width,
+            maxHeight,
+        })
+    }, [])
+
+    const openPicker = () => {
+        updatePos()
+        setQuery('')
+        setHighlight(0)
+        setOpen(true)
+    }
+
+    const closePicker = () => { setOpen(false); setQuery('') }
+
+    const pick = (skuId: string) => {
+        onSelect(skuId)
+        closePicker()
+    }
+
+    useEffect(() => {
+        if (!open) return
+        updatePos()
+        const onDown = (e: MouseEvent) => {
+            const t = e.target as Node
+            if (panelRef.current?.contains(t) || triggerRef.current?.contains(t)) return
+            setOpen(false)
+        }
+        const onScroll = () => updatePos()
+        window.addEventListener('mousedown', onDown)
+        window.addEventListener('scroll', onScroll, true)
+        window.addEventListener('resize', onScroll)
+        const t = setTimeout(() => inputRef.current?.focus(), 20)
+        return () => {
+            clearTimeout(t)
+            window.removeEventListener('mousedown', onDown)
+            window.removeEventListener('scroll', onScroll, true)
+            window.removeEventListener('resize', onScroll)
+        }
+    }, [open, updatePos])
+
+    useEffect(() => { setHighlight(0) }, [query])
+
+    useEffect(() => {
+        const el = listRef.current?.querySelector<HTMLElement>(`[data-idx="${highlight}"]`)
+        el?.scrollIntoView({ block: 'nearest' })
+    }, [highlight])
+
+    const onKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            setHighlight(h => Math.min(h + 1, options.length - 1))
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            setHighlight(h => Math.max(h - 1, 0))
+        } else if (e.key === 'Enter') {
+            e.preventDefault()
+            const opt = options[highlight]
+            if (opt) pick(opt.sku.id)
+        } else if (e.key === 'Escape') {
+            e.preventDefault()
+            closePicker()
+        }
+    }
+
+    const panel = (
+        <div
+            ref={panelRef}
+            className="fixed z-[300] bg-white rounded-xl border border-slate-200 shadow-2xl shadow-slate-900/20 overflow-hidden flex flex-col"
+            style={{
+                left: pos.left,
+                width: pos.width,
+                maxHeight: pos.maxHeight,
+                ...(pos.up ? { bottom: pos.bottom } : { top: pos.top }),
+            }}
+        >
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100 bg-slate-50/60">
+                <Search size={13} className="text-slate-400 shrink-0" />
+                <input
+                    ref={inputRef}
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    onKeyDown={onKeyDown}
+                    placeholder="Cari produk / SKU / kode..."
+                    className="w-full text-xs bg-transparent outline-none text-slate-700 placeholder:text-slate-400"
+                />
+                {query && (
+                    <button type="button" onClick={() => setQuery('')} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={12} /></button>
+                )}
+            </div>
+            <div ref={listRef} className="overflow-y-auto py-1">
+                {options.length === 0 ? (
+                    <p className="px-3 py-4 text-[11px] text-slate-400 text-center">Produk tidak ditemukan</p>
+                ) : options.map(({ sku, product }, i) => (
+                    <button
+                        type="button"
+                        key={sku.id}
+                        data-idx={i}
+                        onMouseEnter={() => setHighlight(i)}
+                        onClick={() => pick(sku.id)}
+                        className={`w-full text-left px-3 py-2 flex items-start gap-2 transition-colors ${i === highlight ? 'bg-indigo-50' : 'bg-white'} ${sku.id === value ? 'ring-1 ring-inset ring-indigo-200' : ''}`}
+                    >
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold text-slate-800 truncate">
+                                {product.name}
+                                {sku.name ? <span className="font-medium text-slate-500"> · {sku.name}</span> : null}
+                            </p>
+                            <p className="text-[10px] text-slate-400 truncate">{product.code} · {sku.code}</p>
+                        </div>
+                        <span className="text-[10px] font-bold text-indigo-600 whitespace-nowrap pt-0.5">
+                            Rp{(sku.salePrice ?? 0).toLocaleString('id-ID')}
+                        </span>
+                    </button>
+                ))}
+            </div>
+            <div className="px-3 py-1.5 border-t border-slate-100 bg-slate-50/60 text-[9px] text-slate-400 flex justify-between">
+                <span>{options.length} produk</span>
+                <span>↑↓ navigasi · Enter pilih · Esc tutup</span>
+            </div>
+        </div>
+    )
+
+    return (
+        <>
+            <button
+                ref={triggerRef}
+                type="button"
+                onClick={() => (open ? closePicker() : openPicker())}
+                title={selected ? `${selected.product.code} – ${selected.product.name}${selected.sku.name ? ' · ' + selected.sku.name : ''}` : 'Pilih produk'}
+                className={`w-full text-left text-[10px] border rounded-lg px-2 py-1.5 flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${selected ? 'bg-indigo-50/60 border-indigo-200 text-indigo-700 font-semibold' : 'bg-slate-50 border-slate-200 text-slate-500'}`}
+            >
+                <span className="truncate flex-1">
+                    {selected ? `${selected.product.name}${selected.sku.name ? ' · ' + selected.sku.name : ''}` : 'Pick SKU...'}
+                </span>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="shrink-0 opacity-60">
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
+            </button>
+            {open && mounted ? createPortal(panel, document.body) : null}
+        </>
+    )
+}
+
 // ─── FORM MODAL ───────────────────────────────────────────────────────────────
 function QuotationFormModal({ quotation, customers, products, projects, onClose, onSuccess }:
     { quotation: Quotation | null; customers: Customer[]; products: Product[]; projects: any[]; onClose: () => void; onSuccess: () => void }) {
@@ -661,15 +859,11 @@ function QuotationFormModal({ quotation, customers, products, projects, onClose,
                                         <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50 align-top">
                                             <td className="px-3 py-2 text-[11px] font-black text-slate-400 text-center">{it.no}</td>
                                             <td className="px-2 py-2">
-                                                <select onChange={e => fillFromSKU(idx, e.target.value)} defaultValue=""
-                                                    className="w-full text-[10px] bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                                                    <option value="">Pick SKU...</option>
-                                                    {products.map(p => (
-                                                        <optgroup key={p.id} label={`${p.code} – ${p.name}`}>
-                                                            {p.skus?.map(s => <option key={s.id} value={s.id}>{s.code}{s.name ? ' · ' + s.name : ''} — Rp{s.salePrice?.toLocaleString()}</option>)}
-                                                        </optgroup>
-                                                    ))}
-                                                </select>
+                                                <ProductSKUPicker
+                                                    products={products}
+                                                    value={it.skuId}
+                                                    onSelect={skuId => fillFromSKU(idx, skuId)}
+                                                />
                                             </td>
                                             <td className="px-2 py-2">
                                                 <textarea value={it.description} onChange={e => updateItem(idx, { description: e.target.value })} placeholder="Item description..." rows={3}
