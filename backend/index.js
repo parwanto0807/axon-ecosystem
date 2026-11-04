@@ -7,6 +7,8 @@ const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcrypt');
+const nodemailer = require('nodemailer');
+const PDFDocument = require('pdfkit');
 const SALT_ROUNDS = 10;
 
 dotenv.config();
@@ -1306,6 +1308,240 @@ app.delete('/api/quotations/:id', async (req, res) => {
     res.json({ message: 'Deleted' });
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
+// --- QUOTATION EMAIL (SMTP + PDF) ---
+
+const isSmtpConfigured = () =>
+  !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+
+const createMailTransporter = () =>
+  nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || 'false') === 'true',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+  });
+
+function generateQuotationPdfBuffer(quotation, company) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 40 });
+      const chunks = [];
+      doc.on('data', (c) => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const RIGHT = doc.page.width - 40;
+      const LEFT = 40;
+      const money = (n) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
+      const fmtDate = (d) => d ? new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '-';
+      const clean = (s) => String(s ?? '')
+        .replace(/[—–]/g, '-')
+        .replace(/•/g, '-')
+        .replace(/×/g, 'x')
+        .replace(/[“”]/g, '"')
+        .replace(/’/g, "'");
+      const co = company || {};
+      const cu = quotation.customer || {};
+
+      // Header: company
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('#0f172a').text(clean(co.name || 'PT INTECH MITRA ABADI'), LEFT, 40, { width: 300 });
+      doc.font('Helvetica').fontSize(8).fillColor('#475569');
+      let hy = 58;
+      const addr = clean([co.address, co.city, co.province, co.postalCode].filter(Boolean).join(', '));
+      if (addr) { doc.text(addr, LEFT, hy, { width: 300 }); hy = doc.y + 1; }
+      if (co.phone) { doc.text(`Tel: ${co.phone}`, LEFT, hy, { width: 300 }); hy = doc.y + 1; }
+      if (co.email) { doc.text(`Email: ${co.email}`, LEFT, hy, { width: 300 }); hy = doc.y + 1; }
+
+      // Header: title
+      doc.font('Helvetica-Bold').fontSize(16).fillColor('#1d4ed8').text('PENAWARAN HARGA', 300, 40, { width: RIGHT - 300, align: 'right' });
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a').text(quotation.number, 300, 62, { width: RIGHT - 300, align: 'right' });
+      doc.font('Helvetica').fontSize(8).fillColor('#475569').text(`Tanggal: ${fmtDate(quotation.date)}`, 300, 74, { width: RIGHT - 300, align: 'right' });
+      doc.text(`Berlaku s/d: ${fmtDate(quotation.validUntil)}`, 300, 85, { width: RIGHT - 300, align: 'right' });
+
+      let y = Math.max(hy, 98) + 10;
+      doc.moveTo(LEFT, y).lineTo(RIGHT, y).strokeColor('#cbd5e1').lineWidth(1).stroke();
+      y += 10;
+
+      // Customer
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#64748b').text('KEPADA YTH:', LEFT, y);
+      y = doc.y + 2;
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a').text(clean(cu.name || '-'), LEFT, y, { width: 330 });
+      y = doc.y + 1;
+      doc.font('Helvetica').fontSize(8).fillColor('#334155');
+      if (cu.address) { doc.text(clean(cu.address), LEFT, y, { width: 330 }); y = doc.y + 1; }
+      if (cu.phone) { doc.text(`Tel: ${cu.phone}`, LEFT, y); y = doc.y + 1; }
+      if (cu.email) { doc.text(`Email: ${cu.email}`, LEFT, y); y = doc.y + 1; }
+
+      // Subject & terms
+      y += 5;
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a').text('Perihal:', LEFT, y);
+      doc.font('Helvetica').fontSize(9).text(clean(quotation.subject || '-'), LEFT + 44, y, { width: RIGHT - LEFT - 44 });
+      y = doc.y + 3;
+      if (quotation.paymentTerms) {
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a').text('Termin:', LEFT, y);
+        doc.font('Helvetica').fontSize(8).text(clean(quotation.paymentTerms), LEFT + 44, y, { width: RIGHT - LEFT - 44 });
+        y = doc.y + 2;
+      }
+      if (quotation.deliveryTerms) {
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a').text('Pengiriman:', LEFT, y);
+        doc.font('Helvetica').fontSize(8).text(clean(quotation.deliveryTerms), LEFT + 62, y, { width: RIGHT - LEFT - 62 });
+        y = doc.y + 2;
+      }
+      y += 8;
+
+      // Table
+      const COL = {
+        no: { x: LEFT, w: 22 },
+        desc: { x: LEFT + 24, w: 236 },
+        qty: { x: LEFT + 262, w: 32 },
+        unit: { x: LEFT + 296, w: 40 },
+        price: { x: LEFT + 338, w: 84 },
+        amount: { x: LEFT + 424, w: RIGHT - (LEFT + 424) }
+      };
+
+      const drawHeader = (yy) => {
+        doc.rect(LEFT, yy, RIGHT - LEFT, 18).fill('#1d4ed8');
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#ffffff');
+        doc.text('NO', COL.no.x, yy + 6, { width: COL.no.w, align: 'center' });
+        doc.text('DESKRIPSI', COL.desc.x, yy + 6, { width: COL.desc.w, align: 'left' });
+        doc.text('QTY', COL.qty.x, yy + 6, { width: COL.qty.w, align: 'center' });
+        doc.text('SATUAN', COL.unit.x, yy + 6, { width: COL.unit.w, align: 'center' });
+        doc.text('HARGA', COL.price.x, yy + 6, { width: COL.price.w, align: 'right' });
+        doc.text('JUMLAH', COL.amount.x, yy + 6, { width: COL.amount.w, align: 'right' });
+        return yy + 18;
+      };
+
+      y = drawHeader(y);
+      const items = quotation.items || [];
+      for (const it of items) {
+        doc.font('Helvetica').fontSize(8);
+        const h = Math.max(16, doc.heightOfString(clean(it.description || ''), { width: COL.desc.w }) + 6);
+        if (y + h > 760) {
+          doc.addPage();
+          y = drawHeader(40);
+        }
+        if (it.no % 2 === 0) doc.rect(LEFT, y, RIGHT - LEFT, h).fill('#f8fafc');
+        doc.font('Helvetica').fontSize(8).fillColor('#0f172a');
+        doc.text(String(it.no), COL.no.x, y + 4, { width: COL.no.w, align: 'center' });
+        doc.text(clean(it.description || ''), COL.desc.x, y + 4, { width: COL.desc.w });
+        doc.text(String(it.qty), COL.qty.x, y + 4, { width: COL.qty.w, align: 'center' });
+        doc.text(it.unit || '', COL.unit.x, y + 4, { width: COL.unit.w, align: 'center' });
+        doc.text(money(it.unitPrice), COL.price.x, y + 4, { width: COL.price.w, align: 'right' });
+        doc.text(money(it.amount), COL.amount.x, y + 4, { width: COL.amount.w, align: 'right' });
+        doc.moveTo(LEFT, y + h).lineTo(RIGHT, y + h).strokeColor('#e2e8f0').lineWidth(0.5).stroke();
+        y += h;
+      }
+
+      // Totals
+      y += 8;
+      const tx = RIGHT - 190;
+      const line = (label, value, opts = {}) => {
+        doc.font(opts.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(opts.size || 8).fillColor(opts.color || '#334155');
+        doc.text(label, tx, y, { width: 110, align: 'left' });
+        doc.text(value, RIGHT - 90, y, { width: 90, align: 'right' });
+        y += opts.gap || 12;
+      };
+      line('Subtotal', money(quotation.subtotal));
+      if (quotation.discountAmt > 0) line('Diskon', `- ${money(quotation.discountAmt)}`, { color: '#e11d48' });
+      line(`PPN (${quotation.tax}%)`, `+ ${money(quotation.taxAmt)}`);
+      y += 2;
+      doc.moveTo(tx, y).lineTo(RIGHT, y).strokeColor('#1d4ed8').lineWidth(1).stroke();
+      y += 6;
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#1d4ed8');
+      doc.text('TOTAL', tx, y, { width: 110 });
+      doc.text(money(quotation.grandTotal), RIGHT - 120, y, { width: 120, align: 'right' });
+      y += 20;
+
+      // Notes
+      if (quotation.notes) {
+        if (y > 700) { doc.addPage(); y = 40; }
+        doc.font('Helvetica-Bold').fontSize(8).fillColor('#0f172a').text('CATATAN:', LEFT, y);
+        y = doc.y + 2;
+        doc.font('Helvetica').fontSize(7.5).fillColor('#475569').text(clean(quotation.notes), LEFT, y, { width: 330 });
+        y = doc.y + 10;
+      }
+
+      // Signature
+      if (y > 720) { doc.addPage(); y = 40; }
+      doc.font('Helvetica').fontSize(8).fillColor('#475569').text('Hormat kami,', LEFT, y);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a').text(clean(co.name || ''), LEFT, y + 32);
+      doc.end();
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+app.post('/api/quotations/:id/send-email', async (req, res) => {
+  try {
+    const quotation = await prisma.quotation.findUnique({
+      where: { id: req.params.id },
+      include: { customer: true, items: { orderBy: { no: 'asc' } } }
+    });
+    if (!quotation) return res.status(404).json({ message: 'Quotation tidak ditemukan' });
+
+    const to = (quotation.customer?.email || '').trim();
+    if (!to) {
+      return res.status(400).json({ message: 'Email customer belum diisi di master customer.' });
+    }
+    if (!isSmtpConfigured()) {
+      return res.status(503).json({ message: 'SMTP belum dikonfigurasi di server (SMTP_HOST/SMTP_USER/SMTP_PASS).' });
+    }
+
+    const company = await prisma.companyProfile.findUnique({ where: { id: 'main' } });
+    const pdf = await generateQuotationPdfBuffer(quotation, company);
+
+    const transporter = createMailTransporter();
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to,
+      subject: `Penawaran Harga ${quotation.number} - ${quotation.subject}`,
+      text:
+        `Yth. ${quotation.customer?.name || 'Bapak/Ibu'},\n\n` +
+        `Berikut kami sampaikan penawaran harga ${quotation.number}:\n` +
+        `Perihal: ${quotation.subject}\n` +
+        `Total: Rp ${Number(quotation.grandTotal || 0).toLocaleString('id-ID')}\n\n` +
+        `Dokumen penawaran (PDF) terlampir.\n\n` +
+        `Hormat kami,\n${company?.name || ''}`,
+      attachments: [
+        {
+          filename: `${quotation.number}.pdf`,
+          content: pdf,
+          contentType: 'application/pdf'
+        }
+      ]
+    });
+
+    await prisma.quotation.update({
+      where: { id: quotation.id },
+      data: { status: 'SENT' }
+    });
+
+    res.json({ success: true, to });
+  } catch (e) {
+    console.error('[Quotation Email]', e);
+    res.status(500).json({ message: e.message || 'Gagal mengirim email' });
+  }
+});
+
+app.get('/api/quotations/:id/pdf', async (req, res) => {
+  try {
+    const quotation = await prisma.quotation.findUnique({
+      where: { id: req.params.id },
+      include: { customer: true, items: { orderBy: { no: 'asc' } } }
+    });
+    if (!quotation) return res.status(404).json({ message: 'Quotation tidak ditemukan' });
+    const company = await prisma.companyProfile.findUnique({ where: { id: 'main' } });
+    const pdf = await generateQuotationPdfBuffer(quotation, company);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${quotation.number}.pdf"`);
+    res.send(pdf);
+  } catch (e) {
+    console.error('[Quotation PDF]', e);
+    res.status(500).json({ message: e.message });
+  }
+});
+
 // --- SALES ORDER ROUTES ---
 
 async function generateSalesOrderNumber() {

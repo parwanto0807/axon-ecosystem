@@ -33,6 +33,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
     const [showBreakdown, setShowBreakdown] = useState(false)
     const [showPOContract, setShowPOContract] = useState(false)
     const [showSimpleList, setShowSimpleList] = useState(false)
+    const [sendingEmail, setSendingEmail] = useState(false)
     const c = quotation.customer
     const sc = STATUS_CFG[quotation.status] || STATUS_CFG.DRAFT
     const poItems = quotation.items?.some(i => i.isChecklist) ? quotation.items.filter(i => i.checked) : (quotation.items || [])
@@ -74,13 +75,33 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
         window.open(`https://wa.me/${wa}?text=${encodeURIComponent(buildShareText())}`, "_blank")
     }
 
-    const sendEmail = () => {
+    const sendEmail = async () => {
         if (!c?.email) {
             alert("Email customer belum diisi. Silakan lengkapi data customer terlebih dahulu.")
             return
         }
-        const subject = `Penawaran Harga ${quotation.number} - ${company?.name || ""}`.trim()
-        window.location.href = `mailto:${c.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(buildShareText())}`
+        setSendingEmail(true)
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations/${quotation.id}/send-email`, {
+                method: "POST",
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) {
+                const fallback = window.confirm(
+                    `${data.message || "Gagal mengirim email."}\n\nKirim manual via aplikasi email?`
+                )
+                if (fallback) {
+                    const subject = `Penawaran Harga ${quotation.number} - ${company?.name || ""}`.trim()
+                    window.location.href = `mailto:${c.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(buildShareText())}`
+                }
+                return
+            }
+            alert(`Penawaran ${quotation.number} berhasil dikirim ke ${data.to}`)
+        } catch (e) {
+            alert("Gagal menghubungi server email. Periksa koneksi/backend.")
+        } finally {
+            setSendingEmail(false)
+        }
     }
 
     const getProductImage = (it: QuotationItem) => {
@@ -568,10 +589,10 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                             <MessageCircle size={13} className="mr-2" />
                             WhatsApp
                         </Button>
-                        <Button onClick={sendEmail} disabled={busy} variant="outline" title="Kirim ringkasan penawaran via Email"
+                        <Button onClick={sendEmail} disabled={busy || sendingEmail} variant="outline" title="Kirim penawaran (PDF) otomatis via Email"
                             className="rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200 font-bold h-9 px-4 text-xs uppercase tracking-wider">
                             <Mail size={13} className="mr-2" />
-                            Email
+                            {sendingEmail ? "Mengirim..." : "Email PDF"}
                         </Button>
                     </div>
                     <button onClick={onClose} className="w-9 h-9 rounded-xl hover:bg-slate-200 flex items-center justify-center text-slate-500"><X size={18} /></button>
