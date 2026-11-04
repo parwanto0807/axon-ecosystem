@@ -117,7 +117,11 @@ async function requireApiAuth(req, res, next) {
     }
 
     if (!user) {
-      return res.status(401).json({ message: 'Unauthorized: sesi login tidak valid' });
+      return res.status(401).json({
+        message: req.headers.cookie
+          ? 'Unauthorized: sesi tidak valid (NEXTAUTH_SECRET tidak cocok / token rusak)'
+          : 'Unauthorized: cookie sesi tidak terkirim ke API'
+      });
     }
 
     req.authUser = user;
