@@ -46,7 +46,7 @@ const SESSION_COOKIE_NAMES = [
 // NEXTAUTH_SECRET kedua proses sempat tidak sinkron.
 const FRONTEND_INTERNAL_URLS = (process.env.FRONTEND_INTERNAL_URLS ||
   process.env.FRONTEND_INTERNAL_URL ||
-  'http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3003')
+  'http://127.0.0.1:3003,http://localhost:3003,http://127.0.0.1:3000,http://localhost:3000')
   .split(',')
   .map((u) => u.trim().replace(/\/+$/, ''))
   .filter(Boolean);
