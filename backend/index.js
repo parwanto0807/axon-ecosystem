@@ -31,6 +31,14 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
+// Response API tidak boleh disimpan browser/proxy dan tidak boleh diindeks.
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  next();
+});
+
 // --- GLOBAL API AUTH GUARD ---
 // Hanya endpoint publik tertentu (link PDF 24 jam) yang boleh tanpa session.
 const PUBLIC_API_PREFIXES = ['/api/health', '/api/login', '/api/quotations/shared/'];
@@ -141,6 +149,15 @@ async function requireApiAuth(req, res, next) {
 
     const full = (req.originalUrl || '').split('?')[0];
     if (PUBLIC_API_PREFIXES.some((p) => full.startsWith(p))) return next();
+
+    // Endpoint API hanya untuk dipanggil aplikasi (fetch/XHR). Tolak akses
+    // yang dibuka langsung sebagai halaman di browser (address bar / tab baru)
+    // supaya data JSON tidak bisa diintip atau di-bookmark.
+    const secFetchMode = String(req.headers['sec-fetch-mode'] || '').toLowerCase();
+    const secFetchDest = String(req.headers['sec-fetch-dest'] || '').toLowerCase();
+    if (secFetchMode === 'navigate' || secFetchDest === 'document') {
+      return res.status(404).json({ reason: 'not_a_browser_endpoint', message: 'Not found' });
+    }
 
     const host = String(req.headers.host || '').split(':')[0];
     const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1';
