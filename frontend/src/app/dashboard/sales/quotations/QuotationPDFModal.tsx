@@ -88,10 +88,17 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             return
         }
         setSendingEmail(true)
-        showToast("info", "Mengirim penawaran via email...")
+        showToast("info", "Menyiapkan PDF & mengirim email...")
         try {
+            // Pakai PDF yang sama persis dengan hasil Download PDF
+            const doc = await buildQuotationPdf()
+            const dataUri = doc.output("datauristring") as string
+            const pdfBase64 = dataUri.includes(",") ? dataUri.split(",").pop() || "" : dataUri
+
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations/${quotation.id}/send-email`, {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pdfBase64 }),
             })
             const data = await res.json().catch(() => ({}))
             if (!res.ok) {
@@ -104,7 +111,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
             }
             showToast("success", `Penawaran ${quotation.number} terkirim ke ${data.to}`)
         } catch (e) {
-            showToast("error", "Gagal menghubungi server email. Periksa koneksi/backend.")
+            showToast("error", "Gagal menyiapkan/mengirim PDF. Periksa koneksi/backend.")
         } finally {
             setSendingEmail(false)
         }
@@ -135,9 +142,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
         return null
     }
 
-    const generatePDF = async () => {
-        setBusy(true)
-        try {
+    const buildQuotationPdf = async () => {
             const { default: jsPDF } = await import('jspdf')
             const { default: autoTable } = await import('jspdf-autotable')
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -519,8 +524,15 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                 doc.text(`Dokumen resmi dari ${company.name || 'PT. Axon Ecosystem'}`, M, 290)
                 doc.text(`Hal ${i} / ${pc}`, W - M, 290, { align: 'right' })
             }
+            return doc
+    }
+
+    const generatePDF = async () => {
+        setBusy(true)
+        try {
+            const doc = await buildQuotationPdf()
             doc.save(`${quotation.number}.pdf`)
-        } catch (e) { console.error(e); alert('Gagal generate PDF') }
+        } catch (e) { console.error(e); showToast("error", "Gagal generate PDF") }
         finally { setBusy(false) }
     }
 

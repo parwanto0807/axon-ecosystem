@@ -26,7 +26,7 @@ const { testMikrotikConnection } = require('./utils/mikrotik');
 let lastTrafficStats = {};
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 const itOslRouter = require('./routes/it-osl');
 app.use('/api/it-osl', itOslRouter);
@@ -1489,7 +1489,23 @@ app.post('/api/quotations/:id/send-email', async (req, res) => {
     }
 
     const company = await prisma.companyProfile.findUnique({ where: { id: 'main' } });
-    const pdf = await generateQuotationPdfBuffer(quotation, company);
+
+    // Pakai PDF yang dikirim frontend (identik dengan hasil Download PDF).
+    // Fallback ke generator server jika tidak ada.
+    const rawBase64 = typeof req.body?.pdfBase64 === 'string' ? req.body.pdfBase64 : '';
+    let pdf;
+    if (rawBase64) {
+      const cleanB64 = rawBase64.includes(',') ? rawBase64.split(',').pop() : rawBase64;
+      pdf = Buffer.from(cleanB64, 'base64');
+      if (pdf.length > 20 * 1024 * 1024) {
+        return res.status(413).json({ message: 'Ukuran PDF terlalu besar (maks 20 MB).' });
+      }
+      if (pdf.length < 100) {
+        return res.status(400).json({ message: 'File PDF tidak valid.' });
+      }
+    } else {
+      pdf = await generateQuotationPdfBuffer(quotation, company);
+    }
 
     const transporter = createMailTransporter();
     await transporter.sendMail({
