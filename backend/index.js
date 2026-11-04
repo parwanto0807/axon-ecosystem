@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const multer = require('multer');
 const sharp = require('sharp');
@@ -34,6 +35,26 @@ app.use('/public', express.static(path.join(__dirname, 'public')));
 // Hanya endpoint publik tertentu (link PDF 24 jam) yang boleh tanpa session.
 const PUBLIC_API_PREFIXES = ['/api/health', '/api/login', '/api/quotations/shared/'];
 
+const SESSION_COOKIE_NAMES = [
+  '__Secure-next-auth.session-token',
+  'next-auth.session-token',
+  '__Host-next-auth.session-token',
+];
+
+// Frontend internal URL dipakai untuk verifikasi cadangan: frontend adalah
+// otoritas sesi NextAuth, jadi backend tetap bisa memvalidasi cookie walau
+// NEXTAUTH_SECRET kedua proses sempat tidak sinkron.
+const FRONTEND_INTERNAL_URLS = (process.env.FRONTEND_INTERNAL_URLS ||
+  process.env.FRONTEND_INTERNAL_URL ||
+  'http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:3003')
+  .split(',')
+  .map((u) => u.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+const SESSION_CACHE_TTL_MS = 2 * 60 * 1000;
+const sessionUserCache = new Map();
+const sessionUserInflight = new Map();
+
 const parseCookies = (header = '') => {
   const out = {};
   for (const part of String(header).split(';')) {
@@ -46,6 +67,72 @@ const parseCookies = (header = '') => {
   }
   return out;
 };
+
+const getSessionCookieToken = (cookies) => {
+  for (const name of SESSION_COOKIE_NAMES) {
+    if (cookies[name]) return cookies[name];
+  }
+  return null;
+};
+
+async function resolveUserFromFrontendSession(cookieHeader, AUTH_DEBUG) {
+  if (!cookieHeader) return null;
+  const cacheKey = crypto.createHash('sha256').update(cookieHeader).digest('hex');
+  const cached = sessionUserCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.user;
+  if (sessionUserInflight.has(cacheKey)) return sessionUserInflight.get(cacheKey);
+
+  const task = (async () => {
+    for (const baseUrl of FRONTEND_INTERNAL_URLS) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 2500);
+        let res;
+        try {
+          res = await fetch(`${baseUrl}/api/auth/session`, {
+            headers: { cookie: cookieHeader, accept: 'application/json' },
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+        if (!res.ok) continue;
+        const data = await res.json().catch(() => null);
+        const sessionUser = data && data.user;
+        if (!sessionUser) continue;
+
+        let user = null;
+        if (sessionUser.id) {
+          user = await prisma.user.findUnique({ where: { id: String(sessionUser.id) } });
+        }
+        if (!user && sessionUser.email) {
+          user = await prisma.user.findUnique({ where: { email: String(sessionUser.email) } });
+        }
+        if (!user) continue;
+
+        sessionUserCache.set(cacheKey, { user, expiresAt: Date.now() + SESSION_CACHE_TTL_MS });
+        if (sessionUserCache.size > 500) {
+          const now = Date.now();
+          for (const [key, value] of sessionUserCache) {
+            if (value.expiresAt <= now) sessionUserCache.delete(key);
+          }
+        }
+        if (AUTH_DEBUG) console.log('[AuthGuard] resolved via frontend session', { baseUrl, email: user.email });
+        return user;
+      } catch (e) {
+        if (AUTH_DEBUG) console.log('[AuthGuard] frontend session check failed', { baseUrl, error: e.message });
+      }
+    }
+    return null;
+  })();
+
+  sessionUserInflight.set(cacheKey, task);
+  try {
+    return await task;
+  } finally {
+    sessionUserInflight.delete(cacheKey);
+  }
+}
 
 async function requireApiAuth(req, res, next) {
   const AUTH_DEBUG = process.env.AUTH_DEBUG === '1';
@@ -69,16 +156,14 @@ async function requireApiAuth(req, res, next) {
     }
 
     let user = null;
+    let reason = 'no_session_cookie';
 
     // 1) Coba session database (jika strategi NextAuth memakai database)
-    const dbToken =
-      cookies['__Secure-next-auth.session-token'] ||
-      cookies['next-auth.session-token'] ||
-      cookies['__Host-next-auth.session-token'];
+    const sessionToken = getSessionCookieToken(cookies);
 
-    if (dbToken) {
+    if (sessionToken) {
       const session = await prisma.session.findUnique({
-        where: { sessionToken: dbToken },
+        where: { sessionToken },
         include: { user: true }
       });
       if (session && new Date(session.expires).getTime() >= Date.now()) {
@@ -87,12 +172,12 @@ async function requireApiAuth(req, res, next) {
     }
 
     // 2) Fallback: validasi JWT NextAuth (strategi "jwt")
-    if (!user) {
+    if (!user && sessionToken) {
       const secret = process.env.NEXTAUTH_SECRET;
       if (!secret) {
         return res.status(500).json({ message: 'Server auth belum dikonfigurasi (NEXTAUTH_SECRET).' });
       }
-      for (const name of ['__Secure-next-auth.session-token', 'next-auth.session-token', '__Host-next-auth.session-token']) {
+      for (const name of SESSION_COOKIE_NAMES) {
         const cookieToken = cookies[name];
         if (!cookieToken) continue;
         let payload = null;
@@ -110,15 +195,25 @@ async function requireApiAuth(req, res, next) {
             user = await prisma.user.findUnique({ where: { email: payload.email } });
           }
           if (user) break;
+          reason = 'user_not_found';
         } else if (AUTH_DEBUG) {
           console.log('[AuthGuard] jwt failed', { name });
+          reason = 'jwt_secret_mismatch';
         }
       }
     }
 
+    // 3) Fallback terakhir: minta frontend memvalidasi cookie sesinya sendiri.
+    //    Ini membuat API tetap jalan walau NEXTAUTH_SECRET backend/frontend
+    //    berbeda (mis. env produksi belum disamakan).
+    if (!user && sessionToken) {
+      user = await resolveUserFromFrontendSession(req.headers.cookie || '', AUTH_DEBUG);
+    }
+
     if (!user) {
       return res.status(401).json({
-        message: req.headers.cookie
+        reason,
+        message: sessionToken
           ? 'Unauthorized: sesi tidak valid (NEXTAUTH_SECRET tidak cocok / token rusak)'
           : 'Unauthorized: cookie sesi tidak terkirim ke API'
       });
@@ -139,6 +234,11 @@ async function requireApiAuth(req, res, next) {
 }
 
 app.use('/api', requireApiAuth);
+
+console.log(
+  `[AuthGuard] enabled (secret: ${process.env.NEXTAUTH_SECRET ? 'set' : 'MISSING'}) ` +
+  `— frontend session fallback: ${FRONTEND_INTERNAL_URLS.join(', ')}`
+);
 
 const itOslRouter = require('./routes/it-osl');
 app.use('/api/it-osl', itOslRouter);
