@@ -1,7 +1,7 @@
 "use client"
 import { useState, Fragment } from "react"
 import { motion } from "framer-motion"
-import { X, Download, Mail, MessageCircle } from "lucide-react"
+import { X, Download, Mail, MessageCircle, Loader2, CheckCircle2, AlertCircle, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface QuotationItem { id?: string; no: number; description: string; qty: number; unit: string; unitPrice: number; discount: number; amount: number; costPrice?: number; isChecklist?: boolean; checked?: boolean }
@@ -34,6 +34,12 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
     const [showPOContract, setShowPOContract] = useState(false)
     const [showSimpleList, setShowSimpleList] = useState(false)
     const [sendingEmail, setSendingEmail] = useState(false)
+    const [toast, setToast] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null)
+
+    const showToast = (type: "success" | "error" | "info", msg: string) => {
+        setToast({ type, msg })
+        window.setTimeout(() => setToast(null), 5000)
+    }
     const c = quotation.customer
     const sc = STATUS_CFG[quotation.status] || STATUS_CFG.DRAFT
     const poItems = quotation.items?.some(i => i.isChecklist) ? quotation.items.filter(i => i.checked) : (quotation.items || [])
@@ -69,36 +75,36 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
     const sendWhatsApp = () => {
         const wa = normalizePhone(c?.phone)
         if (!wa) {
-            alert("Nomor WhatsApp customer belum diisi. Silakan lengkapi data customer terlebih dahulu.")
+            showToast("error", "Nomor WhatsApp customer belum diisi di master customer.")
             return
         }
         window.open(`https://wa.me/${wa}?text=${encodeURIComponent(buildShareText())}`, "_blank")
+        showToast("success", "Membuka WhatsApp customer...")
     }
 
     const sendEmail = async () => {
         if (!c?.email) {
-            alert("Email customer belum diisi. Silakan lengkapi data customer terlebih dahulu.")
+            showToast("error", "Email customer belum diisi di master customer.")
             return
         }
         setSendingEmail(true)
+        showToast("info", "Mengirim penawaran via email...")
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations/${quotation.id}/send-email`, {
                 method: "POST",
             })
             const data = await res.json().catch(() => ({}))
             if (!res.ok) {
-                const fallback = window.confirm(
-                    `${data.message || "Gagal mengirim email."}\n\nKirim manual via aplikasi email?`
-                )
-                if (fallback) {
-                    const subject = `Penawaran Harga ${quotation.number} - ${company?.name || ""}`.trim()
-                    window.location.href = `mailto:${c.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(buildShareText())}`
+                if (res.status === 404) {
+                    showToast("error", "Endpoint email belum tersedia di server (404). Deploy ulang backend terbaru.")
+                } else {
+                    showToast("error", data.message || `Gagal mengirim email (HTTP ${res.status}).`)
                 }
                 return
             }
-            alert(`Penawaran ${quotation.number} berhasil dikirim ke ${data.to}`)
+            showToast("success", `Penawaran ${quotation.number} terkirim ke ${data.to}`)
         } catch (e) {
-            alert("Gagal menghubungi server email. Periksa koneksi/backend.")
+            showToast("error", "Gagal menghubungi server email. Periksa koneksi/backend.")
         } finally {
             setSendingEmail(false)
         }
@@ -591,7 +597,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         </Button>
                         <Button onClick={sendEmail} disabled={busy || sendingEmail} variant="outline" title="Kirim penawaran (PDF) otomatis via Email"
                             className="rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200 font-bold h-9 px-4 text-xs uppercase tracking-wider">
-                            <Mail size={13} className="mr-2" />
+                            {sendingEmail ? <Loader2 size={13} className="mr-2 animate-spin" /> : <Mail size={13} className="mr-2" />}
                             {sendingEmail ? "Mengirim..." : "Email PDF"}
                         </Button>
                     </div>
@@ -884,6 +890,20 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                     </div>
                 </div>
             </motion.div>
+
+            {/* Toast notification */}
+            {toast && (
+                <div className={`fixed bottom-6 left-1/2 z-[200] flex max-w-[90vw] -translate-x-1/2 items-center gap-2 rounded-xl border px-4 py-3 text-xs font-semibold shadow-xl ${
+                    toast.type === "success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : toast.type === "error"
+                            ? "border-rose-200 bg-rose-50 text-rose-800"
+                            : "border-sky-200 bg-sky-50 text-sky-800"
+                }`}>
+                    {toast.type === "success" ? <CheckCircle2 size={15} /> : toast.type === "error" ? <AlertCircle size={15} /> : <Info size={15} />}
+                    <span>{toast.msg}</span>
+                </div>
+            )}
         </div>
     )
 }
