@@ -9,6 +9,7 @@ const fs = require('fs');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 const PDFDocument = require('pdfkit');
+const { decode: decodeNextAuthJwt } = require('next-auth/jwt');
 const SALT_ROUNDS = 10;
 
 dotenv.config();
@@ -28,6 +29,113 @@ let lastTrafficStats = {};
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use('/public', express.static(path.join(__dirname, 'public')));
+
+// --- GLOBAL API AUTH GUARD ---
+// Hanya endpoint publik tertentu (link PDF 24 jam) yang boleh tanpa session.
+const PUBLIC_API_PREFIXES = ['/api/health', '/api/login', '/api/quotations/shared/'];
+
+const parseCookies = (header = '') => {
+  const out = {};
+  for (const part of String(header).split(';')) {
+    const i = part.indexOf('=');
+    if (i < 0) continue;
+    const k = part.slice(0, i).trim();
+    const v = part.slice(i + 1).trim();
+    if (!k) continue;
+    try { out[k] = decodeURIComponent(v); } catch (_) { out[k] = v; }
+  }
+  return out;
+};
+
+async function requireApiAuth(req, res, next) {
+  const AUTH_DEBUG = process.env.AUTH_DEBUG === '1';
+  try {
+    if (req.method === 'OPTIONS') return next();
+
+    const full = (req.originalUrl || '').split('?')[0];
+    if (PUBLIC_API_PREFIXES.some((p) => full.startsWith(p))) return next();
+
+    const host = String(req.headers.host || '').split(':')[0];
+    const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    if (isLocal && process.env.ALLOW_LOCAL_API !== 'false') return next();
+
+    const cookies = parseCookies(req.headers.cookie || '');
+    if (AUTH_DEBUG) {
+      console.log('[AuthGuard]', req.method, full, {
+        hasCookieHeader: !!req.headers.cookie,
+        cookieNames: Object.keys(cookies),
+        secretLen: (process.env.NEXTAUTH_SECRET || '').length,
+      });
+    }
+
+    let user = null;
+
+    // 1) Coba session database (jika strategi NextAuth memakai database)
+    const dbToken =
+      cookies['__Secure-next-auth.session-token'] ||
+      cookies['next-auth.session-token'] ||
+      cookies['__Host-next-auth.session-token'];
+
+    if (dbToken) {
+      const session = await prisma.session.findUnique({
+        where: { sessionToken: dbToken },
+        include: { user: true }
+      });
+      if (session && new Date(session.expires).getTime() >= Date.now()) {
+        user = session.user;
+      }
+    }
+
+    // 2) Fallback: validasi JWT NextAuth (strategi "jwt")
+    if (!user) {
+      const secret = process.env.NEXTAUTH_SECRET;
+      if (!secret) {
+        return res.status(500).json({ message: 'Server auth belum dikonfigurasi (NEXTAUTH_SECRET).' });
+      }
+      for (const name of ['__Secure-next-auth.session-token', 'next-auth.session-token', '__Host-next-auth.session-token']) {
+        const cookieToken = cookies[name];
+        if (!cookieToken) continue;
+        let payload = null;
+        try {
+          payload = await decodeNextAuthJwt({ token: cookieToken, secret, salt: name });
+        } catch (_) {
+          payload = null;
+        }
+        if (payload) {
+          if (AUTH_DEBUG) console.log('[AuthGuard] jwt ok', { name, sub: payload.sub, email: payload.email });
+          if (payload.sub) {
+            user = await prisma.user.findUnique({ where: { id: payload.sub } });
+          }
+          if (!user && payload.email) {
+            user = await prisma.user.findUnique({ where: { email: payload.email } });
+          }
+          if (user) break;
+        } else if (AUTH_DEBUG) {
+          console.log('[AuthGuard] jwt failed', { name });
+        }
+      }
+    }
+
+    if (!user) {
+      return res.status(401).json({ message: 'Unauthorized: sesi login tidak valid' });
+    }
+
+    req.authUser = user;
+    // Timpa header agar seluruh RBAC lama memakai data session asli (anti-spoof)
+    req.headers['x-user-id'] = user.id;
+    req.headers['x-user-role'] = user.role;
+    req.headers['x-user-dept'] = user.department;
+    req.headers['x-user-name'] = user.name || user.email || '';
+
+    next();
+  } catch (e) {
+    console.error('[Auth Guard]', e);
+    res.status(500).json({ message: 'Auth error' });
+  }
+}
+
+app.use('/api', requireApiAuth);
+
 const itOslRouter = require('./routes/it-osl');
 app.use('/api/it-osl', itOslRouter);
 
