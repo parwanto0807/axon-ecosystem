@@ -1558,6 +1558,79 @@ app.get('/api/quotations/:id/pdf', async (req, res) => {
   }
 });
 
+const QUOTATION_SHARE_DIR = path.join(__dirname, 'storage', 'quotations');
+if (!fs.existsSync(QUOTATION_SHARE_DIR)) fs.mkdirSync(QUOTATION_SHARE_DIR, { recursive: true });
+
+const SHARE_TTL_MS = 24 * 60 * 60 * 1000; // 24 jam
+
+app.post('/api/quotations/:id/share', async (req, res) => {
+  try {
+    const quotation = await prisma.quotation.findUnique({ where: { id: req.params.id } });
+    if (!quotation) return res.status(404).json({ message: 'Quotation tidak ditemukan' });
+
+    const rawBase64 = typeof req.body?.pdfBase64 === 'string' ? req.body.pdfBase64 : '';
+    if (!rawBase64) return res.status(400).json({ message: 'PDF tidak dikirim.' });
+
+    const cleanB64 = rawBase64.includes(',') ? rawBase64.split(',').pop() : rawBase64;
+    const buf = Buffer.from(cleanB64, 'base64');
+    if (buf.length < 100) return res.status(400).json({ message: 'File PDF tidak valid.' });
+    if (buf.length > 20 * 1024 * 1024) return res.status(413).json({ message: 'Ukuran PDF terlalu besar (maks 20 MB).' });
+
+    // Bersihkan file lama (untuk quotation ini maupun yang sudah kedaluwarsa)
+    const now = Date.now();
+    for (const f of fs.readdirSync(QUOTATION_SHARE_DIR)) {
+      const m = f.match(/-(\d{13})\.pdf$/);
+      const expired = m ? Number(m[1]) < now : false;
+      if (expired || f.startsWith(`${quotation.number}-`)) {
+        try { fs.unlinkSync(path.join(QUOTATION_SHARE_DIR, f)); } catch (_) {}
+      }
+    }
+
+    const expiresAt = now + SHARE_TTL_MS;
+    const token = Math.random().toString(36).slice(2, 10);
+    const fileName = `${quotation.number}-${token}-${expiresAt}.pdf`;
+    fs.writeFileSync(path.join(QUOTATION_SHARE_DIR, fileName), buf);
+
+    const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const url = `${base.replace(/\/$/, '')}/api/quotations/shared/${fileName}`;
+
+    res.json({ url, expiresAt: new Date(expiresAt).toISOString() });
+  } catch (e) {
+    console.error('[Quotation Share]', e);
+    res.status(500).json({ message: e.message || 'Gagal membuat link PDF' });
+  }
+});
+
+app.get('/api/quotations/shared/:file', (req, res) => {
+  try {
+    const file = path.basename(req.params.file);
+    if (!/^[A-Za-z0-9._-]+\.pdf$/.test(file)) {
+      return res.status(400).json({ message: 'Nama file tidak valid.' });
+    }
+
+    const m = file.match(/-(\d{13})\.pdf$/);
+    if (!m) return res.status(404).json({ message: 'Link tidak valid.' });
+
+    const expiresAt = Number(m[1]);
+    const fullPath = path.join(QUOTATION_SHARE_DIR, file);
+
+    if (Date.now() > expiresAt) {
+      try { fs.unlinkSync(fullPath); } catch (_) {}
+      return res.status(410).send('Link penawaran sudah kedaluwarsa (berlaku 24 jam).');
+    }
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).send('File penawaran tidak ditemukan.');
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${file.replace(/-\d{13}\.pdf$/, '.pdf')}"`);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.sendFile(fullPath);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
 // --- SALES ORDER ROUTES ---
 
 async function generateSalesOrderNumber() {

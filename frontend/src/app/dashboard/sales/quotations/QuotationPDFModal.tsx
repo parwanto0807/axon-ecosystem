@@ -34,6 +34,7 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
     const [showPOContract, setShowPOContract] = useState(false)
     const [showSimpleList, setShowSimpleList] = useState(false)
     const [sendingEmail, setSendingEmail] = useState(false)
+    const [sharingWa, setSharingWa] = useState(false)
     const [toast, setToast] = useState<{ type: "success" | "error" | "info"; msg: string } | null>(null)
 
     const showToast = (type: "success" | "error" | "info", msg: string) => {
@@ -72,14 +73,40 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
         return lines.join("\n")
     }
 
-    const sendWhatsApp = () => {
+    const sendWhatsApp = async () => {
         const wa = normalizePhone(c?.phone)
         if (!wa) {
             showToast("error", "Nomor WhatsApp customer belum diisi di master customer.")
             return
         }
-        window.open(`https://wa.me/${wa}?text=${encodeURIComponent(buildShareText())}`, "_blank")
-        showToast("success", "Membuka WhatsApp customer...")
+        setSharingWa(true)
+        showToast("info", "Menyiapkan PDF & link penawaran...")
+        try {
+            const doc = await buildQuotationPdf()
+            const dataUri = doc.output("datauristring") as string
+            const pdfBase64 = dataUri.includes(",") ? dataUri.split(",").pop() || "" : dataUri
+
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/quotations/${quotation.id}/share`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pdfBase64 }),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok || !data.url) {
+                showToast("error", data.message || `Gagal membuat link PDF (HTTP ${res.status}).`)
+                return
+            }
+
+            const text = `${buildShareText()}\n\nLink PDF (berlaku 24 jam):\n${data.url}`
+            try { await navigator.clipboard.writeText(data.url) } catch (_) { /* ignore */ }
+
+            window.open(`https://wa.me/${wa}?text=${encodeURIComponent(text)}`, "_blank")
+            showToast("success", "Link PDF (24 jam) dibuat & dibuka di WhatsApp. Link juga disalin.")
+        } catch (e) {
+            showToast("error", "Gagal menyiapkan link PDF.")
+        } finally {
+            setSharingWa(false)
+        }
     }
 
     const sendEmail = async () => {
@@ -602,10 +629,10 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                             <Download size={13} className="mr-2" />
                             {showPOContract ? 'PO Contract' : 'PDF Quotation'}
                         </Button>
-                        <Button onClick={sendWhatsApp} disabled={busy} variant="outline" title="Kirim ringkasan penawaran via WhatsApp"
+                        <Button onClick={sendWhatsApp} disabled={busy || sharingWa} variant="outline" title="Kirim link PDF penawaran (berlaku 24 jam) via WhatsApp"
                             className="rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 font-bold h-9 px-4 text-xs uppercase tracking-wider">
-                            <MessageCircle size={13} className="mr-2" />
-                            WhatsApp
+                            {sharingWa ? <Loader2 size={13} className="mr-2 animate-spin" /> : <MessageCircle size={13} className="mr-2" />}
+                            {sharingWa ? "Menyiapkan..." : "WhatsApp"}
                         </Button>
                         <Button onClick={sendEmail} disabled={busy || sendingEmail} variant="outline" title="Kirim penawaran (PDF) otomatis via Email"
                             className="rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200 font-bold h-9 px-4 text-xs uppercase tracking-wider">
