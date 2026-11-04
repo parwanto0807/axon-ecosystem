@@ -1,7 +1,7 @@
 "use client"
 import { useState, Fragment } from "react"
 import { motion } from "framer-motion"
-import { X, Download } from "lucide-react"
+import { X, Download, Mail, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface QuotationItem { id?: string; no: number; description: string; qty: number; unit: string; unitPrice: number; discount: number; amount: number; costPrice?: number; isChecklist?: boolean; checked?: boolean }
@@ -36,6 +36,52 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
     const c = quotation.customer
     const sc = STATUS_CFG[quotation.status] || STATUS_CFG.DRAFT
     const poItems = quotation.items?.some(i => i.isChecklist) ? quotation.items.filter(i => i.checked) : (quotation.items || [])
+
+    const normalizePhone = (p?: string | null) => {
+        if (!p) return ""
+        let d = p.replace(/\D/g, "")
+        if (d.startsWith("0")) d = "62" + d.slice(1)
+        else if (d.startsWith("8")) d = "62" + d
+        return d
+    }
+
+    const buildShareText = () => {
+        const lines = [
+            `Yth. ${c?.name || "Bapak/Ibu"},`,
+            ``,
+            `Berikut kami sampaikan penawaran harga ${quotation.number}:`,
+            `Perihal: ${quotation.subject}`,
+            `Total: ${fr(quotation.grandTotal)}`,
+        ]
+        if (quotation.validUntil) lines.push(`Berlaku s/d: ${fd(quotation.validUntil)}`)
+        if (quotation.paymentTerms) lines.push(`Termin: ${quotation.paymentTerms}`)
+        lines.push(
+            ``,
+            `Dokumen penawaran (PDF) kami lampirkan menyusul.`,
+            ``,
+            `Hormat kami,`,
+            company?.name || "PT INTECH MITRA ABADI",
+        )
+        return lines.join("\n")
+    }
+
+    const sendWhatsApp = () => {
+        const wa = normalizePhone(c?.phone)
+        if (!wa) {
+            alert("Nomor WhatsApp customer belum diisi. Silakan lengkapi data customer terlebih dahulu.")
+            return
+        }
+        window.open(`https://wa.me/${wa}?text=${encodeURIComponent(buildShareText())}`, "_blank")
+    }
+
+    const sendEmail = () => {
+        if (!c?.email) {
+            alert("Email customer belum diisi. Silakan lengkapi data customer terlebih dahulu.")
+            return
+        }
+        const subject = `Penawaran Harga ${quotation.number} - ${company?.name || ""}`.trim()
+        window.location.href = `mailto:${c.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(buildShareText())}`
+    }
 
     const getProductImage = (it: QuotationItem) => {
         if (!products) return null
@@ -506,8 +552,8 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         </div>
                     </div>
                 </div>
-                <div className="px-8 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                <div className="px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button onClick={generatePDF} disabled={busy}
                             className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-9 px-5 text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20">
                             <Download size={13} className="mr-2" />
@@ -516,6 +562,16 @@ export default function QuotationPDFModal({ quotation, company, products, onClos
                         <Button onClick={() => setShowPOContract(!showPOContract)} disabled={busy} variant="outline" className="rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-bold h-9 px-5 text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/20">
                             <Download size={13} className="mr-2" />
                             {showPOContract ? 'PO Contract' : 'PDF Quotation'}
+                        </Button>
+                        <Button onClick={sendWhatsApp} disabled={busy} variant="outline" title="Kirim ringkasan penawaran via WhatsApp"
+                            className="rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200 font-bold h-9 px-4 text-xs uppercase tracking-wider">
+                            <MessageCircle size={13} className="mr-2" />
+                            WhatsApp
+                        </Button>
+                        <Button onClick={sendEmail} disabled={busy} variant="outline" title="Kirim ringkasan penawaran via Email"
+                            className="rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border-sky-200 font-bold h-9 px-4 text-xs uppercase tracking-wider">
+                            <Mail size={13} className="mr-2" />
+                            Email
                         </Button>
                     </div>
                     <button onClick={onClose} className="w-9 h-9 rounded-xl hover:bg-slate-200 flex items-center justify-center text-slate-500"><X size={18} /></button>
