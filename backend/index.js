@@ -155,7 +155,10 @@ async function requireApiAuth(req, res, next) {
     // supaya data JSON tidak bisa diintip atau di-bookmark.
     const secFetchMode = String(req.headers['sec-fetch-mode'] || '').toLowerCase();
     const secFetchDest = String(req.headers['sec-fetch-dest'] || '').toLowerCase();
-    if (secFetchMode === 'navigate' || secFetchDest === 'document') {
+    const acceptHeader = String(req.headers.accept || '').toLowerCase();
+    // Navigasi browser selalu minta HTML; fetch/XHR minta JSON atau */*.
+    const wantsHtmlDocument = acceptHeader.includes('text/html') && !acceptHeader.includes('application/json');
+    if (secFetchMode === 'navigate' || secFetchDest === 'document' || wantsHtmlDocument) {
       return res.status(404).json({ reason: 'not_a_browser_endpoint', message: 'Not found' });
     }
 
