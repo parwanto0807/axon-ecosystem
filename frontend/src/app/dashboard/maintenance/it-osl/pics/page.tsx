@@ -10,11 +10,12 @@ import {
   Wrench, Building2, Briefcase, Plus, FileSpreadsheet, 
   RotateCcw, CheckCircle2, AlertCircle, Copy, Check,
   Filter, Sparkles, PhoneCall, ChevronDown, ChevronUp,
-  FolderKanban, Layers
+  FolderKanban, Layers, ExternalLink, ShieldCheck, Tag
 } from "lucide-react"
-
+import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
+import { ItOslNav } from "@/components/it-osl/ItOslNav"
 import { canItOsl } from "@/lib/itOslPermissions"
 
 const API = process.env.NEXT_PUBLIC_API_URL
@@ -77,8 +78,8 @@ export default function ItOslPicsPage() {
 
 function ItOslPicsContent() {
   const { data: session } = useSession()
-  const currentUserId = (session?.user as { id?:string })?.id || null
-  const currentRole = (session?.user as { role?:string })?.role || null
+  const currentUserId = (session?.user as { id?: string })?.id || null
+  const currentRole = (session?.user as { role?: string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
   const canWrite = canItOsl(currentRole, 'master.write')
   const canLocationWrite = canItOsl(currentRole, 'location.write')
@@ -116,7 +117,14 @@ function ItOslPicsContent() {
   const [editing, setEditing] = useState<Pic | null>(null)
   const [form, setForm] = useState({
     customerId: "",
-    name: "", position: "", department: "", phone: "", email: "", locationId: "", notes: "", isActive: true
+    name: "",
+    position: "",
+    department: "",
+    phone: "",
+    email: "",
+    locationId: "",
+    notes: "",
+    isActive: true
   })
   const [saving, setSaving] = useState(false)
 
@@ -124,6 +132,11 @@ function ItOslPicsContent() {
   const [showAddLocationModal, setShowAddLocationModal] = useState(false)
   const [locationForm, setLocationForm] = useState({ code: "", name: "", address: "" })
   const [savingLocation, setSavingLocation] = useState(false)
+
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<PicDetail | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null)
 
   const submitQuickLocation = async () => {
     if (!canLocationWrite) return alert("Role Anda tidak memiliki izin menambah lokasi")
@@ -148,9 +161,7 @@ function ItOslPicsContent() {
       const d = await res.json()
       if (!res.ok) throw new Error(d.message || "Gagal membuat lokasi baru")
 
-      // Update locations list
       setLocations(prev => [...prev, d])
-      // Auto-select in pic form
       setForm(prev => ({ ...prev, locationId: d.id }))
       setShowAddLocationModal(false)
       setLocationForm({ code: "", name: "", address: "" })
@@ -160,11 +171,6 @@ function ItOslPicsContent() {
       setSavingLocation(false)
     }
   }
-
-  const [detailId, setDetailId] = useState<string | null>(null)
-  const [detail, setDetail] = useState<PicDetail | null>(null)
-  const [loadingDetail, setLoadingDetail] = useState(false)
-  const [copiedPhone, setCopiedPhone] = useState<string | null>(null)
 
   // Fetch initial data
   const load = async () => {
@@ -296,7 +302,6 @@ function ItOslPicsContent() {
       ticketCount: number
     }>()
 
-    // Initialize with customers list
     customers.forEach(c => {
       groupsMap.set(c.id, {
         customerId: c.id,
@@ -368,8 +373,14 @@ function ItOslPicsContent() {
     setEditing(null)
     setForm({
       customerId: (custId && custId !== "unassigned") ? custId : filterCustomer || (customers[0]?.id || ""),
-      name: "", position: "", department: "", phone: "", email: "",
-      locationId: locations[0]?.id || "", notes: "", isActive: true
+      name: "",
+      position: "",
+      department: "",
+      phone: "",
+      email: "",
+      locationId: locations[0]?.id || "",
+      notes: "",
+      isActive: true
     })
     setShowForm(true)
   }
@@ -449,14 +460,15 @@ function ItOslPicsContent() {
     setTimeout(() => setCopiedPhone(null), 2000)
   }
 
-  // CSV
+  // CSV Export
   const exportCsv = () => {
     if (filteredPics.length === 0) return alert("Tidak ada data PIC untuk diekspor")
-    const headers = ["Nama PIC", "Jabatan", "Departemen / Unit", "No. Telepon / WA", "Email", "Lokasi", "Jumlah Aset", "Status", "Catatan"]
+    const headers = ["Nama PIC", "Jabatan", "Departemen / Unit", "Customer", "No. Telepon / WA", "Email", "Lokasi", "Jumlah Aset", "Status", "Catatan"]
     const rows = filteredPics.map(p => [
       `"${p.name.replace(/"/g, '""')}"`,
       `"${(p.position || "").replace(/"/g, '""')}"`,
       `"${(p.department || "").replace(/"/g, '""')}"`,
+      `"${(p.customer?.name || "-").replace(/"/g, '""')}"`,
       `"${p.phone || ""}"`,
       `"${p.email || ""}"`,
       `"${p.location?.name || ""}"`,
@@ -468,7 +480,7 @@ function ItOslPicsContent() {
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement("a")
     link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `axon_pics_directory_${new Date().toISOString().slice(0, 10)}.csv`)
+    link.setAttribute("download", `Data_PIC_Axon_${new Date().toISOString().slice(0, 10)}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -481,7 +493,7 @@ function ItOslPicsContent() {
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement("a")
     link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `template_import_pic.csv`)
+    link.setAttribute("download", `Template_Import_PIC.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -531,33 +543,40 @@ function ItOslPicsContent() {
   }
 
   // Format phone for WhatsApp direct URL
-  const getWhatsAppUrl = (phoneStr: string | null) => {
+  const getWhatsAppUrl = (phoneStr: string | null, picName?: string) => {
     if (!phoneStr) return null
     let clean = phoneStr.replace(/\D/g, "")
     if (clean.startsWith("0")) clean = "62" + clean.slice(1)
     else if (!clean.startsWith("62")) clean = "62" + clean
-    return `https://wa.me/${clean}`
+    const msg = picName
+      ? `Halo Bapak/Ibu ${picName}, dari IT Support Axon terkait koordinasi maintenance & tiket...`
+      : "Halo dari IT Support Axon terkait koordinasi maintenance & operasional..."
+    return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`
   }
 
   return (
-    <div className="w-full max-w-full px-3 sm:px-4 md:px-6 lg:px-8 py-3.5 sm:py-6 space-y-3.5 sm:space-y-4 pb-28 md:pb-8 overflow-x-hidden font-sans relative">
-      {/* ── 1. HEADER ──────────────────────────────────────────────────────────── */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full bg-white p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-indigo-700 to-indigo-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/20 text-white">
-            <Users size={20} />
+    <div className="w-full max-w-full px-3 sm:px-4 md:px-6 lg:px-8 py-3.5 sm:py-6 space-y-4 pb-28 md:pb-8 font-sans">
+      
+      {/* ── SUB-NAVIGATION TABS ──────────────────────────────────────────────── */}
+      <ItOslNav badgeCounts={{ pics: pics.length }} />
+
+      {/* ── 1. HEADER & GLOBAL ACTIONS ────────────────────────────────────────── */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/20 text-white">
+            <Users size={22} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight truncate">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
                 Direktori PIC Unit
               </h1>
-              <span className="text-[10px] sm:text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+              <span className="text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800">
                 {pics.length} PIC
               </span>
             </div>
-            <p className="text-[10px] sm:text-xs text-slate-400 truncate">
-              Kontak Penanggung Jawab Unit, Pelapor Tiket & Pemegang Aset
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+              Kontak Penanggung Jawab Unit Kerja • Pelapor Insiden • Pemegang Perangkat IT
             </p>
           </div>
         </div>
@@ -566,14 +585,14 @@ function ItOslPicsContent() {
         <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap">
           <button
             onClick={exportCsv}
-            className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+            className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 shadow-xs transition"
           >
             <Download size={14} className="text-slate-500" />
             <span className="hidden sm:inline">Export</span> CSV
           </button>
 
           {canPicWrite && (
-            <label className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer transition">
+            <label className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center gap-1.5 shadow-xs cursor-pointer transition">
               <Upload size={14} className="text-slate-500" />
               <span className="hidden sm:inline">Import</span> CSV
               <input
@@ -592,16 +611,16 @@ function ItOslPicsContent() {
 
           <button
             onClick={downloadTemplate}
-            className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-500 hover:text-slate-700 transition shadow-sm hidden sm:flex"
+            className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 text-slate-500 hover:text-slate-700 transition shadow-xs hidden sm:flex"
             title="Unduh Template CSV PIC"
           >
-            <FileSpreadsheet size={16} />
+            <FileSpreadsheet size={15} />
           </button>
 
           {canPicWrite && (
             <button
-              onClick={openCreate}
-              className="hidden sm:flex px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black items-center gap-1.5 shadow-md shadow-indigo-600/25 transition"
+              onClick={() => openCreate()}
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-indigo-600/25 transition"
             >
               <Plus size={16} strokeWidth={2.5} />
               <span>Tambah PIC</span>
@@ -610,41 +629,60 @@ function ItOslPicsContent() {
         </div>
       </header>
 
-      {/* ── 2. KPI METRICS CARDS ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full">
+      {/* ── 2. KPI TELEMETRY METRIC TILES ─────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <button
           onClick={clearAllFilters}
-          className="p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm text-left hover:border-slate-300 transition active:scale-95"
+          className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-left hover:border-slate-300 dark:hover:border-slate-700 transition active:scale-95"
         >
-          <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">Total PIC Terdaftar</p>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 tabular-nums">{metrics.total}</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">{metrics.deptCount} Unit / Departemen</p>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total PIC Terdaftar</span>
+            <Users size={14} className="text-slate-400" />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">{metrics.total}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{metrics.deptCount} Unit / Departemen</p>
         </button>
 
         <button
           onClick={() => { clearAllFilters(); setFilterActive("active"); }}
-          className="p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm text-left hover:border-emerald-300 transition active:scale-95"
+          className={`p-3.5 bg-white dark:bg-slate-900 rounded-2xl border text-left transition active:scale-95 shadow-xs ${
+            filterActive === "active" ? "border-emerald-500 ring-2 ring-emerald-500/20" : "border-slate-200/80 dark:border-slate-800 hover:border-emerald-300"
+          }`}
         >
-          <p className="text-[9px] font-black uppercase tracking-wider text-emerald-600">PIC Aktif</p>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 tabular-nums">{metrics.active}</p>
-          <p className="text-[10px] text-emerald-600 mt-0.5">Siap dihubungi</p>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">PIC Aktif</span>
+            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">{metrics.active}</p>
+          <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Siap dihubungi</p>
         </button>
 
-        <div className="p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm text-left">
-          <p className="text-[9px] font-black uppercase tracking-wider text-indigo-600">Pegang Aset</p>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 tabular-nums">{metrics.withAssets}</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Memegang &ge;1 perangkat</p>
+        <div className="p-3.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs text-left">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Pegang Aset</span>
+            <Package size={14} className="text-indigo-500" />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">{metrics.withAssets}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Memegang &ge;1 perangkat</p>
         </div>
 
-        <div className="p-3 sm:p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm text-left">
-          <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Non-Aktif</p>
-          <p className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 tabular-nums">{metrics.inactive}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">Riwayat PIC lama</p>
-        </div>
+        <button
+          onClick={() => { clearAllFilters(); setFilterActive("inactive"); }}
+          className={`p-3.5 bg-white dark:bg-slate-900 rounded-2xl border text-left transition active:scale-95 shadow-xs ${
+            filterActive === "inactive" ? "border-slate-500 ring-2 ring-slate-500/20" : "border-slate-200/80 dark:border-slate-800 hover:border-slate-400"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Non-Aktif</span>
+            <div className="w-2 h-2 rounded-full bg-slate-400" />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-1 tabular-nums">{metrics.inactive}</p>
+          <p className="text-xs text-slate-400 mt-0.5">Riwayat kontak lama</p>
+        </button>
       </div>
 
-      {/* ── 3. SEARCH & FILTERS TOOLBAR ───────────────────────────────────────── */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+      {/* ── 3. SEARCH & STREAMLINED FILTER TOOLBAR ────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
           <div className="relative flex-1 min-w-0">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -652,35 +690,20 @@ function ItOslPicsContent() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Cari PIC, no. telepon/WA, departemen, jabatan, lokasi..."
-              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full pl-10 pr-9 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
             />
             {q && (
-              <button onClick={() => setQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 p-1">
+              <button onClick={() => setQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
                 <X size={14} />
               </button>
             )}
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {customers.length > 0 && (
-              <select
-                value={filterCustomer}
-                onChange={(e) => setFilterCustomer(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-indigo-200 text-xs font-bold bg-indigo-50/50 text-indigo-900 max-w-[190px]"
-              >
-                <option value="">Semua Customer</option>
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.companyName ? `(${c.companyName})` : ""}
-                  </option>
-                ))}
-              </select>
-            )}
-
             <select
               value={filterDept}
               onChange={(e) => setFilterDept(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium bg-white text-slate-700"
+              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
             >
               <option value="">Semua Departemen</option>
               {departments.map(d => <option key={d} value={d}>{d}</option>)}
@@ -689,7 +712,7 @@ function ItOslPicsContent() {
             <select
               value={filterLocation}
               onChange={(e) => setFilterLocation(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium bg-white text-slate-700"
+              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
             >
               <option value="">Semua Lokasi</option>
               {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -698,40 +721,40 @@ function ItOslPicsContent() {
             <select
               value={filterActive}
               onChange={(e) => setFilterActive(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium bg-white text-slate-700"
+              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
             >
               <option value="">Semua Status</option>
               <option value="active">Aktif</option>
               <option value="inactive">Nonaktif</option>
             </select>
 
-            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+            {/* View Switchers */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
               <button
                 onClick={() => setGroupByCustomer(!groupByCustomer)}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
                   groupByCustomer
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-transparent text-slate-600 hover:text-slate-900"
+                    ? "bg-indigo-600 text-white shadow-xs"
+                    : "bg-transparent text-slate-600 dark:text-slate-300 hover:text-slate-900"
                 }`}
                 title="Kelompokkan PIC berdasarkan Customer"
               >
                 <FolderKanban size={14} />
-                <span className="hidden sm:inline">Group Customer</span>
-                <span className="sm:hidden">Group</span>
+                <span className="hidden sm:inline">Kelompokkan</span>
               </button>
 
-              <div className="h-4 w-[1px] bg-slate-200 mx-0.5" />
+              <div className="h-4 w-[1px] bg-slate-200 dark:bg-slate-700 mx-0.5" />
 
               <button
                 onClick={() => setViewMode("table")}
-                className={`p-1.5 rounded-lg text-xs font-bold transition ${viewMode === "table" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"}`}
+                className={`p-1.5 rounded-lg text-xs font-semibold transition ${viewMode === "table" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs" : "text-slate-500 dark:text-slate-400"}`}
                 title="Tampilan Tabel"
               >
                 <LayoutList size={15} />
               </button>
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-lg text-xs font-bold transition ${viewMode === "grid" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500"}`}
+                className={`p-1.5 rounded-lg text-xs font-semibold transition ${viewMode === "grid" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs" : "text-slate-500 dark:text-slate-400"}`}
                 title="Tampilan Kartu"
               >
                 <LayoutGrid size={15} />
@@ -740,31 +763,32 @@ function ItOslPicsContent() {
           </div>
         </div>
 
-        {/* Customer Quick Pills Tabs Bar */}
+        {/* Unified Customer Pills Strip */}
         {customers.length > 0 && (
-          <div className="pt-2.5 border-t border-slate-100">
+          <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800">
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Pilih Customer:</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Pilih Customer:</span>
               {groupByCustomer && groupedPics.length > 1 && (
-                <div className="flex items-center gap-1.5 text-[11px]">
-                  <button onClick={expandAll} className="text-indigo-600 hover:underline font-bold">Buka Semua</button>
-                  <span className="text-slate-300">•</span>
-                  <button onClick={collapseAll} className="text-slate-500 hover:underline font-medium">Tutup Semua</button>
+                <div className="flex items-center gap-2 text-xs">
+                  <button onClick={expandAll} className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold">Buka Semua</button>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <button onClick={collapseAll} className="text-slate-500 dark:text-slate-400 hover:underline font-medium">Tutup Semua</button>
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
               <button
                 onClick={() => setFilterCustomer("")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1.5 ${
                   !filterCustomer
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
                 }`}
               >
                 <Building2 size={13} />
                 <span>Semua Customer</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20">
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-white/20 dark:bg-black/20">
                   {pics.length}
                 </span>
               </button>
@@ -777,15 +801,15 @@ function ItOslPicsContent() {
                   <button
                     key={c.id}
                     onClick={() => setFilterCustomer(isSelected ? "" : c.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition flex items-center gap-1.5 border ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 transition flex items-center gap-1.5 border ${
                       isSelected
-                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-                        : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-xs"
+                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200/80 dark:border-slate-700 hover:bg-slate-50"
                     }`}
                   >
                     <span>{c.name}</span>
                     <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
-                      isSelected ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-700"
+                      isSelected ? "bg-white/20 text-white" : "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300"
                     }`}>
                       {count}
                     </span>
@@ -796,36 +820,43 @@ function ItOslPicsContent() {
           </div>
         )}
 
+        {/* Active Filter Summary */}
         {(q || filterCustomer || filterDept || filterLocation || filterActive) && (
-          <div className="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs text-slate-500 flex-wrap">
+          <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
             <span>Filter Aktif:</span>
             {filterCustomer && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-300 text-[11px] font-semibold">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-100/70 dark:bg-indigo-950/50 text-indigo-800 dark:text-indigo-300 border border-indigo-200 text-[11px] font-semibold">
                 Customer: {customers.find(c => c.id === filterCustomer)?.name}
                 <button onClick={() => setFilterCustomer("")}><X size={11} /></button>
               </span>
             )}
-            <button onClick={clearAllFilters} className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[11px]">
+            {filterDept && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-medium">
+                Dept: {filterDept}
+                <button onClick={() => setFilterDept("")}><X size={11} /></button>
+              </span>
+            )}
+            <button onClick={clearAllFilters} className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold flex items-center gap-1 text-[11px]">
               <RotateCcw size={11} /> Reset Filter
             </button>
           </div>
         )}
       </div>
 
-      {/* ── 4. DATA VIEW (GROUPED BY CUSTOMER OR FLAT LIST) ───────────────────── */}
+      {/* ── 4. DATA VIEW ─────────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2.5">
-          <Loader2 className="animate-spin text-indigo-600" size={28} />
-          <p className="text-xs sm:text-sm font-bold text-slate-600">Memuat Direktori PIC...</p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+          <Loader2 className="animate-spin text-indigo-600" size={32} />
+          <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300">Memuat Direktori PIC...</p>
         </div>
       ) : filteredPics.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center text-slate-500 space-y-2.5">
-          <Users size={36} className="mx-auto text-slate-300" />
-          <h3 className="font-black text-sm sm:text-base text-slate-800">Tidak ada PIC yang sesuai</h3>
-          <p className="text-xs text-slate-400">Tekan tombol Tambah PIC untuk mendaftarkan kontak baru.</p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-12 text-center text-slate-500 space-y-3">
+          <Users size={40} className="mx-auto text-slate-300 dark:text-slate-600" />
+          <h3 className="font-bold text-sm sm:text-base text-slate-800 dark:text-slate-200">Tidak ada PIC yang sesuai</h3>
+          <p className="text-xs text-slate-400">Tekan tombol Tambah PIC untuk mendaftarkan kontak penanggung jawab baru.</p>
         </div>
       ) : groupByCustomer ? (
-        /* ══════════ GROUPED BY CUSTOMER VIEW ══════════ */
+        /* ══════════ GROUPED BY CUSTOMER ACCORDION VIEW ══════════ */
         <div className="space-y-4">
           {groupedPics.map((group) => {
             const isCollapsed = Boolean(collapsedGroups[group.customerId])
@@ -833,32 +864,32 @@ function ItOslPicsContent() {
             return (
               <div
                 key={group.customerId}
-                className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden transition hover:border-slate-300"
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden"
               >
                 {/* Customer Group Header */}
-                <div className="p-3.5 sm:p-4 bg-gradient-to-r from-slate-50 via-white to-indigo-50/30 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="p-3.5 sm:p-4 bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
                   <div 
                     onClick={() => toggleCollapse(group.customerId)}
                     className="flex items-center gap-3 cursor-pointer select-none min-w-0 flex-1"
                   >
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/20">
-                      <Building2 size={20} />
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Building2 size={18} />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-sm sm:text-base font-black text-slate-900 truncate">
+                        <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
                           {group.customerName}
                         </h2>
                         {group.customerCode && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-200/80 text-slate-700">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                             {group.customerCode}
                           </span>
                         )}
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                          {group.pics.length} PIC Terdaftar
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          {group.pics.length} PIC
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
                         <span>{group.activeCount} PIC Aktif</span>
                         <span>•</span>
                         <span>{group.assetCount} Aset Dipegang</span>
@@ -868,20 +899,20 @@ function ItOslPicsContent() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {canPicWrite && (
-                    <button
-                      onClick={() => openCreate(group.customerId)}
-                      className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center gap-1 transition active:scale-95 border border-indigo-200"
-                    >
-                      <Plus size={14} />
-                      <span>Tambah PIC</span>
-                    </button>
+                      <button
+                        onClick={() => openCreate(group.customerId)}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 text-xs font-semibold flex items-center gap-1 transition active:scale-95 border border-indigo-200 dark:border-indigo-800"
+                      >
+                        <Plus size={14} />
+                        <span>Tambah PIC</span>
+                      </button>
                     )}
 
                     <button
                       onClick={() => toggleCollapse(group.customerId)}
-                      className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 transition"
+                      className="p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-600 dark:text-slate-300 transition"
                       title={isCollapsed ? "Buka Daftar PIC" : "Tutup Daftar PIC"}
                     >
                       {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
@@ -892,290 +923,16 @@ function ItOslPicsContent() {
                 {/* Customer Group Body */}
                 {!isCollapsed && (
                   <div className="p-3 sm:p-4">
-                    {group.pics.length === 0 ? (
-                      <div className="text-center py-6 text-slate-400 text-xs italic">
-                        Belum ada PIC terdaftar untuk customer ini.
+                    {viewMode === "grid" ? (
+                      /* Grid per customer */
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {group.pics.map((p) => renderPicCard(p))}
                       </div>
                     ) : (
-                      <>
-                        {/* Mobile Card List per Group */}
-                        <div className="block md:hidden space-y-2.5">
-                          {group.pics.map((p) => {
-                            const waUrl = getWhatsAppUrl(p.phone)
-
-                            return (
-                              <div
-                                key={p.id}
-                                className="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-3 space-y-2"
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0 border border-indigo-200">
-                                      {p.name.slice(0, 2).toUpperCase()}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <h3 
-                                        onClick={() => setDetailId(p.id)}
-                                        className="font-bold text-slate-900 text-xs truncate hover:text-indigo-600 cursor-pointer"
-                                      >
-                                        {p.name}
-                                      </h3>
-                                      <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                                        {p.position ? `${p.position} • ` : ""}{p.department || "Umum"}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 ${
-                                    p.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
-                                  }`}>
-                                    {p.isActive ? "Aktif" : "Non-aktif"}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60 text-[11px] text-slate-600">
-                                  <div className="flex items-center gap-1 min-w-0">
-                                    <MapPin size={11} className="text-slate-400 shrink-0" />
-                                    <span className="truncate">{p.location?.name || "-"}</span>
-                                  </div>
-
-                                  <div className="flex items-center gap-1.5 shrink-0 font-medium">
-                                    <span className="text-indigo-600 font-bold">{p.assetCount || 0} Aset</span>
-                                    <span className="text-slate-300">•</span>
-                                    <span>{p.ticketCount || 0} Tiket</span>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-200/60">
-                                  {p.phone && waUrl ? (
-                                    <a
-                                      href={waUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="flex-1 py-1.5 px-2.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[11px] font-bold flex items-center justify-center gap-1 transition"
-                                    >
-                                      <MessageCircle size={12} />
-                                      <span>WhatsApp</span>
-                                    </a>
-                                  ) : (
-                                    <span className="flex-1 py-1 px-2 bg-white rounded-lg text-slate-400 text-[10px] text-center italic">
-                                      Tanpa WA
-                                    </span>
-                                  )}
-
-                                  <button
-                                    onClick={() => setDetailId(p.id)}
-                                    className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-[11px] font-bold flex items-center gap-1 transition"
-                                  >
-                                    <Eye size={12} /> Detail
-                                  </button>
-                                  <button
-                                    onClick={() => openEdit(p)}
-                                    className="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-600"
-                                  >
-                                    <Edit2 size={12} />
-                                  </button>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-
-                        {/* Desktop View per Group */}
-                        <div className="hidden md:block">
-                          {viewMode === "table" ? (
-                            <div className="overflow-x-auto rounded-2xl border border-slate-100">
-                              <table className="w-full text-left text-xs border-collapse">
-                                <thead>
-                                  <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-                                    <th className="p-3">Nama PIC</th>
-                                    <th className="p-3">Jabatan & Departemen</th>
-                                    <th className="p-3">Kontak (WA / Telp)</th>
-                                    <th className="p-3">Lokasi Kerja</th>
-                                    <th className="p-3 text-center">Aset</th>
-                                    <th className="p-3 text-center">Tiket</th>
-                                    <th className="p-3">Status</th>
-                                    <th className="p-3 text-right w-24">Aksi</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 text-slate-700">
-                                  {group.pics.map((p) => {
-                                    const waUrl = getWhatsAppUrl(p.phone)
-
-                                    return (
-                                      <tr key={p.id} className="hover:bg-indigo-50/20 transition-colors">
-                                        <td className="p-3">
-                                          <div className="flex items-center gap-2.5">
-                                            <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0 border border-indigo-200">
-                                              {p.name.slice(0, 2).toUpperCase()}
-                                            </div>
-                                            <div>
-                                              <p className="font-bold text-slate-900 text-sm hover:text-indigo-600 cursor-pointer" onClick={() => setDetailId(p.id)}>
-                                                {p.name}
-                                              </p>
-                                              {p.email && <p className="text-[11px] text-slate-400 truncate">{p.email}</p>}
-                                            </div>
-                                          </div>
-                                        </td>
-
-                                        <td className="p-3">
-                                          <div>
-                                            <p className="font-semibold text-slate-800">{p.position || "-"}</p>
-                                            <p className="text-[11px] text-slate-500 mt-0.5">{p.department || "Umum"}</p>
-                                          </div>
-                                        </td>
-
-                                        <td className="p-3 whitespace-nowrap">
-                                          {p.phone ? (
-                                            <div className="flex items-center gap-1.5">
-                                              <span className="font-mono text-xs font-semibold text-slate-800">{p.phone}</span>
-                                              <button
-                                                onClick={() => copyPhone(p.phone!)}
-                                                className="text-slate-400 hover:text-slate-600 p-1"
-                                                title="Salin nomor"
-                                              >
-                                                {copiedPhone === p.phone ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                                              </button>
-                                              {waUrl && (
-                                                <a
-                                                  href={waUrl}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  className="p-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition"
-                                                  title="Kirim WhatsApp"
-                                                >
-                                                  <MessageCircle size={13} />
-                                                </a>
-                                              )}
-                                            </div>
-                                          ) : (
-                                            <span className="text-slate-400 text-xs italic">Tanpa No. HP</span>
-                                          )}
-                                        </td>
-
-                                        <td className="p-3 whitespace-nowrap">
-                                          <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs font-medium">
-                                            <MapPin size={11} className="text-slate-400 shrink-0" />
-                                            <span className="truncate max-w-[120px]">{p.location?.name || "-"}</span>
-                                          </span>
-                                        </td>
-
-                                        <td className="p-3 text-center whitespace-nowrap">
-                                          <button
-                                            onClick={() => setDetailId(p.id)}
-                                            className="font-bold text-xs px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition"
-                                          >
-                                            {p.assetCount || 0} Aset
-                                          </button>
-                                        </td>
-
-                                        <td className="p-3 text-center whitespace-nowrap">
-                                          <span className="font-bold text-xs text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
-                                            {p.ticketCount || 0} Tiket
-                                          </span>
-                                        </td>
-
-                                        <td className="p-3 whitespace-nowrap">
-                                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                            p.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
-                                          }`}>
-                                            {p.isActive ? "Aktif" : "Non-aktif"}
-                                          </span>
-                                        </td>
-
-                                        <td className="p-3 text-right whitespace-nowrap">
-                                          <div className="flex items-center justify-end gap-1">
-                                            <button
-                                              onClick={() => setDetailId(p.id)}
-                                              className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition"
-                                              title="Detail PIC"
-                                            >
-                                              <Eye size={12} />
-                                            </button>
-                                            <button
-                                              onClick={() => openEdit(p)}
-                                              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition"
-                                              title="Edit PIC"
-                                            >
-                                              <Edit2 size={12} />
-                                            </button>
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    )
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                              {group.pics.map((p) => {
-                                const waUrl = getWhatsAppUrl(p.phone)
-
-                                return (
-                                  <div key={p.id} className="bg-slate-50/60 rounded-2xl border border-slate-200/80 p-3.5 flex flex-col justify-between hover:bg-white hover:shadow-sm transition">
-                                    <div>
-                                      <div className="flex items-start justify-between gap-2">
-                                        <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center border border-indigo-200">
-                                          {p.name.slice(0, 2).toUpperCase()}
-                                        </div>
-                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                                          p.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
-                                        }`}>
-                                          {p.isActive ? "Aktif" : "Nonaktif"}
-                                        </span>
-                                      </div>
-
-                                      <h3 className="font-bold text-slate-900 text-xs sm:text-sm mt-2.5 hover:text-indigo-600 cursor-pointer truncate" onClick={() => setDetailId(p.id)}>
-                                        {p.name}
-                                      </h3>
-                                      <p className="text-[11px] text-slate-500 font-medium truncate">
-                                        {p.position ? `${p.position} • ` : ""}{p.department || "Umum"}
-                                      </p>
-
-                                      <div className="space-y-1 mt-2.5 pt-2 border-t border-slate-200/60 text-xs text-slate-600">
-                                        <p className="flex items-center gap-1.5">
-                                          <MapPin size={12} className="text-slate-400 shrink-0" />
-                                          <span className="truncate">{p.location?.name || "-"}</span>
-                                        </p>
-                                        {p.phone && (
-                                          <p className="flex items-center justify-between gap-1 font-mono text-[11px]">
-                                            <span className="flex items-center gap-1 text-slate-700">
-                                              <Phone size={11} className="text-slate-400 shrink-0" />
-                                              <span>{p.phone}</span>
-                                            </span>
-                                            {waUrl && (
-                                              <a href={waUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline text-[10px] font-bold font-sans">
-                                                WA
-                                              </a>
-                                            )}
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center gap-1.5">
-                                      <button
-                                        onClick={() => setDetailId(p.id)}
-                                        className="flex-1 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-1 transition"
-                                      >
-                                        <Eye size={12} /> Detail
-                                      </button>
-                                      <button
-                                        onClick={() => openEdit(p)}
-                                        className="p-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 transition"
-                                        title="Edit PIC"
-                                      >
-                                        <Edit2 size={13} />
-                                      </button>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </>
+                      /* Table per customer */
+                      <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800">
+                        {renderPicTable(group.pics)}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1184,478 +941,257 @@ function ItOslPicsContent() {
           })}
         </div>
       ) : (
-        /* ══════════ FLAT LIST VIEW WITH PAGINATION ══════════ */
-        <>
-          {/* MOBILE VIEW (CARD LIST) */}
-          <div className="block md:hidden space-y-2.5">
-            {paginatedPics.map((p) => {
-              const waUrl = getWhatsAppUrl(p.phone)
-
-              return (
-                <div
-                  key={p.id}
-                  className="bg-white rounded-2xl border border-slate-100 p-3.5 space-y-2.5 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-2.5">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0 border border-indigo-100">
-                        {p.name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 
-                            onClick={() => setDetailId(p.id)}
-                            className="font-black text-slate-900 text-xs sm:text-sm truncate hover:text-indigo-600 cursor-pointer"
-                          >
-                            {p.name}
-                          </h3>
-                          {p.customer && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
-                              {p.customer.name}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                          {p.position ? `${p.position} • ` : ""}{p.department || "Umum"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 ${
-                      p.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
-                    }`}>
-                      {p.isActive ? "Aktif" : "Non-aktif"}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-50 text-[11px] text-slate-600">
-                    <div className="flex items-center gap-1 min-w-0">
-                      <MapPin size={12} className="text-slate-400 shrink-0" />
-                      <span className="truncate">{p.location?.name || "-"}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-indigo-600 font-bold">{p.assetCount || 0} Aset</span>
-                      <span className="text-slate-400">•</span>
-                      <span className="text-slate-600 font-semibold">{p.ticketCount || 0} Tiket</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-slate-50">
-                    {p.phone && waUrl ? (
-                      <a
-                        href={waUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-[11px] font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
-                      >
-                        <MessageCircle size={13} />
-                        <span>Chat WhatsApp</span>
-                      </a>
-                    ) : (
-                      <span className="flex-1 py-1.5 px-3 rounded-xl bg-slate-50 text-slate-400 text-[11px] text-center italic">
-                        Tanpa Nomor WA
-                      </span>
-                    )}
-
-                    <button
-                      onClick={() => setDetailId(p.id)}
-                      className="px-3.5 py-1.5 rounded-xl bg-slate-900 text-white text-[11px] font-bold flex items-center gap-1 active:scale-95 transition"
-                    >
-                      <Eye size={12} /> Detail
-                    </button>
-                    <button
-                      onClick={() => openEdit(p)}
-                      className="p-1.5 rounded-xl border border-slate-200 text-slate-600 active:scale-95"
-                    >
-                      <Edit2 size={13} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* DESKTOP TABLE / GRID VIEW */}
-          <div className="hidden md:block">
-            {viewMode === "table" ? (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-                <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-                        <th className="p-3.5">Nama PIC</th>
-                        <th className="p-3.5">Customer</th>
-                        <th className="p-3.5">Jabatan & Departemen</th>
-                        <th className="p-3.5">Kontak (WhatsApp / Telp)</th>
-                        <th className="p-3.5">Lokasi Kerja</th>
-                        <th className="p-3.5 text-center">Aset Dipegang</th>
-                        <th className="p-3.5 text-center">Tiket Dilaporkan</th>
-                        <th className="p-3.5">Status</th>
-                        <th className="p-3.5 text-right w-28">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {paginatedPics.map((p) => {
-                        const waUrl = getWhatsAppUrl(p.phone)
-
-                        return (
-                          <tr key={p.id} className="hover:bg-indigo-50/30 transition-colors">
-                            <td className="p-3">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0 border border-indigo-200">
-                                  {p.name.slice(0, 2).toUpperCase()}
-                                </div>
-                                <div>
-                                  <p className="font-bold text-slate-900 text-sm hover:text-indigo-600 cursor-pointer" onClick={() => setDetailId(p.id)}>
-                                    {p.name}
-                                  </p>
-                                  {p.email && <p className="text-[11px] text-slate-400 truncate">{p.email}</p>}
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="p-3">
-                              {p.customer ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                  <Building2 size={11} /> {p.customer.name}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 text-xs italic">-</span>
-                              )}
-                            </td>
-
-                            <td className="p-3">
-                              <div>
-                                <p className="font-semibold text-slate-800">{p.position || "-"}</p>
-                                <p className="text-[11px] text-slate-500 mt-0.5">{p.department || "Umum"}</p>
-                              </div>
-                            </td>
-
-                            <td className="p-3 whitespace-nowrap">
-                              {p.phone ? (
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-mono text-xs font-semibold text-slate-800">{p.phone}</span>
-                                  <button
-                                    onClick={() => copyPhone(p.phone!)}
-                                    className="text-slate-400 hover:text-slate-600 p-1"
-                                    title="Salin nomor"
-                                  >
-                                    {copiedPhone === p.phone ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                                  </button>
-                                  {waUrl && (
-                                    <a
-                                      href={waUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="p-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition"
-                                      title="Kirim Pesan WhatsApp"
-                                    >
-                                      <MessageCircle size={13} />
-                                    </a>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 text-xs italic">Tanpa No. HP</span>
-                              )}
-                            </td>
-
-                            <td className="p-3 whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-lg text-xs font-medium">
-                                <MapPin size={12} className="text-slate-400 shrink-0" />
-                                <span className="truncate max-w-[130px]">{p.location?.name || "-"}</span>
-                              </span>
-                            </td>
-
-                            <td className="p-3 text-center whitespace-nowrap">
-                              <button
-                                onClick={() => setDetailId(p.id)}
-                                className="font-bold text-xs px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition"
-                              >
-                                {p.assetCount || 0} Aset
-                              </button>
-                            </td>
-
-                            <td className="p-3 text-center whitespace-nowrap">
-                              <span className="font-bold text-xs text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
-                                {p.ticketCount || 0} Tiket
-                              </span>
-                            </td>
-
-                            <td className="p-3 whitespace-nowrap">
-                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                p.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
-                              }`}>
-                                {p.isActive ? "Aktif" : "Non-aktif"}
-                              </span>
-                            </td>
-
-                            <td className="p-3 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  onClick={() => setDetailId(p.id)}
-                                  className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition"
-                                  title="Detail Aset & Tiket PIC"
-                                >
-                                  <Eye size={13} />
-                                </button>
-                                <button
-                                  onClick={() => openEdit(p)}
-                                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition"
-                                  title="Edit Data PIC"
-                                >
-                                  <Edit2 size={13} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 sm:gap-4 w-full">
-                {paginatedPics.map((p) => {
-                  const waUrl = getWhatsAppUrl(p.phone)
-
-                  return (
-                    <div key={p.id} className="bg-white rounded-2xl border border-slate-100 p-4 flex flex-col justify-between hover:shadow-md transition">
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 font-black text-sm flex items-center justify-center border border-indigo-200">
-                            {p.name.slice(0, 2).toUpperCase()}
-                          </div>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                            p.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
-                          }`}>
-                            {p.isActive ? "Aktif" : "Non-aktif"}
-                          </span>
-                        </div>
-
-                        <h3 className="font-black text-slate-900 text-sm mt-3 hover:text-indigo-600 cursor-pointer" onClick={() => setDetailId(p.id)}>
-                          {p.name}
-                        </h3>
-                        {p.customer && (
-                          <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 mt-1">
-                            {p.customer.name}
-                          </span>
-                        )}
-                        <p className="text-xs text-slate-500 font-medium mt-1">
-                          {p.position ? `${p.position} • ` : ""}{p.department || "Umum"}
-                        </p>
-
-                        <div className="space-y-1.5 mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-600">
-                          <p className="flex items-center gap-1.5">
-                            <MapPin size={13} className="text-slate-400 shrink-0" />
-                            <span className="truncate">{p.location?.name || "-"}</span>
-                          </p>
-                          {p.phone && (
-                            <p className="flex items-center justify-between gap-1.5 font-mono text-xs">
-                              <span className="flex items-center gap-1.5 text-slate-700">
-                                <Phone size={13} className="text-slate-400 shrink-0" />
-                                <span>{p.phone}</span>
-                              </span>
-                              {waUrl && (
-                                <a href={waUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline text-[11px] font-bold font-sans">
-                                  WhatsApp
-                                </a>
-                              )}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100 text-[11px]">
-                          <span className="text-slate-500">Aset: <b className="text-indigo-600">{p.assetCount || 0}</b></span>
-                          <span className="text-slate-500">Tiket: <b className="text-slate-900">{p.ticketCount || 0}</b></span>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-1.5">
-                        <button
-                          onClick={() => setDetailId(p.id)}
-                          className="flex-1 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-98 text-white text-xs font-bold flex items-center justify-center gap-1 shadow-sm transition"
-                        >
-                          <Eye size={12} /> Detail
-                        </button>
-                        <button
-                          onClick={() => openEdit(p)}
-                          className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 transition"
-                          title="Edit PIC"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Pagination for Flat List */}
-          {totalItems > 0 && (
-            <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-              <div className="flex items-center justify-between w-full sm:w-auto gap-3">
-                <div className="flex items-center gap-1.5">
-                  <span>Baris:</span>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="px-2 py-1 rounded-lg border border-slate-200 bg-white font-bold"
-                  >
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                </div>
-                <span className="text-[11px] text-slate-500">
-                  <b>{(currentPage - 1) * pageSize + 1}</b>–<b>{Math.min(currentPage * pageSize, totalItems)}</b> dari <b>{totalItems}</b>
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="p-1.5 rounded-lg border disabled:opacity-30"><ChevronsLeft size={14} /></button>
-                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border disabled:opacity-30"><ChevronLeft size={14} /></button>
-                <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs">{currentPage} / {totalPages}</span>
-                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1.5 rounded-lg border disabled:opacity-30"><ChevronRight size={14} /></button>
-                <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="p-1.5 rounded-lg border disabled:opacity-30"><ChevronsRight size={14} /></button>
+        /* ══════════ FLAT VIEW ══════════ */
+        <div>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+              {paginatedPics.map((p) => renderPicCard(p))}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                {renderPicTable(paginatedPics)}
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
-      {/* Mobile Floating Action Button (FAB) */}
-      {canPicWrite && (
-        <button 
-          onClick={openCreate} 
-          className="fixed bottom-20 right-4 sm:hidden w-12 h-12 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 flex items-center justify-center z-40 active:scale-90 transition-transform"
-          aria-label="Tambah PIC Baru"
-        >
-          <Plus size={22} strokeWidth={2.5} />
-        </button>
+      {/* ── 5. PAGINATION (Flat Mode) ─────────────────────────────────────────── */}
+      {!groupByCustomer && totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2">
+            <span>Baris per halaman:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>Menampilkan {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalItems)} dari {totalItems} PIC</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <ChevronsLeft size={14} />
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <ChevronLeft size={14} />
+            </button>
+
+            <span className="px-3 py-1 font-semibold text-slate-800 dark:text-slate-200">
+              Hal. {currentPage} / {totalPages}
+            </span>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <ChevronRight size={14} />
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <ChevronsRight size={14} />
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* ── 7. PIC DETAIL DRAWER (Shows Assets Held & Ticket History) ──────────── */}
+      {/* ── 6. PIC DETAIL MODAL / DRAWER ─────────────────────────────────────── */}
       <AnimatePresence>
         {detailId && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex justify-end items-end sm:items-stretch"
+            className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4"
             onClick={() => setDetailId(null)}
           >
             <motion.div
-              initial={{ y: "100%", x: 0 }}
-              animate={{ y: 0, x: 0 }}
-              exit={{ y: "100%", x: 0 }}
-              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full sm:max-w-xl lg:max-w-2xl h-[92dvh] sm:h-[100dvh] rounded-t-3xl sm:rounded-none flex flex-col shadow-2xl overflow-hidden pb-safe"
+              className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800"
             >
-              {loadingDetail && !detail ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
-                  <Loader2 size={32} className="animate-spin text-indigo-600" />
-                  <p className="text-xs sm:text-sm font-bold text-slate-700">Memuat profil PIC...</p>
+              {loadingDetail || !detail ? (
+                <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+                  <Loader2 className="animate-spin text-indigo-600" size={28} />
+                  <p className="text-xs font-semibold">Memuat Profil PIC...</p>
                 </div>
-              ) : detail ? (
+              ) : (
                 <>
-                  <div className="p-4 sm:p-5 border-b shrink-0 bg-slate-50 flex items-start justify-between gap-3">
+                  {/* Modal Header */}
+                  <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3 bg-slate-50/70 dark:bg-slate-800/50">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/20">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white font-bold text-base flex items-center justify-center shrink-0 shadow-sm">
                         {detail.name.slice(0, 2).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-sm sm:text-lg font-black text-slate-900 truncate">{detail.name}</h2>
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
-                            detail.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">
+                            {detail.name}
+                          </h2>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            detail.isActive 
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                              : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
                           }`}>
                             {detail.isActive ? "Aktif" : "Non-aktif"}
                           </span>
                         </div>
-                        <p className="text-[11px] sm:text-xs text-slate-500 truncate mt-0.5">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                           {detail.position ? `${detail.position} • ` : ""}{detail.department || "Unit Umum"}
+                          {detail.customer?.name ? ` @ ${detail.customer.name}` : ""}
                         </p>
-                        {detail.customer && (
-                          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-lg mt-1.5">
-                            <Building2 size={12} className="text-indigo-600" />
-                            <span>Customer: {detail.customer.name} {detail.customer.companyName ? `(${detail.customer.companyName})` : ""}</span>
-                          </div>
-                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => { setDetailId(null); openEdit(detail); }} className="p-2 rounded-xl border bg-white text-slate-700 shadow-sm" title="Edit PIC">
-                        <Edit2 size={15} />
-                      </button>
-                      <button onClick={() => setDetailId(null)} className="p-2 rounded-xl hover:bg-slate-200 text-slate-500">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {canPicWrite && (
+                        <button
+                          onClick={() => { openEdit(detail); setDetailId(null); }}
+                          className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 text-slate-600 dark:text-slate-300 transition"
+                          title="Edit PIC"
+                        >
+                          <Edit2 size={15} />
+                        </button>
+                      )}
+                      <button onClick={() => setDetailId(null)} className="p-2 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-700 text-slate-400">
                         <X size={17} />
                       </button>
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
-                    {/* Contact Card */}
-                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 sm:p-4 space-y-2 text-xs">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Informasi Kontak</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
-                        <div className="flex items-center gap-2">
-                          <Phone size={14} className="text-slate-400 shrink-0" />
-                          <span className="font-mono">{detail.phone || "-"}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Mail size={14} className="text-slate-400 shrink-0" />
-                          <span className="truncate">{detail.email || "-"}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin size={14} className="text-slate-400 shrink-0" />
-                          <span>{detail.location?.name || "-"}</span>
-                        </div>
-                      </div>
-
-                      {detail.phone && getWhatsAppUrl(detail.phone) && (
-                        <div className="pt-2 border-t border-slate-200/60">
+                  {/* Modal Body */}
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+                    {/* Fast Communication Action Strip */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                      {detail.phone ? (
+                        <>
                           <a
-                            href={getWhatsAppUrl(detail.phone)!}
+                            href={getWhatsAppUrl(detail.phone, detail.name) || "#"}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm"
+                            className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2 font-semibold hover:bg-emerald-100 transition"
                           >
-                            <MessageCircle size={15} /> Hubungi via WhatsApp
+                            <MessageCircle size={16} />
+                            <span>Kirim WhatsApp</span>
                           </a>
+
+                          <a
+                            href={`tel:${detail.phone}`}
+                            className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 font-semibold hover:bg-slate-100 transition"
+                          >
+                            <Phone size={16} />
+                            <span>Panggil Telepon</span>
+                          </a>
+                        </>
+                      ) : (
+                        <div className="sm:col-span-2 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 text-center text-slate-400 italic">
+                          Nomor telepon tidak tercatat
+                        </div>
+                      )}
+
+                      {detail.email ? (
+                        <a
+                          href={`mailto:${detail.email}`}
+                          className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 flex items-center justify-center gap-2 font-semibold hover:bg-indigo-100 transition truncate"
+                        >
+                          <Mail size={16} />
+                          <span className="truncate">Kirim Email</span>
+                        </a>
+                      ) : (
+                        <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 text-center text-slate-400 italic">
+                          Tanpa Email
                         </div>
                       )}
                     </div>
 
-                    {/* Assets Held */}
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                          <Package size={13} /> Aset Dipegang ({detail.assets?.length || 0})
-                        </h3>
+                    {/* Work Location & Details */}
+                    <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">Lokasi Penempatan</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{detail.location?.name || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">Customer</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{detail.customer?.name || "Internal"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400">Nomor Telepon</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{detail.phone || "-"}</span>
+                          {detail.phone && (
+                            <button onClick={() => copyPhone(detail.phone!)} className="text-slate-400 hover:text-slate-600">
+                              {copiedPhone === detail.phone ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {detail.notes && (
+                        <div className="sm:col-span-3 pt-2 border-t border-slate-200/60 dark:border-slate-700">
+                          <p className="text-[10px] font-bold uppercase text-slate-400">Catatan Khusus</p>
+                          <p className="text-slate-700 dark:text-slate-300 mt-0.5">{detail.notes}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Assigned Assets Section */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                          <Package size={14} className="text-indigo-600" />
+                          <span>Perangkat Aset yang Dipegang ({detail.assets?.length || 0})</span>
+                        </p>
+                        <Link
+                          href={`/dashboard/maintenance/it-osl/assets?pic=${detail.id}`}
+                          className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                        >
+                          <span>Buka di Registri Aset</span>
+                          <ExternalLink size={11} />
+                        </Link>
                       </div>
 
                       {(!detail.assets || detail.assets.length === 0) ? (
-                        <div className="p-4 text-center bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-400">
-                          PIC ini belum memegang perangkat aset terdaftar.
+                        <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-center text-slate-400 text-xs">
+                          PIC ini belum memegang perangkat aset apapun saat ini.
                         </div>
                       ) : (
-                        <div className="space-y-1.5">
-                          {detail.assets.map(a => (
-                            <div key={a.id} className="p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm flex items-center justify-between gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {detail.assets.map((a) => (
+                            <div
+                              key={a.id}
+                              className="p-3 bg-white dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700 flex items-center justify-between gap-2"
+                            >
                               <div className="min-w-0">
-                                <span className="font-mono text-[9px] font-bold px-1.5 py-0.2 bg-slate-900 text-white rounded">
+                                <span className="font-mono text-[10px] font-bold bg-slate-100 dark:bg-slate-700 px-1.5 py-0.2 rounded">
                                   {a.assetCode}
                                 </span>
-                                <p className="font-bold text-slate-900 text-xs truncate mt-0.5">{a.name}</p>
+                                <p className="font-semibold text-slate-800 dark:text-slate-200 truncate mt-0.5">
+                                  {a.name}
+                                </p>
+                                <p className="text-[10px] text-slate-400 truncate">
+                                  {a.brandModel || "Hardware"} • {a.location?.name || "Lokasi"}
+                                </p>
                               </div>
-                              <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                 {a.status}
                               </span>
                             </div>
@@ -1664,258 +1200,227 @@ function ItOslPicsContent() {
                       )}
                     </div>
 
-                    {/* Ticket History */}
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                          <Wrench size={13} /> Riwayat Tiket Dilaporkan ({detail.tickets?.length || 0})
-                        </h3>
-                      </div>
+                    {/* Reported Tickets Section */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <Wrench size={14} className="text-indigo-600" />
+                        <span>Riwayat Tiket Insiden PIC ({detail.tickets?.length || 0})</span>
+                      </p>
 
                       {(!detail.tickets || detail.tickets.length === 0) ? (
-                        <div className="p-4 text-center bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-400">
-                          Belum ada riwayat tiket gangguan dari PIC ini.
+                        <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-center text-slate-400 text-xs">
+                          Belum ada tiket atau laporan masalah dari PIC ini.
                         </div>
                       ) : (
-                        <div className="space-y-1.5">
-                          {detail.tickets.map(t => (
-                            <div key={t.id} className="p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm space-y-0.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-mono text-[9px] font-bold px-1.5 py-0.2 bg-slate-900 text-white rounded">
-                                  {t.ticketNumber}
-                                </span>
-                                <span className="text-[8px] font-bold uppercase px-1.5 py-0.2 rounded-full bg-sky-100 text-sky-700">
-                                  {t.status}
-                                </span>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-xl overflow-hidden text-xs">
+                          {detail.tickets.slice(0, 10).map((t) => (
+                            <div key={t.id} className="p-3 bg-white dark:bg-slate-800/50 flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-[11px]">
+                                    {t.ticketNumber}
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold">
+                                    {t.status}
+                                  </span>
+                                </div>
+                                <p className="font-semibold text-slate-800 dark:text-slate-200 truncate mt-0.5">
+                                  {t.summary}
+                                </p>
                               </div>
-                              <p className="font-bold text-slate-900 text-xs truncate">{t.summary}</p>
-                              <p className="text-[9px] text-slate-400">
-                                {new Date(t.createdAt).toLocaleDateString('id-ID', { dateStyle: 'medium' })}
-                              </p>
+                              <span className="text-[11px] text-slate-400 whitespace-nowrap">
+                                {new Date(t.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                              </span>
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
                   </div>
-
-                  <div className="p-3.5 sm:p-4 border-t bg-slate-50 flex items-center justify-between gap-2.5 shrink-0 pb-6 sm:pb-4">
-                    {canPicWrite ? (
-                      <>
-                        {canWrite && (
-                          <button
-                            onClick={() => deletePic(detail.id, detail.name)}
-                            className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold transition flex items-center gap-1"
-                          >
-                            <Trash2 size={13} /> Hapus
-                          </button>
-                        )}
-                        <button
-                          onClick={() => { setDetailId(null); openEdit(detail); }}
-                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md shadow-indigo-600/25 transition flex items-center gap-1.5"
-                        >
-                          <Edit2 size={13} /> Edit Data PIC
-                        </button>
-                      </>
-                    ) : (
-                      <p className="text-[11px] text-slate-400">Role Anda tidak memiliki izin mengubah data PIC.</p>
-                    )}
-                  </div>
                 </>
-              ) : null}
+              )}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── 8. CREATE / EDIT PIC MODAL ─────────────────────────────────────────── */}
+      {/* ── 7. CREATE / EDIT PIC MODAL ───────────────────────────────────────── */}
       <AnimatePresence>
         {showForm && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+            className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4"
             onClick={() => setShowForm(false)}
           >
             <motion.div
-              initial={{ y: 40, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 40, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90dvh] sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden pb-safe"
+              className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-5 space-y-4 shadow-2xl border border-slate-200/80 dark:border-slate-800"
             >
-              {/* Sticky Modal Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50">
-                <div>
-                  <h3 className="font-black text-sm sm:text-base text-slate-900">
-                    {editing ? "Edit Data PIC" : "Tambah PIC Baru"}
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    PIC / Contact Person penanggung jawab unit perangkat & pelapor tiket.
-                  </p>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                    <UserPlus size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
+                      {editing ? "Perbarui Data PIC" : "Tambah PIC Unit Baru"}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Kontak person penanggung jawab operasional & perangkat
+                    </p>
+                  </div>
                 </div>
-                <button onClick={() => setShowForm(false)} className="p-1.5 rounded-xl hover:bg-slate-200 text-slate-400">
-                  <X size={17} />
+                <button onClick={() => setShowForm(false)} className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                  <X size={18} />
                 </button>
               </div>
 
-              {/* Scrollable Form Body */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
-                {/* Customer (If Available) */}
+              <div className="space-y-3 text-xs">
                 {customers.length > 0 && (
-                  <div className="p-3 bg-indigo-50/40 rounded-2xl border border-indigo-100">
-                    <label className="font-bold text-indigo-950 block mb-1 flex items-center gap-1.5">
-                      <Building2 size={14} className="text-indigo-600" />
-                      <span>Customer / Klien</span>
-                    </label>
+                  <div>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Customer / Perusahaan</label>
                     <select
                       value={form.customerId}
-                      onChange={(e) => setForm({ ...form, customerId: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-indigo-200 bg-white text-indigo-950 font-semibold text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      onChange={(e) => setForm(f => ({ ...f, customerId: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                     >
-                      <option value="">— Customer Umum / Internal (Global) —</option>
+                      <option value="">Internal / Tanpa Customer Khusus</option>
                       {customers.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {c.companyName ? `• ${c.companyName}` : ""} ({c.code})
-                        </option>
+                        <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
                   </div>
                 )}
 
-                <div className="space-y-3">
+                <div>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                    Nama Lengkap PIC <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    value={form.name}
+                    onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Contoh: Budi Santoso, Siti Rahma"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Nama PIC *</label>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Jabatan</label>
                     <input
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      placeholder="Contoh: Budi Santoso, Siti Rahmawati..."
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
+                      value={form.position}
+                      onChange={(e) => setForm(f => ({ ...f, position: e.target.value }))}
+                      placeholder="Contoh: Staff Kasir, Supervisor IT"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="min-w-0">
-                      <label className="font-bold text-slate-700 block mb-1">Jabatan / Posisi</label>
-                      <input
-                        value={form.position}
-                        onChange={(e) => setForm({ ...form, position: e.target.value })}
-                        placeholder="Contoh: Kasir, Staff HR, Kepala Lab"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
-                      />
-                    </div>
+                  <div>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Departemen / Unit</label>
+                    <input
+                      value={form.department}
+                      onChange={(e) => setForm(f => ({ ...f, department: e.target.value }))}
+                      placeholder="Contoh: Finance, Operasional, HRD"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
 
-                    <div className="min-w-0">
-                      <label className="font-bold text-slate-700 block mb-1">Departemen / Divisi</label>
-                      <input
-                        value={form.department}
-                        onChange={(e) => setForm({ ...form, department: e.target.value })}
-                        placeholder="Contoh: Finance, Warehouse, Poli Gigi"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
-                      />
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">No. WhatsApp / Telepon</label>
+                    <input
+                      value={form.phone}
+                      onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))}
+                      placeholder="Contoh: 08123456789"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-mono"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="min-w-0">
-                      <label className="font-bold text-slate-700 block mb-1">No. WhatsApp / HP</label>
-                      <input
-                        value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                        placeholder="Contoh: 08123456789"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
-                      />
-                    </div>
-
-                    <div className="min-w-0">
-                      <label className="font-bold text-slate-700 block mb-1">Email (opsional)</label>
-                      <input
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                        placeholder="pic@domain.com"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
-                      />
-                    </div>
+                  <div>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))}
+                      placeholder="budi@axon.id"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                    />
                   </div>
+                </div>
 
-                  {/* Lokasi Fisik */}
-                  <div className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100">
-                    <div className="flex items-center justify-between mb-1 h-5">
-                      <label className="font-bold text-slate-700">Lokasi Kerja Fisik</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-semibold text-slate-700 dark:text-slate-300">Lokasi Kerja</label>
                       {canLocationWrite && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setLocationForm({ code: "", name: "", address: "" });
-                            setShowAddLocationModal(true);
-                          }}
-                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 active:scale-95 transition"
+                          onClick={() => setShowAddLocationModal(true)}
+                          className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
                         >
-                          <Plus size={12} strokeWidth={2.5} />
-                          <span>Tambah Lokasi</span>
+                          + Buat Lokasi
                         </button>
                       )}
                     </div>
                     <select
                       value={form.locationId}
-                      onChange={(e) => setForm({ ...form, locationId: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 truncate"
+                      onChange={(e) => setForm(f => ({ ...f, locationId: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                     >
-                      <option value="">— Pilih Lokasi Kerja —</option>
+                      <option value="">Pilih Lokasi</option>
                       {locations.map(l => (
-                        <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
+                        <option key={l.id} value={l.id}>{l.name}</option>
                       ))}
                     </select>
-                    {locations.length === 0 && (
-                      <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
-                        <AlertCircle size={11} /> {canLocationWrite ? 'Belum ada lokasi. Klik Tambah Lokasi untuk membuat baru.' : 'Belum ada lokasi. Hubungi admin untuk menambahkan lokasi.'}
-                      </p>
-                    )}
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Status Keaktifan</label>
+                    <select
+                      value={form.isActive ? "true" : "false"}
+                      onChange={(e) => setForm(f => ({ ...f, isActive: e.target.value === "true" }))}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-semibold"
+                    >
+                      <option value="true">Aktif (Dapat Dihubungi)</option>
+                      <option value="false">Non-aktif</option>
+                    </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Catatan Tambahan</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Catatan Tambahan</label>
                   <textarea
+                    rows={2}
                     value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    placeholder="Contoh: Jam kerja shift pagi, kontak cadangan..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm min-h-[50px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
+                    placeholder="Waktu shift kerja, preferensi kontak, atau catatan khusus..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
                   />
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="checkbox"
-                    id="isActiveCheck"
-                    checked={form.isActive}
-                    onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <label htmlFor="isActiveCheck" className="text-xs font-bold text-slate-700 cursor-pointer">
-                    PIC Status Aktif (Tersedia untuk dipilih di tiket & aset)
-                  </label>
                 </div>
               </div>
 
-              {/* Sticky Modal Footer */}
-              <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] z-10 pb-6 sm:pb-4">
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-100 active:scale-95 transition"
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100"
                 >
                   Batal
                 </button>
                 <button
                   type="button"
-                  onClick={submitForm}
                   disabled={saving}
-                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black shadow-md shadow-indigo-600/25 flex items-center gap-1.5 disabled:opacity-60 transition"
+                  onClick={submitForm}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-indigo-600/25 transition disabled:opacity-50"
                 >
-                  {saving ? <Loader2 className="animate-spin" size={13} /> : null}
-                  <span>{editing ? "Simpan Perubahan" : "Simpan PIC"}</span>
+                  {saving && <Loader2 size={14} className="animate-spin" />}
+                  <span>{editing ? "Perbarui PIC" : "Simpan PIC"}</span>
                 </button>
               </div>
             </motion.div>
@@ -1923,105 +1428,340 @@ function ItOslPicsContent() {
         )}
       </AnimatePresence>
 
-      {/* ── 9. QUICK ADD LOCATION MODAL ──────────────────────────────────────── */}
+      {/* ── 8. QUICK ADD LOCATION MODAL ─────────────────────────────────────── */}
       <AnimatePresence>
         {showAddLocationModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[170] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+            className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
             onClick={() => setShowAddLocationModal(false)}
           >
             <motion.div
-              initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 30, opacity: 0 }}
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90dvh] sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden pb-safe border border-slate-100"
+              className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-5 space-y-4 shadow-2xl border border-slate-200/80 dark:border-slate-800"
             >
-              {/* Sticky Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
-                    <MapPin size={16} />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-sm sm:text-base text-slate-900">
-                      Tambah Lokasi Fisik Baru
-                    </h3>
-                    <p className="text-[11px] text-slate-400">
-                      Lokasi baru akan langsung terpilih.
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => setShowAddLocationModal(false)} className="p-1.5 rounded-xl hover:bg-slate-200 text-slate-400">
-                  <X size={17} />
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <MapPin size={16} className="text-indigo-600" />
+                  <span>Tambah Lokasi Baru Cepat</span>
+                </h3>
+                <button onClick={() => setShowAddLocationModal(false)} className="p-1 rounded-full text-slate-400">
+                  <X size={16} />
                 </button>
               </div>
 
-              {/* Scrollable Form Body */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 text-xs">
+              <div className="space-y-3 text-xs">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Nama Lokasi / Ruangan *</label>
+                  <label className="font-semibold block mb-1">Nama Lokasi <span className="text-rose-500">*</span></label>
                   <input
                     value={locationForm.name}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const autoCode = locationForm.code ? locationForm.code : val.replace(/[^a-zA-Z0-9]/g, "").slice(0, 5).toUpperCase();
-                      setLocationForm({ ...locationForm, name: val, code: autoCode });
-                    }}
-                    placeholder="Contoh: Server Room Lantai 2, Kasir Utama, Poli Gigi..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    autoFocus
+                    onChange={(e) => setLocationForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Contoh: Ruang Kasir A, Server Lt. 2"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                   />
                 </div>
-
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Kode Lokasi (Singkatan)</label>
+                  <label className="font-semibold block mb-1">Kode Lokasi</label>
                   <input
                     value={locationForm.code}
-                    onChange={(e) => setLocationForm({ ...locationForm, code: e.target.value.toUpperCase() })}
-                    placeholder="Contoh: SRV-L2, KASIR-1, LT2..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-0.5">Digunakan sebagai prefix identifikasi singkat lokasi.</p>
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Alamat / Keterangan Tambahan (opsional)</label>
-                  <textarea
-                    value={locationForm.address}
-                    onChange={(e) => setLocationForm({ ...locationForm, address: e.target.value })}
-                    placeholder="Contoh: Gedung A Lantai 2 Sayap Barat, Dekat Ruang IT..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    onChange={(e) => setLocationForm(f => ({ ...f, code: e.target.value }))}
+                    placeholder="Contoh: KASIR-A (auto jika kosong)"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
                   />
                 </div>
               </div>
 
-              {/* Sticky Footer */}
-              <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] z-10 pb-6 sm:pb-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddLocationModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-100 active:scale-95 transition"
-                >
+              <div className="pt-2 flex justify-end gap-2">
+                <button onClick={() => setShowAddLocationModal(false)} className="px-3 py-2 rounded-xl border text-xs font-semibold">
                   Batal
                 </button>
                 <button
-                  type="button"
-                  onClick={submitQuickLocation}
                   disabled={savingLocation}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black shadow-md shadow-indigo-600/25 flex items-center gap-1.5 disabled:opacity-60 transition"
+                  onClick={submitQuickLocation}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50"
                 >
-                  {savingLocation ? <Loader2 className="animate-spin" size={13} /> : null}
-                  <span>Simpan & Pilih Lokasi</span>
+                  {savingLocation ? "Menyimpan..." : "Simpan & Pilih"}
                 </button>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
     </div>
   )
+
+  // Sub-renderers for clean structure
+  function renderPicCard(p: Pic) {
+    const waUrl = getWhatsAppUrl(p.phone, p.name)
+
+    return (
+      <div
+        key={p.id}
+        className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 space-y-3 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 transition flex flex-col justify-between"
+      >
+        <div>
+          {/* Card Top: Avatar, Name, Status */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0 border border-indigo-200/60 dark:border-indigo-800">
+                {p.name.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <h3
+                  onClick={() => setDetailId(p.id)}
+                  className="font-bold text-slate-900 dark:text-white text-sm truncate hover:text-indigo-600 cursor-pointer"
+                  title={p.name}
+                >
+                  {p.name}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                  {p.position ? `${p.position} • ` : ""}{p.department || "Unit Umum"}
+                </p>
+              </div>
+            </div>
+
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 border ${
+              p.isActive
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
+            }`}>
+              {p.isActive ? "Aktif" : "Non-aktif"}
+            </span>
+          </div>
+
+          {/* Location & Customer tags */}
+          <div className="pt-3 space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
+            <div className="flex items-center gap-1.5 truncate">
+              <MapPin size={13} className="text-slate-400 shrink-0" />
+              <span className="truncate">{p.location?.name || "Belum ada lokasi"}</span>
+            </div>
+
+            {p.customer?.name && (
+              <div className="flex items-center gap-1.5 truncate">
+                <Building2 size={13} className="text-slate-400 shrink-0" />
+                <span className="truncate font-semibold text-indigo-600 dark:text-indigo-400">{p.customer.name}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Card Bottom: Contact triggers + Counts + Actions */}
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+          <div className="flex items-center justify-between gap-1 text-xs">
+            <button
+              onClick={() => setDetailId(p.id)}
+              className="text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+            >
+              {p.assetCount || 0} Unit Aset
+            </button>
+            <span className="text-slate-300 dark:text-slate-700">•</span>
+            <span className="text-slate-500">{p.ticketCount || 0} Tiket</span>
+          </div>
+
+          <div className="flex items-center justify-between gap-1.5 pt-1">
+            <div className="flex items-center gap-1 flex-1">
+              {p.phone && waUrl ? (
+                <a
+                  href={waUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-1.5 px-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 text-xs font-semibold flex items-center justify-center gap-1 transition"
+                  title="Chat WhatsApp"
+                >
+                  <MessageCircle size={13} />
+                  <span>WhatsApp</span>
+                </a>
+              ) : (
+                <span className="flex-1 py-1 px-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 text-xs text-center italic">
+                  Tanpa WA
+                </span>
+              )}
+
+              {p.phone && (
+                <a
+                  href={`tel:${p.phone}`}
+                  className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 hover:bg-slate-50 transition"
+                  title="Telepon Langsung"
+                >
+                  <Phone size={13} />
+                </a>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setDetailId(p.id)}
+                className="p-1.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-semibold transition"
+                title="Detail PIC"
+              >
+                <Eye size={13} />
+              </button>
+              {canPicWrite && (
+                <button
+                  onClick={() => openEdit(p)}
+                  className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 transition"
+                  title="Edit PIC"
+                >
+                  <Edit2 size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderPicTable(list: Pic[]) {
+    return (
+      <table className="w-full text-left text-xs border-collapse">
+        <thead>
+          <tr className="bg-slate-50/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+            <th className="p-3">Nama PIC</th>
+            <th className="p-3">Jabatan & Departemen</th>
+            <th className="p-3">Customer & Lokasi</th>
+            <th className="p-3">Kontak Cepat</th>
+            <th className="p-3 text-center">Aset</th>
+            <th className="p-3 text-center">Tiket</th>
+            <th className="p-3">Status</th>
+            <th className="p-3 text-right w-24">Aksi</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+          {list.map((p) => {
+            const waUrl = getWhatsAppUrl(p.phone, p.name)
+
+            return (
+              <tr key={p.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                <td className="p-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0 border border-indigo-200/60 dark:border-indigo-800">
+                      {p.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <p 
+                        onClick={() => setDetailId(p.id)}
+                        className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm hover:text-indigo-600 cursor-pointer"
+                      >
+                        {p.name}
+                      </p>
+                      {p.email && <p className="text-[11px] text-slate-400 truncate">{p.email}</p>}
+                    </div>
+                  </div>
+                </td>
+
+                <td className="p-3">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">{p.position || "-"}</p>
+                  <p className="text-[11px] text-slate-500">{p.department || "Unit Umum"}</p>
+                </td>
+
+                <td className="p-3">
+                  <p className="font-medium text-slate-800 dark:text-slate-200">{p.location?.name || "-"}</p>
+                  {p.customer?.name && (
+                    <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">{p.customer.name}</p>
+                  )}
+                </td>
+
+                <td className="p-3 whitespace-nowrap">
+                  {p.phone ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200">{p.phone}</span>
+                      <button
+                        onClick={() => copyPhone(p.phone!)}
+                        className="text-slate-400 hover:text-slate-600 p-0.5"
+                        title="Salin nomor telepon"
+                      >
+                        {copiedPhone === p.phone ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                      </button>
+                      {waUrl && (
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1 rounded-md bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-600 transition"
+                          title="Chat WhatsApp"
+                        >
+                          <MessageCircle size={13} />
+                        </a>
+                      )}
+                      <a
+                        href={`tel:${p.phone}`}
+                        className="p-1 rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 hover:bg-slate-100 transition"
+                        title="Telepon"
+                      >
+                        <Phone size={13} />
+                      </a>
+                    </div>
+                  ) : (
+                    <span className="text-slate-400 text-xs italic">Tanpa No. HP</span>
+                  )}
+                </td>
+
+                <td className="p-3 text-center whitespace-nowrap">
+                  <button
+                    onClick={() => setDetailId(p.id)}
+                    className="font-bold text-xs px-2.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition"
+                  >
+                    {p.assetCount || 0} Aset
+                  </button>
+                </td>
+
+                <td className="p-3 text-center whitespace-nowrap">
+                  <span className="font-semibold text-xs text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-lg">
+                    {p.ticketCount || 0} Tiket
+                  </span>
+                </td>
+
+                <td className="p-3 whitespace-nowrap">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
+                    p.isActive 
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+                      : "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400"
+                  }`}>
+                    {p.isActive ? "Aktif" : "Non-aktif"}
+                  </span>
+                </td>
+
+                <td className="p-3 text-right whitespace-nowrap">
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => setDetailId(p.id)}
+                      className="p-1.5 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 transition"
+                      title="Detail PIC"
+                    >
+                      <Eye size={13} />
+                    </button>
+                    {canPicWrite && (
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-600 dark:text-slate-300 transition"
+                        title="Edit PIC"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                    )}
+                    {canWrite && (
+                      <button
+                        onClick={() => deletePic(p.id, p.name)}
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 text-rose-500 transition"
+                        title="Hapus PIC"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    )
+  }
 }

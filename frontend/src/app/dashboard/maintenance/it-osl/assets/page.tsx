@@ -10,10 +10,13 @@ import {
   Printer, ArrowUpDown, RotateCcw, Plus, Wrench,
   CheckSquare, Square, Info, FileSpreadsheet, Copy, Check, Calendar,
   MessageCircle, Users, Camera, Filter, MoreVertical, SlidersHorizontal,
-  ExternalLink, Sparkles, UserPlus, Image as ImageIcon, Maximize2, Building2
+  ExternalLink, Sparkles, UserPlus, Image as ImageIcon, Maximize2, Building2,
+  ShieldAlert, ShieldCheck, Clock, Shield, Tag, Phone
 } from "lucide-react"
+import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
+import { ItOslNav } from "@/components/it-osl/ItOslNav"
 import { canItOsl } from "@/lib/itOslPermissions"
 
 const API = process.env.NEXT_PUBLIC_API_URL
@@ -23,9 +26,7 @@ const MAX_UPLOAD_MB = 25
 const COMPRESS_MAX_DIMENSION = 1920
 
 /**
- * Perkecil foto di browser sebelum diunggah. Foto kamera ponsel (5–15 MB)
- * biasanya cukup jadi ~200–500 KB, sehingga upload tidak putus di jaringan
- * lambat dan tidak ditolak server.
+ * Perkecil foto di browser sebelum diunggah agar hemat bandwidth dan stabil di jaringan seluler.
  */
 async function compressImage(file: File): Promise<File> {
   if (!file.type.startsWith("image/") || file.type === "image/svg+xml" || file.type === "image/gif") return file
@@ -46,7 +47,6 @@ async function compressImage(file: File): Promise<File> {
     const baseName = file.name.replace(/\.[^.]+$/, "") || "foto"
     return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" })
   } catch {
-    // Browser tidak bisa decode (mis. HEIC) — kirim file asli, server yang olah.
     return file
   }
 }
@@ -57,6 +57,7 @@ type PicOpt = {
   position?: string | null
   department?: string | null
   phone?: string | null
+  email?: string | null
 }
 
 type CustomerOpt = {
@@ -114,9 +115,9 @@ const ASSET_TYPES = [
 ]
 
 const STATUS_OPTS = [
-  { v: "ACTIVE", l: "Aktif", c: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  { v: "IN_REPAIR", l: "Perbaikan", c: "bg-amber-100 text-amber-700 border-amber-200" },
-  { v: "RETIRED", l: "Afkir", c: "bg-slate-200 text-slate-700 border-slate-300" },
+  { v: "ACTIVE", l: "Aktif", dot: "bg-emerald-500", c: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800" },
+  { v: "IN_REPAIR", l: "Perbaikan", dot: "bg-amber-500", c: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800" },
+  { v: "RETIRED", l: "Afkir", dot: "bg-slate-400", c: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700" },
 ]
 
 const getAssetPhotos = (photosRaw?: string | string[] | null): string[] => {
@@ -140,8 +141,8 @@ export default function ItOslAssetsPage() {
 
 function ItOslAssetsContent() {
   const { data: session } = useSession()
-  const currentUserId = (session?.user as { id?:string })?.id || null
-  const currentRole = (session?.user as { role?:string })?.role || null
+  const currentUserId = (session?.user as { id?: string })?.id || null
+  const currentRole = (session?.user as { role?: string })?.role || null
   const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN'
   const canWrite = canItOsl(currentRole, 'master.write')
   const canLocationWrite = canItOsl(currentRole, 'location.write')
@@ -183,88 +184,77 @@ function ItOslAssetsContent() {
   // Selection for Bulk Actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showBatchPrint, setShowBatchPrint] = useState(false)
+  const [printLayout, setPrintLayout] = useState<"single" | "grid">("single")
 
   // Modals & Detail
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<Asset | null>(null)
   const [form, setForm] = useState({
     customerId: "",
-    name: "", assetCode: "", assetType: "", brandModel: "", serialNumber: "",
-    locationId: "", status: "ACTIVE", picId: "", purchaseDate: "", warrantyUntil: "", notes: "",
+    name: "",
+    assetCode: "",
+    assetType: "",
+    brandModel: "",
+    serialNumber: "",
+    locationId: "",
+    status: "ACTIVE",
+    picId: "",
+    purchaseDate: "",
+    warrantyUntil: "",
+    notes: "",
     photos: [] as string[]
   })
   const [saving, setSaving] = useState(false)
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
-  const [previewPhotoModal, setPreviewPhotoModal] = useState<string | null>(null)
+  // Photo Lightbox Carousel State
+  const [photoLightbox, setPhotoLightbox] = useState<{
+    photos: string[]
+    index: number
+  } | null>(null)
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const currentCount = form.photos.length;
-    if (currentCount >= 5) {
-      alert("Maksimal 5 foto per aset.");
-      return;
-    }
-
-    const allowedToAdd = 5 - currentCount;
-    const filesToUpload = Array.from(files).slice(0, allowedToAdd);
-
-    const oversize = filesToUpload.find(f => f.size > MAX_UPLOAD_MB * 1024 * 1024);
-    if (oversize) {
-      alert(`Foto "${oversize.name}" terlalu besar (${(oversize.size / 1024 / 1024).toFixed(1)} MB). Maksimal ${MAX_UPLOAD_MB} MB per foto.`);
-      e.target.value = "";
-      return;
-    }
-
-    setUploadingPhotos(true);
-    try {
-      // Kompres dulu supaya upload stabil di jaringan lambat / data seluler.
-      const prepared = await Promise.all(filesToUpload.map(compressImage));
-
-      const fd = new FormData();
-      prepared.forEach(f => fd.append("files", f));
-
-      const res = await fetch(`${API}/api/it-osl/upload`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: fd
-      });
-
-      // Jangan langsung res.json(): kalau server membalas HTML (mis. error
-      // proxy), pesan errornya jadi tidak jelas.
-      const raw = await res.text();
-      let d: { message?: string; urls?: string[]; url?: string } = {};
-      try { d = raw ? JSON.parse(raw) : {}; } catch { d = {}; }
-
-      if (!res.ok) {
-        throw new Error(d.message || `Gagal mengunggah foto (HTTP ${res.status}). Silakan coba lagi.`);
-      }
-
-      const newUrls = d.urls || (d.url ? [d.url] : []);
-      if (newUrls.length === 0) throw new Error("Server tidak mengembalikan URL foto.");
-
-      setForm(prev => ({
-        ...prev,
-        photos: [...prev.photos, ...newUrls].slice(0, 5)
-      }));
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Gagal mengunggah foto";
-      const isNetworkError = ["Failed to fetch", "Load failed", "NetworkError when attempting to fetch resource.", "Network request failed"].includes(message);
-      alert(isNetworkError
-        ? "Koneksi ke server terputus saat mengunggah foto. Periksa jaringan Anda lalu coba lagi."
-        : message);
-    } finally {
-      setUploadingPhotos(false);
-      e.target.value = "";
-    }
+  const openPhotoLightbox = (photos: string[], startIndex = 0) => {
+    if (!photos || photos.length === 0) return
+    const formatted = photos.map(url => (url.startsWith("http") ? url : `${API}${url}`))
+    setPhotoLightbox({
+      photos: formatted,
+      index: Math.max(0, Math.min(startIndex, formatted.length - 1))
+    })
   }
 
-  const removePhoto = (index: number) => {
-    setForm(prev => ({
+  const closePhotoLightbox = () => setPhotoLightbox(null)
+
+  const nextPhoto = () => {
+    if (!photoLightbox || photoLightbox.photos.length <= 1) return
+    setPhotoLightbox(prev => prev ? {
       ...prev,
-      photos: prev.photos.filter((_, i) => i !== index)
-    }));
+      index: (prev.index + 1) % prev.photos.length
+    } : null)
+  }
+
+  const prevPhoto = () => {
+    if (!photoLightbox || photoLightbox.photos.length <= 1) return
+    setPhotoLightbox(prev => prev ? {
+      ...prev,
+      index: (prev.index - 1 + prev.photos.length) % prev.photos.length
+    } : null)
+  }
+
+  // Keyboard navigation for Lightbox Carousel
+  useEffect(() => {
+    if (!photoLightbox) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closePhotoLightbox()
+      if (e.key === "ArrowRight") nextPhoto()
+      if (e.key === "ArrowLeft") prevPhoto()
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [photoLightbox])
+
+  // Backward compatibility wrapper
+  const setPreviewPhotoModal = (url: string | null) => {
+    if (!url) closePhotoLightbox()
+    else openPhotoLightbox([url], 0)
   }
 
   // Quick Add PIC Modal State
@@ -273,6 +263,94 @@ function ItOslAssetsContent() {
     name: "", position: "", department: "", phone: "", email: "", locationId: "", notes: ""
   })
   const [savingPic, setSavingPic] = useState(false)
+
+  // Quick Add Location Modal State
+  const [showAddLocationModal, setShowAddLocationModal] = useState(false)
+  const [locationForm, setLocationForm] = useState({
+    code: "", name: "", address: ""
+  })
+  const [savingLocation, setSavingLocation] = useState(false)
+
+  // Detail Modal State
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const [detail, setDetail] = useState<AssetDetail | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [singlePrintAsset, setSinglePrintAsset] = useState<Asset | null>(null)
+  const [copiedCode, setCopiedCode] = useState<string | null>(null)
+  const [detailTab, setDetailTab] = useState<"specs" | "pic" | "tickets" | "media">("specs")
+
+  // Add / Edit Wizard State
+  const [formStep, setFormStep] = useState<1 | 2 | 3>(1)
+
+  // QR Scanner State
+  const [showScannerModal, setShowScannerModal] = useState(false)
+  const [manualCodeInput, setManualCodeInput] = useState("")
+  const [scannerError, setScannerError] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const [scanningActive, setScanningActive] = useState(false)
+
+  // Handle Photo Upload
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const currentCount = form.photos.length
+    if (currentCount >= 5) {
+      alert("Maksimal 5 foto per aset.")
+      return
+    }
+
+    const allowedToAdd = 5 - currentCount
+    const filesToUpload = Array.from(files).slice(0, allowedToAdd)
+
+    const oversize = filesToUpload.find(f => f.size > MAX_UPLOAD_MB * 1024 * 1024)
+    if (oversize) {
+      alert(`Foto "${oversize.name}" terlalu besar (${(oversize.size / 1024 / 1024).toFixed(1)} MB). Maksimal ${MAX_UPLOAD_MB} MB per foto.`)
+      e.target.value = ""
+      return
+    }
+
+    setUploadingPhotos(true)
+    try {
+      const prepared = await Promise.all(filesToUpload.map(compressImage))
+      const fd = new FormData()
+      prepared.forEach(f => fd.append("files", f))
+
+      const res = await fetch(`${API}/api/it-osl/upload`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: fd
+      })
+
+      const raw = await res.text()
+      let d: { message?: string; urls?: string[]; url?: string } = {}
+      try { d = raw ? JSON.parse(raw) : {} } catch { d = {} }
+
+      if (!res.ok) {
+        throw new Error(d.message || `Gagal mengunggah foto (HTTP ${res.status}). Silakan coba lagi.`)
+      }
+
+      const newUrls = d.urls || (d.url ? [d.url] : [])
+      if (newUrls.length === 0) throw new Error("Server tidak mengembalikan URL foto.")
+
+      setForm(prev => ({
+        ...prev,
+        photos: [...prev.photos, ...newUrls].slice(0, 5)
+      }))
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Gagal mengunggah foto.")
+    } finally {
+      setUploadingPhotos(false)
+      e.target.value = ""
+    }
+  }
+
+  const removePhoto = (index: number) => {
+    setForm(prev => ({
+      ...prev,
+      photos: prev.photos.filter((_, i) => i !== index)
+    }))
+  }
 
   const submitQuickPic = async () => {
     if (!canPicWrite) return alert("Role Anda tidak memiliki izin menambah PIC")
@@ -297,9 +375,7 @@ function ItOslAssetsContent() {
       const d = await res.json()
       if (!res.ok) throw new Error(d.message || "Gagal mendaftarkan PIC baru")
 
-      // Update pics list
       setPics(prev => [d, ...prev])
-      // Auto-select newly created PIC in the asset form
       setForm(prev => ({ ...prev, picId: d.id }))
       setShowAddPicModal(false)
       setPicForm({ name: "", position: "", department: "", phone: "", email: "", locationId: "", notes: "" })
@@ -309,13 +385,6 @@ function ItOslAssetsContent() {
       setSavingPic(false)
     }
   }
-
-  // Quick Add Location Modal State
-  const [showAddLocationModal, setShowAddLocationModal] = useState(false)
-  const [locationForm, setLocationForm] = useState({
-    code: "", name: "", address: ""
-  })
-  const [savingLocation, setSavingLocation] = useState(false)
 
   const submitQuickLocation = async () => {
     if (!canLocationWrite) return alert("Role Anda tidak memiliki izin menambah lokasi")
@@ -340,11 +409,8 @@ function ItOslAssetsContent() {
       const d = await res.json()
       if (!res.ok) throw new Error(d.message || "Gagal membuat lokasi baru")
 
-      // Update locations list
       setLocations(prev => [...prev, d])
-      // Auto-select newly created location in the asset form
       setForm(prev => ({ ...prev, locationId: d.id }))
-      // Also update in picForm if PIC modal is open
       setPicForm(prev => ({ ...prev, locationId: d.id }))
       setShowAddLocationModal(false)
       setLocationForm({ code: "", name: "", address: "" })
@@ -354,19 +420,6 @@ function ItOslAssetsContent() {
       setSavingLocation(false)
     }
   }
-
-  const [detailId, setDetailId] = useState<string | null>(null)
-  const [detail, setDetail] = useState<AssetDetail | null>(null)
-  const [loadingDetail, setLoadingDetail] = useState(false)
-  const [singlePrintAsset, setSinglePrintAsset] = useState<Asset | null>(null)
-  const [copiedCode, setCopiedCode] = useState<string | null>(null)
-
-  // QR Scanner State
-  const [showScannerModal, setShowScannerModal] = useState(false)
-  const [manualCodeInput, setManualCodeInput] = useState("")
-  const [scannerError, setScannerError] = useState<string | null>(null)
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const [scanningActive, setScanningActive] = useState(false)
 
   // Fetch initial data
   const load = async () => {
@@ -411,6 +464,7 @@ function ItOslAssetsContent() {
   // Fetch detail with ticket history
   const loadDetail = async (id: string) => {
     setLoadingDetail(true)
+    setDetailTab("specs")
     try {
       const res = await fetch(`${API}/api/it-osl/assets/${id}`, { headers: getAuthHeaders() })
       if (res.ok) {
@@ -457,8 +511,8 @@ function ItOslAssetsContent() {
                     handleScannedCode(foundVal)
                     return
                   }
-                } catch (err) {
-                  // ignore frame error
+                } catch {
+                  // frame error ignored
                 }
               }
               if (scanningActive) {
@@ -470,7 +524,7 @@ function ItOslAssetsContent() {
         })
         .catch(err => {
           console.error("Camera access error:", err)
-          setScannerError("Tidak dapat mengakses kamera. Pastikan izin kamera aktif.")
+          setScannerError("Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan di browser.")
         })
     }
 
@@ -490,16 +544,6 @@ function ItOslAssetsContent() {
       setQ(clean)
     }
   }
-
-  // Map counts per PIC
-  const assetsByPic = useMemo(() => {
-    const m = new Map<string, number>()
-    allAssets.forEach(a => {
-      const pid = a.picId || a.pic?.id
-      if (pid) m.set(pid, (m.get(pid) || 0) + 1)
-    })
-    return m
-  }, [allAssets])
 
   // KPI Metrics Calculation
   const metrics = useMemo(() => {
@@ -540,7 +584,6 @@ function ItOslAssetsContent() {
     const query = q.trim().toLowerCase()
 
     return allAssets.filter(a => {
-      // Search
       if (query) {
         const matchCode = a.assetCode.toLowerCase().includes(query)
         const matchName = a.name.toLowerCase().includes(query)
@@ -554,19 +597,11 @@ function ItOslAssetsContent() {
         }
       }
 
-      // Customer Filter
       if (filterCustomer && a.customerId !== filterCustomer && a.customer?.id !== filterCustomer) return false
-
-      // Location
       if (filterLocation && a.locationId !== filterLocation) return false
-
-      // Type
       if (filterType && a.assetType !== filterType) return false
-
-      // Status
       if (filterStatus && a.status !== filterStatus) return false
 
-      // PIC Filter
       if (filterPic) {
         if (filterPic === "UNASSIGNED") {
           if (a.picId || a.pic || a.picUserId) return false
@@ -575,7 +610,6 @@ function ItOslAssetsContent() {
         }
       }
 
-      // Warranty
       if (filterWarranty === "active") {
         if (!a.warrantyUntil || new Date(a.warrantyUntil).getTime() <= now) return false
       } else if (filterWarranty === "expired") {
@@ -584,7 +618,6 @@ function ItOslAssetsContent() {
         if (a.warrantyUntil) return false
       }
 
-      // Recurring filter
       if (filterRecurringOnly && !a.recurring && a.ticketCount < 3) return false
 
       return true
@@ -598,14 +631,10 @@ function ItOslAssetsContent() {
         res = (a.ticketCount || 0) - (b.ticketCount || 0)
       } else if (sortBy === "location") {
         res = (a.location?.name || "").localeCompare(b.location?.name || "")
-      } else if (sortBy === "warrantyUntil") {
-        const timeA = a.warrantyUntil ? new Date(a.warrantyUntil).getTime() : 0
-        const timeB = b.warrantyUntil ? new Date(b.warrantyUntil).getTime() : 0
-        res = timeA - timeB
       } else {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
-        res = timeA - timeB
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        res = dateA - dateB
       }
       return sortDir === "asc" ? res : -res
     })
@@ -626,16 +655,16 @@ function ItOslAssetsContent() {
 
   // Active filters count
   const activeFilterCount = useMemo(() => {
-    let count = 0
-    if (q) count++
-    if (filterCustomer) count++
-    if (filterLocation) count++
-    if (filterType) count++
-    if (filterStatus) count++
-    if (filterPic) count++
-    if (filterWarranty) count++
-    if (filterRecurringOnly) count++
-    return count
+    let c = 0
+    if (q) c++
+    if (filterCustomer) c++
+    if (filterLocation) c++
+    if (filterType) c++
+    if (filterStatus) c++
+    if (filterPic) c++
+    if (filterWarranty) c++
+    if (filterRecurringOnly) c++
+    return c
   }, [q, filterCustomer, filterLocation, filterType, filterStatus, filterPic, filterWarranty, filterRecurringOnly])
 
   const clearAllFilters = () => {
@@ -650,28 +679,30 @@ function ItOslAssetsContent() {
   }
 
   // Selection handlers
-  const handleSelectAllCurrentPage = () => {
-    const next = new Set(selectedIds)
-    const pageIds = paginatedAssets.map(a => a.id)
-    const allSelected = pageIds.every(id => next.has(id))
-    if (allSelected) {
-      pageIds.forEach(id => next.delete(id))
-    } else {
-      pageIds.forEach(id => next.add(id))
-    }
-    setSelectedIds(next)
-  }
-
   const handleToggleSelect = (id: string) => {
-    const next = new Set(selectedIds)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setSelectedIds(next)
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
-  const handleDeselectAll = () => {
-    setSelectedIds(new Set())
+  const handleSelectAllCurrentPage = () => {
+    const pageIds = paginatedAssets.map(a => a.id)
+    const allSelected = pageIds.every(id => selectedIds.has(id))
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allSelected) {
+        pageIds.forEach(id => next.delete(id))
+      } else {
+        pageIds.forEach(id => next.add(id))
+      }
+      return next
+    })
   }
+
+  const handleDeselectAll = () => setSelectedIds(new Set())
 
   // Sorting helper
   const handleSort = (field: string) => {
@@ -687,6 +718,7 @@ function ItOslAssetsContent() {
   const openCreate = () => {
     if (!canAssetWrite) return alert("Role Anda tidak memiliki izin menambah aset")
     setEditing(null)
+    setFormStep(1)
     setForm({
       customerId: filterCustomer || (customers[0]?.id || ""),
       name: "",
@@ -708,6 +740,7 @@ function ItOslAssetsContent() {
   const openEdit = (a: Asset) => {
     if (!canAssetWrite) return alert("Role Anda tidak memiliki izin mengubah aset")
     setEditing(a)
+    setFormStep(1)
     setForm({
       customerId: a.customerId || a.customer?.id || "",
       name: a.name,
@@ -790,23 +823,27 @@ function ItOslAssetsContent() {
   }
 
   // Helper for WhatsApp URL
-  const getWhatsAppUrl = (phone?: string | null) => {
+  const getWhatsAppUrl = (phone?: string | null, assetName?: string) => {
     if (!phone) return null
     let clean = phone.replace(/[^0-9]/g, "")
     if (clean.startsWith("0")) clean = "62" + clean.slice(1)
     if (!clean.startsWith("62")) clean = "62" + clean
-    return `https://wa.me/${clean}?text=${encodeURIComponent("Halo PIC Unit, perihal aset IT...")}`
+    const msg = assetName 
+      ? `Halo PIC Unit, koordinasi perihal aset IT: ${assetName}...` 
+      : "Halo PIC Unit, koordinasi perihal pemeliharaan aset IT Axon..."
+    return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`
   }
 
   // Export CSV Helper
   const exportCsv = (assetsToExport: Asset[]) => {
-    const headers = ["Kode Aset", "Nama Perangkat", "Jenis", "Merek/Model", "Serial Number", "Lokasi", "PIC", "Status", "Garansi", "Tiket", "Catatan"]
+    const headers = ["Kode Aset", "Nama Perangkat", "Jenis", "Merek/Model", "Serial Number", "Customer", "Lokasi", "PIC", "Status", "Garansi", "Tiket", "Catatan"]
     const rows = assetsToExport.map(a => [
       a.assetCode,
       `"${a.name.replace(/"/g, '""')}"`,
       a.assetType || "-",
       `"${(a.brandModel || "-").replace(/"/g, '""')}"`,
       a.serialNumber || "-",
+      `"${(a.customer?.name || "-").replace(/"/g, '""')}"`,
       `"${(a.location?.name || "-").replace(/"/g, '""')}"`,
       `"${(a.pic?.name || a.picUser?.name || "-").replace(/"/g, '""')}"`,
       a.status,
@@ -815,11 +852,11 @@ function ItOslAssetsContent() {
       `"${(a.notes || "").replace(/"/g, '""')}"`
     ])
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n")
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n")
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement("a")
     link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `Aset_IT_${new Date().toISOString().slice(0, 10)}.csv`)
+    link.setAttribute("download", `Aset_IT_Axon_${new Date().toISOString().slice(0, 10)}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -829,7 +866,7 @@ function ItOslAssetsContent() {
   const downloadCsvTemplate = () => {
     const headers = ["name", "assetCode", "assetType", "brandModel", "serialNumber", "notes"]
     const sample = ["Switch Cisco 24 Port Lantai 1", "AST-SW-001", "Switch", "Cisco SG350-28", "FOC21390A1", "IP: 192.168.1.2"]
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), sample.join(",")].join("\n")
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), sample.join(",")].join("\n")
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement("a")
     link.setAttribute("href", encodedUri)
@@ -889,34 +926,38 @@ function ItOslAssetsContent() {
   }, [allAssets, selectedIds])
 
   return (
-    <div className="w-full max-w-full px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-6 space-y-3.5 sm:space-y-4 pb-28 md:pb-8 overflow-x-hidden font-sans">
+    <div className="w-full max-w-full px-3 sm:px-4 md:px-6 lg:px-8 py-3.5 sm:py-6 space-y-4 pb-28 md:pb-8 font-sans">
+      
+      {/* ── SUB-NAVIGATION TABS ──────────────────────────────────────────────── */}
+      <ItOslNav badgeCounts={{ assets: allAssets.length }} />
+
       {/* ── 1. HEADER & GLOBAL ACTIONS ────────────────────────────────────────── */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full bg-white p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-indigo-700 to-indigo-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/20 text-white">
-            <Package size={20} />
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/20 text-white">
+            <Package size={22} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight truncate">
-                Registri Aset IT & QR
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
+                Registri Aset IT & Label QR
               </h1>
-              <span className="text-[10px] sm:text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+              <span className="text-[11px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800">
                 {allAssets.length} Unit
               </span>
             </div>
-            <p className="text-[10px] sm:text-xs text-slate-400 truncate">
-              Inventaris Perangkat • Label QR Cetak • Terhubung PIC Unit
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+              Inventaris Perangkat Keras • Label Stiker QR • Monitoring Garansi & Insiden
             </p>
           </div>
         </div>
 
-        {/* Action Toolbar */}
+        {/* Global Toolbar */}
         <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap">
           {/* Scan QR Button */}
           <button
             onClick={() => setShowScannerModal(true)}
-            className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition"
+            className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition"
             title="Scan QR Code Aset"
           >
             <Camera size={15} />
@@ -927,25 +968,28 @@ function ItOslAssetsContent() {
           {canAssetWrite && (
             <button
               onClick={openCreate}
-              className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/25 transition"
+              className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-600/25 transition"
             >
               <Plus size={16} strokeWidth={2.5} />
-              <span>+ Aset Baru</span>
+              <span>Tambah Aset</span>
             </button>
           )}
 
-          {/* Export / Import Dropdown on Desktop / Toolbar */}
-          <div className="hidden sm:flex items-center gap-1.5 pl-1 border-l border-slate-200">
+          {/* Export / Import Dropdown on Desktop */}
+          <div className="flex items-center gap-1.5 pl-1.5 border-l border-slate-200 dark:border-slate-800">
             <button
               onClick={() => exportCsv(filteredAssets)}
-              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-600 text-xs font-bold transition"
-              title="Ekspor data CSV"
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 text-slate-600 dark:text-slate-300 text-xs font-medium transition"
+              title="Ekspor CSV Data Terfilter"
             >
               <Download size={15} />
             </button>
 
             {canAssetWrite && (
-              <label className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-600 text-xs font-bold cursor-pointer transition" title="Impor CSV">
+              <label 
+                className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 text-slate-600 dark:text-slate-300 text-xs font-medium cursor-pointer transition" 
+                title="Impor CSV"
+              >
                 <Upload size={15} />
                 <input
                   type="file"
@@ -963,7 +1007,7 @@ function ItOslAssetsContent() {
 
             <button
               onClick={downloadCsvTemplate}
-              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-500 hover:text-slate-700 transition"
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 transition hidden sm:flex"
               title="Unduh Template CSV"
             >
               <FileSpreadsheet size={15} />
@@ -972,22 +1016,25 @@ function ItOslAssetsContent() {
         </div>
       </header>
 
-      {/* ── 2. KPI METRIC CARDS (Scrollable strip on Mobile, Grid on Tablet/Desktop) ─────────────────────────── */}
-      <div className="flex sm:grid sm:grid-cols-3 lg:grid-cols-6 gap-2.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar snap-x">
+      {/* ── 2. KPI TELEMETRY METRIC TILES ─────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         {/* Total Assets */}
         <button
           onClick={clearAllFilters}
-          className={`shrink-0 w-32 sm:w-auto snap-start p-3 rounded-2xl border text-left transition-all active:scale-95 ${
+          className={`p-3 rounded-2xl border text-left transition-all active:scale-95 ${
             activeFilterCount === 0 
-              ? "bg-slate-900 text-white border-slate-900 shadow-md" 
-              : "bg-white text-slate-800 border-slate-100 hover:border-slate-300 shadow-sm"
+              ? "bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 shadow-sm" 
+              : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-slate-800 hover:border-slate-300 shadow-xs"
           }`}
         >
-          <p className={`text-[9px] font-black uppercase tracking-wider ${activeFilterCount === 0 ? "text-slate-300" : "text-slate-400"}`}>
-            Total Aset
-          </p>
-          <p className="text-lg sm:text-2xl font-black mt-0.5 tabular-nums">{metrics.total}</p>
-          <p className={`text-[9px] mt-0.5 truncate ${activeFilterCount === 0 ? "text-slate-300" : "text-slate-400"}`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${activeFilterCount === 0 ? "text-slate-300 dark:text-slate-600" : "text-slate-400"}`}>
+              Total Aset
+            </span>
+            <Package size={14} className={activeFilterCount === 0 ? "text-slate-300" : "text-slate-400"} />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold mt-1 tabular-nums">{metrics.total}</p>
+          <p className={`text-[11px] mt-0.5 truncate ${activeFilterCount === 0 ? "text-slate-300 dark:text-slate-600" : "text-slate-400"}`}>
             Semua kategori
           </p>
         </button>
@@ -995,17 +1042,20 @@ function ItOslAssetsContent() {
         {/* Active */}
         <button
           onClick={() => { clearAllFilters(); setFilterStatus("ACTIVE"); }}
-          className={`shrink-0 w-32 sm:w-auto snap-start p-3 rounded-2xl border text-left transition-all active:scale-95 ${
+          className={`p-3 rounded-2xl border text-left transition-all active:scale-95 ${
             filterStatus === "ACTIVE" 
-              ? "bg-emerald-600 text-white border-emerald-600 shadow-md" 
-              : "bg-white text-slate-800 border-slate-100 hover:border-emerald-300 shadow-sm"
+              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm" 
+              : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-slate-800 hover:border-emerald-300 shadow-xs"
           }`}
         >
-          <p className={`text-[9px] font-black uppercase tracking-wider ${filterStatus === "ACTIVE" ? "text-emerald-100" : "text-emerald-600"}`}>
-            Aktif / Normal
-          </p>
-          <p className="text-lg sm:text-2xl font-black mt-0.5 tabular-nums">{metrics.active}</p>
-          <p className={`text-[9px] mt-0.5 truncate ${filterStatus === "ACTIVE" ? "text-emerald-100" : "text-slate-400"}`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${filterStatus === "ACTIVE" ? "text-emerald-100" : "text-emerald-600 dark:text-emerald-400"}`}>
+              Aktif / Normal
+            </span>
+            <div className={`w-2 h-2 rounded-full ${filterStatus === "ACTIVE" ? "bg-white" : "bg-emerald-500"}`} />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold mt-1 tabular-nums">{metrics.active}</p>
+          <p className={`text-[11px] mt-0.5 truncate ${filterStatus === "ACTIVE" ? "text-emerald-100" : "text-slate-400"}`}>
             Siap operasional
           </p>
         </button>
@@ -1013,17 +1063,20 @@ function ItOslAssetsContent() {
         {/* In Repair */}
         <button
           onClick={() => { clearAllFilters(); setFilterStatus("IN_REPAIR"); }}
-          className={`shrink-0 w-32 sm:w-auto snap-start p-3 rounded-2xl border text-left transition-all active:scale-95 ${
+          className={`p-3 rounded-2xl border text-left transition-all active:scale-95 ${
             filterStatus === "IN_REPAIR" 
-              ? "bg-amber-500 text-white border-amber-500 shadow-md" 
-              : "bg-white text-slate-800 border-slate-100 hover:border-amber-300 shadow-sm"
+              ? "bg-amber-500 text-white border-amber-500 shadow-sm" 
+              : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-slate-800 hover:border-amber-300 shadow-xs"
           }`}
         >
-          <p className={`text-[9px] font-black uppercase tracking-wider ${filterStatus === "IN_REPAIR" ? "text-amber-100" : "text-amber-600"}`}>
-            Perbaikan
-          </p>
-          <p className="text-lg sm:text-2xl font-black mt-0.5 tabular-nums">{metrics.inRepair}</p>
-          <p className={`text-[9px] mt-0.5 truncate ${filterStatus === "IN_REPAIR" ? "text-amber-100" : "text-slate-400"}`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${filterStatus === "IN_REPAIR" ? "text-amber-100" : "text-amber-600 dark:text-amber-400"}`}>
+              Perbaikan
+            </span>
+            <Wrench size={13} className={filterStatus === "IN_REPAIR" ? "text-white" : "text-amber-500"} />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold mt-1 tabular-nums">{metrics.inRepair}</p>
+          <p className={`text-[11px] mt-0.5 truncate ${filterStatus === "IN_REPAIR" ? "text-amber-100" : "text-slate-400"}`}>
             Sedang diservis
           </p>
         </button>
@@ -1031,17 +1084,20 @@ function ItOslAssetsContent() {
         {/* Retired */}
         <button
           onClick={() => { clearAllFilters(); setFilterStatus("RETIRED"); }}
-          className={`shrink-0 w-32 sm:w-auto snap-start p-3 rounded-2xl border text-left transition-all active:scale-95 ${
+          className={`p-3 rounded-2xl border text-left transition-all active:scale-95 ${
             filterStatus === "RETIRED" 
-              ? "bg-slate-700 text-white border-slate-700 shadow-md" 
-              : "bg-white text-slate-800 border-slate-100 hover:border-slate-300 shadow-sm"
+              ? "bg-slate-700 text-white border-slate-700 shadow-sm" 
+              : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-slate-800 hover:border-slate-400 shadow-xs"
           }`}
         >
-          <p className={`text-[9px] font-black uppercase tracking-wider ${filterStatus === "RETIRED" ? "text-slate-300" : "text-slate-400"}`}>
-            Afkir / Rusak
-          </p>
-          <p className="text-lg sm:text-2xl font-black mt-0.5 tabular-nums">{metrics.retired}</p>
-          <p className={`text-[9px] mt-0.5 truncate ${filterStatus === "RETIRED" ? "text-slate-300" : "text-slate-400"}`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${filterStatus === "RETIRED" ? "text-slate-300" : "text-slate-500"}`}>
+              Afkir / Rusak
+            </span>
+            <div className={`w-2 h-2 rounded-full ${filterStatus === "RETIRED" ? "bg-white" : "bg-slate-400"}`} />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold mt-1 tabular-nums">{metrics.retired}</p>
+          <p className={`text-[11px] mt-0.5 truncate ${filterStatus === "RETIRED" ? "text-slate-300" : "text-slate-400"}`}>
             Non-operasional
           </p>
         </button>
@@ -1049,17 +1105,20 @@ function ItOslAssetsContent() {
         {/* Warranty */}
         <button
           onClick={() => { clearAllFilters(); setFilterWarranty("active"); }}
-          className={`shrink-0 w-32 sm:w-auto snap-start p-3 rounded-2xl border text-left transition-all active:scale-95 ${
+          className={`p-3 rounded-2xl border text-left transition-all active:scale-95 ${
             filterWarranty === "active" 
-              ? "bg-sky-600 text-white border-sky-600 shadow-md" 
-              : "bg-white text-slate-800 border-slate-100 hover:border-sky-300 shadow-sm"
+              ? "bg-sky-600 text-white border-sky-600 shadow-sm" 
+              : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-slate-800 hover:border-sky-300 shadow-xs"
           }`}
         >
-          <p className={`text-[9px] font-black uppercase tracking-wider ${filterWarranty === "active" ? "text-sky-100" : "text-sky-600"}`}>
-            Garansi Aktif
-          </p>
-          <p className="text-lg sm:text-2xl font-black mt-0.5 tabular-nums">{metrics.inWarranty}</p>
-          <p className={`text-[9px] mt-0.5 truncate ${filterWarranty === "active" ? "text-sky-100" : "text-slate-400"}`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${filterWarranty === "active" ? "text-sky-100" : "text-sky-600 dark:text-sky-400"}`}>
+              Garansi Aktif
+            </span>
+            <ShieldCheck size={14} className={filterWarranty === "active" ? "text-white" : "text-sky-500"} />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold mt-1 tabular-nums">{metrics.inWarranty}</p>
+          <p className={`text-[11px] mt-0.5 truncate ${filterWarranty === "active" ? "text-sky-100" : "text-slate-400"}`}>
             Klaim pabrik
           </p>
         </button>
@@ -1067,38 +1126,41 @@ function ItOslAssetsContent() {
         {/* Recurring */}
         <button
           onClick={() => { clearAllFilters(); setFilterRecurringOnly(true); }}
-          className={`shrink-0 w-32 sm:w-auto snap-start p-3 rounded-2xl border text-left transition-all active:scale-95 ${
+          className={`p-3 rounded-2xl border text-left transition-all active:scale-95 ${
             filterRecurringOnly 
-              ? "bg-rose-600 text-white border-rose-600 shadow-md" 
-              : "bg-white text-slate-800 border-slate-100 hover:border-rose-300 shadow-sm"
+              ? "bg-rose-600 text-white border-rose-600 shadow-sm" 
+              : "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-slate-800 hover:border-rose-300 shadow-xs"
           }`}
         >
-          <p className={`text-[9px] font-black uppercase tracking-wider flex items-center gap-1 ${filterRecurringOnly ? "text-rose-100" : "text-rose-600"}`}>
-            <AlertTriangle size={11} /> Sering Rusak
-          </p>
-          <p className="text-lg sm:text-2xl font-black mt-0.5 tabular-nums">{metrics.recurring}</p>
-          <p className={`text-[9px] mt-0.5 truncate ${filterRecurringOnly ? "text-rose-100" : "text-slate-400"}`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${filterRecurringOnly ? "text-rose-100" : "text-rose-600 dark:text-rose-400"}`}>
+              <AlertTriangle size={11} /> Sering Rusak
+            </span>
+            <div className={`w-2 h-2 rounded-full ${filterRecurringOnly ? "bg-white" : "bg-rose-500 animate-pulse"}`} />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold mt-1 tabular-nums">{metrics.recurring}</p>
+          <p className={`text-[11px] mt-0.5 truncate ${filterRecurringOnly ? "text-rose-100" : "text-slate-400"}`}>
             ≥3 tiket insiden
           </p>
         </button>
       </div>
 
-      {/* ── 3. SEARCH & ADVANCED FILTER TOOLBAR ─────────────────────────────────── */}
-      <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
-        <div className="flex flex-col md:flex-row gap-2.5 items-stretch md:items-center">
+      {/* ── 3. SMART SEARCH & FILTER TOOLBAR ─────────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+        <div className="flex flex-col lg:flex-row gap-2.5 items-stretch lg:items-center">
           {/* Search Input */}
           <div className="relative flex-1 min-w-0">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari kode aset, nama, SN, merek, lokasi, PIC..."
-              className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
+              placeholder="Cari kode aset, nama perangkat, serial number, merek, lokasi, PIC..."
+              className="w-full pl-10 pr-9 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition"
             />
             {q && (
               <button
                 onClick={() => setQ("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full"
               >
                 <X size={14} />
               </button>
@@ -1111,7 +1173,7 @@ function ItOslAssetsContent() {
               <select
                 value={filterCustomer}
                 onChange={(e) => setFilterCustomer(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-indigo-200 text-xs font-bold bg-indigo-50/50 text-indigo-900 max-w-[190px]"
+                className="px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 text-xs font-semibold bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 max-w-[190px]"
               >
                 <option value="">Semua Customer</option>
                 {customers.map(c => (
@@ -1125,7 +1187,7 @@ function ItOslAssetsContent() {
             <select
               value={filterLocation}
               onChange={(e) => setFilterLocation(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium bg-white text-slate-700"
+              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
             >
               <option value="">Semua Lokasi</option>
               {locations.map(l => (
@@ -1136,7 +1198,7 @@ function ItOslAssetsContent() {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium bg-white text-slate-700"
+              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200"
             >
               <option value="">Semua Jenis</option>
               {ASSET_TYPES.map(t => (
@@ -1147,7 +1209,7 @@ function ItOslAssetsContent() {
             <select
               value={filterPic}
               onChange={(e) => setFilterPic(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium bg-white text-slate-700 max-w-[170px]"
+              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 max-w-[170px]"
             >
               <option value="">Semua PIC</option>
               <option value="UNASSIGNED">Tanpa PIC</option>
@@ -1163,18 +1225,18 @@ function ItOslAssetsContent() {
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={() => setShowMobileFilterSheet(true)}
-              className="lg:hidden flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95"
+              className="lg:hidden flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95"
             >
               <Filter size={14} />
               <span>Filter {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}</span>
             </button>
 
             {/* View Switcher (Desktop & Mobile) */}
-            <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 shrink-0">
+            <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shrink-0">
               <button
                 onClick={() => setViewMode("table")}
-                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition ${
-                  viewMode === "table" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition ${
+                  viewMode === "table" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
                 }`}
                 title="Tampilan Tabel"
               >
@@ -1182,8 +1244,8 @@ function ItOslAssetsContent() {
               </button>
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition ${
-                  viewMode === "grid" ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition ${
+                  viewMode === "grid" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
                 }`}
                 title="Tampilan Kartu"
               >
@@ -1193,593 +1255,583 @@ function ItOslAssetsContent() {
           </div>
         </div>
 
-        {/* Filter Chips */}
+        {/* Active Filter Chips */}
         {activeFilterCount > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-100 text-xs">
-            <span className="font-bold text-slate-500 text-[10px] uppercase">Filter:</span>
+          <div className="flex items-center gap-1.5 flex-wrap pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+            <span className="font-semibold text-slate-400 text-[10px] uppercase">Filter:</span>
 
             {q && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[11px] font-medium">
                 &quot;{q}&quot;
-                <button onClick={() => setQ("")}><X size={11} /></button>
+                <button onClick={() => setQ("")} className="hover:text-indigo-900"><X size={11} /></button>
               </span>
             )}
             {filterCustomer && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-300 text-[11px] font-semibold">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-100/70 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-700 text-[11px] font-semibold">
                 Customer: {customers.find(c => c.id === filterCustomer)?.name}
                 <button onClick={() => setFilterCustomer("")}><X size={11} /></button>
               </span>
             )}
             {filterLocation && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] font-medium">
                 {locations.find(l => l.id === filterLocation)?.name}
                 <button onClick={() => setFilterLocation("")}><X size={11} /></button>
               </span>
             )}
             {filterType && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] font-medium">
                 {filterType}
                 <button onClick={() => setFilterType("")}><X size={11} /></button>
               </span>
             )}
             {filterStatus && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] font-medium">
                 Status: {STATUS_OPTS.find(s => s.v === filterStatus)?.l}
                 <button onClick={() => setFilterStatus("")}><X size={11} /></button>
               </span>
             )}
             {filterPic && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] font-medium">
                 PIC: {filterPic === "UNASSIGNED" ? "Tanpa PIC" : (pics.find(p => p.id === filterPic)?.name || filterPic)}
                 <button onClick={() => setFilterPic("")}><X size={11} /></button>
               </span>
             )}
             {filterWarranty && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 text-[11px] font-medium">
                 Garansi: {filterWarranty === "active" ? "Aktif" : filterWarranty === "expired" ? "Habis" : "Tanpa"}
                 <button onClick={() => setFilterWarranty("")}><X size={11} /></button>
               </span>
             )}
             {filterRecurringOnly && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-medium">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-[11px] font-medium">
                 Sering Rusak
                 <button onClick={() => setFilterRecurringOnly(false)}><X size={11} /></button>
               </span>
             )}
 
-            <button onClick={clearAllFilters} className="text-indigo-600 hover:text-indigo-800 font-bold ml-1 text-[11px] flex items-center gap-0.5">
-              <RotateCcw size={11} /> Reset
+            <button onClick={clearAllFilters} className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold ml-1 text-[11px] flex items-center gap-1">
+              <RotateCcw size={11} /> Reset Filter
             </button>
           </div>
         )}
       </div>
 
-      {/* ── 4. BATCH ACTIONS BAR ──────────────────────────────────────────────── */}
+      {/* ── 4. FLOATING BATCH ACTION DOCK ────────────────────────────────────── */}
       <AnimatePresence>
         {selectedIds.size > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="bg-indigo-900 text-white p-3 rounded-2xl shadow-xl flex items-center justify-between gap-2.5 flex-wrap z-30"
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-3 border border-slate-700 dark:border-slate-200 max-w-[90vw]"
           >
-            <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-indigo-700 text-white font-black text-xs flex items-center justify-center">
+            <div className="flex items-center gap-2 border-r border-slate-700 dark:border-slate-300 pr-3">
+              <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center">
                 {selectedIds.size}
               </span>
-              <span className="text-xs font-bold">Aset terpilih</span>
+              <span className="text-xs font-semibold hidden sm:inline">Aset Dipilih</span>
             </div>
 
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowBatchPrint(true)}
-                className="px-3 py-1.5 rounded-xl bg-white text-indigo-900 hover:bg-indigo-50 active:scale-95 text-xs font-black flex items-center gap-1.5 transition shadow-sm"
+                onClick={() => { setPrintLayout("grid"); setShowBatchPrint(true); }}
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-xs"
               >
                 <Printer size={13} />
-                <span>Cetak {selectedIds.size} QR</span>
+                <span>Cetak Label ({selectedIds.size})</span>
               </button>
 
               <button
                 onClick={() => exportCsv(selectedAssetsList)}
-                className="px-3 py-1.5 rounded-xl bg-indigo-800 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 transition"
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 dark:bg-slate-200 dark:hover:bg-slate-300 text-xs font-semibold flex items-center gap-1.5 transition"
               >
                 <Download size={13} />
-                <span className="hidden sm:inline">Export</span>
+                <span className="hidden sm:inline">Export CSV</span>
               </button>
 
-              <button onClick={handleDeselectAll} className="px-2.5 py-1.5 rounded-xl hover:bg-indigo-800 text-indigo-200 text-xs font-bold transition">
-                Batal
+              <button 
+                onClick={handleDeselectAll} 
+                className="p-1.5 rounded-lg hover:bg-slate-800 dark:hover:bg-slate-200 text-slate-400 dark:text-slate-600 transition"
+                title="Batalkan pilihan"
+              >
+                <X size={15} />
               </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── 5. DATA VIEW (MOBILE ADAPTIVE) ───────────────────────────────────────── */}
+      {/* ── 5. DATA VIEW ─────────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2.5">
-          <Loader2 className="animate-spin text-indigo-600" size={28} />
-          <p className="text-xs sm:text-sm font-bold text-slate-600">Memuat Registri Aset...</p>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+          <Loader2 className="animate-spin text-indigo-600" size={32} />
+          <p className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300">Memuat Registri Aset IT...</p>
         </div>
       ) : paginatedAssets.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center text-slate-500 space-y-2.5">
-          <Package size={36} className="mx-auto text-slate-300" />
-          <h3 className="font-black text-sm sm:text-base text-slate-800">Tidak ada aset yang sesuai</h3>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-12 text-center text-slate-500 space-y-3">
+          <Package size={40} className="mx-auto text-slate-300 dark:text-slate-600" />
+          <h3 className="font-bold text-sm sm:text-base text-slate-800 dark:text-slate-200">Tidak ada aset yang sesuai kriteria</h3>
+          <p className="text-xs text-slate-400">Silakan ubah kata kunci pencarian atau sesuaikan filter Anda.</p>
           {activeFilterCount > 0 && (
-            <button onClick={clearAllFilters} className="px-3.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-bold">
-              Reset Filter
+            <button onClick={clearAllFilters} className="px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 text-xs font-semibold">
+              Reset Semua Filter
             </button>
           )}
         </div>
-      ) : (
-        <>
-          {/* MOBILE VIEW (CARD LIST - ALWAYS CLEAN ON SMALL SCREENS) */}
-          <div className="block md:hidden space-y-2.5">
-            {paginatedAssets.map((a) => {
-              const isSelected = selectedIds.has(a.id)
-              const isWarrantyActive = a.warrantyUntil && new Date(a.warrantyUntil) > new Date()
-              const picName = a.pic?.name || a.picUser?.name || null
-              const picPhone = a.pic?.phone || null
-              const waUrl = getWhatsAppUrl(picPhone)
-              const assetPhotos = getAssetPhotos(a.photos)
+      ) : viewMode === "grid" ? (
+        /* ══════════ GRID VIEW ══════════ */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+          {paginatedAssets.map((a) => {
+            const isSelected = selectedIds.has(a.id)
+            const statusObj = STATUS_OPTS.find(s => s.v === a.status) || STATUS_OPTS[0]
+            const isWarrantyActive = a.warrantyUntil && new Date(a.warrantyUntil) > new Date()
+            const picName = a.pic?.name || a.picUser?.name || null
+            const picPhone = a.pic?.phone || null
+            const waUrl = getWhatsAppUrl(picPhone, a.name)
+            const assetPhotos = getAssetPhotos(a.photos)
+            const mainPhoto = assetPhotos[0] ? (assetPhotos[0].startsWith("http") ? assetPhotos[0] : `${API}${assetPhotos[0]}`) : null
 
-              return (
-                <div
-                  key={a.id}
-                  className={`bg-white rounded-2xl border p-3.5 space-y-2.5 transition-all shadow-sm ${
-                    isSelected ? "border-indigo-600 ring-2 ring-indigo-500/20" : "border-slate-100"
-                  }`}
-                >
-                  {/* Top Bar: Code + Badges */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <button onClick={() => handleToggleSelect(a.id)} className="text-slate-400 shrink-0">
+            return (
+              <div
+                key={a.id}
+                className={`bg-white dark:bg-slate-900 rounded-2xl border p-4 space-y-3 transition-all shadow-xs hover:border-slate-300 dark:hover:border-slate-700 relative flex flex-col justify-between ${
+                  isSelected ? "border-indigo-600 ring-2 ring-indigo-500/20" : "border-slate-200/80 dark:border-slate-800"
+                }`}
+              >
+                <div>
+                  {/* Card Top Header: Checkbox + Asset Code + Status */}
+                  <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <button onClick={() => handleToggleSelect(a.id)} className="text-slate-400 hover:text-slate-600 shrink-0">
                         {isSelected ? <CheckSquare size={16} className="text-indigo-600" /> : <Square size={16} />}
                       </button>
                       <button
                         onClick={() => setDetailId(a.id)}
-                        className="font-mono text-[10px] font-black bg-slate-900 text-white px-2 py-0.5 rounded truncate"
+                        className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-indigo-600 truncate bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded"
                       >
                         {a.assetCode}
                       </button>
-                      <button onClick={() => copyCode(a.assetCode)} className="text-slate-400 p-0.5">
-                        {copiedCode === a.assetCode ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                      <button onClick={() => copyCode(a.assetCode)} className="text-slate-400 hover:text-slate-600 p-0.5" title="Salin kode">
+                        {copiedCode === a.assetCode ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      {a.customer && (
-                        <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-full border border-indigo-200 truncate max-w-[100px]">
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusObj.c}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${statusObj.dot}`} />
+                      {statusObj.l}
+                    </span>
+                  </div>
+
+                  {/* Thumbnail & Identity */}
+                  <div className="flex items-start gap-3 pt-2.5">
+                    {mainPhoto ? (
+                      <div 
+                        onClick={() => openPhotoLightbox(assetPhotos, 0)}
+                        className="w-14 h-14 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 shrink-0 cursor-pointer relative group"
+                      >
+                        <img src={mainPhoto} alt={a.name} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white">
+                          <Maximize2 size={12} />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 shrink-0 border border-slate-200/80 dark:border-slate-700">
+                        <Package size={22} />
+                      </div>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <h3 
+                        onClick={() => setDetailId(a.id)}
+                        className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate hover:text-indigo-600 cursor-pointer"
+                        title={a.name}
+                      >
+                        {a.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                        {a.brandModel || a.assetType || "Perangkat IT"}
+                      </p>
+                      {a.serialNumber && (
+                        <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 truncate mt-0.5">
+                          SN: {a.serialNumber}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Badges & Meta */}
+                  <div className="pt-3 space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <MapPin size={13} className="text-slate-400 shrink-0" />
+                      <span className="truncate">{a.location?.name || "Belum ditentukan"}</span>
+                      {a.customer?.name && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 shrink-0">
                           {a.customer.name}
                         </span>
                       )}
-                      {assetPhotos.length > 0 && (
-                        <span className="text-[9px] font-bold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5 border border-slate-200">
-                          <Camera size={9} className="text-indigo-600" /> {assetPhotos.length}
-                        </span>
-                      )}
-                      {(a.recurring || (a.ticketCount || 0) >= 3) && (
-                        <span className="text-[9px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                          <AlertTriangle size={9} /> Rusak
-                        </span>
-                      )}
-                      <span className={`px-2 py-0.5 rounded-full font-black text-[9px] uppercase tracking-wider border ${
-                        STATUS_OPTS.find(s => s.v === a.status)?.c || "bg-slate-100 text-slate-700"
-                      }`}>
-                        {STATUS_OPTS.find(s => s.v === a.status)?.l || a.status}
-                      </span>
                     </div>
-                  </div>
 
-                  {/* Title & Info */}
-                  <div onClick={() => setDetailId(a.id)} className="cursor-pointer flex items-start gap-2.5">
-                    {assetPhotos.length > 0 && (
-                      <div className="relative w-11 h-11 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shrink-0 shadow-xs">
-                        <img
-                          src={assetPhotos[0].startsWith("http") ? assetPhotos[0] : `${API}${assetPhotos[0]}`}
-                          alt={a.name}
-                          className="w-full h-full object-cover"
-                        />
+                    <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <User size={13} className="text-slate-400 shrink-0" />
+                        <span className="truncate text-xs">{picName || "Tanpa PIC"}</span>
                       </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-black text-slate-900 text-xs sm:text-sm line-clamp-1 hover:text-indigo-600">
-                        {a.name}
-                      </h3>
-                      <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                        {a.assetType || "Perangkat"} • {a.brandModel || "Tanpa Merek"} {a.serialNumber ? `• SN: ${a.serialNumber}` : ""}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Metadata: Location & PIC */}
-                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-50 text-[11px] text-slate-600">
-                    <div className="flex items-center gap-1 min-w-0">
-                      <MapPin size={12} className="text-slate-400 shrink-0" />
-                      <span className="truncate">{a.location?.name || "-"}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      <User size={12} className="text-indigo-500 shrink-0" />
-                      <span className="font-medium truncate max-w-[110px]">
-                        {picName || <span className="text-slate-400 italic">Tanpa PIC</span>}
-                      </span>
-                      {waUrl && (
-                        <a href={waUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-600 p-0.5">
-                          <MessageCircle size={12} />
+                      {picPhone && waUrl && (
+                        <a
+                          href={waUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-600 hover:text-emerald-700 p-1"
+                          title="Chat WhatsApp PIC"
+                        >
+                          <MessageCircle size={14} />
                         </a>
                       )}
                     </div>
-                  </div>
 
-                  {/* Action Strip */}
-                  <div className="flex items-center gap-1.5 pt-2 border-t border-slate-50">
+                    {(a.recurring || a.ticketCount >= 3) && (
+                      <div className="pt-1">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/50 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-800">
+                          <AlertTriangle size={11} /> Sering Rusak ({a.ticketCount} Tiket)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card Bottom Actions */}
+                <div className="flex items-center justify-between gap-1.5 pt-3 border-t border-slate-100 dark:border-slate-800 mt-2">
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => setDetailId(a.id)}
-                      className="flex-1 py-1.5 rounded-xl bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center gap-1 active:scale-95 transition"
+                      className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-semibold transition"
                     >
-                      <Eye size={12} /> Detail
+                      Detail
                     </button>
                     <button
                       onClick={() => setSinglePrintAsset(a)}
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 text-[11px] font-bold flex items-center gap-1 active:scale-95"
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+                      title="Cetak Label QR"
                     >
-                      <QrCode size={13} /> Cetak QR
-                    </button>
-                    <button
-                      onClick={() => openEdit(a)}
-                      className="p-1.5 rounded-xl border border-slate-200 text-slate-600 active:scale-95"
-                    >
-                      <Edit2 size={13} />
+                      <QrCode size={14} />
                     </button>
                   </div>
-                </div>
-              );
-            })}
-          </div>
 
-          {/* DESKTOP TABLE / GRID VIEW (md and up) */}
-          <div className="hidden md:block">
-            {viewMode === "table" ? (
-              /* ── TABLE VIEW ──────────────────────────────────────────────────── */
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-                <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50/80 border-b border-slate-200/80 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
-                        <th className="p-3.5 w-10 text-center">
-                          <button onClick={handleSelectAllCurrentPage} className="text-slate-400 hover:text-indigo-600 transition">
-                            {paginatedAssets.every(a => selectedIds.has(a.id)) ? <CheckSquare size={16} className="text-indigo-600" /> : <Square size={16} />}
-                          </button>
-                        </th>
-                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort("assetCode")}>
-                          <div className="flex items-center gap-1.5">
-                            <span>Kode Aset (QR)</span>
-                            <ArrowUpDown size={12} className={sortBy === "assetCode" ? "text-indigo-600" : "text-slate-400"} />
-                          </div>
-                        </th>
-                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort("name")}>
-                          <div className="flex items-center gap-1.5">
-                            <span>Nama Perangkat & Spesifikasi</span>
-                            <ArrowUpDown size={12} className={sortBy === "name" ? "text-indigo-600" : "text-slate-400"} />
-                          </div>
-                        </th>
-                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort("location")}>
-                          <div className="flex items-center gap-1.5">
-                            <span>Lokasi Fisik</span>
-                            <ArrowUpDown size={12} className={sortBy === "location" ? "text-indigo-600" : "text-slate-400"} />
-                          </div>
-                        </th>
-                        <th className="p-3.5">
-                          <span>PIC Penanggung Jawab</span>
-                        </th>
-                        <th className="p-3.5">
-                          <span>Status</span>
-                        </th>
-                        <th className="p-3.5 cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort("warrantyUntil")}>
-                          <div className="flex items-center gap-1.5">
-                            <span>Garansi</span>
-                            <ArrowUpDown size={12} className={sortBy === "warrantyUntil" ? "text-indigo-600" : "text-slate-400"} />
-                          </div>
-                        </th>
-                        <th className="p-3.5 text-center cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort("ticketCount")}>
-                          <div className="flex items-center justify-center gap-1">
-                            <span>Tiket</span>
-                            <ArrowUpDown size={12} className={sortBy === "ticketCount" ? "text-indigo-600" : "text-slate-400"} />
-                          </div>
-                        </th>
-                        <th className="p-3.5 text-right w-24">
-                          <span>Aksi</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {paginatedAssets.map((a) => {
-                        const isSelected = selectedIds.has(a.id)
-                        const isWarrantyActive = a.warrantyUntil && new Date(a.warrantyUntil) > new Date()
-                        const isWarrantyExpired = a.warrantyUntil && new Date(a.warrantyUntil) <= new Date()
-                        const picName = a.pic?.name || a.picUser?.name || a.picUser?.email || null
-                        const picPhone = a.pic?.phone || null
-                        const waUrl = getWhatsAppUrl(picPhone)
-                        const assetPhotos = getAssetPhotos(a.photos)
-
-                        return (
-                          <tr key={a.id} className={`hover:bg-indigo-50/40 transition-colors ${isSelected ? "bg-indigo-50/70" : ""}`}>
-                            <td className="p-3 text-center">
-                              <button onClick={() => handleToggleSelect(a.id)} className="text-slate-400 hover:text-indigo-600 transition">
-                                {isSelected ? <CheckSquare size={16} className="text-indigo-600" /> : <Square size={16} />}
-                              </button>
-                            </td>
-
-                            <td className="p-3 whitespace-nowrap">
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => { setDetailId(a.id) }}
-                                  className="font-mono text-xs font-black text-indigo-600 hover:text-indigo-800 hover:underline bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
-                                >
-                                  {a.assetCode}
-                                </button>
-                                <button onClick={() => copyCode(a.assetCode)} className="text-slate-400 hover:text-slate-600 p-1 rounded" title="Salin kode">
-                                  {copiedCode === a.assetCode ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                                </button>
-                              </div>
-                            </td>
-
-                            <td className="p-3 max-w-xs">
-                              <div className="flex items-center gap-2.5">
-                                {assetPhotos.length > 0 && (
-                                  <div 
-                                    onClick={() => setPreviewPhotoModal(assetPhotos[0].startsWith("http") ? assetPhotos[0] : `${API}${assetPhotos[0]}`)}
-                                    className="relative w-9 h-9 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shrink-0 shadow-xs cursor-pointer group"
-                                    title="Klik untuk melihat foto"
-                                  >
-                                    <img
-                                      src={assetPhotos[0].startsWith("http") ? assetPhotos[0] : `${API}${assetPhotos[0]}`}
-                                      alt={a.name}
-                                      className="w-full h-full object-cover group-hover:scale-110 transition"
-                                    />
-                                    {assetPhotos.length > 1 && (
-                                      <span className="absolute bottom-0.5 right-0.5 px-1 py-0.2 bg-black/75 text-white rounded text-[7px] font-bold">
-                                        +{assetPhotos.length - 1}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <p className="font-bold text-slate-900 truncate hover:text-indigo-600 cursor-pointer" onClick={() => setDetailId(a.id)}>
-                                      {a.name}
-                                    </p>
-                                    {a.customer && (
-                                      <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
-                                        {a.customer.name}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                                    {a.assetType ? <span className="font-semibold text-slate-700">{a.assetType}</span> : "Lainnya"}
-                                    {a.brandModel ? ` • ${a.brandModel}` : ""}
-                                    {a.serialNumber ? ` • SN: ${a.serialNumber}` : ""}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="p-3 whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-lg text-xs font-medium">
-                                <MapPin size={12} className="text-slate-400 shrink-0" />
-                                <span className="truncate max-w-[130px]">{a.location?.name || "-"}</span>
-                              </span>
-                            </td>
-
-                            {/* PIC Column */}
-                            <td className="p-3 whitespace-nowrap">
-                              {picName ? (
-                                <div className="flex items-center gap-1.5">
-                                  <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-700 font-bold text-[10px] flex items-center justify-center shrink-0 border border-indigo-200">
-                                    {picName.slice(0, 1).toUpperCase()}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="font-bold text-xs text-slate-800 truncate max-w-[130px]">{picName}</p>
-                                    {a.pic?.department && <p className="text-[10px] text-slate-400 truncate">{a.pic.department}</p>}
-                                  </div>
-                                  {waUrl && (
-                                    <a href={waUrl} target="_blank" rel="noopener noreferrer" className="p-1 rounded text-emerald-600 hover:bg-emerald-50" title="Chat WhatsApp PIC">
-                                      <MessageCircle size={13} />
-                                    </a>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 text-xs italic">Belum set PIC</span>
-                              )}
-                            </td>
-
-                            <td className="p-3 whitespace-nowrap">
-                              <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                                STATUS_OPTS.find(s => s.v === a.status)?.c || "bg-slate-100 text-slate-700"
-                              }`}>
-                                {STATUS_OPTS.find(s => s.v === a.status)?.l || a.status}
-                              </span>
-                            </td>
-
-                            <td className="p-3 whitespace-nowrap">
-                              {isWarrantyActive && (
-                                <span className="inline-flex items-center gap-1 text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md font-bold text-[10px]">
-                                  <CheckCircle2 size={11} /> s/d {new Date(a.warrantyUntil!).toLocaleDateString('id-ID', { month: 'short', year: 'numeric' })}
-                                </span>
-                              )}
-                              {isWarrantyExpired && <span className="text-slate-400 text-[10px]">Habis</span>}
-                              {!a.warrantyUntil && <span className="text-slate-400 text-[10px]">-</span>}
-                            </td>
-
-                            <td className="p-3 text-center whitespace-nowrap">
-                              <div className="inline-flex items-center gap-1.5">
-                                <span className="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded-md text-xs">
-                                  {a.ticketCount || 0}
-                                </span>
-                                {(a.recurring || (a.ticketCount || 0) >= 3) && (
-                                  <span className="p-1 rounded bg-rose-100 text-rose-700" title="Sering bermasalah (≥3 tiket)">
-                                    <AlertTriangle size={13} />
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-
-                            <td className="p-3 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-1">
-                                <button onClick={() => setSinglePrintAsset(a)} className="p-1.5 rounded-lg border hover:bg-slate-100 text-slate-600" title="Cetak Label QR">
-                                  <QrCode size={13} />
-                                </button>
-                                <button onClick={() => setDetailId(a.id)} className="p-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800" title="Detail">
-                                  <Eye size={13} />
-                                </button>
-                                <button onClick={() => openEdit(a)} className="p-1.5 rounded-lg border hover:bg-slate-100 text-slate-600" title="Edit">
-                                  <Edit2 size={13} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+                  <div className="flex items-center gap-1">
+                    {canAssetWrite && (
+                      <button
+                        onClick={() => openEdit(a)}
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+                        title="Edit Aset"
+                      >
+                        <Edit2 size={13} />
+                      </button>
+                    )}
+                    {canWrite && (
+                      <button
+                        onClick={() => deleteAsset(a.id, a.name)}
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-500 transition"
+                        title="Hapus Aset"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            ) : (
-              /* ── DESKTOP GRID VIEW ───────────────────────────────────────────── */
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 sm:gap-4 w-full">
+            )
+          })}
+        </div>
+      ) : (
+        /* ══════════ TABLE VIEW ══════════ */
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                  <th className="p-3 w-10 text-center">
+                    <button onClick={handleSelectAllCurrentPage} className="text-slate-400 hover:text-slate-600">
+                      {paginatedAssets.length > 0 && paginatedAssets.every(a => selectedIds.has(a.id)) ? (
+                        <CheckSquare size={16} className="text-indigo-600" />
+                      ) : (
+                        <Square size={16} />
+                      )}
+                    </button>
+                  </th>
+                  <th className="p-3 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200" onClick={() => handleSort("name")}>
+                    <div className="flex items-center gap-1">
+                      <span>Perangkat & Merek</span>
+                      <ArrowUpDown size={12} />
+                    </div>
+                  </th>
+                  <th className="p-3 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200" onClick={() => handleSort("assetCode")}>
+                    <div className="flex items-center gap-1">
+                      <span>Kode & Serial Number</span>
+                      <ArrowUpDown size={12} />
+                    </div>
+                  </th>
+                  <th className="p-3">Jenis</th>
+                  <th className="p-3 cursor-pointer select-none" onClick={() => handleSort("location")}>
+                    <div className="flex items-center gap-1">
+                      <span>Lokasi & Customer</span>
+                      <ArrowUpDown size={12} />
+                    </div>
+                  </th>
+                  <th className="p-3">PIC Unit</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-center cursor-pointer select-none" onClick={() => handleSort("ticketCount")}>
+                    <div className="flex items-center justify-center gap-1">
+                      <span>Tiket</span>
+                      <ArrowUpDown size={12} />
+                    </div>
+                  </th>
+                  <th className="p-3 text-right w-28">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
                 {paginatedAssets.map((a) => {
                   const isSelected = selectedIds.has(a.id)
-                  const isWarrantyActive = a.warrantyUntil && new Date(a.warrantyUntil) > new Date()
+                  const statusObj = STATUS_OPTS.find(s => s.v === a.status) || STATUS_OPTS[0]
                   const picName = a.pic?.name || a.picUser?.name || null
+                  const picPhone = a.pic?.phone || null
+                  const waUrl = getWhatsAppUrl(picPhone, a.name)
+                  const assetPhotos = getAssetPhotos(a.photos)
+                  const mainPhoto = assetPhotos[0] ? (assetPhotos[0].startsWith("http") ? assetPhotos[0] : `${API}${assetPhotos[0]}`) : null
 
                   return (
-                    <div
+                    <tr
                       key={a.id}
-                      className={`bg-white rounded-2xl border p-4 flex flex-col justify-between transition-all hover:shadow-md ${
-                        isSelected ? "border-indigo-600 ring-2 ring-indigo-500/20 shadow-md" : "border-slate-200/80"
+                      className={`hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors ${
+                        isSelected ? "bg-indigo-50/40 dark:bg-indigo-950/20" : ""
                       }`}
                     >
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => handleToggleSelect(a.id)} className="text-slate-400 hover:text-indigo-600 transition">
-                              {isSelected ? <CheckSquare size={16} className="text-indigo-600" /> : <Square size={16} />}
-                            </button>
-                            <span className="font-mono text-[10px] font-bold bg-slate-900 text-white px-2 py-0.5 rounded">
-                              {a.assetCode}
-                            </span>
-                          </div>
+                      <td className="p-3 text-center">
+                        <button onClick={() => handleToggleSelect(a.id)} className="text-slate-400 hover:text-slate-600">
+                          {isSelected ? <CheckSquare size={16} className="text-indigo-600" /> : <Square size={16} />}
+                        </button>
+                      </td>
 
-                          <div className="flex items-center gap-1">
-                            {(a.recurring || (a.ticketCount || 0) >= 3) && (
-                              <span className="text-[10px] font-black bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <AlertTriangle size={10} /> Sering Rusak
-                              </span>
-                            )}
-                            <span className={`px-2 py-0.5 rounded-full font-black text-[10px] uppercase ${
-                              STATUS_OPTS.find(s => s.v === a.status)?.c || "bg-slate-100 text-slate-700"
-                            }`}>
-                              {STATUS_OPTS.find(s => s.v === a.status)?.l || a.status}
-                            </span>
-                          </div>
-                        </div>
-
-                        <h3 className="font-black text-slate-900 text-sm mt-2 line-clamp-1 hover:text-indigo-600 cursor-pointer" onClick={() => setDetailId(a.id)}>
-                          {a.name}
-                        </h3>
-                        <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                          {a.assetType || "Lainnya"} • {a.brandModel || "Tanpa Merek"} • SN: {a.serialNumber || "-"}
-                        </p>
-
-                        <div className="space-y-1 mt-2.5 text-xs text-slate-600">
-                          <p className="flex items-center gap-1.5">
-                            <MapPin size={13} className="text-slate-400 shrink-0" />
-                            <span className="truncate">{a.location?.name || "-"}</span>
-                          </p>
-                          <p className="flex items-center gap-1.5">
-                            <User size={13} className="text-indigo-500 shrink-0" />
-                            <span className="truncate font-medium">
-                              PIC: {picName || <span className="text-slate-400 italic font-normal">Belum set</span>}
-                            </span>
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100 text-[11px]">
-                          <span className="text-slate-500 font-medium">Tiket: <b className="text-slate-900">{a.ticketCount || 0}</b></span>
-                          {isWarrantyActive ? (
-                            <span className="text-sky-700 font-bold flex items-center gap-1 text-[10px]">
-                              <CheckCircle2 size={11} /> Garansi Aktif
-                            </span>
+                      {/* Name & Photo */}
+                      <td className="p-3">
+                        <div className="flex items-center gap-2.5">
+                          {mainPhoto ? (
+                            <div 
+                              onClick={() => openPhotoLightbox(assetPhotos, 0)}
+                              className="w-9 h-9 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 shrink-0 cursor-pointer relative group"
+                            >
+                              <img src={mainPhoto} alt={a.name} className="w-full h-full object-cover" />
+                            </div>
                           ) : (
-                            <span className="text-slate-400 text-[10px]">Tanpa Garansi</span>
+                            <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">
+                              <Package size={16} />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p 
+                              onClick={() => setDetailId(a.id)}
+                              className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm hover:text-indigo-600 cursor-pointer truncate max-w-[200px]"
+                            >
+                              {a.name}
+                            </p>
+                            <p className="text-[11px] text-slate-400 truncate max-w-[200px]">
+                              {a.brandModel || "-"}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Code & Serial */}
+                      <td className="p-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span 
+                            onClick={() => setDetailId(a.id)}
+                            className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded cursor-pointer hover:text-indigo-600"
+                          >
+                            {a.assetCode}
+                          </span>
+                          <button onClick={() => copyCode(a.assetCode)} className="text-slate-400 hover:text-slate-600 p-0.5" title="Salin kode">
+                            {copiedCode === a.assetCode ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                          </button>
+                        </div>
+                        {a.serialNumber && (
+                          <p className="text-[10px] font-mono text-slate-400 mt-0.5 truncate max-w-[150px]">
+                            SN: {a.serialNumber}
+                          </p>
+                        )}
+                      </td>
+
+                      {/* Type */}
+                      <td className="p-3 whitespace-nowrap">
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {a.assetType || "-"}
+                        </span>
+                      </td>
+
+                      {/* Location & Customer */}
+                      <td className="p-3">
+                        <p className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
+                          {a.location?.name || "-"}
+                        </p>
+                        {a.customer?.name && (
+                          <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold truncate max-w-[150px]">
+                            {a.customer.name}
+                          </p>
+                        )}
+                      </td>
+
+                      {/* PIC */}
+                      <td className="p-3 whitespace-nowrap">
+                        {picName ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-slate-800 dark:text-slate-200">{picName}</span>
+                            {picPhone && waUrl && (
+                              <a
+                                href={waUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-emerald-600 hover:text-emerald-700 p-0.5"
+                                title="Hubungi via WhatsApp"
+                              >
+                                <MessageCircle size={13} />
+                              </a>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-xs italic">Tanpa PIC</span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="p-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${statusObj.c}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusObj.dot}`} />
+                          {statusObj.l}
+                        </span>
+                      </td>
+
+                      {/* Tickets & Recurring */}
+                      <td className="p-3 text-center whitespace-nowrap">
+                        {(a.recurring || a.ticketCount >= 3) ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-bold text-[11px] border border-rose-200 dark:border-rose-800" title="Insiden berulang (>=3 tiket)">
+                            <AlertTriangle size={11} /> {a.ticketCount} Tiket
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 font-medium">
+                            {a.ticketCount || 0} Tiket
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="p-3 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setDetailId(a.id)}
+                            className="p-1.5 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 transition"
+                            title="Detail Aset"
+                          >
+                            <Eye size={13} />
+                          </button>
+                          <button
+                            onClick={() => setSinglePrintAsset(a)}
+                            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+                            title="Cetak Label QR"
+                          >
+                            <QrCode size={13} />
+                          </button>
+                          {canAssetWrite && (
+                            <button
+                              onClick={() => openEdit(a)}
+                              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition"
+                              title="Edit Aset"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                          )}
+                          {canWrite && (
+                            <button
+                              onClick={() => deleteAsset(a.id, a.name)}
+                              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 text-rose-500 transition"
+                              title="Hapus Aset"
+                            >
+                              <Trash2 size={13} />
+                            </button>
                           )}
                         </div>
-                      </div>
-
-                      <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center gap-1.5">
-                        <button
-                          onClick={() => setDetailId(a.id)}
-                          className="flex-1 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-98 text-white text-xs font-bold flex items-center justify-center gap-1 shadow-sm transition"
-                        >
-                          <Eye size={12} /> Detail
-                        </button>
-                        <button onClick={() => setSinglePrintAsset(a)} className="p-2 rounded-xl border hover:bg-slate-50 text-slate-700" title="Cetak Label QR">
-                          <QrCode size={14} />
-                        </button>
-                        <button onClick={() => openEdit(a)} className="p-2 rounded-xl border hover:bg-slate-50 text-slate-700" title="Edit Aset">
-                          <Edit2 size={14} />
-                        </button>
-                      </div>
-                    </div>
+                      </td>
+                    </tr>
                   )
                 })}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* ── 6. PAGINATION ──────────────────────────────────────────────────────── */}
-      {!loading && totalItems > 0 && (
-        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
-          <div className="flex items-center justify-between w-full sm:w-auto gap-3">
-            <div className="flex items-center gap-1.5">
-              <span>Baris:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-                className="px-2 py-1 rounded-lg border border-slate-200 bg-white font-bold"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
-            <span className="text-[11px] text-slate-500">
-              <b>{(currentPage - 1) * pageSize + 1}</b>–<b>{Math.min(currentPage * pageSize, totalItems)}</b> dari <b>{totalItems}</b>
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="p-1.5 rounded-lg border disabled:opacity-30"><ChevronsLeft size={14} /></button>
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border disabled:opacity-30"><ChevronLeft size={14} /></button>
-            <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs">{currentPage} / {totalPages}</span>
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1.5 rounded-lg border disabled:opacity-30"><ChevronRight size={14} /></button>
-            <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="p-1.5 rounded-lg border disabled:opacity-30"><ChevronsRight size={14} /></button>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* ── 7. CAMERA SCANNER MODAL ────────────────────────────────────────────── */}
+      {/* ── 6. PAGINATION CONTROLS ───────────────────────────────────────────── */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2">
+            <span>Baris per halaman:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>Menampilkan {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalItems)} dari {totalItems} aset</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <ChevronsLeft size={14} />
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <ChevronLeft size={14} />
+            </button>
+
+            <span className="px-3 py-1 font-semibold text-slate-800 dark:text-slate-200">
+              Hal. {currentPage} / {totalPages}
+            </span>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <ChevronRight size={14} />
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-30 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <ChevronsRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 7. CAMERA QR SCANNER MODAL ───────────────────────────────────────── */}
       <AnimatePresence>
         {showScannerModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4"
+            className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
             onClick={() => setShowScannerModal(false)}
           >
             <motion.div
@@ -1787,16 +1839,16 @@ function ItOslAssetsContent() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-slate-900 text-white rounded-3xl w-full max-w-md p-5 space-y-4 shadow-2xl border border-slate-800 flex flex-col"
+              className="bg-slate-900 border border-slate-800 text-white rounded-3xl w-full max-w-md p-5 space-y-4 shadow-2xl overflow-hidden"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center">
                     <Camera size={16} />
                   </div>
                   <div>
-                    <h3 className="font-black text-sm text-white">Scan Label QR Aset</h3>
-                    <p className="text-[10px] text-slate-400">Arahkan kamera ke stiker QR perangkat</p>
+                    <h3 className="font-bold text-sm text-white">Scan Label QR Aset</h3>
+                    <p className="text-[11px] text-slate-400">Arahkan kamera ke stiker label perangkat</p>
                   </div>
                 </div>
                 <button onClick={() => setShowScannerModal(false)} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400">
@@ -1804,44 +1856,48 @@ function ItOslAssetsContent() {
                 </button>
               </div>
 
-              {/* Video Viewfinder */}
-              <div className="relative aspect-square w-full rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-slate-700">
-                <video
-                  ref={videoRef}
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-
-                {/* Scanning Target Box */}
-                <div className="absolute inset-8 sm:inset-12 border-2 border-indigo-500 rounded-2xl pointer-events-none flex items-center justify-center shadow-[0_0_20px_rgba(99,102,241,0.3)]">
-                  <div className="w-full h-0.5 bg-indigo-400 animate-pulse shadow-[0_0_8px_#818cf8]" />
+              {/* Camera Stream Box */}
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-black border border-slate-800 flex items-center justify-center">
+                <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline muted />
+                
+                {/* Visual Target Frame */}
+                <div className="absolute inset-0 border-2 border-indigo-500/40 rounded-2xl pointer-events-none flex items-center justify-center">
+                  <div className="w-48 h-48 border-2 border-dashed border-indigo-400 rounded-xl relative">
+                    <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-indigo-400" />
+                    <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-indigo-400" />
+                    <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-indigo-400" />
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-indigo-400" />
+                  </div>
                 </div>
 
                 {scannerError && (
-                  <div className="absolute inset-0 bg-slate-900/90 p-6 flex flex-col items-center justify-center text-center space-y-2">
-                    <AlertTriangle size={28} className="text-amber-400" />
-                    <p className="text-xs text-slate-300 font-medium">{scannerError}</p>
+                  <div className="absolute inset-0 bg-slate-950/90 p-4 flex flex-col items-center justify-center text-center gap-2 text-rose-400 text-xs">
+                    <AlertTriangle size={24} />
+                    <p>{scannerError}</p>
                   </div>
                 )}
               </div>
 
-              {/* Manual Code Input Fallback */}
-              <div className="space-y-2 pt-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Atau masukkan kode secara manual</p>
+              {/* Manual Input Fallback */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11px] text-slate-400 font-medium">Atau masukkan kode aset manual:</label>
                 <div className="flex gap-2">
                   <input
                     value={manualCodeInput}
-                    onChange={(e) => setManualCodeInput(e.target.value.toUpperCase())}
-                    placeholder="Contoh: AST-SW-001"
-                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 uppercase"
+                    onChange={(e) => setManualCodeInput(e.target.value)}
+                    placeholder="Contoh: AST-2026-001"
+                    className="flex-1 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && manualCodeInput.trim()) {
+                        handleScannedCode(manualCodeInput)
+                      }
+                    }}
                   />
                   <button
-                    onClick={() => handleScannedCode(manualCodeInput)}
-                    disabled={!manualCodeInput.trim()}
-                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold"
+                    onClick={() => manualCodeInput.trim() && handleScannedCode(manualCodeInput)}
+                    className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
                   >
-                    Buka
+                    Cari
                   </button>
                 </div>
               </div>
@@ -1850,61 +1906,56 @@ function ItOslAssetsContent() {
         )}
       </AnimatePresence>
 
-      {/* ── 8. MOBILE FILTER BOTTOM SHEET ───────────────────────────────────────── */}
+      {/* ── 8. MOBILE FILTER SHEET ───────────────────────────────────────────── */}
       <AnimatePresence>
         {showMobileFilterSheet && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-end lg:hidden"
+            className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center p-0 sm:p-4 lg:hidden"
             onClick={() => setShowMobileFilterSheet(false)}
           >
             <motion.div
-              initial={{ y: "100%" }}
-              animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 26, stiffness: 280 }}
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full rounded-t-3xl max-h-[85vh] flex flex-col p-5 space-y-4 pb-safe shadow-2xl"
+              className="bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl w-full max-w-lg p-5 space-y-4 max-h-[85vh] overflow-y-auto"
             >
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
                   <Filter size={16} className="text-indigo-600" />
-                  <h3 className="font-black text-sm text-slate-900">Filter Aset IT</h3>
-                </div>
+                  <span>Filter Registri Aset</span>
+                </h3>
                 <button onClick={() => setShowMobileFilterSheet(false)} className="p-1 rounded-full text-slate-400">
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 text-xs">
-                {/* Customer */}
+              <div className="space-y-3 text-xs">
                 {customers.length > 0 && (
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Customer / Klien</label>
+                    <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Customer</label>
                     <select
                       value={filterCustomer}
                       onChange={(e) => setFilterCustomer(e.target.value)}
-                      className="w-full px-3 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/40 font-semibold text-indigo-950"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                     >
                       <option value="">Semua Customer</option>
                       {customers.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {c.companyName ? `(${c.companyName})` : ""}
-                        </option>
+                        <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
                   </div>
                 )}
 
-                {/* Lokasi */}
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Lokasi Penempatan</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Lokasi</label>
                   <select
                     value={filterLocation}
                     onChange={(e) => setFilterLocation(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                   >
                     <option value="">Semua Lokasi</option>
                     {locations.map(l => (
@@ -1913,13 +1964,12 @@ function ItOslAssetsContent() {
                   </select>
                 </div>
 
-                {/* Jenis Perangkat */}
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Jenis Perangkat</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Jenis Perangkat</label>
                   <select
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                   >
                     <option value="">Semua Jenis</option>
                     {ASSET_TYPES.map(t => (
@@ -1928,13 +1978,12 @@ function ItOslAssetsContent() {
                   </select>
                 </div>
 
-                {/* Status */}
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Status Operasional</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Status Perangkat</label>
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                   >
                     <option value="">Semua Status</option>
                     {STATUS_OPTS.map(s => (
@@ -1943,50 +1992,33 @@ function ItOslAssetsContent() {
                   </select>
                 </div>
 
-                {/* PIC */}
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">PIC Penanggung Jawab</label>
-                  <select
-                    value={filterPic}
-                    onChange={(e) => setFilterPic(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
-                  >
-                    <option value="">Semua PIC</option>
-                    <option value="UNASSIGNED">Tanpa PIC</option>
-                    {pics.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} {p.department ? `(${p.department})` : ""}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Garansi */}
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Status Garansi</label>
+                  <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Garansi</label>
                   <select
                     value={filterWarranty}
                     onChange={(e) => setFilterWarranty(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                   >
                     <option value="">Semua Status Garansi</option>
                     <option value="active">Garansi Masih Aktif</option>
                     <option value="expired">Garansi Sudah Habis</option>
-                    <option value="none">Tanpa Informasi Garansi</option>
+                    <option value="none">Tanpa Garansi</option>
                   </select>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+              <div className="pt-2 flex gap-2">
                 <button
-                  onClick={clearAllFilters}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs"
+                  onClick={() => { clearAllFilters(); setShowMobileFilterSheet(false); }}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-300 text-xs"
                 >
                   Reset
                 </button>
                 <button
                   onClick={() => setShowMobileFilterSheet(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-black text-xs shadow-md"
+                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold text-xs shadow-xs"
                 >
-                  Terapkan Filter ({filteredAssets.length} Aset)
+                  Terapkan ({activeFilterCount})
                 </button>
               </div>
             </motion.div>
@@ -1994,251 +2026,457 @@ function ItOslAssetsContent() {
         )}
       </AnimatePresence>
 
-      {/* ── 9. ASSET DETAIL DRAWER (MOBILE BOTTOM SHEET & DESKTOP SIDE PANEL) ────────────────────────────────────────────── */}
+      {/* ── 9. ASSET DETAIL DRAWER / MODAL ───────────────────────────────────── */}
       <AnimatePresence>
         {detailId && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex justify-end items-end sm:items-stretch"
+            className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4"
             onClick={() => setDetailId(null)}
           >
             <motion.div
-              initial={{ y: "100%", x: 0 }}
-              animate={{ y: 0, x: 0 }}
-              exit={{ y: "100%", x: 0 }}
-              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white w-full sm:max-w-xl lg:max-w-2xl h-[92dvh] sm:h-[100dvh] rounded-t-3xl sm:rounded-none flex flex-col shadow-2xl overflow-hidden pb-safe"
+              className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800"
             >
-              {loadingDetail && !detail ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 p-8">
-                  <Loader2 size={32} className="animate-spin text-indigo-600" />
-                  <p className="text-xs sm:text-sm font-bold text-slate-700">Memuat detail aset...</p>
+              {loadingDetail || !detail ? (
+                <div className="p-16 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+                  <Loader2 className="animate-spin text-indigo-600" size={32} />
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Memuat Spesifikasi & Riwayat Perangkat...</p>
+                  <p className="text-[11px] text-slate-400">Sinkronisasi data aset dari server</p>
                 </div>
-              ) : detail ? (
+              ) : (
                 <>
-                  {/* Modal Header */}
-                  <div className="p-4 sm:p-5 border-b shrink-0 bg-slate-50 flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-xs font-black bg-slate-900 text-white px-2.5 py-0.5 rounded">
-                          {detail.assetCode}
-                        </span>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                          STATUS_OPTS.find(s => s.v === detail.status)?.c || "bg-slate-100"
-                        }`}>
-                          {STATUS_OPTS.find(s => s.v === detail.status)?.l || detail.status}
-                        </span>
-                      </div>
-                      <h2 className="text-sm sm:text-lg font-black text-slate-900 mt-1.5 break-words leading-tight">
-                        {detail.name}
-                      </h2>
-                      <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                        {detail.assetType || "Lainnya"} • {detail.brandModel || "-"} • Lokasi: {detail.location?.name || "-"}
-                      </p>
-                      {detail.customer && (
-                        <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-lg mt-1.5">
-                          <Building2 size={12} className="text-indigo-600" />
-                          <span>Customer: {detail.customer.name} {detail.customer.companyName ? `(${detail.customer.companyName})` : ""}</span>
+                  {/* Executive Header */}
+                  <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/20">
+                          <Package size={22} />
                         </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => setSinglePrintAsset(detail)} className="p-2 rounded-xl border bg-white text-slate-700 shadow-sm" title="Cetak Label QR">
-                        <Printer size={15} />
-                      </button>
-                      <button onClick={() => { setDetailId(null); openEdit(detail); }} className="p-2 rounded-xl border bg-white text-slate-700 shadow-sm" title="Edit">
-                        <Edit2 size={15} />
-                      </button>
-                      <button onClick={() => setDetailId(null)} className="p-2 rounded-xl hover:bg-slate-200 text-slate-500">
-                        <X size={17} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Modal Body */}
-                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-5">
-                    {/* QR Code Sticker Card Preview */}
-                    <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center gap-3.5">
-                      <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-sm shrink-0">
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(detail.assetCode)}`}
-                          alt="qr label"
-                          className="w-20 h-20 sm:w-24 sm:h-24 object-contain"
-                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => copyCode(detail.assetCode)}
+                              className="font-mono text-xs font-bold bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-2.5 py-0.5 rounded-lg flex items-center gap-1.5 hover:opacity-90 transition"
+                              title="Salin Kode Aset"
+                            >
+                              <span>{detail.assetCode}</span>
+                              {copiedCode === detail.assetCode ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} className="text-slate-400" />}
+                            </button>
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${
+                              (STATUS_OPTS.find(s => s.v === detail.status) || STATUS_OPTS[0]).c
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${(STATUS_OPTS.find(s => s.v === detail.status) || STATUS_OPTS[0]).dot}`} />
+                              {(STATUS_OPTS.find(s => s.v === detail.status) || STATUS_OPTS[0]).l}
+                            </span>
+                          </div>
+                          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mt-1 truncate">
+                            {detail.name}
+                          </h2>
+                          <p className="text-xs text-slate-400 truncate">
+                            {detail.brandModel || detail.assetType || "Hardware IT"} • {detail.location?.name || "Lokasi belum diatur"}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 text-center sm:text-left space-y-1">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Label QR Asset Ready</p>
-                        <p className="font-mono text-xs sm:text-sm font-black text-slate-900">{detail.assetCode}</p>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Link
+                          href={`/dashboard/maintenance/it-osl/tickets?assetId=${detail.id}&assetCode=${encodeURIComponent(detail.assetCode)}&assetName=${encodeURIComponent(detail.name)}`}
+                          className="px-2.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1 shadow-sm transition"
+                          title="Buat Tiket Insiden untuk Perangkat ini"
+                        >
+                          <Plus size={14} />
+                          <span className="hidden sm:inline">Buat Tiket</span>
+                        </Link>
                         <button
                           onClick={() => setSinglePrintAsset(detail)}
-                          className="mt-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-[11px] font-bold inline-flex items-center gap-1.5 shadow-sm active:scale-95 transition"
+                          className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition"
+                          title="Cetak Label Stiker QR"
                         >
-                          <Printer size={12} /> Cetak Label Stiker
+                          <Printer size={15} />
+                        </button>
+                        {canAssetWrite && (
+                          <button
+                            onClick={() => { openEdit(detail); setDetailId(null); }}
+                            className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition"
+                            title="Edit Aset"
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                        )}
+                        <button onClick={() => setDetailId(null)} className="p-2 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-700 text-slate-400">
+                          <X size={17} />
                         </button>
                       </div>
                     </div>
 
-                    {/* PIC Contact Card in Asset Detail */}
-                    <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-3.5 sm:p-4 space-y-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
-                        <Users size={13} /> PIC Penanggung Jawab Perangkat
-                      </p>
-                      {detail.pic ? (
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                    {/* Segmented Navigation Tabs */}
+                    <div className="flex items-center gap-1.5 mt-4 p-1 bg-slate-200/60 dark:bg-slate-800 rounded-xl">
+                      <button
+                        onClick={() => setDetailTab("specs")}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                          detailTab === "specs"
+                            ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                            : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                        }`}
+                      >
+                        <Tag size={13} />
+                        <span>Spesifikasi</span>
+                      </button>
+                      <button
+                        onClick={() => setDetailTab("pic")}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                          detailTab === "pic"
+                            ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                            : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                        }`}
+                      >
+                        <Users size={13} />
+                        <span>PIC Unit</span>
+                      </button>
+                      <button
+                        onClick={() => setDetailTab("tickets")}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                          detailTab === "tickets"
+                            ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                            : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                        }`}
+                      >
+                        <Wrench size={13} />
+                        <span>Tiket ({detail.tickets?.length || 0})</span>
+                      </button>
+                      <button
+                        onClick={() => setDetailTab("media")}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                          detailTab === "media"
+                            ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs"
+                            : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                        }`}
+                      >
+                        <QrCode size={13} />
+                        <span>Foto & Stiker</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Body Content based on detailTab */}
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                    {/* TAB 1: SPESIFIKASI */}
+                    {detailTab === "specs" && (
+                      <div className="space-y-4">
+                        {/* Specs Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 text-xs">
                           <div>
-                            <p className="font-black text-slate-900 text-xs sm:text-sm">{detail.pic.name}</p>
-                            <p className="text-[11px] text-slate-600">
-                              {detail.pic.position ? `${detail.pic.position} • ` : ""}{detail.pic.department || "Unit"}
-                            </p>
-                            {detail.pic.phone && <p className="font-mono text-[11px] text-indigo-700 mt-0.5">{detail.pic.phone}</p>}
+                            <p className="text-[10px] uppercase font-bold text-slate-400">Jenis Perangkat</p>
+                            <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{detail.assetType || "-"}</p>
                           </div>
-                          {detail.pic.phone && getWhatsAppUrl(detail.pic.phone) && (
-                            <a
-                              href={getWhatsAppUrl(detail.pic.phone)!}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-1 shadow-sm"
-                            >
-                              <MessageCircle size={13} /> Chat WhatsApp
-                            </a>
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400">Merek / Model</p>
+                            <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{detail.brandModel || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400">Serial Number (SN)</p>
+                            <p className="font-mono font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{detail.serialNumber || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400">Lokasi Penempatan</p>
+                            <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{detail.location?.name || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400">Customer / Klien</p>
+                            <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{detail.customer?.name || "Internal Axon"}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase font-bold text-slate-400">Tanggal Pengadaan</p>
+                            <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                              {detail.purchaseDate ? new Date(detail.purchaseDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Warranty Widget Card */}
+                        <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-800/60 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                              detail.warrantyUntil && new Date(detail.warrantyUntil) > new Date()
+                                ? "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400"
+                                : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                            }`}>
+                              <ShieldCheck size={20} />
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase font-bold text-slate-400">Status Garansi Resmi</p>
+                              <p className="text-xs font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+                                {detail.warrantyUntil ? (
+                                  new Date(detail.warrantyUntil) > new Date() ? (
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                                      Garansi Aktif s.d {new Date(detail.warrantyUntil).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400">
+                                      Masa Garansi Berakhir ({new Date(detail.warrantyUntil).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })})
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="text-slate-400">Tidak ada informasi garansi</span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                          {detail.warrantyUntil && new Date(detail.warrantyUntil) > new Date() && (
+                            <span className="text-[10px] font-bold px-2 py-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 rounded-lg shrink-0">
+                              Terproteksi
+                            </span>
                           )}
                         </div>
-                      ) : (
-                        <p className="text-xs text-slate-400 italic">Belum ada PIC penanggung jawab untuk perangkat ini.</p>
-                      )}
-                    </div>
 
-                    {/* Photos Gallery in Detail */}
-                    {detail.photos && getAssetPhotos(detail.photos).length > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                            <ImageIcon size={13} /> Foto Dokumentasi Perangkat ({getAssetPhotos(detail.photos).length})
-                          </h3>
-                        </div>
-                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                          {getAssetPhotos(detail.photos).map((url, idx) => {
-                            const fullUrl = url.startsWith("http") ? url : `${API}${url}`;
-                            return (
-                              <div
-                                key={idx}
-                                onClick={() => setPreviewPhotoModal(fullUrl)}
-                                className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 group shadow-sm cursor-pointer"
-                              >
-                                <img
-                                  src={fullUrl}
-                                  alt={`Foto ${idx + 1}`}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition"
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                  <span className="p-1 rounded-lg bg-black/60 text-white"><Maximize2 size={13} /></span>
-                                </div>
-                                <span className="absolute bottom-1 left-1.5 px-1.5 py-0.2 bg-black/60 text-white rounded text-[8px] font-bold">
-                                  #{idx + 1}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                        {/* Notes Section */}
+                        {detail.notes ? (
+                          <div className="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Catatan Konfigurasi / Teknis</p>
+                            <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{detail.notes}</p>
+                          </div>
+                        ) : null}
                       </div>
                     )}
 
-                    {/* Technical Specs */}
-                    <div>
-                      <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <Info size={13} /> Spesifikasi Perangkat
-                      </h3>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                          <p className="text-slate-400 text-[9px] font-bold uppercase">Jenis Aset</p>
-                          <p className="font-bold text-slate-800 mt-0.5 truncate">{detail.assetType || "-"}</p>
-                        </div>
-                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                          <p className="text-slate-400 text-[9px] font-bold uppercase">Merek / Model</p>
-                          <p className="font-bold text-slate-800 mt-0.5 truncate">{detail.brandModel || "-"}</p>
-                        </div>
-                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                          <p className="text-slate-400 text-[9px] font-bold uppercase">Serial Number (SN)</p>
-                          <p className="font-mono font-bold text-slate-800 mt-0.5 truncate">{detail.serialNumber || "-"}</p>
-                        </div>
-                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                          <p className="text-slate-400 text-[9px] font-bold uppercase">Lokasi</p>
-                          <p className="font-bold text-slate-800 mt-0.5 truncate">{detail.location?.name || "-"}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ticket Service History */}
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                          <Wrench size={13} /> Riwayat Tiket ({detail.tickets?.length || 0})
-                        </h3>
-                      </div>
-
-                      {(!detail.tickets || detail.tickets.length === 0) ? (
-                        <div className="p-4 text-center bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-400">
-                          Belum ada riwayat perbaikan untuk perangkat ini.
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {detail.tickets.map(t => (
-                            <div key={t.id} className="p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm space-y-0.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-mono text-[9px] font-bold px-1.5 py-0.2 bg-slate-900 text-white rounded">
-                                  {t.ticketNumber}
-                                </span>
-                                <span className="text-[8px] font-bold uppercase px-1.5 py-0.2 rounded-full bg-sky-100 text-sky-700">
-                                  {t.status}
-                                </span>
+                    {/* TAB 2: PIC UNIT */}
+                    {detailTab === "pic" && (
+                      <div className="space-y-4">
+                        {detail.pic || detail.picUser ? (
+                          <div className="bg-white dark:bg-slate-800/80 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3.5">
+                                <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg shrink-0">
+                                  {(detail.pic?.name || detail.picUser?.name || "U")[0].toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="text-[10px] uppercase font-bold text-slate-400">Penanggung Jawab Perangkat</p>
+                                  <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+                                    {detail.pic?.name || detail.picUser?.name}
+                                  </h4>
+                                  <p className="text-xs text-slate-500">
+                                    {detail.pic?.position ? `${detail.pic.position} • ` : ""}{detail.pic?.department || "Unit Operasional"}
+                                  </p>
+                                </div>
                               </div>
-                              <p className="font-bold text-slate-900 text-xs truncate">{t.summary}</p>
-                              <p className="text-[9px] text-slate-400">
-                                {new Date(t.createdAt).toLocaleDateString('id-ID', { dateStyle: 'medium' })}
-                              </p>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Sticky Footer */}
-                  <div className="p-3.5 sm:p-4 border-t bg-slate-50 flex items-center justify-between gap-2.5 shrink-0 pb-6 sm:pb-4">
-                    {canAssetWrite ? (
-                      <>
-                        {canWrite && (
-                          <button onClick={() => deleteAsset(detail.id, detail.name)} className="px-3 py-2 rounded-xl text-rose-600 hover:bg-rose-50 text-xs font-bold transition flex items-center gap-1">
-                            <Trash2 size={13} /> Hapus
-                          </button>
+                            {/* Contact Badges */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                <div>
+                                  <p className="text-[10px] text-slate-400">Nomor Telepon / WA</p>
+                                  <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{detail.pic?.phone || "-"}</p>
+                                </div>
+                                {detail.pic?.phone && (
+                                  <div className="flex items-center gap-1">
+                                    <a
+                                      href={getWhatsAppUrl(detail.pic.phone, detail.name) || "#"}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 hover:bg-emerald-100 text-[11px] font-bold flex items-center gap-1 transition"
+                                    >
+                                      <MessageCircle size={12} />
+                                      <span>WA</span>
+                                    </a>
+                                    <a
+                                      href={`tel:${detail.pic.phone}`}
+                                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-600 dark:text-slate-300"
+                                      title="Telepon Langsung"
+                                    >
+                                      <Phone size={12} />
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                <div>
+                                  <p className="text-[10px] text-slate-400">Alamat Email</p>
+                                  <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 truncate max-w-[170px]">{detail.pic?.email || detail.picUser?.email || "-"}</p>
+                                </div>
+                                {(detail.pic?.email || detail.picUser?.email) && (
+                                  <a
+                                    href={`mailto:${detail.pic?.email || detail.picUser?.email}`}
+                                    className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-[11px] font-semibold text-slate-600 dark:text-slate-300"
+                                  >
+                                    Email
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-8 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-3">
+                            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                              <Users size={22} />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Belum Ada PIC Terhubung</p>
+                              <p className="text-[11px] text-slate-400 mt-0.5">Tautkan PIC penanggung jawab untuk kemudahan koordinasi insiden.</p>
+                            </div>
+                            {canAssetWrite && (
+                              <button
+                                onClick={() => { openEdit(detail); setDetailId(null); }}
+                                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm transition"
+                              >
+                                <Edit2 size={12} />
+                                <span>Hubungkan PIC Sekarang</span>
+                              </button>
+                            )}
+                          </div>
                         )}
-                        <button onClick={() => { setDetailId(null); openEdit(detail); }} className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md shadow-indigo-600/25 transition flex items-center gap-1.5">
-                          <Edit2 size={13} /> Edit Data
-                        </button>
-                      </>
-                    ) : (
-                      <p className="text-[11px] text-slate-400">Role Anda tidak memiliki izin mengubah data aset.</p>
+                      </div>
+                    )}
+
+                    {/* TAB 3: RIWAYAT TIKET */}
+                    {detailTab === "tickets" && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            Riwayat Insiden & Perbaikan ({detail.tickets?.length || 0})
+                          </p>
+                          <Link
+                            href={`/dashboard/maintenance/it-osl/tickets?assetId=${detail.id}&assetCode=${encodeURIComponent(detail.assetCode)}&assetName=${encodeURIComponent(detail.name)}`}
+                            className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                          >
+                            <Plus size={12} />
+                            <span>+ Buat Tiket Baru</span>
+                          </Link>
+                        </div>
+
+                        {(!detail.tickets || detail.tickets.length === 0) ? (
+                          <div className="p-8 text-center rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-2">
+                            <CheckCircle2 size={24} className="mx-auto text-emerald-500" />
+                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Perangkat Sehat & Bersih</p>
+                            <p className="text-[11px] text-slate-400">Belum ada riwayat kendala atau tiket perbaikan yang tercatat.</p>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200/80 dark:border-slate-700 rounded-2xl overflow-hidden text-xs">
+                            {detail.tickets.map((t) => (
+                              <Link
+                                key={t.id}
+                                href={`/dashboard/maintenance/it-osl/tickets`}
+                                className="p-3.5 bg-white dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-between gap-3 transition block"
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs">
+                                      {t.ticketNumber}
+                                    </span>
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold">
+                                      {t.status}
+                                    </span>
+                                  </div>
+                                  <p className="font-semibold text-slate-800 dark:text-slate-200 truncate mt-1">
+                                    {t.summary}
+                                  </p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <span className="text-[11px] text-slate-400 block">
+                                    {new Date(t.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 inline-flex items-center gap-0.5 mt-0.5">
+                                    Detail <ChevronRight size={10} />
+                                  </span>
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TAB 4: FOTO & LABEL QR */}
+                    {detailTab === "media" && (
+                      <div className="space-y-5">
+                        {/* Photos Section */}
+                        <div className="space-y-2">
+                          <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Foto Fisik Perangkat</p>
+                          {getAssetPhotos(detail.photos).length > 0 ? (
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5">
+                              {getAssetPhotos(detail.photos).map((url, idx) => {
+                                const fullUrl = url.startsWith("http") ? url : `${API}${url}`
+                                return (
+                                  <div
+                                    key={idx}
+                                    onClick={() => openPhotoLightbox(getAssetPhotos(detail.photos), idx)}
+                                    className="aspect-square rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 cursor-pointer group relative shadow-xs"
+                                  >
+                                    <img src={fullUrl} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition duration-200" />
+                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition">
+                                      <Maximize2 size={16} />
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <div className="p-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-slate-400 text-xs">
+                              Belum ada foto fisik yang diunggah.
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Stiker QR Label Preview */}
+                        <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300">Preview Stiker Label Aset</p>
+                            <button
+                              onClick={() => setSinglePrintAsset(detail)}
+                              className="px-3 py-1.5 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:opacity-90 text-xs font-bold flex items-center gap-1.5 transition"
+                            >
+                              <Printer size={13} />
+                              <span>Cetak Stiker Label</span>
+                            </button>
+                          </div>
+
+                          <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-center">
+                            <div className="w-[300px] p-3.5 bg-white text-slate-900 rounded-xl border-2 border-slate-900 shadow-md flex items-center gap-3">
+                              <div className="w-20 h-20 bg-slate-100 rounded-lg p-1 border border-slate-300 flex items-center justify-center shrink-0">
+                                <img
+                                  src={`${API}/api/it-osl/assets/${detail.id}/qr`}
+                                  alt="QR Code"
+                                  className="w-full h-full object-contain"
+                                  onError={(e) => {
+                                    // Fallback to QR icon if endpoint error
+                                    (e.target as HTMLElement).style.display = 'none'
+                                  }}
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[9px] font-black tracking-wider uppercase text-slate-400">AXON IT ASSET</p>
+                                <p className="font-mono text-xs font-black text-slate-900 truncate mt-0.5">{detail.assetCode}</p>
+                                <p className="text-[11px] font-bold text-slate-800 truncate mt-0.5">{detail.name}</p>
+                                <p className="text-[9px] text-slate-500 truncate mt-0.5">{detail.location?.name || "Unit Operasional"}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </>
-              ) : null}
+              )}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── 10. BATCH / SINGLE QR LABEL PRINT MODAL ─────────────────────────────── */}
+      {/* ── 10. PRINT QR LABEL STICKER MODAL ─────────────────────────────────── */}
       <AnimatePresence>
         {(showBatchPrint || singlePrintAsset) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+            className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-3 sm:p-4"
             onClick={() => { setShowBatchPrint(false); setSinglePrintAsset(null); }}
           >
             <motion.div
@@ -2246,58 +2484,86 @@ function ItOslAssetsContent() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-3xl w-full max-w-3xl p-4 sm:p-6 space-y-3.5 max-h-[90vh] flex flex-col shadow-2xl"
+              className="bg-white rounded-3xl w-full max-w-3xl p-5 space-y-4 max-h-[90vh] flex flex-col shadow-2xl"
             >
-              <div className="flex items-center justify-between pb-2.5 border-b">
-                <div>
-                  <h3 className="font-black text-sm sm:text-base text-slate-900 flex items-center gap-2">
-                    <Printer size={16} className="text-indigo-600" />
-                    <span>Cetak Label Stiker QR Perangkat</span>
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    {singlePrintAsset
-                      ? `1 label untuk ${singlePrintAsset.name} (${singlePrintAsset.assetCode})`
-                      : `${selectedAssetsList.length} label stiker terpilih`}
-                  </p>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                    <Printer size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900">
+                      Cetak Label Stiker QR Perangkat
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      {singlePrintAsset
+                        ? `1 label untuk ${singlePrintAsset.name} (${singlePrintAsset.assetCode})`
+                        : `${selectedAssetsList.length} label stiker terpilih`}
+                    </p>
+                  </div>
                 </div>
                 <button onClick={() => { setShowBatchPrint(false); setSinglePrintAsset(null); }} className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400">
-                  <X size={17} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-1">
-                <div id="printable-labels-grid" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 p-1">
+              {/* Printable Labels Area */}
+              <div className="flex-1 overflow-y-auto p-2">
+                <div 
+                  id="printable-labels-area" 
+                  className={`grid ${printLayout === "grid" ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"} gap-3 p-1`}
+                >
                   {(singlePrintAsset ? [singlePrintAsset] : selectedAssetsList).map(a => (
-                    <div key={a.id} className="border-2 border-dashed border-slate-300 rounded-2xl p-3 bg-white flex flex-col justify-between space-y-1.5 text-center">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-                        <span className="font-black text-[9px] tracking-widest text-slate-900 uppercase">AXON ASSET</span>
-                        <span className="text-[8px] font-bold text-slate-400">{a.location?.name || "IT"}</span>
+                    <div 
+                      key={a.id} 
+                      className="border-2 border-dashed border-slate-300 rounded-2xl p-3 bg-white flex flex-col justify-between space-y-2 text-center break-inside-avoid shadow-xs"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-1 text-[9px] font-bold">
+                        <span className="tracking-widest text-slate-900 uppercase">AXON IT ASSET</span>
+                        <span className="text-slate-500">{a.location?.name || "IT"}</span>
                       </div>
-                      <div className="flex justify-center py-0.5">
+
+                      <div className="flex justify-center py-1">
                         <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(a.assetCode)}`}
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=1&data=${encodeURIComponent(a.assetCode)}`}
                           alt={a.assetCode}
-                          className="w-20 h-20 object-contain bg-white p-1 rounded-lg border border-slate-100"
+                          className="w-24 h-24 object-contain bg-white p-1 rounded-lg border border-slate-100"
                         />
                       </div>
+
                       <div>
-                        <p className="font-mono text-[11px] font-black text-indigo-700 bg-slate-50 py-0.5 rounded border border-slate-200">{a.assetCode}</p>
-                        <p className="font-bold text-slate-900 text-xs mt-0.5 truncate">{a.name}</p>
-                        <p className="text-[9px] text-slate-500 truncate">{a.assetType || "IT Device"} • SN: {a.serialNumber || "-"}</p>
+                        <p className="font-mono text-xs font-bold text-indigo-700 bg-slate-50 py-0.5 rounded border border-slate-200">
+                          {a.assetCode}
+                        </p>
+                        <p className="font-bold text-slate-900 text-xs mt-1 truncate">
+                          {a.name}
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate">
+                          {a.brandModel || a.assetType || "Hardware"} {a.serialNumber ? `• SN: ${a.serialNumber}` : ""}
+                        </p>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="pt-3 border-t flex items-center justify-between gap-2">
-                <p className="text-[11px] text-slate-400 hidden sm:block">Gunakan ukuran stiker label saat mencetak dari browser.</p>
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                  <button onClick={() => { setShowBatchPrint(false); setSinglePrintAsset(null); }} className="px-3.5 py-2 rounded-xl border text-slate-700 text-xs font-bold hover:bg-slate-50">
-                    Tutup
+              {/* Print Footer */}
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2">
+                <p className="text-xs text-slate-500 hidden sm:block">
+                  Tips: Sesuaikan ukuran kertas thermal atau stiker A4 pada dialog cetak browser.
+                </p>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => { setShowBatchPrint(false); setSinglePrintAsset(null); }} 
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50"
+                  >
+                    Batal
                   </button>
-                  <button onClick={() => window.print()} className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black flex items-center gap-1.5 shadow-md">
-                    <Printer size={14} /> Cetak Sekarang
+                  <button 
+                    onClick={() => window.print()} 
+                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-indigo-600/20 active:scale-95 transition"
+                  >
+                    <Printer size={15} /> Cetak Sekarang
                   </button>
                 </div>
               </div>
@@ -2306,534 +2572,542 @@ function ItOslAssetsContent() {
         )}
       </AnimatePresence>
 
-      {/* ── 11. CREATE / EDIT ASSET MODAL ───────────────────────────────────────── */}
+      {/* ── 11. CREATE / EDIT ASSET MODAL (3-STEP WIZARD) ────────────────── */}
       <AnimatePresence>
         {showForm && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4"
             onClick={() => setShowForm(false)}
           >
             <motion.div
-              initial={{ y: 40, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 40, opacity: 0 }}
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-xl max-h-[90dvh] sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden pb-safe"
+              className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200/80 dark:border-slate-800"
             >
-              {/* Sticky Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50">
-                <div>
-                  <h3 className="font-black text-sm sm:text-base text-slate-900">
-                    {editing ? "Edit Informasi Aset" : "Tambah Aset Baru"}
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Isi data identitas perangkat, lokasi, dan PIC unit.
-                  </p>
+              {/* Form Header with 3-Step Wizard Navigation */}
+              <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <Package size={18} />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
+                        {editing ? "Perbarui Data Aset IT" : "Tambah Perangkat Aset Baru"}
+                      </h3>
+                      <p className="text-[11px] text-slate-400">
+                        {editing ? `Mengedit aset: ${editing.assetCode}` : "Pendaftaran inventaris unit hardware IT Axon"}
+                      </p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowForm(false)} className="p-1.5 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 text-slate-400">
+                    <X size={18} />
+                  </button>
                 </div>
-                <button onClick={() => setShowForm(false)} className="p-1.5 rounded-xl hover:bg-slate-200 text-slate-400">
-                  <X size={17} />
-                </button>
+
+                {/* Step Indicators */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormStep(1)}
+                    className={`py-2 px-2.5 rounded-xl text-left border transition flex items-center gap-2 ${
+                      formStep === 1
+                        ? "bg-indigo-600 border-indigo-600 text-white shadow-xs"
+                        : form.name.trim()
+                        ? "bg-white dark:bg-slate-800 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      formStep === 1 ? "bg-white/25 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    }`}>
+                      1
+                    </span>
+                    <span className="text-[11px] font-bold truncate">Identitas & Spek</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormStep(2)}
+                    className={`py-2 px-2.5 rounded-xl text-left border transition flex items-center gap-2 ${
+                      formStep === 2
+                        ? "bg-indigo-600 border-indigo-600 text-white shadow-xs"
+                        : form.locationId
+                        ? "bg-white dark:bg-slate-800 border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      formStep === 2 ? "bg-white/25 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    }`}>
+                      2
+                    </span>
+                    <span className="text-[11px] font-bold truncate">Lokasi & PIC</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormStep(3)}
+                    className={`py-2 px-2.5 rounded-xl text-left border transition flex items-center gap-2 ${
+                      formStep === 3
+                        ? "bg-indigo-600 border-indigo-600 text-white shadow-xs"
+                        : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      formStep === 3 ? "bg-white/25 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                    }`}>
+                      3
+                    </span>
+                    <span className="text-[11px] font-bold truncate">Status & Media</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Scrollable Form Body */}
+              {/* Form Body - Step Conditional */}
               <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
-                {/* 1. Customer (If Available) */}
-                {customers.length > 0 && (
-                  <div className="p-3 bg-indigo-50/40 rounded-2xl border border-indigo-100">
-                    <label className="font-bold text-indigo-950 block mb-1 flex items-center gap-1.5">
-                      <Building2 size={14} className="text-indigo-600" />
-                      <span>Customer / Klien Pemilik Perangkat</span>
-                    </label>
-                    <select
-                      value={form.customerId}
-                      onChange={(e) => setForm({ ...form, customerId: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-indigo-200 bg-white text-indigo-950 font-semibold text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option value="">— Customer Umum / Internal (Global) —</option>
-                      {customers.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {c.companyName ? `• ${c.companyName}` : ""} ({c.code})
-                        </option>
-                      ))}
-                    </select>
+                {/* STEP 1: IDENTITAS & SPESIFIKASI */}
+                {formStep === 1 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                        <Tag size={13} className="text-indigo-600" />
+                        <span>Informasi Pokok Perangkat</span>
+                      </p>
+                      <span className="text-[10px] text-slate-400">Langkah 1 dari 3</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                          Nama Perangkat <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          autoFocus
+                          value={form.name}
+                          onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+                          placeholder="Contoh: Switch Cisco Core Lt. 2, PC Kasir Utama, Printer Barcode"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Jenis Perangkat</label>
+                          <select
+                            value={form.assetType}
+                            onChange={(e) => setForm(f => ({ ...f, assetType: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                          >
+                            <option value="">— Pilih Jenis Perangkat —</option>
+                            {ASSET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
+                            Kode Aset <span className="text-[10px] text-slate-400 font-normal">(Opsional)</span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              value={form.assetCode}
+                              onChange={(e) => setForm(f => ({ ...f, assetCode: e.target.value }))}
+                              placeholder="Auto-generate sistem jika kosong"
+                              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-slate-900 dark:text-slate-100"
+                            />
+                            {!form.assetCode && (
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md pointer-events-none">
+                                Auto
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Merek & Model</label>
+                          <input
+                            value={form.brandModel}
+                            onChange={(e) => setForm(f => ({ ...f, brandModel: e.target.value }))}
+                            placeholder="Contoh: Cisco SG350-28, HP ProDesk 400 G6"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Serial Number (SN)</label>
+                          <input
+                            value={form.serialNumber}
+                            onChange={(e) => setForm(f => ({ ...f, serialNumber: e.target.value }))}
+                            placeholder="Contoh: FOC21390A1, S/N: 4CE0460XXX"
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-slate-900 dark:text-slate-100"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* 2. Device Identity */}
-                <div className="space-y-3">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Nama Aset / Perangkat *</label>
-                    <input
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      placeholder="Contoh: Switch Core Lantai 2, PC Kasir 01..."
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="min-w-0">
-                      <label className="font-bold text-slate-700 block mb-1">Kode Aset (QR)</label>
-                      <input
-                        value={form.assetCode}
-                        onChange={(e) => setForm({ ...form, assetCode: e.target.value.toUpperCase() })}
-                        placeholder="Auto: AST-..."
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-xs sm:text-sm uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
-                      />
+                {/* STEP 2: PENEMPATAN & PIC */}
+                {formStep === 2 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                        <MapPin size={13} className="text-indigo-600" />
+                        <span>Penempatan & Penanggung Jawab</span>
+                      </p>
+                      <span className="text-[10px] text-slate-400">Langkah 2 dari 3</span>
                     </div>
 
-                    <div className="min-w-0">
-                      <label className="font-bold text-slate-700 block mb-1">Jenis Aset</label>
-                      <select
-                        value={form.assetType}
-                        onChange={(e) => setForm({ ...form, assetType: e.target.value })}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
-                      >
-                        <option value="">— Pilih Jenis Aset —</option>
-                        {ASSET_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-                  </div>
+                    <div className="space-y-3">
+                      {customers.length > 0 && (
+                        <div>
+                          <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Customer / Klien</label>
+                          <select
+                            value={form.customerId}
+                            onChange={(e) => setForm(f => ({ ...f, customerId: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                          >
+                            <option value="">Internal Axon / Tanpa Klien Tertentu</option>
+                            {customers.map(c => (
+                              <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="min-w-0">
-                      <label className="font-bold text-slate-700 block mb-1">Merek / Model</label>
-                      <input
-                        value={form.brandModel}
-                        onChange={(e) => setForm({ ...form, brandModel: e.target.value })}
-                        placeholder="Contoh: Cisco SG350 / Dell 7080"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
-                      />
-                    </div>
-
-                    <div className="min-w-0">
-                      <label className="font-bold text-slate-700 block mb-1">Serial Number (SN)</label>
-                      <input
-                        value={form.serialNumber}
-                        onChange={(e) => setForm({ ...form, serialNumber: e.target.value })}
-                        placeholder="Contoh: FOC21390A1"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Placement & PIC Section */}
-                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Lokasi Fisik */}
-                    <div className="min-w-0">
-                      <div className="flex items-center justify-between mb-1 h-5">
-                        <label className="font-bold text-slate-700">Lokasi Fisik *</label>
-                        {canLocationWrite && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLocationForm({ code: "", name: "", address: "" });
-                            setShowAddLocationModal(true);
-                          }}
-                          className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 active:scale-95 transition"
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-semibold text-slate-700 dark:text-slate-300">
+                            Lokasi / Ruangan Penempatan <span className="text-rose-500">*</span>
+                          </label>
+                          {canLocationWrite && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAddLocationModal(true)}
+                              className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-1"
+                            >
+                              <Plus size={11} /> Buat Lokasi Baru
+                            </button>
+                          )}
+                        </div>
+                        <select
+                          value={form.locationId}
+                          onChange={(e) => setForm(f => ({ ...f, locationId: e.target.value }))}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-semibold"
                         >
-                          <Plus size={12} strokeWidth={2.5} />
-                          <span>Tambah Lokasi</span>
-                        </button>
-                        )}
+                          <option value="">— Pilih Lokasi Penempatan —</option>
+                          {locations.map(l => (
+                            <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
+                          ))}
+                        </select>
                       </div>
-                      <select
-                        value={form.locationId}
-                        onChange={(e) => setForm({ ...form, locationId: e.target.value })}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 truncate"
-                      >
-                        <option value="">— Pilih Lokasi —</option>
-                        {locations.map(l => (
-                          <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
-                        ))}
-                      </select>
-                      {locations.length === 0 && (
-                        <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
-                          <AlertTriangle size={11} /> Belum ada lokasi. Klik <b>Tambah Lokasi</b>.
-                        </p>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-semibold text-slate-700 dark:text-slate-300">PIC Penanggung Jawab Unit</label>
+                          {canPicWrite && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAddPicModal(true)}
+                              className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-1"
+                            >
+                              <UserPlus size={11} /> Tambah PIC Baru
+                            </button>
+                          )}
+                        </div>
+                        <select
+                          value={form.picId}
+                          onChange={(e) => setForm(f => ({ ...f, picId: e.target.value }))}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                        >
+                          <option value="">— Tanpa PIC Khusus —</option>
+                          {pics.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} {p.department ? `(${p.department})` : ""} {p.phone ? `• ${p.phone}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Selected PIC Preview Card */}
+                      {form.picId && (() => {
+                        const selPic = pics.find(p => p.id === form.picId)
+                        if (!selPic) return null
+                        return (
+                          <div className="p-3 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                              {selPic.name[0].toUpperCase()}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-slate-900 dark:text-white truncate">{selPic.name}</p>
+                              <p className="text-[11px] text-slate-500 truncate">
+                                {selPic.position ? `${selPic.position} • ` : ""}{selPic.department || "-"} • {selPic.phone || "Tanpa telp"}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3: STATUS, GARANSI & DOKUMENTASI */}
+                {formStep === 3 && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                        <Shield size={13} className="text-indigo-600" />
+                        <span>Status Operasional & Dokumentasi</span>
+                      </p>
+                      <span className="text-[10px] text-slate-400">Langkah 3 dari 3</span>
+                    </div>
+
+                    {/* Status Segmented Cards */}
+                    <div>
+                      <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">Status Operasional Unit</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {STATUS_OPTS.map((s) => {
+                          const isSel = form.status === s.v
+                          return (
+                            <button
+                              key={s.v}
+                              type="button"
+                              onClick={() => setForm(f => ({ ...f, status: s.v }))}
+                              className={`p-2.5 rounded-xl border text-center transition flex flex-col items-center justify-center gap-1 ${
+                                isSel
+                                  ? "border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/50 shadow-xs"
+                                  : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50"
+                              }`}
+                            >
+                              <span className={`w-2.5 h-2.5 rounded-full ${s.dot}`} />
+                              <span className={`font-bold text-xs ${isSel ? "text-indigo-600 dark:text-indigo-400" : "text-slate-700 dark:text-slate-300"}`}>
+                                {s.l}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Warranty Dates */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Tanggal Pembelian</label>
+                        <input
+                          type="date"
+                          value={form.purchaseDate}
+                          onChange={(e) => setForm(f => ({ ...f, purchaseDate: e.target.value }))}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Garansi Sampai Dengan</label>
+                        <input
+                          type="date"
+                          value={form.warrantyUntil}
+                          onChange={(e) => setForm(f => ({ ...f, warrantyUntil: e.target.value }))}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Photos Upload */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="font-semibold text-slate-700 dark:text-slate-300">Dokumentasi Foto Perangkat</label>
+                        <span className="text-[10px] text-slate-400">{form.photos.length}/5 foto</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <label className="px-3.5 py-2 rounded-xl border border-dashed border-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 font-semibold cursor-pointer flex items-center gap-1.5 hover:bg-indigo-100/50 transition">
+                          <Upload size={14} />
+                          <span>{uploadingPhotos ? "Mengunggah..." : "+ Unggah Foto"}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            disabled={uploadingPhotos || form.photos.length >= 5}
+                            onChange={handlePhotoUpload}
+                          />
+                        </label>
+                      </div>
+
+                      {form.photos.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {form.photos.map((url, idx) => {
+                            const fullUrl = url.startsWith("http") ? url : `${API}${url}`
+                            return (
+                              <div key={idx} className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 group cursor-pointer" onClick={() => openPhotoLightbox(form.photos, idx)}>
+                                <img src={fullUrl} alt="Thumbnail" className="w-full h-full object-cover hover:scale-105 transition" />
+                                <button
+                                  type="button"
+                                  onClick={() => removePhoto(idx)}
+                                  className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white hover:bg-rose-600 transition"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
                       )}
                     </div>
 
-                    {/* Status Operasional */}
-                    <div className="min-w-0">
-                      <div className="flex items-center mb-1 h-5">
-                        <label className="font-bold text-slate-700">Status Operasional</label>
-                      </div>
-                      <select
-                        value={form.status}
-                        onChange={(e) => setForm({ ...form, status: e.target.value })}
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                      >
-                        {STATUS_OPTS.map(s => <option key={s.v} value={s.v}>{s.l}</option>)}
-                      </select>
+                    {/* Notes */}
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">Catatan Tambahan & Konfigurasi</label>
+                      <textarea
+                        rows={2}
+                        value={form.notes}
+                        onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
+                        placeholder="IP Address, port, konfigurasi khusus, atau keterangan kondisi..."
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+                      />
                     </div>
                   </div>
-
-                  {/* PIC Penanggung Jawab */}
-                  <div className="min-w-0 pt-1 border-t border-slate-200/60">
-                    <div className="flex items-center justify-between mb-1 h-5">
-                      <label className="font-bold text-slate-700">
-                        PIC Penanggung Jawab Perangkat
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPicForm({
-                            name: "",
-                            position: "",
-                            department: "",
-                            phone: "",
-                            email: "",
-                            locationId: form.locationId || "",
-                            notes: ""
-                          });
-                          setShowAddPicModal(true);
-                        }}
-                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 active:scale-95 transition"
-                      >
-                        <Plus size={12} strokeWidth={2.5} />
-                        <span>Tambah PIC Baru</span>
-                      </button>
-                    </div>
-
-                    <select
-                      value={form.picId}
-                      onChange={(e) => setForm({ ...form, picId: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 truncate"
-                    >
-                      <option value="">— Tanpa PIC (Umum) —</option>
-                      {pics.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} {p.department ? `• ${p.department}` : ""} {p.phone ? `(${p.phone})` : ""}
-                        </option>
-                      ))}
-                    </select>
-
-                    {pics.length === 0 && (
-                      <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
-                        <AlertTriangle size={11} /> Belum ada data PIC. Klik <b>Tambah PIC Baru</b> jika diperlukan.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* 4. Dates / Warranty */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="min-w-0">
-                    <label className="font-bold text-slate-700 block mb-1">Tanggal Perolehan</label>
-                    <input
-                      type="date"
-                      value={form.purchaseDate}
-                      onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-
-                  <div className="min-w-0">
-                    <label className="font-bold text-slate-700 block mb-1">Garansi Berakhir</label>
-                    <input
-                      type="date"
-                      value={form.warrantyUntil}
-                      onChange={(e) => setForm({ ...form, warrantyUntil: e.target.value })}
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-                </div>
-
-                {/* ── FOTO DOKUMENTASI FISIK ASET (3 - 5 FOTO) ── */}
-                <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <label className="font-bold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
-                          <Camera size={15} className="text-indigo-600" />
-                          Foto Dokumentasi Fisik Aset
-                        </label>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-wide border ${
-                          form.photos.length >= 3 && form.photos.length <= 5
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : form.photos.length > 0
-                            ? "bg-amber-50 text-amber-700 border-amber-200"
-                            : "bg-slate-200/70 text-slate-600 border-slate-300"
-                        }`}>
-                          {form.photos.length}/5 Foto
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Disarankan <b>3–5 foto</b> dari berbagai sudut (Tampak Depan, Belakang, Stiker SN, Port/Kabel).
-                        Foto otomatis dikompres, maksimal {MAX_UPLOAD_MB} MB per file.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Photo Thumbnails Grid */}
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
-                    {form.photos.map((url, idx) => {
-                      const fullUrl = url.startsWith("http") ? url : `${API}${url}`;
-                      return (
-                        <div
-                          key={idx}
-                          className="relative aspect-square rounded-xl overflow-hidden border-2 border-indigo-100 bg-white shadow-sm group"
-                        >
-                          <img
-                            src={fullUrl}
-                            alt={`Foto Aset ${idx + 1}`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition cursor-pointer"
-                            onClick={() => setPreviewPhotoModal(fullUrl)}
-                          />
-                          <span className="absolute top-1 left-1 px-1.5 py-0.2 bg-black/60 text-white rounded text-[9px] font-bold">
-                            #{idx + 1}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removePhoto(idx)}
-                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-md active:scale-90 transition"
-                            title="Hapus foto"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      );
-                    })}
-
-                    {/* Upload Tile if less than 5 */}
-                    {form.photos.length < 5 && (
-                      <label className={`relative aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center p-2 text-center cursor-pointer transition ${
-                        uploadingPhotos
-                          ? "border-indigo-400 bg-indigo-50/50 cursor-wait"
-                          : "border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/30 bg-white"
-                      }`}>
-                        {uploadingPhotos ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <Loader2 size={20} className="animate-spin text-indigo-600" />
-                            <span className="text-[10px] font-bold text-indigo-600">Mengunggah...</span>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center mb-1 group-hover:scale-110 transition">
-                              <Camera size={16} />
-                            </div>
-                            <span className="text-[10px] font-bold text-slate-700 leading-tight">
-                              + Foto
-                            </span>
-                            <span className="text-[9px] text-slate-400">
-                              (Maks 5)
-                            </span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              disabled={uploadingPhotos}
-                              onChange={handlePhotoUpload}
-                              className="hidden"
-                            />
-                          </>
-                        )}
-                      </label>
-                    )}
-                  </div>
-
-                  {/* Status Indicator / Recommendation */}
-                  {form.photos.length === 0 ? (
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-white p-2 rounded-xl border border-slate-200/60">
-                      <Info size={13} className="text-slate-400 shrink-0" />
-                      <span>Belum ada foto yang diunggah. Ambil/pilih 3–5 foto fisik perangkat.</span>
-                    </div>
-                  ) : form.photos.length < 3 ? (
-                    <div className="flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50/80 p-2 rounded-xl border border-amber-200">
-                      <AlertTriangle size={13} className="text-amber-500 shrink-0" />
-                      <span>Tambahkan {3 - form.photos.length} foto lagi untuk memenuhi rekomendasi standar (min. 3 foto).</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50/80 p-2 rounded-xl border border-emerald-200">
-                      <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                      <span>Dokumentasi lengkap ({form.photos.length} foto aset terpasang).</span>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Catatan Tambahan</label>
-                  <textarea
-                    value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    placeholder="IP Address, Rak Server, Port Switch..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm min-h-[50px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  />
-                </div>
+                )}
               </div>
 
-              {/* Sticky Footer */}
-              <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] z-10 pb-6 sm:pb-4">
+              {/* Form Footer */}
+              <div className="p-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 bg-slate-50/50 dark:bg-slate-800/40">
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-100 active:scale-95 transition"
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100"
                 >
                   Batal
                 </button>
-                <button
-                  type="button"
-                  onClick={submitForm}
-                  disabled={saving}
-                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black shadow-md shadow-indigo-600/25 flex items-center gap-1.5 disabled:opacity-60 transition"
-                >
-                  {saving ? <Loader2 className="animate-spin" size={13} /> : null}
-                  <span>{editing ? "Simpan Perubahan" : "Simpan Aset"}</span>
-                </button>
+
+                <div className="flex items-center gap-2">
+                  {formStep > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setFormStep(s => (s - 1) as 1 | 2 | 3)}
+                      className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-100"
+                    >
+                      ← Sebelumnya
+                    </button>
+                  )}
+
+                  {formStep < 3 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (formStep === 1 && !form.name.trim()) {
+                          return alert("Nama perangkat wajib diisi sebelum lanjut")
+                        }
+                        setFormStep(s => (s + 1) as 1 | 2 | 3)
+                      }}
+                      className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:opacity-90 text-xs font-bold transition flex items-center gap-1"
+                    >
+                      <span>Lanjut</span>
+                      <ChevronRight size={14} />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={submitForm}
+                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-indigo-600/25 transition disabled:opacity-50"
+                    >
+                      {saving && <Loader2 size={14} className="animate-spin" />}
+                      <span>{editing ? "Perbarui Aset" : "Simpan Aset"}</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── 12. QUICK ADD PIC MODAL ────────────────────────────────────────────── */}
+      {/* ── 12. QUICK ADD PIC MODAL ─────────────────────────────────────────── */}
       <AnimatePresence>
         {showAddPicModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[160] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+            className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
             onClick={() => setShowAddPicModal(false)}
           >
             <motion.div
-              initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 30, opacity: 0 }}
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90dvh] sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden pb-safe border border-slate-100"
+              className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-5 space-y-4 shadow-2xl border border-slate-200/80 dark:border-slate-800"
             >
-              {/* Sticky Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
-                    <UserPlus size={16} />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-sm sm:text-base text-slate-900">
-                      Tambah PIC Baru Cepat
-                    </h3>
-                    <p className="text-[11px] text-slate-400">
-                      PIC akan langsung otomatis terpilih untuk aset ini.
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => setShowAddPicModal(false)} className="p-1.5 rounded-xl hover:bg-slate-200 text-slate-400">
-                  <X size={17} />
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <UserPlus size={16} className="text-indigo-600" />
+                  <span>Daftarkan PIC Baru Cepat</span>
+                </h3>
+                <button onClick={() => setShowAddPicModal(false)} className="p-1 rounded-full text-slate-400">
+                  <X size={16} />
                 </button>
               </div>
 
-              {/* Scrollable Form Body */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 text-xs">
+              <div className="space-y-3 text-xs">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Nama PIC *</label>
+                  <label className="font-semibold block mb-1">Nama PIC <span className="text-rose-500">*</span></label>
                   <input
                     value={picForm.name}
-                    onChange={(e) => setPicForm({ ...picForm, name: e.target.value })}
-                    placeholder="Contoh: Budi Santoso, Siti Rahmawati..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    autoFocus
+                    onChange={(e) => setPicForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Nama Lengkap Penanggung Jawab"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                   />
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Jabatan / Posisi</label>
+                    <label className="font-semibold block mb-1">Jabatan</label>
                     <input
                       value={picForm.position}
-                      onChange={(e) => setPicForm({ ...picForm, position: e.target.value })}
-                      placeholder="Contoh: Kasir, Staff HR"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      onChange={(e) => setPicForm(f => ({ ...f, position: e.target.value }))}
+                      placeholder="Contoh: Staff Kasir"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                     />
                   </div>
-
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Departemen / Divisi</label>
+                    <label className="font-semibold block mb-1">Departemen</label>
                     <input
                       value={picForm.department}
-                      onChange={(e) => setPicForm({ ...picForm, department: e.target.value })}
-                      placeholder="Contoh: Finance, Logistik"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      onChange={(e) => setPicForm(f => ({ ...f, department: e.target.value }))}
+                      placeholder="Contoh: Operasional"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                     />
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">No. WhatsApp / HP</label>
-                    <input
-                      value={picForm.phone}
-                      onChange={(e) => setPicForm({ ...picForm, phone: e.target.value })}
-                      placeholder="Contoh: 08123456789"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">Email (opsional)</label>
-                    <input
-                      value={picForm.email}
-                      onChange={(e) => setPicForm({ ...picForm, email: e.target.value })}
-                      placeholder="pic@domain.com"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    />
-                  </div>
-                </div>
-
-                {/* Lokasi Fisik */}
                 <div>
-                  <div className="flex items-center justify-between mb-1 h-5">
-                    <label className="font-bold text-slate-700">Lokasi Kerja Fisik</label>
-                    {canLocationWrite && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLocationForm({ code: "", name: "", address: "" });
-                        setShowAddLocationModal(true);
-                      }}
-                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 active:scale-95 transition"
-                    >
-                      <Plus size={12} strokeWidth={2.5} />
-                      <span>Tambah Lokasi</span>
-                    </button>
-                    )}
-                  </div>
-                  <select
-                    value={picForm.locationId}
-                    onChange={(e) => setPicForm({ ...picForm, locationId: e.target.value })}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 truncate"
-                  >
-                    <option value="">— Pilih Lokasi Kerja —</option>
-                    {locations.map(l => (
-                      <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
-                    ))}
-                  </select>
+                  <label className="font-semibold block mb-1">No. WhatsApp / Telepon</label>
+                  <input
+                    value={picForm.phone}
+                    onChange={(e) => setPicForm(f => ({ ...f, phone: e.target.value }))}
+                    placeholder="08123456789"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  />
                 </div>
               </div>
 
-              {/* Sticky Footer */}
-              <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] z-10 pb-6 sm:pb-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddPicModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-100 active:scale-95 transition"
-                >
+              <div className="pt-2 flex justify-end gap-2">
+                <button onClick={() => setShowAddPicModal(false)} className="px-3 py-2 rounded-xl border text-xs font-semibold">
                   Batal
                 </button>
                 <button
-                  type="button"
-                  onClick={submitQuickPic}
                   disabled={savingPic}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black shadow-md shadow-indigo-600/25 flex items-center gap-1.5 disabled:opacity-60 transition"
+                  onClick={submitQuickPic}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50"
                 >
-                  {savingPic ? <Loader2 className="animate-spin" size={13} /> : null}
-                  <span>Simpan & Pilih PIC</span>
+                  {savingPic ? "Menyimpan..." : "Simpan & Pilih"}
                 </button>
               </div>
             </motion.div>
@@ -2841,99 +3115,73 @@ function ItOslAssetsContent() {
         )}
       </AnimatePresence>
 
-      {/* ── 13. QUICK ADD LOCATION MODAL ──────────────────────────────────────── */}
+      {/* ── 13. QUICK ADD LOCATION MODAL ────────────────────────────────────── */}
       <AnimatePresence>
         {showAddLocationModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[170] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+            className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
             onClick={() => setShowAddLocationModal(false)}
           >
             <motion.div
-              initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 30, opacity: 0 }}
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md max-h-[90dvh] sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden pb-safe border border-slate-100"
+              className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-5 space-y-4 shadow-2xl border border-slate-200/80 dark:border-slate-800"
             >
-              {/* Sticky Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-600/20">
-                    <MapPin size={16} />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-sm sm:text-base text-slate-900">
-                      Tambah Lokasi Fisik Baru
-                    </h3>
-                    <p className="text-[11px] text-slate-400">
-                      Lokasi baru akan langsung terpilih.
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => setShowAddLocationModal(false)} className="p-1.5 rounded-xl hover:bg-slate-200 text-slate-400">
-                  <X size={17} />
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <MapPin size={16} className="text-indigo-600" />
+                  <span>Tambah Lokasi Baru Cepat</span>
+                </h3>
+                <button onClick={() => setShowAddLocationModal(false)} className="p-1 rounded-full text-slate-400">
+                  <X size={16} />
                 </button>
               </div>
 
-              {/* Scrollable Form Body */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 text-xs">
+              <div className="space-y-3 text-xs">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Nama Lokasi / Ruangan *</label>
+                  <label className="font-semibold block mb-1">Nama Lokasi <span className="text-rose-500">*</span></label>
                   <input
                     value={locationForm.name}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      const autoCode = locationForm.code ? locationForm.code : val.replace(/[^a-zA-Z0-9]/g, "").slice(0, 5).toUpperCase();
-                      setLocationForm({ ...locationForm, name: val, code: autoCode });
-                    }}
-                    placeholder="Contoh: Server Room Lantai 2, Kasir Utama, Poli Gigi..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    autoFocus
+                    onChange={(e) => setLocationForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Contoh: Server Room Lt. 2, Ruang Kasir A"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                   />
                 </div>
-
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Kode Lokasi (Singkatan)</label>
+                  <label className="font-semibold block mb-1">Kode Lokasi (Singkatan)</label>
                   <input
                     value={locationForm.code}
-                    onChange={(e) => setLocationForm({ ...locationForm, code: e.target.value.toUpperCase() })}
-                    placeholder="Contoh: SRV-L2, KASIR-1, LT2..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    onChange={(e) => setLocationForm(f => ({ ...f, code: e.target.value }))}
+                    placeholder="Contoh: SR-L2, KASIR-A (auto-generate jika kosong)"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono"
                   />
-                  <p className="text-[10px] text-slate-400 mt-0.5">Digunakan sebagai prefix identifikasi singkat lokasi.</p>
                 </div>
-
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Alamat / Keterangan Tambahan (opsional)</label>
-                  <textarea
+                  <label className="font-semibold block mb-1">Alamat / Keterangan</label>
+                  <input
                     value={locationForm.address}
-                    onChange={(e) => setLocationForm({ ...locationForm, address: e.target.value })}
-                    placeholder="Contoh: Gedung A Lantai 2 Sayap Barat, Dekat Ruang IT..."
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    onChange={(e) => setLocationForm(f => ({ ...f, address: e.target.value }))}
+                    placeholder="Contoh: Gedung Timur, Area Bebas Akses"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                   />
                 </div>
               </div>
 
-              {/* Sticky Footer */}
-              <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-2.5 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] z-10 pb-6 sm:pb-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddLocationModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-100 active:scale-95 transition"
-                >
+              <div className="pt-2 flex justify-end gap-2">
+                <button onClick={() => setShowAddLocationModal(false)} className="px-3 py-2 rounded-xl border text-xs font-semibold">
                   Batal
                 </button>
                 <button
-                  type="button"
-                  onClick={submitQuickLocation}
                   disabled={savingLocation}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-black shadow-md shadow-indigo-600/25 flex items-center gap-1.5 disabled:opacity-60 transition"
+                  onClick={submitQuickLocation}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold disabled:opacity-50"
                 >
-                  {savingLocation ? <Loader2 className="animate-spin" size={13} /> : null}
-                  <span>Simpan & Pilih Lokasi</span>
+                  {savingLocation ? "Menyimpan..." : "Simpan & Pilih"}
                 </button>
               </div>
             </motion.div>
@@ -2941,72 +3189,124 @@ function ItOslAssetsContent() {
         )}
       </AnimatePresence>
 
-      {/* ── 14. LIGHTBOX PHOTO PREVIEW MODAL ────────────────────────────────────── */}
+      {/* ── 14. PHOTO LIGHTBOX & CAROUSEL MODAL (ZERO FLICKER) ──────────────── */}
       <AnimatePresence>
-        {previewPhotoModal && (
+        {photoLightbox && photoLightbox.photos.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[180] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4"
-            onClick={() => setPreviewPhotoModal(null)}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="fixed inset-0 z-[200] bg-black/85 flex flex-col items-center justify-between p-3 sm:p-6 select-none"
+            onClick={closePhotoLightbox}
           >
             {/* Top Toolbar */}
-            <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
-              <div className="flex items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-full text-white text-xs font-bold border border-white/10">
-                <ImageIcon size={14} className="text-indigo-400" />
-                <span>Foto Dokumentasi Aset</span>
+            <div 
+              className="w-full max-w-4xl flex items-center justify-between text-white shrink-0 py-2 px-1 z-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-bold bg-white/10 px-3 py-1 rounded-full border border-white/10">
+                  Foto {photoLightbox.index + 1} dari {photoLightbox.photos.length}
+                </span>
+                {photoLightbox.photos.length > 1 && (
+                  <span className="text-[11px] text-white/60 hidden sm:inline">
+                    (Gunakan tombol panah ← → untuk navigasi)
+                  </span>
+                )}
               </div>
+
               <div className="flex items-center gap-2">
                 <a
-                  href={previewPhotoModal}
+                  href={photoLightbox.photos[photoLightbox.index]}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition active:scale-95"
-                  title="Buka Ukuran Penuh"
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition text-xs font-semibold flex items-center gap-1.5"
+                  title="Buka Foto Asli Tab Baru"
                 >
-                  <ExternalLink size={18} />
+                  <ExternalLink size={15} />
+                  <span className="hidden sm:inline">Tab Baru</span>
                 </a>
                 <button
                   type="button"
-                  onClick={() => setPreviewPhotoModal(null)}
-                  className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition active:scale-95"
-                  title="Tutup Preview"
+                  onClick={closePhotoLightbox}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 hover:text-rose-400 text-white transition"
+                  title="Tutup (Esc)"
                 >
-                  <X size={18} />
+                  <X size={20} />
                 </button>
               </div>
             </div>
 
-            {/* Main Image Container */}
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+            {/* Main Stage (Image + Prev/Next Buttons) */}
+            <div 
+              className="relative w-full max-w-5xl flex-1 flex items-center justify-center my-auto min-h-0 px-2"
               onClick={(e) => e.stopPropagation()}
-              className="relative max-w-4xl max-h-[80vh] w-full flex items-center justify-center p-2"
             >
-              <img
-                src={previewPhotoModal}
-                alt="Pratinjau Foto Aset"
-                className="max-w-full max-h-[78vh] object-contain rounded-2xl shadow-2xl border border-white/10"
-              />
-            </motion.div>
+              {/* Prev Button (Only show if multiple photos) */}
+              {photoLightbox.photos.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); prevPhoto(); }}
+                  className="absolute left-2 sm:left-4 z-20 w-11 h-11 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 shadow-xl transition active:scale-95"
+                  title="Foto Sebelumnya (Panah Kiri)"
+                >
+                  <ChevronLeft size={24} />
+                </button>
+              )}
+
+              {/* Main Image with smooth transition */}
+              <div className="relative max-w-full max-h-[75vh] sm:max-h-[80vh] flex items-center justify-center">
+                <img
+                  key={photoLightbox.photos[photoLightbox.index]}
+                  src={photoLightbox.photos[photoLightbox.index]}
+                  alt={`Foto ${photoLightbox.index + 1}`}
+                  className="max-w-full max-h-[75vh] sm:max-h-[80vh] rounded-2xl object-contain shadow-2xl border border-white/10"
+                />
+              </div>
+
+              {/* Next Button (Only show if multiple photos) */}
+              {photoLightbox.photos.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); nextPhoto(); }}
+                  className="absolute right-2 sm:right-4 z-20 w-11 h-11 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center border border-white/20 shadow-xl transition active:scale-95"
+                  title="Foto Berikutnya (Panah Kanan)"
+                >
+                  <ChevronRight size={24} />
+                </button>
+              )}
+            </div>
+
+            {/* Bottom Thumbnails Strip (Only if multiple photos) */}
+            {photoLightbox.photos.length > 1 && (
+              <div 
+                className="w-full max-w-xl flex items-center justify-center gap-2 py-2 px-3 bg-black/50 rounded-2xl border border-white/10 shrink-0 overflow-x-auto z-10"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {photoLightbox.photos.map((p, pIdx) => {
+                  const isActive = pIdx === photoLightbox.index
+                  return (
+                    <button
+                      key={pIdx}
+                      type="button"
+                      onClick={() => setPhotoLightbox(prev => prev ? { ...prev, index: pIdx } : null)}
+                      className={`relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border-2 transition active:scale-95 ${
+                        isActive
+                          ? "border-indigo-500 ring-2 ring-indigo-500/50 scale-105"
+                          : "border-white/20 opacity-50 hover:opacity-100"
+                      }`}
+                    >
+                      <img src={p} alt={`Thumbnail ${pIdx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Mobile Floating Action Button (FAB) */}
-      {canAssetWrite && (
-      <button 
-        onClick={openCreate} 
-        className="fixed bottom-20 right-4 sm:hidden w-12 h-12 rounded-full bg-indigo-600 text-white shadow-xl shadow-indigo-600/40 flex items-center justify-center z-40 active:scale-90 transition-transform"
-        aria-label="Tambah Aset Baru"
-      >
-        <Plus size={22} strokeWidth={2.5} />
-      </button>
-      )}
     </div>
   )
 }

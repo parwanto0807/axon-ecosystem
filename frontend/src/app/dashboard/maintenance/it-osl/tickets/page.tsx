@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, Suspense } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Plus, Search, Clock3, AlertTriangle, Wrench, History, X, Loader2, 
@@ -8,10 +8,13 @@ import {
   LayoutGrid, LayoutList, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, 
   ArrowUpDown, RotateCcw, Copy, Download, MapPin, CheckSquare, Square, Filter, Tag,
   SlidersHorizontal, ChevronDown, Sparkles, Building2,
-  PlayCircle, PauseCircle, CheckCircle2, Lock, Timer, ShieldCheck
+  PlayCircle, PauseCircle, CheckCircle2, Lock, Timer, ShieldCheck, ExternalLink, Phone
 } from "lucide-react"
 import { useSession } from "next-auth/react"
 import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
+import { ItOslNav } from "@/components/it-osl/ItOslNav"
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { canItOsl } from "@/lib/itOslPermissions"
 
 const API = process.env.NEXT_PUBLIC_API_URL
@@ -140,7 +143,9 @@ const STATUS_META: Record<string, { label: string; hint: string; icon: typeof Se
 export default function ItOslTicketsPage() {
   return (
     <ItOslAccessGuard>
-      <ItOslTicketsContent />
+      <Suspense fallback={<div className="p-12 text-center text-slate-400"><Loader2 size={32} className="animate-spin text-indigo-600 inline" /></div>}>
+        <ItOslTicketsContent />
+      </Suspense>
     </ItOslAccessGuard>
   )
 }
@@ -267,6 +272,43 @@ function ItOslTicketsContent() {
     }
   }, [session?.user?.email, currentUserId, currentRole])
   
+  const searchParams = useSearchParams()
+
+  // Handle URL query parameters (e.g. from Assets or external links)
+  useEffect(() => {
+    const qAssetId = searchParams.get("assetId")
+    const qAssetName = searchParams.get("assetName")
+    const qAssetCode = searchParams.get("assetCode")
+    const qTicketId = searchParams.get("ticketId")
+
+    if (qAssetId) {
+      setQuick(prev => ({
+        ...prev,
+        assetId: qAssetId,
+        summary: prev.summary || (qAssetName ? `Perbaikan: ${qAssetName}` : (qAssetCode ? `Perbaikan: ${qAssetCode}` : ""))
+      }))
+      setShowQuick(true)
+    }
+
+    if (qTicketId) {
+      setDetailId(qTicketId)
+    }
+  }, [searchParams])
+
+  // Once assets or locations load, auto-link asset customer and location
+  useEffect(() => {
+    if (quick.assetId && assets.length > 0) {
+      const found = assets.find(a => a.id === quick.assetId)
+      if (found) {
+        setQuick(prev => ({
+          ...prev,
+          customerId: prev.customerId || found.customerId || "",
+          locationId: prev.locationId || (found.location?.name ? locations.find(l => l.name === found.location?.name)?.id || "" : "")
+        }))
+      }
+    }
+  }, [quick.assetId, assets, locations])
+
   // prefill reporter & assignee in Quick-Log from session
   useEffect(()=>{
     if(showQuick && currentUserName && !quick.reporterName) {
@@ -736,6 +778,9 @@ function ItOslTicketsContent() {
   return (
     <div className="w-full max-w-full px-2.5 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-6 space-y-3 sm:space-y-4 pb-28 md:pb-8 overflow-x-hidden">
       
+      {/* ── SUB-NAVIGATION TABS ── */}
+      <ItOslNav badgeCounts={{ tickets: allTickets.length }} />
+
       {/* ── HEADER ──────────────────────────────────────────────────────── */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 w-full">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
@@ -1117,7 +1162,7 @@ function ItOslTicketsContent() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 text-xs w-[92%] sm:w-auto max-w-xl justify-between"
+            className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 text-xs w-[92%] sm:w-auto max-w-xl justify-between"
           >
             <div className="flex items-center gap-2">
               <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-black text-xs flex items-center justify-center">
@@ -1676,252 +1721,326 @@ function ItOslTicketsContent() {
         </>
       )}
 
-      {/* ── QUICK-LOG MODAL (≤20 DETIK) ──────────────────────────────────── */}
+      {/* ── QUICK-LOG MODAL (EXECUTIVE REDESIGN) ─────────────────────────── */}
       <AnimatePresence>
         {showQuick && (
           <motion.div 
-            initial={{opacity:0}} 
-            animate={{opacity:1}} 
-            exit={{opacity:0}} 
-            className="fixed inset-0 z-[150] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" 
-            onClick={()=>setShowQuick(false)}
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center p-3 sm:p-5" 
+            onClick={() => setShowQuick(false)}
           >
             <motion.div 
-              initial={{y:40, opacity:0}} 
-              animate={{y:0, opacity:1}} 
-              exit={{y:40, opacity:0}} 
-              onClick={(e)=>e.stopPropagation()} 
-              className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-lg p-4 sm:p-6 space-y-4 max-h-[92dvh] overflow-y-auto shadow-2xl pb-safe"
+              initial={{ scale: 0.96, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              exit={{ scale: 0.96, opacity: 0 }} 
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              onClick={(e) => e.stopPropagation()} 
+              className="bg-white rounded-3xl w-full max-w-2xl flex flex-col shadow-2xl max-h-[92vh] overflow-hidden border border-slate-200/80"
             >
-              {/* Mobile handle indicator */}
-              <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto sm:hidden -mt-1 mb-2" />
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-black text-base sm:text-lg text-slate-900">Quick-Log — ≤20 detik</h3>
-                  <p className="text-[11px] text-slate-400">Pencatatan insiden/permintaan cepat</p>
+              {/* Modal Header */}
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-600/20">
+                    <Wrench size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-extrabold text-base sm:text-lg text-slate-900">Quick-Log Tiket</h3>
+                      <span className="font-mono text-[10px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full">
+                        ≤20 Detik
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400">Pencatatan cepat kendala operasional & permintaan layanan IT</p>
+                  </div>
                 </div>
-                <button onClick={()=>setShowQuick(false)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600">
-                  <X size={18}/>
+                <button onClick={() => setShowQuick(false)} className="p-2 rounded-xl hover:bg-slate-200/60 text-slate-400">
+                  <X size={18} />
                 </button>
               </div>
 
-              <div className="space-y-3">
-                {/* Customer Selector */}
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between mb-1">
-                    <span className="flex items-center gap-1"><Building2 size={12} className="text-indigo-600" /> Customer / Klien</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Opsional</span>
-                  </label>
-                  <select
-                    value={quick.customerId}
-                    onChange={(e)=> setQuick({...quick, customerId: e.target.value})}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">— Pilih Customer / Klien (Opsional) —</option>
-                    {customers.map(c=> (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.code})
-                      </option>
-                    ))}
-                  </select>
+              {/* Form Scrollable Body */}
+              <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 text-xs">
+                {/* 1. Tipe Tiket Segments (Full-Width 3 Cards) */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 block">Tipe Tiket Layanan</label>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {[
+                      { id: "INCIDENT", label: "INCIDENT", desc: "Gangguan / Kendala", icon: AlertTriangle, active: "border-rose-500 bg-rose-50/80 text-rose-700 ring-1 ring-rose-500/20 shadow-xs" },
+                      { id: "REQUEST", label: "REQUEST", desc: "Permintaan Layanan", icon: Sparkles, active: "border-indigo-600 bg-indigo-50/80 text-indigo-700 ring-1 ring-indigo-600/20 shadow-xs" },
+                      { id: "PM", label: "PM", desc: "Preventive Maint.", icon: ShieldCheck, active: "border-emerald-500 bg-emerald-50/80 text-emerald-700 ring-1 ring-emerald-500/20 shadow-xs" }
+                    ].map(t => {
+                      const Icon = t.icon
+                      const isSel = quick.ticketType === t.id
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setQuick(q => ({ ...q, ticketType: t.id }))}
+                          className={`p-2.5 sm:p-3 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-0.5 active:scale-95 ${
+                            isSel ? t.active + " font-extrabold" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 text-xs font-black">
+                            <Icon size={14} />
+                            <span>{t.label}</span>
+                          </div>
+                          <span className="text-[10px] opacity-75">{t.desc}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Uraian Masalah *</label>
+                {/* 2. Uraian Masalah */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-700">
+                      Uraian Masalah / Permintaan <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400">{quick.summary.length}/150</span>
+                  </div>
                   <input 
                     autoFocus 
                     value={quick.summary} 
-                    onChange={(e)=>setQuick({...quick, summary:e.target.value})} 
-                    placeholder="Contoh: PC Kasir 2 blue screen saat restart" 
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" 
+                    onChange={(e) => setQuick({ ...quick, summary: e.target.value })} 
+                    placeholder="Contoh: PC Kasir 2 blue screen saat proses pembayaran checkout" 
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition" 
                     maxLength={150} 
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* 3. Lokasi & Kategori (Grid 2-Kolom) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Lokasi *</label>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Lokasi Kejadian <span className="text-rose-500">*</span>
+                    </label>
                     <select 
                       value={quick.locationId} 
-                      onChange={(e)=>setQuick({...quick, locationId:e.target.value})} 
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      onChange={(e) => setQuick({ ...quick, locationId: e.target.value })} 
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
                     >
-                      <option value="">— Pilih Lokasi —</option>
-                      {quickLocations.map((l)=>(<option key={l.id} value={l.id}>{l.name}</option>))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Tipe Tiket</label>
-                    <select 
-                      value={quick.ticketType} 
-                      onChange={(e)=>setQuick({...quick, ticketType:e.target.value})} 
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option value="INCIDENT">INCIDENT (Gangguan)</option>
-                      <option value="REQUEST">REQUEST (Permintaan)</option>
-                      <option value="PM">PM (Maintenance)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1">Kategori Masalah *</label>
-                  <select 
-                    value={quick.categoryId} 
-                    onChange={(e)=>setQuick({...quick, categoryId:e.target.value})} 
-                    className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm w-full bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">— Pilih Kategori —</option>
-                    {catsGrouped.map(([g, items])=>(
-                      <optgroup key={g} label={g}>
-                        {items.map((c)=>(<option key={c.id} value={c.id}>{c.name}</option>))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Asset connect */}
-                <div className="space-y-1.5 pt-1">
-                  <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
-                    <Package size={13}/> Aset terkait (opsional)
-                  </label>
-                  <div className="relative">
-                    <input 
-                      value={assetQuery} 
-                      onChange={(e)=>{ setAssetQuery(e.target.value); setShowAssetPicker(true) }} 
-                      onFocus={()=>setShowAssetPicker(true)} 
-                      placeholder="Cari kode/nama aset atau scan QR…" 
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                    />
-                    {quick.assetId && quickAsset && (
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">
-                        {quickAsset.assetCode}
-                      </span>
-                    )}
-                  </div>
-                  {showAssetPicker && assetQuery && (
-                    <div className="border border-slate-200 rounded-xl max-h-[160px] overflow-auto bg-white shadow-lg">
-                      {filteredAssets.map(a=>(
-                        <button 
-                          key={a.id} 
-                          onClick={()=>{ setQuick({...quick, assetId:a.id}); setAssetQuery(a.name); setShowAssetPicker(false) }} 
-                          className="w-full text-left px-3.5 py-2 hover:bg-indigo-50 active:bg-indigo-100 text-xs flex justify-between items-center gap-2 border-b border-slate-50 last:border-0"
-                        >
-                          <span className="font-bold text-slate-800">{a.name} <span className="font-mono text-[10px] text-slate-400 font-normal">({a.assetCode})</span></span>
-                          <span className="text-[11px] text-slate-400 truncate">{a.location?.name||""}</span>
-                        </button>
+                      <option value="">— Pilih Lokasi Ruangan —</option>
+                      {quickLocations.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
                       ))}
-                      {filteredAssets.length===0 && <div className="p-3 text-xs text-slate-400 text-center">Tidak ada aset cocok</div>}
-                    </div>
-                  )}
-                  {quick.assetId && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1 rounded-lg flex-1 truncate font-medium">
-                        Terhubung: {quickAsset?.name} ({quickAsset?.assetCode})
-                      </span>
-                      <button 
-                        onClick={()=>{setQuick({...quick, assetId:""}); setAssetQuery("")}} 
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs text-rose-600 hover:bg-rose-50"
-                      >
-                        Hapus
-                      </button>
-                    </div>
-                  )}
-                </div>
+                    </select>
+                  </div>
 
-                {/* PIC Selector */}
-                <div className="space-y-1 pt-0.5">
-                  <label className="text-[11px] font-bold text-slate-600 flex items-center justify-between">
-                    <span className="flex items-center gap-1"><Users size={12} className="text-indigo-600"/> PIC Unit (Kontak Klien)</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Auto-isi pelapor & lokasi</span>
-                  </label>
-                  <select 
-                    value={quick.picId} 
-                    onChange={(e)=>{
-                      const pId = e.target.value;
-                      const selPic = quickPics.find(p=> p.id === pId);
-                      setQuick(prev=> ({
-                        ...prev,
-                        picId: pId,
-                        reporterName: selPic ? selPic.name : prev.reporterName,
-                        locationId: (selPic?.locationId && !prev.locationId) ? selPic.locationId : prev.locationId
-                      }));
-                    }} 
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="">— Pilih PIC Unit (Opsional) —</option>
-                    {quickPics.map(p=> (
-                      <option key={p.id} value={p.id}>
-                        {p.name} {p.department ? `(${p.department})` : ''} {p.phone ? `• ${p.phone}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Petugas IT (Teknisi)</label>
-                    {canAssign ? (
-                      <select 
-                        value={quick.assignedTo} 
-                        onChange={(e)=>setQuick({...quick, assignedTo:e.target.value})} 
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                      >
-                        <option value="">— Pilih Teknisi IT —</option>
-                        {users.map(u=> <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
-                      </select>
-                    ) : (
-                      <div className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-600">
-                        {currentUserName || "Saya sendiri"} (otomatis)
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Kategori Masalah <span className="text-rose-500">*</span>
+                    </label>
+                    <select 
+                      value={quick.categoryId} 
+                      onChange={(e) => setQuick({ ...quick, categoryId: e.target.value })} 
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
+                    >
+                      <option value="">— Pilih Kategori Masalah —</option>
+                      {catsGrouped.map(([g, items]) => (
+                        <optgroup key={g} label={g}>
+                          {items.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* 4. Customer & PIC Unit (Grid 2-Kolom) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between mb-1">
+                      <span className="flex items-center gap-1"><Building2 size={12} className="text-indigo-600" /> Customer / Klien</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Opsional</span>
+                    </label>
+                    <select
+                      value={quick.customerId}
+                      onChange={(e) => setQuick({ ...quick, customerId: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                      <option value="">— Internal Axon / Tanpa Klien —</option>
+                      {customers.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between mb-1">
+                      <span className="flex items-center gap-1"><Users size={12} className="text-indigo-600"/> PIC Unit (Kontak Klien)</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Auto-isi pelapor</span>
+                    </label>
+                    <select 
+                      value={quick.picId} 
+                      onChange={(e) => {
+                        const pId = e.target.value
+                        const selPic = quickPics.find(p => p.id === pId)
+                        setQuick(prev => ({
+                          ...prev,
+                          picId: pId,
+                          reporterName: selPic ? selPic.name : prev.reporterName,
+                          locationId: (selPic?.locationId && !prev.locationId) ? selPic.locationId : prev.locationId
+                        }))
+                      }} 
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    >
+                      <option value="">— Pilih PIC Unit (Opsional) —</option>
+                      {quickPics.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} {p.department ? `(${p.department})` : ''} {p.phone ? `• ${p.phone}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* 5. Aset Terkait & Teknisi / Pelapor (Grid 2-Kolom) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between mb-1">
+                      <span className="flex items-center gap-1"><Package size={13} className="text-indigo-600"/> Aset IT Terkait</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Opsional</span>
+                    </label>
+                    <div className="relative">
+                      <input 
+                        value={assetQuery} 
+                        onChange={(e) => { setAssetQuery(e.target.value); setShowAssetPicker(true); }} 
+                        onFocus={() => setShowAssetPicker(true)} 
+                        placeholder="Cari kode atau nama aset IT…" 
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm pr-8 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                      />
+                      {quick.assetId && quickAsset && (
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-bold">
+                          {quickAsset.assetCode}
+                        </span>
+                      )}
+                    </div>
+                    {showAssetPicker && assetQuery && (
+                      <div className="border border-slate-200 rounded-xl max-h-[160px] overflow-auto bg-white shadow-lg mt-1 z-20 relative">
+                        {filteredAssets.map(a => (
+                          <button 
+                            key={a.id} 
+                            type="button"
+                            onClick={() => { setQuick({ ...quick, assetId: a.id }); setAssetQuery(a.name); setShowAssetPicker(false); }} 
+                            className="w-full text-left px-3.5 py-2 hover:bg-indigo-50 text-xs flex justify-between items-center gap-2 border-b border-slate-50 last:border-0"
+                          >
+                            <span className="font-bold text-slate-800">{a.name} <span className="font-mono text-[10px] text-slate-400">({a.assetCode})</span></span>
+                            <span className="text-[11px] text-slate-400 truncate">{a.location?.name || ""}</span>
+                          </button>
+                        ))}
+                        {filteredAssets.length === 0 && <div className="p-3 text-xs text-slate-400 text-center">Tidak ada aset cocok</div>}
+                      </div>
+                    )}
+                    {quick.assetId && (
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1 rounded-lg flex-1 truncate font-medium flex items-center gap-1.5">
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                          <span className="truncate">{quickAsset?.name} ({quickAsset?.assetCode})</span>
+                        </span>
+                        <button 
+                          type="button"
+                          onClick={() => { setQuick({ ...quick, assetId: "" }); setAssetQuery(""); }} 
+                          className="px-2 py-1 rounded-lg border border-slate-200 text-xs text-rose-600 hover:bg-rose-50 font-semibold"
+                        >
+                          Lepas
+                        </button>
                       </div>
                     )}
                   </div>
+
                   <div>
-                    <label className="text-[11px] font-bold text-slate-600 block mb-1">Nama Pelapor</label>
-                    <input 
-                      value={quick.reporterName} 
-                      onChange={(e)=>setQuick({...quick, reporterName:e.target.value})} 
-                      placeholder="Nama pelapor / unit" 
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Teknisi Penanganan</label>
+                        {canAssign ? (
+                          <select 
+                            value={quick.assignedTo} 
+                            onChange={(e) => setQuick({ ...quick, assignedTo: e.target.value })} 
+                            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                          >
+                            <option value="">— Pilih Teknisi —</option>
+                            {users.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+                          </select>
+                        ) : (
+                          <div className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-600 truncate">
+                            {currentUserName || "Saya sendiri"}
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Nama Pelapor</label>
+                        <input 
+                          value={quick.reporterName} 
+                          onChange={(e) => setQuick({ ...quick, reporterName: e.target.value })} 
+                          placeholder="Nama pelapor" 
+                          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-600 block mb-1.5">Tingkat Severity</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(["LOW","MEDIUM","CRITICAL"] as const).map((s)=>(
-                      <button 
-                        key={s} 
-                        type="button"
-                        onClick={()=>setQuick({...quick, severity:s})} 
-                        className={`py-2.5 rounded-xl font-black text-xs border transition active:scale-95 ${
-                          quick.severity===s 
-                            ? (s==="CRITICAL"?"bg-rose-600 border-rose-600 text-white shadow-sm shadow-rose-600/30":s==="LOW"?"bg-emerald-600 border-emerald-600 text-white shadow-sm shadow-emerald-600/30":"bg-amber-500 border-amber-500 text-white shadow-sm shadow-amber-500/30") 
-                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        {s}
-                      </button>
-                    ))}
+                {/* 6. Severity (3 Wide Cards) */}
+                <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                  <label className="text-xs font-bold text-slate-700 block">Tingkat Urgensi (Severity)</label>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {[
+                      { id: "LOW", label: "LOW", sub: "Rendah", desc: "Kendala minor, tidak mengganggu operasional", active: "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20" },
+                      { id: "MEDIUM", label: "MEDIUM", sub: "Sedang", desc: "Gangguan fungsi standar, sistem masih jalan", active: "bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20" },
+                      { id: "CRITICAL", label: "CRITICAL", sub: "Kritis", desc: "Sistem down / operasional terhenti total", active: "bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-600/20" }
+                    ].map(s => {
+                      const isSel = quick.severity === s.id
+                      return (
+                        <button 
+                          key={s.id} 
+                          type="button"
+                          onClick={() => setQuick({ ...quick, severity: s.id })} 
+                          className={`p-2.5 sm:p-3 rounded-2xl border text-left transition flex flex-col justify-between active:scale-95 ${
+                            isSel 
+                              ? s.active + " font-bold" 
+                              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-black text-xs">{s.label}</span>
+                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${isSel ? "bg-white/20 text-white" : "text-slate-400"}`}>
+                              {s.sub}
+                            </span>
+                          </div>
+                          <p className={`text-[10px] mt-1 leading-snug line-clamp-2 ${isSel ? "text-white/90" : "text-slate-400"}`}>
+                            {s.desc}
+                          </p>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               </div>
 
-              <div className="flex gap-2.5 pt-2">
+              {/* Modal Footer */}
+              <div className="p-4 sm:p-5 border-t border-slate-100 flex items-center justify-between gap-3 bg-slate-50/60">
                 <button 
-                  onClick={()=>setShowQuick(false)} 
-                  className="flex-1 py-3 rounded-xl border border-slate-200 font-bold text-sm text-slate-700 hover:bg-slate-50 active:scale-98 transition"
+                  type="button"
+                  onClick={() => setShowQuick(false)} 
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 transition"
                 >
                   Batal
                 </button>
                 <button 
+                  type="button"
                   onClick={submitQuick} 
                   disabled={saving} 
-                  className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition disabled:opacity-60"
+                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition disabled:opacity-60"
                 >
-                  {saving ? <Loader2 className="animate-spin" size={16}/> : null} 
+                  {saving ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
                   <span>Simpan Tiket</span>
                 </button>
               </div>
@@ -1937,7 +2056,7 @@ function ItOslTicketsContent() {
             initial={{opacity:0}} 
             animate={{opacity:1}} 
             exit={{opacity:0}} 
-            className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex justify-end" 
+            className="fixed inset-0 z-[150] bg-black/60  flex justify-end" 
             onClick={()=>{setDetailId(null); setDetail(null)}}
           >
             <motion.div 
@@ -1957,7 +2076,7 @@ function ItOslTicketsContent() {
               ) : detail ? (
                 <>
                 {/* 1. Compact Sticky Top Bar */}
-                <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-4 sm:px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 shadow-xs">
+                <div className="sticky top-0 z-30 bg-white  px-4 sm:px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-2 shrink-0 shadow-xs">
                   <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                     <span className="font-mono text-xs font-black bg-slate-900 text-white px-2 py-0.5 rounded-md shrink-0">
                       {detail.ticketNumber}
@@ -2131,15 +2250,24 @@ function ItOslTicketsContent() {
                           <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                             <span className="flex items-center gap-1"><Users size={12} className="text-indigo-600"/> PIC Unit</span>
                             {detail.pic?.phone && (
-                              <a 
-                                href={`https://wa.me/${detail.pic.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')}`} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="text-emerald-600 hover:text-emerald-700 font-bold flex items-center gap-0.5 text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200"
-                                title="Chat WhatsApp"
-                              >
-                                <MessageSquare size={10} /> WA
-                              </a>
+                              <div className="flex items-center gap-1">
+                                <a 
+                                  href={`https://wa.me/${detail.pic.phone.replace(/[^0-9]/g, '').replace(/^0/, '62')}?text=${encodeURIComponent(`Halo ${detail.pic.name}, terkait tiket insiden [${detail.ticketNumber}] ${detail.summary}...`)}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 text-[10px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200"
+                                  title="Chat WhatsApp"
+                                >
+                                  <MessageSquare size={10} /> WA
+                                </a>
+                                <a
+                                  href={`tel:${detail.pic.phone}`}
+                                  className="p-1 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-100"
+                                  title="Telepon PIC"
+                                >
+                                  <Phone size={10} />
+                                </a>
+                              </div>
                             )}
                           </div>
                           <div className="mt-1.5">
@@ -2173,7 +2301,16 @@ function ItOslTicketsContent() {
                             {detail.asset ? (
                               <div className="flex items-center justify-between text-xs bg-white p-1.5 rounded-lg border border-slate-200">
                                 <span className="font-bold text-slate-800 truncate text-[11px]">{detail.asset.name} <span className="font-mono text-[10px] text-slate-400 font-normal">({detail.asset.assetCode})</span></span>
-                                <button onClick={()=>connectAsset(detail.id,"")} className="text-[9px] px-1.5 py-0.5 rounded border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold shrink-0 ml-1">Lepas</button>
+                                <div className="flex items-center gap-1 shrink-0 ml-1">
+                                  <Link
+                                    href={`/dashboard/maintenance/it-osl/assets`}
+                                    className="text-[9px] px-1.5 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-bold inline-flex items-center gap-0.5"
+                                    title="Buka Data Aset"
+                                  >
+                                    <ExternalLink size={9} /> Buka
+                                  </Link>
+                                  <button onClick={()=>connectAsset(detail.id,"")} className="text-[9px] px-1.5 py-0.5 rounded border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold">Lepas</button>
+                                </div>
                               </div>
                             ) : (
                               <p className="text-xs text-slate-400">Tanpa aset terhubung</p>
@@ -2222,7 +2359,7 @@ function ItOslTicketsContent() {
                     <h3 className="text-sm font-black text-slate-900">Catatan Pekerjaan</h3>
                     <p className="mt-0.5 text-[11px] text-slate-500">Isi berurutan: Analisa → Pengerjaan → Hasil.</p>
                   </div>
-                  <div className="sticky top-0 z-20 flex gap-1.5 border-b border-slate-200 bg-white/95 p-2.5 shadow-xs backdrop-blur-md">
+                  <div className="sticky top-0 z-20 flex gap-1.5 border-b border-slate-200 bg-white p-2.5 shadow-xs ">
                     {PHASES.map((p, idx) => {
                       const cnt = phaseCounts[p.id]
                       const isActive = activePhase===p.id
