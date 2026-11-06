@@ -18,7 +18,7 @@ import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
 import { ItOslNav } from "@/components/it-osl/ItOslNav"
 import { canItOsl } from "@/lib/itOslPermissions"
 
-const API = process.env.NEXT_PUBLIC_API_URL
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5003"
 
 type CustomerOpt = {
   id: string

@@ -19,7 +19,7 @@ import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
 import { ItOslNav } from "@/components/it-osl/ItOslNav"
 import { canItOsl } from "@/lib/itOslPermissions"
 
-const API = process.env.NEXT_PUBLIC_API_URL
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5003"
 
 // Batas ukuran file harus sama dengan batas di backend (backend/routes/it-osl.js).
 const MAX_UPLOAD_MB = 25

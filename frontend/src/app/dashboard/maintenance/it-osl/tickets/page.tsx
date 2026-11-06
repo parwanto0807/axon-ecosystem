@@ -17,7 +17,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { canItOsl } from "@/lib/itOslPermissions"
 
-const API = process.env.NEXT_PUBLIC_API_URL
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5003"
 
 type CustomerOpt = {
   id: string
@@ -175,6 +175,7 @@ function ItOslTicketsContent() {
   const [pics, setPics] = useState<PicOpt[]>([])
   const [users, setUsers] = useState<UserOpt[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   // Filters
   const [q, setQ] = useState("")
@@ -229,6 +230,7 @@ function ItOslTicketsContent() {
   // Load all initial datasets
   const load = async () => {
     setLoading(true)
+    setFetchError(null)
     try {
       const headers = getAuthHeaders()
       const [tRes, lRes, cRes, aRes, pRes, uRes, custRes] = await Promise.all([
@@ -260,7 +262,8 @@ function ItOslTicketsContent() {
         }
       }
     } catch (e) {
-      console.error("Failed to load tickets data:", e)
+      console.warn("Gagal memuat data tiket dari backend:", e)
+      setFetchError(`Tidak dapat terhubung ke server backend API (${API}). Pastikan service backend aktif di port 5003.`)
     } finally {
       setLoading(false)
     }
@@ -564,6 +567,7 @@ function ItOslTicketsContent() {
     if (!confirm(`Ubah ${selectedIds.size} tiket terpilih menjadi status ${toStatus}?`)) return
     
     setLoading(true)
+    setFetchError(null)
     try {
       for (const id of Array.from(selectedIds)) {
         await fetch(`${API}/api/it-osl/tickets/${id}/status`, {
@@ -780,6 +784,27 @@ function ItOslTicketsContent() {
       
       {/* ── SUB-NAVIGATION TABS ── */}
       <ItOslNav badgeCounts={{ tickets: allTickets.length }} />
+
+      {/* ── ERROR NOTICE BANNER JIKA BACKEND OFFLINE ── */}
+      {fetchError && (
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <AlertTriangle className="text-amber-600 shrink-0 mt-0.5 sm:mt-0" size={18} />
+            <div>
+              <p className="font-bold">{fetchError}</p>
+              <p className="text-[11px] text-amber-700 mt-0.5">
+                Pastikan service backend berjalan di terminal: <code className="font-mono font-bold bg-amber-100 px-1.5 py-0.5 rounded">npm run dev</code> pada folder backend.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={load}
+            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs transition shadow-xs shrink-0 self-end sm:self-auto"
+          >
+            Coba Hubungkan Lagi
+          </button>
+        </div>
+      )}
 
       {/* ── HEADER ──────────────────────────────────────────────────────── */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 w-full">
