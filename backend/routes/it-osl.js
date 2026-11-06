@@ -1688,6 +1688,515 @@ router.get('/dashboard', requirePermission('VIEW'), async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+// ── ANALYTICS / EXECUTIVE DASHBOARD ─────────────────────────────────────────
+// Menampung seluruh data IT Maintenance dalam satu payload siap-analisa:
+// KPI, tren, distribusi kategori/lokasi/customer, beban teknisi, aset
+// bermasalah, sparepart, backlog aging, PM & kesehatan aset, plus
+// perbandingan periode sebelumnya untuk membaca arah performa.
+router.get('/analytics', requirePermission('VIEW'), async (req, res) => {
+  try {
+    const scope = await getCustomerScope(req);
+    const { from, to, customerId } = req.query;
+    const actor = req.itOslActor || {};
+    const fieldScoped = isFieldRole(normalizeRole(actor.role)) && Boolean(actor.id);
+
+    const now = new Date();
+    const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const defaultEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const start = from ? new Date(String(from) + 'T00:00:00') : defaultStart;
+    const endInclusive = to ? new Date(String(to) + 'T00:00:00') : defaultEnd;
+    if (Number.isNaN(start.getTime()) || Number.isNaN(endInclusive.getTime())) {
+      return res.status(400).json({ message: 'Format tanggal tidak valid (gunakan YYYY-MM-DD)' });
+    }
+    const end = new Date(endInclusive);
+    end.setDate(end.getDate() + 1); // eksklusif
+    if (end <= start) return res.status(400).json({ message: 'Rentang tanggal tidak valid' });
+
+    const rangeMs = end.getTime() - start.getTime();
+    const prevStart = new Date(start.getTime() - rangeMs);
+    const prevEnd = new Date(start);
+    // Format tanggal lokal (bukan toISOString) agar tidak bergeser satu hari
+    // akibat offset timezone WIB/UTC.
+    const dateKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const prevEndInclusive = new Date(prevEnd);
+    prevEndInclusive.setDate(prevEndInclusive.getDate() - 1);
+
+    const withFieldScope = (where) => {
+      if (!fieldScoped) return where;
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        { OR: [{ assignedTo: actor.id }, { createdBy: actor.id }, { assignedTo: null }] },
+      ];
+      return where;
+    };
+
+    const buildTicketWhere = (range) => {
+      const where = { createdAt: range };
+      applyCustomerFilter(where, scope, customerId, { includeShared: false });
+      return withFieldScope(where);
+    };
+
+    const currentWhere = buildTicketWhere({ gte: start, lt: end });
+    const previousWhere = buildTicketWhere({ gte: prevStart, lt: prevEnd });
+
+    // Backlog semua tiket yang masih terbuka (bukan hanya periode terpilih)
+    const openWhere = { status: { in: ['NEW', 'IN_PROGRESS', 'PENDING', 'REOPENED'] } };
+    applyCustomerFilter(openWhere, scope, customerId, { includeShared: false });
+    withFieldScope(openWhere);
+
+    // PM & aset mengikuti scope customer
+    const pmScheduleWhere = {};
+    applyCustomerFilter(pmScheduleWhere, scope, customerId, { includeShared: true });
+    const assetWhere = {};
+    applyCustomerFilter(assetWhere, scope, customerId, { includeShared: true });
+
+    const pmExecutionWhere = { executedAt: { gte: start, lt: end } };
+    if (scope.isGlobal) {
+      if (customerId) pmExecutionWhere.schedule = { customerId: String(customerId) };
+    } else {
+      const allowed = Array.isArray(scope.allowedCustomerIds) ? scope.allowedCustomerIds : [];
+      pmExecutionWhere.schedule = customerId
+        ? { customerId: allowed.includes(String(customerId)) ? String(customerId) : '__NO_ACCESS_PERMITTED__' }
+        : { customerId: { in: allowed } };
+    }
+
+    const [
+      tickets,
+      prevTickets,
+      openTickets,
+      resolvedInRange,
+      pmSchedules,
+      pmExecutions,
+      totalAssets,
+      assetsByStatus,
+      warrantyExpiring,
+    ] = await Promise.all([
+      prisma.itOslTicket.findMany({
+        where: currentWhere,
+        include: {
+          location: { select: { id: true, name: true, code: true } },
+          category: { select: { id: true, name: true, groupName: true } },
+          customer: { select: { id: true, name: true, code: true, company: true } },
+          asset: { select: { id: true, name: true, assetCode: true } },
+          assignedUser: { select: { id: true, name: true } },
+          parts: true,
+          pendings: { select: { reason: true, startedAt: true, endedAt: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 5000,
+      }),
+      prisma.itOslTicket.findMany({
+        where: previousWhere,
+        select: {
+          id: true, severity: true, status: true, ticketType: true,
+          createdAt: true, acknowledgedAt: true, resolvedAt: true, totalPendingSec: true,
+        },
+        take: 5000,
+      }),
+      prisma.itOslTicket.findMany({
+        where: openWhere,
+        select: {
+          id: true, ticketNumber: true, summary: true, severity: true, status: true,
+          createdAt: true, location: { select: { name: true } },
+          assignedUser: { select: { name: true } }, customer: { select: { name: true } },
+          pendings: { select: { reason: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 2000,
+      }),
+      prisma.itOslTicket.findMany({
+        where: (() => {
+          const w = { resolvedAt: { gte: start, lt: end } };
+          applyCustomerFilter(w, scope, customerId, { includeShared: false });
+          return withFieldScope(w);
+        })(),
+        select: { resolvedAt: true },
+        take: 5000,
+      }),
+      prisma.itOslPmSchedule.count({ where: { ...pmScheduleWhere, isActive: true } }),
+      prisma.itOslPmExecution.findMany({
+        where: pmExecutionWhere,
+        select: { status: true, executedAt: true },
+        take: 5000,
+      }),
+      prisma.itOslAsset.count({ where: assetWhere }),
+      prisma.itOslAsset.groupBy({ by: ['status'], where: assetWhere, _count: { _all: true } }),
+      prisma.itOslAsset.count({
+        where: {
+          ...assetWhere,
+          warrantyUntil: { gte: now, lte: new Date(now.getTime() + 30 * 86400000) },
+        },
+      }),
+    ]);
+
+    // ── Helper metrik ────────────────────────────────────────────────────
+    const isResolvedStatus = (s) => ['RESOLVED', 'CLOSED'].includes(s);
+    const isOpenStatus = (s) => ['NEW', 'IN_PROGRESS', 'PENDING', 'REOPENED'].includes(s);
+    const isSlaEligible = (t) => !['CANCELLED', 'DUPLICATE'].includes(t.status) && t.ticketType !== 'REQUEST';
+    const frtOf = (t) => (t.acknowledgedAt
+      ? (new Date(t.acknowledgedAt).getTime() - new Date(t.createdAt).getTime()) / 60000
+      : null);
+    const mttrOf = (t) => {
+      if (!t.resolvedAt) return null;
+      const base = t.acknowledgedAt ? new Date(t.acknowledgedAt) : new Date(t.createdAt);
+      const raw = (new Date(t.resolvedAt).getTime() - base.getTime()) / 60000;
+      return raw - (t.totalPendingSec || 0) / 60;
+    };
+    const isBreach = (t) => {
+      if (!isSlaEligible(t)) return false;
+      const threshold = slaThresholdMinutes(t.severity);
+      const frt = frtOf(t);
+      if (frt !== null) return frt > threshold;
+      if (isOpenStatus(t.status)) return (Date.now() - new Date(t.createdAt).getTime()) / 60000 > threshold;
+      return false;
+    };
+    const avg = (arr) => (arr.length ? Math.round(arr.reduce((s, v) => s + v, 0) / arr.length) : 0);
+    const median = (arr) => {
+      if (!arr.length) return 0;
+      const s = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(s.length / 2);
+      return Math.round(s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2);
+    };
+    const countBy = (list, keyFn) => {
+      const map = new Map();
+      list.forEach((item) => {
+        const key = keyFn(item);
+        if (!key) return;
+        map.set(key, (map.get(key) || 0) + 1);
+      });
+      return map;
+    };
+    const toSortedArray = (map, limit = 10) => Array.from(map.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+
+    // ── KPI utama ────────────────────────────────────────────────────────
+    const resolvedTickets = tickets.filter((t) => isResolvedStatus(t.status));
+    const openInRange = tickets.filter((t) => isOpenStatus(t.status));
+    const eligible = tickets.filter(isSlaEligible);
+    const breachTickets = eligible.filter(isBreach);
+    const frtValues = tickets.map(frtOf).filter((v) => v !== null && v >= 0);
+    const mttrValues = resolvedTickets.map(mttrOf).filter((v) => v !== null && v >= 0);
+
+    const byStatus = {};
+    const bySeverity = {};
+    const byTicketType = {};
+    const byChannel = {};
+    tickets.forEach((t) => {
+      byStatus[t.status] = (byStatus[t.status] || 0) + 1;
+      bySeverity[t.severity] = (bySeverity[t.severity] || 0) + 1;
+      byTicketType[t.ticketType] = (byTicketType[t.ticketType] || 0) + 1;
+      if (t.reportChannel) byChannel[t.reportChannel] = (byChannel[t.reportChannel] || 0) + 1;
+    });
+
+    const prevResolved = prevTickets.filter((t) => isResolvedStatus(t.status));
+    const prevEligible = prevTickets.filter(isSlaEligible);
+    const prevBreach = prevEligible.filter(isBreach);
+    const prevFrt = prevTickets.map(frtOf).filter((v) => v !== null && v >= 0);
+    const prevMttr = prevResolved.map(mttrOf).filter((v) => v !== null && v >= 0);
+
+    // ── Distribusi kategori/lokasi/customer + breach per kategori ────────
+    const categoryMap = new Map();
+    tickets.forEach((t) => {
+      const name = t.category?.groupName || t.category?.name || 'Tanpa kategori';
+      const row = categoryMap.get(name) || { name, count: 0, breach: 0, resolved: 0 };
+      row.count += 1;
+      if (isBreach(t)) row.breach += 1;
+      if (isResolvedStatus(t.status)) row.resolved += 1;
+      categoryMap.set(name, row);
+    });
+    const byCategory = Array.from(categoryMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
+
+    const byLocation = toSortedArray(countBy(tickets, (t) => t.location?.name || 'Tanpa lokasi'), 10);
+    const byCustomer = toSortedArray(
+      countBy(tickets, (t) => t.customer?.company || t.customer?.name || 'Internal / Tanpa customer'),
+      10,
+    );
+
+    // ── Beban & kinerja teknisi ──────────────────────────────────────────
+    const techMap = new Map();
+    tickets.forEach((t) => {
+      const key = t.assignedUser?.id || '__unassigned__';
+      const name = t.assignedUser?.name || 'Belum ditugaskan';
+      const row = techMap.get(key) || { id: key, name, total: 0, resolved: 0, open: 0, breach: 0, mttr: [] };
+      row.total += 1;
+      if (isResolvedStatus(t.status)) row.resolved += 1;
+      if (isOpenStatus(t.status)) row.open += 1;
+      if (isBreach(t)) row.breach += 1;
+      const m = mttrOf(t);
+      if (m !== null && m >= 0) row.mttr.push(m);
+      techMap.set(key, row);
+    });
+    const technicians = Array.from(techMap.values())
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        total: r.total,
+        resolved: r.resolved,
+        open: r.open,
+        breach: r.breach,
+        avgMttrMin: avg(r.mttr),
+        completionRate: r.total ? Math.round((r.resolved / r.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+
+    // ── Aset paling sering bermasalah & sparepart ────────────────────────
+    const assetMap = new Map();
+    tickets.forEach((t) => {
+      if (!t.asset) return;
+      const row = assetMap.get(t.asset.id) || {
+        id: t.asset.id, name: t.asset.name, assetCode: t.asset.assetCode,
+        count: 0, breach: 0, location: t.location?.name || null,
+      };
+      row.count += 1;
+      if (isBreach(t)) row.breach += 1;
+      assetMap.set(t.asset.id, row);
+    });
+    const topAssets = Array.from(assetMap.values()).sort((a, b) => b.count - a.count).slice(0, 8);
+
+    const partsMap = new Map();
+    tickets.forEach((t) => {
+      (t.parts || []).forEach((p) => {
+        const key = `${p.partName}__${p.unit || 'pcs'}`;
+        const row = partsMap.get(key) || { partName: p.partName, unit: p.unit || 'pcs', quantity: 0, tickets: 0 };
+        row.quantity += Number(p.quantity) || 0;
+        row.tickets += 1;
+        partsMap.set(key, row);
+      });
+    });
+    const partsUsed = Array.from(partsMap.values()).sort((a, b) => b.quantity - a.quantity).slice(0, 10);
+
+    // ── Kategori penyelesaian & alasan tertahan (analisa akar masalah) ───
+    const solutionMap = new Map();
+    tickets.forEach((t) => {
+      if (!t.solutionCategory) return;
+      solutionMap.set(t.solutionCategory, (solutionMap.get(t.solutionCategory) || 0) + 1);
+    });
+    const bySolutionCategory = Array.from(solutionMap.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const pendingReasonMap = new Map();
+    openTickets.forEach((t) => {
+      (t.pendings || []).forEach((p) => {
+        if (!p.reason) return;
+        pendingReasonMap.set(p.reason, (pendingReasonMap.get(p.reason) || 0) + 1);
+      });
+    });
+    const pendingReasons = Array.from(pendingReasonMap.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // ── Backlog aging (tiket terbuka, seluruh waktu) ─────────────────────
+    const aging = { d0_1: 0, d1_3: 0, d3_7: 0, gt7: 0 };
+    openTickets.forEach((t) => {
+      const ageDays = (Date.now() - new Date(t.createdAt).getTime()) / 86400000;
+      if (ageDays < 1) aging.d0_1 += 1;
+      else if (ageDays < 3) aging.d1_3 += 1;
+      else if (ageDays < 7) aging.d3_7 += 1;
+      else aging.gt7 += 1;
+    });
+
+    // ── Tren tiket (created vs resolved) ─────────────────────────────────
+    const days = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000));
+    const trendMode = days <= 45 ? 'day' : days <= 180 ? 'week' : 'month';
+    const buckets = [];
+    if (trendMode === 'day') {
+      for (let d = new Date(start); d < end; d = new Date(d.getTime() + 86400000)) {
+        buckets.push({
+          key: `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
+          label: d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+        });
+      }
+    } else if (trendMode === 'week') {
+      for (let i = 0; i < days; i += 7) {
+        const d = new Date(start.getTime() + i * 86400000);
+        buckets.push({
+          key: `w${i}`,
+          label: `${d.getDate()}/${d.getMonth() + 1}`,
+        });
+      }
+    } else {
+      const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+      while (cursor < end) {
+        buckets.push({
+          key: `${cursor.getFullYear()}-${cursor.getMonth() + 1}`,
+          label: cursor.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }),
+        });
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+    }
+    const bucketIndex = (date) => {
+      const d = new Date(date);
+      if (trendMode === 'day') {
+        return Math.floor((d.getTime() - start.getTime()) / 86400000);
+      }
+      if (trendMode === 'week') return Math.floor((d.getTime() - start.getTime()) / (7 * 86400000));
+      return buckets.findIndex((b) => b.key === `${d.getFullYear()}-${d.getMonth() + 1}`);
+    };
+    const createdSeries = buckets.map(() => 0);
+    const resolvedSeries = buckets.map(() => 0);
+    tickets.forEach((t) => {
+      const idx = bucketIndex(t.createdAt);
+      if (idx >= 0 && idx < createdSeries.length) createdSeries[idx] += 1;
+    });
+    resolvedInRange.forEach((t) => {
+      if (!t.resolvedAt) return;
+      const idx = bucketIndex(t.resolvedAt);
+      if (idx >= 0 && idx < resolvedSeries.length) resolvedSeries[idx] += 1;
+    });
+
+    // ── Tiket kritis / melewati SLA untuk papan perhatian ────────────────
+    const breachList = eligible
+      .filter(isBreach)
+      .map((t) => {
+        const frt = frtOf(t);
+        const ageMinutes = Math.round(frt !== null ? frt : (Date.now() - new Date(t.createdAt).getTime()) / 60000);
+        return {
+          id: t.id,
+          ticketNumber: t.ticketNumber,
+          summary: t.summary,
+          severity: t.severity,
+          status: t.status,
+          location: t.location?.name || null,
+          assignedTo: t.assignedUser?.name || null,
+          ageMinutes,
+          thresholdMinutes: slaThresholdMinutes(t.severity),
+          createdAt: t.createdAt,
+        };
+      })
+      .sort((a, b) => b.ageMinutes - a.ageMinutes)
+      .slice(0, 10);
+
+    // ── Tiket terbaru ────────────────────────────────────────────────────
+    const recent = [...tickets]
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 8)
+      .map((t) => ({
+        id: t.id,
+        ticketNumber: t.ticketNumber,
+        summary: t.summary,
+        severity: t.severity,
+        status: t.status,
+        ticketType: t.ticketType,
+        createdAt: t.createdAt,
+        location: t.location ? { name: t.location.name } : null,
+        category: t.category ? { name: t.category.groupName || t.category.name } : null,
+        customer: t.customer ? { name: t.customer.company || t.customer.name } : null,
+        assignedTo: t.assignedUser?.name || null,
+        slaBreach: isBreach(t),
+      }));
+
+    const total = tickets.length;
+    const slaCompliance = eligible.length
+      ? Math.round(((eligible.length - breachTickets.length) / eligible.length) * 100)
+      : 100;
+    const prevSlaCompliance = prevEligible.length
+      ? Math.round(((prevEligible.length - prevBreach.length) / prevEligible.length) * 100)
+      : 100;
+    const completionRate = total ? Math.round((resolvedTickets.length / total) * 100) : 0;
+    const prevCompletionRate = prevTickets.length
+      ? Math.round((prevResolved.length / prevTickets.length) * 100)
+      : 0;
+
+    const pmIssue = pmExecutions.filter((e) => e.status === 'ISSUE_FOUND').length;
+
+    res.json({
+      range: {
+        from: dateKey(start),
+        to: dateKey(endInclusive),
+        days,
+      },
+      previousRange: {
+        from: dateKey(prevStart),
+        to: dateKey(prevEndInclusive),
+      },
+      total,
+      active: openTickets.length,
+      openInRange: openInRange.length,
+      pending: byStatus.PENDING || 0,
+      resolved: resolvedTickets.length,
+      closed: byStatus.CLOSED || 0,
+      cancelled: (byStatus.CANCELLED || 0) + (byStatus.DUPLICATE || 0),
+      newTickets: byStatus.NEW || 0,
+      inProgress: byStatus.IN_PROGRESS || 0,
+      reopened: tickets.reduce((s, t) => s + (t.reopenedCount || 0), 0),
+      preventable: tickets.filter((t) => t.isPreventable === true).length,
+      avgFrtMin: avg(frtValues),
+      avgMttrMin: avg(mttrValues),
+      medianMttrMin: median(mttrValues),
+      avgBacklogAgeDays: openTickets.length
+        ? Math.round(openTickets.reduce((s, t) => s + (Date.now() - new Date(t.createdAt).getTime()) / 86400000, 0) / openTickets.length * 10) / 10
+        : 0,
+      slaCompliance,
+      slaEligible: eligible.length,
+      breachCount: breachTickets.length,
+      completionRate,
+      byStatus,
+      bySeverity,
+      byTicketType,
+      byChannel,
+      byCategory,
+      byLocation,
+      byCustomer,
+      technicians,
+      topAssets,
+      partsUsed,
+      bySolutionCategory,
+      pendingReasons,
+      backlogAging: aging,
+      breachList,
+      recent,
+      trend: {
+        mode: trendMode,
+        labels: buckets.map((b) => b.label),
+        created: createdSeries,
+        resolved: resolvedSeries,
+      },
+      pm: {
+        activeSchedules: pmSchedules,
+        executions: pmExecutions.length,
+        issueFound: pmIssue,
+        completionRate: pmExecutions.length
+          ? Math.round(((pmExecutions.length - pmIssue) / pmExecutions.length) * 100)
+          : 100,
+      },
+      assets: {
+        total: totalAssets,
+        byStatus: Object.fromEntries(assetsByStatus.map((a) => [a.status, a._count._all])),
+        warrantyExpiring30d: warrantyExpiring,
+      },
+      comparison: {
+        total,
+        prevTotal: prevTickets.length,
+        totalDelta: prevTickets.length
+          ? Math.round(((total - prevTickets.length) / prevTickets.length) * 100)
+          : null,
+        resolved: resolvedTickets.length,
+        prevResolved: prevResolved.length,
+        resolvedDelta: prevResolved.length
+          ? Math.round(((resolvedTickets.length - prevResolved.length) / prevResolved.length) * 100)
+          : null,
+        slaCompliance,
+        prevSlaCompliance,
+        completionRate,
+        prevCompletionRate,
+        avgFrtMin: avg(frtValues),
+        prevAvgFrtMin: avg(prevFrt),
+        avgMttrMin: avg(mttrValues),
+        prevAvgMttrMin: avg(prevMttr),
+      },
+    });
+  } catch (e) {
+    console.error('[IT-OSL analytics]', e);
+    res.status(500).json({ message: e.message });
+  }
+});
+
 // ── REPORTS ──────────────────────────────────────────────────────────────────
 router.get('/reports/daily', requirePermission('VIEW'), async (req, res) => {
   try {

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { 
-  Layers, Package, Users, Building2, Wrench, FileSpreadsheet, 
+  LayoutDashboard, Layers, Package, Users, Building2, Wrench, FileSpreadsheet, 
   ArrowLeftRight, Settings
 } from "lucide-react"
 
@@ -19,6 +19,11 @@ export function ItOslNav({ badgeCounts }: ItOslNavProps) {
   const pathname = usePathname()
 
   const navItems = [
+    {
+      href: "/dashboard/maintenance/it-osl",
+      label: "Ringkasan",
+      icon: LayoutDashboard,
+    },
     {
       href: "/dashboard/maintenance/it-osl/tickets",
       label: "Tiket Insiden",

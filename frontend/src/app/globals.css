@@ -203,14 +203,16 @@ body {
 
 
 /* ==========================================================================
-   PRINT STYLES FOR IT-OSL ASSETS & LABELS
+   PRINT STYLES FOR IT-OSL ASSETS, LABELS, & DOT MATRIX PR RECOMMENDATION
    ========================================================================== */
 @media print {
   body * {
     visibility: hidden !important;
   }
   #printable-labels-area,
-  #printable-labels-area * {
+  #printable-labels-area *,
+  #printable-pr-recommendation,
+  #printable-pr-recommendation * {
     visibility: visible !important;
   }
   #printable-labels-area {
@@ -221,6 +223,19 @@ body {
     margin: 0 !important;
     padding: 10px !important;
     background: white !important;
+  }
+  #printable-pr-recommendation {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    margin: 0 !important;
+    padding: 3mm 6mm !important;
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .no-print {
     display: none !important;

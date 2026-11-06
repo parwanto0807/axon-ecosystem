@@ -8,8 +8,10 @@ import {
   LayoutGrid, LayoutList, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, 
   ArrowUpDown, RotateCcw, Copy, Download, MapPin, CheckSquare, Square, Filter, Tag,
   SlidersHorizontal, ChevronDown, Sparkles, Building2,
-  PlayCircle, PauseCircle, CheckCircle2, Lock, Timer, ShieldCheck, ExternalLink, Phone
+  PlayCircle, PauseCircle, CheckCircle2, Lock, Timer, ShieldCheck, ExternalLink, Phone,
+  Printer, FileText
 } from "lucide-react"
+import { TicketPrRecommendationModal, TicketForPr } from "@/components/it-osl/TicketPrRecommendationModal"
 import { useSession } from "next-auth/react"
 import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
 import { ItOslNav } from "@/components/it-osl/ItOslNav"
@@ -216,6 +218,13 @@ function ItOslTicketsContent() {
 
   // Detail Drawer & Work-Items
   const [detailId, setDetailId] = useState<string | null>(null)
+  const [prTicket, setPrTicket] = useState<TicketForPr | null>(null)
+  const [showPrModal, setShowPrModal] = useState(false)
+
+  const openPrRecommendation = (t: Ticket | TicketDetail) => {
+    setPrTicket(t as TicketForPr)
+    setShowPrModal(true)
+  }
   const [detail, setDetail] = useState<TicketDetail | null>(null)
   const detailStatusMeta = detail ? (STATUS_META[detail.status] || STATUS_META.NEW) : STATUS_META.NEW
   const detailStepIndex = detail ? statusStepIndex(detail.status) : 0
@@ -1359,6 +1368,15 @@ function ItOslTicketsContent() {
 
                     <div className="flex items-center gap-1.5">
                       <button
+                        type="button"
+                        onClick={(e)=> { e.stopPropagation(); openPrRecommendation(t); }}
+                        className="px-2 py-1 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 font-bold text-[10px] active:scale-95 transition flex items-center gap-1"
+                        title="Cetak Surat Rekomendasi Pembelian (PR)"
+                      >
+                        <Printer size={11} />
+                        <span>PR</span>
+                      </button>
+                      <button
                         onClick={()=> { setDetail(null); setDetailId(t.id); }}
                         className="px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 font-bold text-[10px] active:scale-95 transition"
                       >
@@ -1574,6 +1592,15 @@ function ItOslTicketsContent() {
 
                             <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); openPrRecommendation(t); }}
+                                  className="px-2 py-1 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-[10px] shadow-2xs active:scale-95 transition flex items-center gap-1"
+                                  title="Cetak Surat Rekomendasi Pembelian (PR)"
+                                >
+                                  <Printer size={12} />
+                                  <span className="hidden xl:inline">PR</span>
+                                </button>
                                 <button
                                   onClick={() => { setDetail(null); setDetailId(t.id); }}
                                   className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-[10px] shadow-sm active:scale-95 transition"
@@ -2123,6 +2150,16 @@ function ItOslTicketsContent() {
                     )}
                   </div>
 
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openPrRecommendation(detail)}
+                      className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs"
+                      title="Cetak Surat Rekomendasi Pembelian (PR - 1/2 A4 Dot Matrix)"
+                    >
+                      <Printer size={14} />
+                      <span className="hidden sm:inline">Rekomendasi PR</span>
+                    </button>
                   {isAdmin && (
                     <button 
                       onClick={()=>deleteTicket(detail.id)} 
@@ -2132,6 +2169,7 @@ function ItOslTicketsContent() {
                       <Trash2 size={18}/>
                     </button>
                   )}
+                  </div>
 
                   <button 
                     onClick={()=>{setDetailId(null); setDetail(null)}} 
@@ -2536,6 +2574,30 @@ function ItOslTicketsContent() {
                       </p>
                     </div>
 
+                    {/* Rekomendasi Pembelian PR Card */}
+                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-2xl p-4 text-xs text-slate-800 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 font-black text-amber-900 text-xs">
+                          <Printer size={15} className="text-amber-700" />
+                          <span>Surat Rekomendasi Pembelian (PR)</span>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-200/70 text-amber-900">
+                            1/2 A4 Dot Matrix
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                          Butuh pengadaan sparepart/perangkat baru? Buat dan cetak formulir rekomendasi teknis untuk diajukan ke Purchasing.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openPrRecommendation(detail)}
+                        className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-sm shrink-0 self-end sm:self-auto"
+                      >
+                        <Printer size={14} />
+                        <span>Buat / Cetak Rekomendasi</span>
+                      </button>
+                    </div>
+
                     {/* Resolution Summary (If resolved/closed) */}
                     {(detail.rootCause || detail.correctiveAction) && (
                       <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 space-y-2 text-xs text-slate-700 shadow-sm">
@@ -2573,6 +2635,14 @@ function ItOslTicketsContent() {
       <div className="text-[10px] sm:text-[11px] text-slate-400 px-1 text-center sm:text-left">
         Target FRT SLA otomatis dihitung berdasarkan tingkat severity tiket.
       </div>
+
+      {/* ── MODAL REKOMENDASI PEMBELIAN (PR - 1/2 A4 DOT MATRIX) ── */}
+      <TicketPrRecommendationModal
+        isOpen={showPrModal}
+        onClose={() => { setShowPrModal(false); setPrTicket(null); }}
+        ticket={prTicket}
+        currentUserName={currentUserName}
+      />
 
       {/* Mobile Floating Action Button (FAB) */}
       <button 
