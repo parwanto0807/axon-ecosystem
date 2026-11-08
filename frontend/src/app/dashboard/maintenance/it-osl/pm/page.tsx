@@ -821,7 +821,6 @@ function ItOslPmContent() {
               <option value="auto">Otomatis</option>
               <option value="month">Bulanan</option>
               <option value="week">Mingguan</option>
-              <option value="day">Harian</option>
             </select>
             <span className="ml-auto text-[10px] text-slate-400">
               {fmtDate(matrix?.from || range.from)} — {fmtDate(matrix?.to || range.to)}
