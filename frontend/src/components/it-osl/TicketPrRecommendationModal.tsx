@@ -61,7 +61,11 @@ export function TicketPrRecommendationModal({
   // Load master company name if available from API
   useEffect(() => {
     const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5003"
-    fetch(`${API}/api/company`)
+    fetch(`${API}/api/company`, {
+      headers: {
+        "x-user-role": "SUPER_ADMIN",
+      },
+    })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data && (data.legalName || data.name)) {

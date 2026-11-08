@@ -2855,14 +2855,25 @@ router.post('/pm/schedules/:id/execute', requirePermission('PM_EXECUTE'), async 
       return res.status(403).json({ message: 'Anda tidak memiliki akses ke jadwal PM customer ini' });
     }
     const actor = req.itOslActor || {};
-    const { notes, items } = req.body; // items: [{checkItemId,name,result,notes}]
+    const { notes, items, photos } = req.body; // items: [{checkItemId,name,result,notes}]
     const executedAt = new Date();
+    let finalNotes = notes || null;
+    if (Array.isArray(photos) && photos.length > 0) {
+      try {
+        finalNotes = JSON.stringify({
+          text: typeof notes === 'string' ? notes : '',
+          photos: photos,
+        });
+      } catch (_) {
+        finalNotes = String(notes || '');
+      }
+    }
     const exec = await prisma.itOslPmExecution.create({
       data: {
         scheduleId: schedule.id,
         executedBy: actor.id || null,
         executedAt,
-        notes: notes || null,
+        notes: finalNotes,
         status: (items || []).some((item) => item.result === 'ISSUE') ? 'ISSUE_FOUND' : 'COMPLETED',
         items: {
           create: (items || []).map((item) => ({
@@ -2928,6 +2939,9 @@ router.get('/pm/executions', requirePermission('VIEW'), async (req, res) => {
     if (scheduleId) {
       where.scheduleId = String(scheduleId);
     }
+    if (req.query.id) {
+      where.id = String(req.query.id);
+    }
     if (assetId) {
       where.schedule = { ...(where.schedule || {}), assetId: String(assetId) };
     }
@@ -2939,7 +2953,20 @@ router.get('/pm/executions', requirePermission('VIEW'), async (req, res) => {
             id: true,
             title: true,
             assetId: true,
-            asset: { select: { id: true, assetCode: true, name: true } },
+            locationId: true,
+            customerId: true,
+            location: { select: { id: true, name: true } },
+            customer: { select: { id: true, name: true } },
+            asset: {
+              select: {
+                id: true,
+                assetCode: true,
+                name: true,
+                brandModel: true,
+                location: { select: { name: true } },
+                pic: { select: { name: true, phone: true, department: true } },
+              },
+            },
           },
         },
         executor: { select: { id: true, name: true } },
@@ -2948,7 +2975,21 @@ router.get('/pm/executions', requirePermission('VIEW'), async (req, res) => {
       orderBy: { executedAt: 'desc' },
       take: 100,
     });
-    res.json(list);
+    const formatted = list.map((item) => {
+      let textNotes = item.notes || '';
+      let photos = [];
+      if (typeof item.notes === 'string' && item.notes.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(item.notes);
+          if (parsed && typeof parsed === 'object') {
+            textNotes = parsed.text || '';
+            photos = Array.isArray(parsed.photos) ? parsed.photos : [];
+          }
+        } catch (_) {}
+      }
+      return { ...item, notes: textNotes, photos };
+    });
+    res.json(formatted);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 

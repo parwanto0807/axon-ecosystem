@@ -26,7 +26,15 @@ import {
   UserRound,
   Wrench,
   X,
+  Camera,
+  MessageCircle,
+  Copy,
+  Check,
+  FileText,
 } from "lucide-react"
+import { PmReportModal } from "@/components/it-osl/PmReportModal"
+import { PmPlanReportModal } from "@/components/it-osl/PmPlanReportModal"
+import { PmUserScheduleView } from "@/components/it-osl/PmUserScheduleView"
 import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
 import { ItOslNav } from "@/components/it-osl/ItOslNav"
 import { canItOsl } from "@/lib/itOslPermissions"
@@ -70,6 +78,7 @@ type ExecutionRecord = {
   executedAt: string
   status: string
   notes?: string | null
+  photos?: string[]
   executor?: { id: string; name: string } | null
   items: { id: string; name: string; result: string; notes?: string | null }[]
 }
@@ -454,7 +463,12 @@ function ItOslPmContent() {
   const [loadingMatrix, setLoadingMatrix] = useState(true)
   const [error, setError] = useState("")
 
-  const [tab, setTab] = useState<"matrix" | "list">("matrix")
+  const [tab, setTab] = useState<"matrix" | "list" | "user-schedule">("matrix")
+  const [execPhotos, setExecPhotos] = useState<string[]>([])
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
+  const [reportTarget, setReportTarget] = useState<{ schedule: Schedule; record: ExecutionRecord } | null>(null)
+  const [planReportModal, setPlanReportModal] = useState<{ mode: "single" | "master"; schedule?: Schedule } | null>(null)
+  const [selectedLightboxPhoto, setSelectedLightboxPhoto] = useState<string | null>(null)
   const [rangeMonths, setRangeMonths] = useState(12)
   const [granularity, setGranularity] = useState<"auto" | "month" | "week" | "day">("auto")
   const [customerId, setCustomerId] = useState("")
@@ -725,8 +739,12 @@ function ItOslPmContent() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.message || "Gagal menyimpan jadwal")
       notify("success", editor.mode === "edit" ? "Jadwal PM diperbarui." : "Jadwal PM dibuat.")
+      const savedData = data?.id ? data : null
       setEditor(null)
       refreshAll()
+      if (savedData) {
+        setPlanReportModal({ mode: "single", schedule: savedData })
+      }
     } catch (e) {
       setEditorError(e instanceof Error ? e.message : "Gagal menyimpan jadwal")
     } finally {
@@ -785,6 +803,34 @@ function ItOslPmContent() {
     )
   }
 
+  const handleUploadExecPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    setUploadingPhotos(true)
+    try {
+      const formData = new FormData()
+      Array.from(files).forEach((f) => formData.append("files", f))
+      const res = await fetch(`${API}/api/it-osl/upload`, {
+        method: "POST",
+        headers: authHeaders,
+        body: formData,
+      })
+      const data = await res.json()
+      if (res.ok && (data?.urls || data?.url)) {
+        const uploaded = Array.isArray(data.urls) ? data.urls : [data.url]
+        setExecPhotos((prev) => [...prev, ...uploaded])
+        notify("success", `${uploaded.length} foto bukti berhasil diunggah`)
+      } else {
+        throw new Error(data?.message || "Gagal mengunggah foto")
+      }
+    } catch (err) {
+      notify("error", err instanceof Error ? err.message : "Gagal mengunggah foto")
+    } finally {
+      setUploadingPhotos(false)
+      e.target.value = ""
+    }
+  }
+
   const submitExecution = async () => {
     if (!execTarget) return
     setExecSaving(true)
@@ -792,7 +838,7 @@ function ItOslPmContent() {
       const res = await fetch(`${API}/api/it-osl/pm/schedules/${execTarget.id}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({ notes: execNotes, items: execItems }),
+        body: JSON.stringify({ notes: execNotes, items: execItems, photos: execPhotos }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.message || "Gagal menyimpan eksekusi")
@@ -924,6 +970,14 @@ function ItOslPmContent() {
             <RefreshCw size={14} className={loadingMatrix || loadingSchedules ? "animate-spin" : ""} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
+          <button
+            onClick={() => setPlanReportModal({ mode: "master" })}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold shadow-xs active:scale-95 transition"
+            title="Cetak Laporan Rekapitulasi Rencana PM untuk Atasan (PDF A4)"
+          >
+            <Printer size={14} />
+            <span className="hidden sm:inline">Cetak Rekap PM (Atasan)</span>
+          </button>
           {canPlan && (
             <button
               onClick={openCreate}
@@ -994,6 +1048,14 @@ function ItOslPmContent() {
               }`}
             >
               <List size={14} /> Daftar Jadwal
+            </button>
+            <button
+              onClick={() => setTab("user-schedule")}
+              className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                tab === "user-schedule" ? "bg-white text-indigo-700 shadow-xs dark:bg-slate-700 dark:text-white" : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <CalendarDays size={14} /> Jadwal ke User
             </button>
           </div>
 
@@ -1072,7 +1134,7 @@ function ItOslPmContent() {
           onOpenCell={(row, cell) => setCellDetail({ row, cell })}
           onOpenCreate={canPlan ? openCreate : undefined}
         />
-      ) : (
+      ) : tab === "list" ? (
         <ListView
           schedules={filteredSchedules}
           loading={loadingSchedules}
@@ -1080,10 +1142,21 @@ function ItOslPmContent() {
           canExecute={canExecute}
           onExecute={startExecution}
           onHistory={openHistory}
+          onPrintPlan={(s) => setPlanReportModal({ mode: "single", schedule: s })}
           onEdit={openEdit}
           onToggle={toggleSchedule}
           onDelete={(schedule) => setConfirmDelete(schedule)}
           onOpenCreate={canPlan ? openCreate : undefined}
+        />
+      ) : (
+        <PmUserScheduleView
+          schedules={filteredSchedules}
+          loading={loadingSchedules}
+          canExecute={canExecute}
+          onExecute={startExecution}
+          onHistory={openHistory}
+          onPrintPlan={(s) => setPlanReportModal({ mode: "single", schedule: s })}
+          onToast={notify}
         />
       )}
 
@@ -1430,6 +1503,48 @@ function ItOslPmContent() {
               />
             </div>
 
+            {/* Foto Bukti Hasil Pemeriksaan */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <Label>Foto Bukti Hasil Pemeriksaan (Kamera / File)</Label>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {execPhotos.length} foto terpilih
+                </span>
+              </div>
+
+              {execPhotos.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-2">
+                  {execPhotos.map((url, idx) => (
+                    <div key={idx} className="relative group rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={`Bukti ${idx + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setExecPhotos((prev) => prev.filter((_, i) => i !== idx))}
+                        className="absolute top-1 right-1 p-1 rounded-full bg-rose-600 text-white opacity-0 group-hover:opacity-100 transition shadow-xs"
+                        title="Hapus foto"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <label className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-slate-300 hover:border-indigo-500 hover:bg-indigo-50/50 cursor-pointer transition text-xs text-slate-600 font-bold bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
+                <Camera size={16} className="text-indigo-600" />
+                <span>{uploadingPhotos ? "Sedang Mengunggah Foto…" : "+ Ambil Foto / Unggah Bukti Pemeriksaan"}</span>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  disabled={uploadingPhotos}
+                  onChange={handleUploadExecPhotos}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
             <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
               <button
                 onClick={() => setExecTarget(null)}
@@ -1583,10 +1698,13 @@ function ItOslPmContent() {
                           {record.status === "ISSUE_FOUND" ? "Ada temuan" : "Selesai"}
                         </span>
                         <button
-                          onClick={() => printExecution(record)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                          type="button"
+                          onClick={() => historyTarget && setReportTarget({ schedule: historyTarget, record })}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 transition shadow-2xs"
+                          title="Buka & Cetak Laporan Lengkap untuk Atasan (A4)"
                         >
-                          <Printer size={11} /> Cetak
+                          <FileText size={12} />
+                          <span>Laporan Atasan (A4)</span>
                         </button>
                       </div>
                     </div>
@@ -1595,6 +1713,29 @@ function ItOslPmContent() {
                       <p className="border-b border-slate-100 px-3 py-2 text-[11px] text-slate-600 dark:border-slate-800 dark:text-slate-300">
                         <span className="font-semibold">Catatan:</span> {record.notes}
                       </p>
+                    )}
+
+                    {record.photos && record.photos.length > 0 && (
+                      <div className="border-b border-slate-100 px-3 py-2 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/20">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          Foto Bukti Pemeriksaan ({record.photos.length}):
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {record.photos.map((src, pIdx) => (
+                            <div
+                              key={pIdx}
+                              onClick={() => setSelectedLightboxPhoto(src)}
+                              className="relative group rounded-lg overflow-hidden border border-slate-200 aspect-video w-20 h-14 bg-slate-100 cursor-pointer hover:border-indigo-500 transition shadow-2xs"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={src} alt="Foto Bukti" className="w-full h-full object-cover group-hover:scale-105 transition duration-150" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[9px] font-bold">
+                                Zoom
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
 
                     <div className="overflow-x-auto">
@@ -1680,6 +1821,48 @@ function ItOslPmContent() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* ── MODAL LAPORAN HASIL PM UNTUK ATASAN (A4) ── */}
+      <PmReportModal
+        isOpen={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        schedule={reportTarget?.schedule || null}
+        record={reportTarget?.record || null}
+        currentUserName={session?.user?.name || undefined}
+      />
+
+      {/* ── MODAL LAPORAN RENCANA KERJA & SURAT TUGAS PM UNTUK ATASAN (A4) ── */}
+      <PmPlanReportModal
+        isOpen={!!planReportModal}
+        onClose={() => setPlanReportModal(null)}
+        mode={planReportModal?.mode || "single"}
+        schedule={planReportModal?.schedule || null}
+        schedules={filteredSchedules}
+        currentUserName={session?.user?.name || undefined}
+      />
+
+      {/* ── LIGHTBOX FOTO PEMERIKSAAN PM ── */}
+      {selectedLightboxPhoto && (
+        <div
+          className="fixed inset-0 z-[260] bg-black/90 flex items-center justify-center p-4 cursor-pointer"
+          onClick={() => setSelectedLightboxPhoto(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={selectedLightboxPhoto}
+              alt="Bukti PM"
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
+            />
+            <button
+              onClick={() => setSelectedLightboxPhoto(null)}
+              className="absolute top-3 right-3 p-2 rounded-full bg-black/60 text-white hover:bg-black transition"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
       )}
 
       {/* toast */}
@@ -1902,6 +2085,7 @@ function ListView({
   canExecute,
   onExecute,
   onHistory,
+  onPrintPlan,
   onEdit,
   onToggle,
   onDelete,
@@ -1913,6 +2097,7 @@ function ListView({
   canExecute: boolean
   onExecute: (schedule: Schedule) => void
   onHistory: (schedule: Schedule) => void
+  onPrintPlan?: (schedule: Schedule) => void
   onEdit: (schedule: Schedule) => void
   onToggle: (schedule: Schedule) => void
   onDelete: (schedule: Schedule) => void
@@ -1994,6 +2179,11 @@ function ListView({
                 <td className="px-3 py-2.5 text-[11px] text-slate-500">{schedule._count?.executions ?? 0}x</td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center justify-end gap-1">
+                    {onPrintPlan && (
+                      <IconButton title="Cetak Rencana PM (Atasan)" onClick={() => onPrintPlan(schedule)}>
+                        <Printer size={13} />
+                      </IconButton>
+                    )}
                     <IconButton title="Riwayat hasil" onClick={() => onHistory(schedule)}>
                       <History size={13} />
                     </IconButton>
@@ -2050,6 +2240,15 @@ function ListView({
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
+              {onPrintPlan && (
+                <button
+                  onClick={() => onPrintPlan(schedule)}
+                  className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10.5px] font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                  title="Cetak Rencana PM (Atasan)"
+                >
+                  <Printer size={12} /> Cetak
+                </button>
+              )}
               <button
                 onClick={() => onHistory(schedule)}
                 className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10.5px] font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300"
@@ -2108,7 +2307,7 @@ function Modal({
   onClose: () => void
 }) {
   return (
-    <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/60 p-0 sm:p-4" onClick={onClose}>
       <div
         onClick={(event) => event.stopPropagation()}
         className="w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-white p-4 sm:p-6 shadow-2xl dark:bg-slate-900"

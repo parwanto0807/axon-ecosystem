@@ -203,8 +203,13 @@ body {
 
 
 /* ==========================================================================
-   PRINT STYLES FOR IT-OSL ASSETS, LABELS, & DOT MATRIX PR RECOMMENDATION
+   PRINT STYLES FOR IT-OSL ASSETS, LABELS, DOT MATRIX PR & PM EXECUTIVE REPORT
    ========================================================================== */
+#printable-pm-report,
+#printable-pm-plan-report {
+  display: none;
+}
+
 @media print {
   body * {
     visibility: hidden !important;
@@ -212,7 +217,11 @@ body {
   #printable-labels-area,
   #printable-labels-area *,
   #printable-pr-recommendation,
-  #printable-pr-recommendation * {
+  #printable-pr-recommendation *,
+  #printable-pm-report,
+  #printable-pm-report *,
+  #printable-pm-plan-report,
+  #printable-pm-plan-report * {
     visibility: visible !important;
   }
   #printable-labels-area {
@@ -234,6 +243,21 @@ body {
     padding: 3mm 6mm !important;
     background: white !important;
     color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  #printable-pm-report,
+  #printable-pm-plan-report {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 10mm 12mm !important;
+    background: white !important;
+    color: #0f172a !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
