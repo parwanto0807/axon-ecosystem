@@ -21,6 +21,7 @@ import {
   Search,
   Sparkles,
   Trash2,
+  UserRound,
   Wrench,
   X,
 } from "lucide-react"
@@ -45,6 +46,8 @@ type AssetOpt = {
   locationId?: string | null
   location?: { id: string; name: string } | null
   customer?: { id: string; name: string } | null
+  pic?: { id: string; name: string; phone?: string | null; department?: string | null; position?: string | null } | null
+  picUser?: { id: string; name: string; email?: string | null } | null
   recurring?: boolean
   ticketCount?: number
 }
@@ -310,6 +313,13 @@ const templateFor = (asset?: AssetOpt | null) => {
   return checklistTemplates.find((template) => template.match.some((key) => haystack.includes(key))) || null
 }
 
+const assetPicName = (asset?: AssetOpt | null) => asset?.picUser?.name || asset?.pic?.name || ""
+
+const assetPicDetail = (asset?: AssetOpt | null) => {
+  if (!asset) return ""
+  return [asset.pic?.position, asset.pic?.department].filter(Boolean).join(" · ")
+}
+
 /* ─────────────────────────── page ─────────────────────────── */
 
 export default function ItOslPmPage() {
@@ -534,7 +544,7 @@ function ItOslPmContent() {
     const term = assetSearch.trim().toLowerCase()
     if (!term) return assets
     return assets.filter((asset) =>
-      `${asset.assetCode} ${asset.name} ${asset.assetType || ""} ${asset.customer?.name || ""}`
+      `${asset.assetCode} ${asset.name} ${asset.assetType || ""} ${asset.customer?.name || ""} ${assetPicName(asset)}`
         .toLowerCase()
         .includes(term)
     )
@@ -905,6 +915,7 @@ function ItOslPmContent() {
                     {assetOptions.map((asset) => (
                       <option key={asset.id} value={asset.id}>
                         {asset.assetCode} — {asset.name}
+                        {assetPicName(asset) ? ` · PIC: ${assetPicName(asset)}` : ""}
                         {asset.customer?.name ? ` · ${asset.customer.name}` : ""}
                       </option>
                     ))}
@@ -918,6 +929,14 @@ function ItOslPmContent() {
                         </span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        {assetPicName(selectedAsset) && (
+                          <span className="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-200">
+                            <UserRound size={10} /> {assetPicName(selectedAsset)}
+                            {assetPicDetail(selectedAsset) && (
+                              <span className="font-normal text-slate-400">({assetPicDetail(selectedAsset)})</span>
+                            )}
+                          </span>
+                        )}
                         <span className="inline-flex items-center gap-1">
                           <MapPin size={10} /> {selectedAsset.location?.name || "Tanpa lokasi"}
                         </span>
