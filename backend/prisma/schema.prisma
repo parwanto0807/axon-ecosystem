@@ -1957,7 +1957,13 @@ model ItOslPmSchedule {
   id          String         @id @default(cuid())
   title       String
   description String?        @db.Text
-  frequency   String         @default("WEEKLY") // DAILY WEEKLY MONTHLY
+  frequency   String         @default("WEEKLY") // legacy label: DAILY WEEKLY MONTHLY
+  intervalUnit  String       @default("WEEK")   // DAY WEEK MONTH YEAR
+  intervalValue Int          @default(1)
+  startDate   DateTime       @default(now())
+  nextDueAt   DateTime?
+  lastExecutedAt DateTime?
+  priority    String         @default("MEDIUM") // LOW MEDIUM HIGH
   customerId  String?
   customer    Customer?      @relation(fields: [customerId], references: [id], onDelete: SetNull)
   locationId  String?
@@ -1973,6 +1979,8 @@ model ItOslPmSchedule {
   executions  ItOslPmExecution[]
 
   @@index([customerId])
+  @@index([assetId])
+  @@index([nextDueAt])
 }
 
 model ItOslPmCheckItem {

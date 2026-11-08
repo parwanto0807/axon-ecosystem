@@ -2278,37 +2278,574 @@ router.get('/reports/monthly', requirePermission('REPORT_FULL'), async (req, res
 });
 
 // ── PM SCHEDULES ─────────────────────────────────────────────────────────────
+// ── PREVENTIVE MAINTENANCE (PM) ─────────────────────────────────────────────
+// Jadwal fleksibel: tiap N hari / minggu / bulan / tahun. Occurrence dan
+// matrix dihitung on-the-fly dari startDate + interval, sehingga tidak perlu
+// menyimpan ribuan baris jadwal. Eksekusi tetap tersimpan di ItOslPmExecution.
+const PM_INTERVAL_UNITS = ['DAY', 'WEEK', 'MONTH', 'YEAR'];
+const PM_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'];
+const PM_DAY_MS = 86400000;
+const PM_TZ_OFFSET_MS = 7 * 60 * 60 * 1000; // WIB (UTC+7)
+
+const pmDateOnly = (value) => {
+  const d = value instanceof Date ? new Date(value) : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+};
+
+const pmToday = () => pmDateOnly(new Date(Date.now() + PM_TZ_OFFSET_MS));
+
+const pmAddMonthsClamped = (date, months) => {
+  const d = new Date(date);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, last));
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+};
+
+const pmOccurrenceAt = (start, unit, value, index) => {
+  const base = pmDateOnly(start);
+  if (unit === 'DAY') return new Date(base.getTime() + index * value * PM_DAY_MS);
+  if (unit === 'WEEK') return new Date(base.getTime() + index * value * 7 * PM_DAY_MS);
+  if (unit === 'YEAR') return pmAddMonthsClamped(base, index * value * 12);
+  return pmAddMonthsClamped(base, index * value);
+};
+
+const pmConfigFrom = (schedule) => {
+  const rawUnit = String(schedule.intervalUnit || '').toUpperCase();
+  let unit = PM_INTERVAL_UNITS.includes(rawUnit) ? rawUnit : '';
+  if (!unit) {
+    const legacy = String(schedule.frequency || '').toUpperCase();
+    unit = legacy === 'DAILY' ? 'DAY' : legacy === 'MONTHLY' ? 'MONTH' : 'WEEK';
+  }
+  return { unit, value: Math.max(1, Number(schedule.intervalValue) || 1) };
+};
+
+const pmOccurrenceIndexFrom = (start, unit, value, from) => {
+  const s = pmDateOnly(start);
+  const target = pmDateOnly(from);
+  if (target <= s) return 0;
+  if (unit === 'DAY') return Math.max(0, Math.floor((target - s) / (PM_DAY_MS * value)));
+  if (unit === 'WEEK') return Math.max(0, Math.floor((target - s) / (PM_DAY_MS * 7 * value)));
+  const step = unit === 'YEAR' ? value * 12 : value;
+  const months = (target.getUTCFullYear() - s.getUTCFullYear()) * 12 + (target.getUTCMonth() - s.getUTCMonth());
+  return Math.max(0, Math.floor(months / step));
+};
+
+const pmFirstOnOrAfter = (config, start, from) => {
+  const s = pmDateOnly(start);
+  const target = pmDateOnly(from);
+  let index = pmOccurrenceIndexFrom(s, config.unit, config.value, target);
+  let occ = pmOccurrenceAt(s, config.unit, config.value, index);
+  let guard = 0;
+  while (occ < target && guard < 2000) {
+    index += 1;
+    occ = pmOccurrenceAt(s, config.unit, config.value, index);
+    guard += 1;
+  }
+  return occ;
+};
+
+const pmNextAfter = (config, start, after) => {
+  const s = pmDateOnly(start);
+  const target = pmDateOnly(after);
+  let index = pmOccurrenceIndexFrom(s, config.unit, config.value, target);
+  let occ = pmOccurrenceAt(s, config.unit, config.value, index);
+  let guard = 0;
+  while (occ <= target && guard < 2000) {
+    index += 1;
+    occ = pmOccurrenceAt(s, config.unit, config.value, index);
+    guard += 1;
+  }
+  return occ;
+};
+
+const pmIntervalText = (unit, value) => {
+  const v = Math.max(1, Number(value) || 1);
+  const singular = { DAY: 'Harian', WEEK: 'Mingguan', MONTH: 'Bulanan', YEAR: 'Tahunan' }[unit] || 'Bulanan';
+  if (v === 1) return singular;
+  const unitText = { DAY: 'hari', WEEK: 'minggu', MONTH: 'bulan', YEAR: 'tahun' }[unit] || 'bulan';
+  return `Tiap ${v} ${unitText}`;
+};
+
+const pmFrequencyToken = (unit, value) => {
+  const v = Math.max(1, Number(value) || 1);
+  if (v === 1 && unit === 'DAY') return 'DAILY';
+  if (v === 1 && unit === 'WEEK') return 'WEEKLY';
+  if (v === 1 && unit === 'MONTH') return 'MONTHLY';
+  if (v === 1 && unit === 'YEAR') return 'YEARLY';
+  return `EVERY_${v}_${unit}`;
+};
+
+const pmScheduleStatus = (schedule, now = new Date()) => {
+  if (!schedule.isActive) return 'PAUSED';
+  const config = pmConfigFrom(schedule);
+  const start = schedule.startDate || schedule.createdAt;
+  const due = schedule.nextDueAt ? pmDateOnly(schedule.nextDueAt) : pmFirstOnOrAfter(config, start, now);
+  const today = pmToday();
+  if (due < today) return 'OVERDUE';
+  if (due <= new Date(today.getTime() + 7 * PM_DAY_MS)) return 'DUE_SOON';
+  return 'SCHEDULED';
+};
+
+const pmSerialize = (schedule, now = new Date()) => {
+  const config = pmConfigFrom(schedule);
+  const start = schedule.startDate || schedule.createdAt;
+  const due = schedule.nextDueAt ? pmDateOnly(schedule.nextDueAt) : pmFirstOnOrAfter(config, start, now);
+  return {
+    ...schedule,
+    intervalUnit: config.unit,
+    intervalValue: config.value,
+    intervalLabel: pmIntervalText(config.unit, config.value),
+    nextDueAt: due,
+    status: pmScheduleStatus(schedule, now),
+  };
+};
+
+const PM_SCHEDULE_INCLUDE = {
+  asset: { include: { location: true, customer: true } },
+  location: true,
+  customer: true,
+  checkItems: { orderBy: { order: 'asc' } },
+  executions: {
+    orderBy: { executedAt: 'desc' },
+    take: 3,
+    include: { executor: { select: { id: true, name: true } } },
+  },
+  _count: { select: { executions: true } },
+};
+
+const pmSanitizeCheckItems = (checkItems) => {
+  if (!Array.isArray(checkItems)) return undefined;
+  return checkItems
+    .map((item, index) => ({
+      name: String((item && item.name) || item || '').trim(),
+      order: index,
+    }))
+    .filter((item) => item.name);
+};
+
+const pmBuildPeriods = (from, to, granularity) => {
+  const periods = [];
+  if (granularity === 'month') {
+    let cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1));
+    let guard = 0;
+    while (cursor <= to && guard < 60) {
+      const end = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0));
+      periods.push({
+        key: `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}`,
+        label: cursor.toLocaleDateString('id-ID', { month: 'short', year: '2-digit', timeZone: 'UTC' }),
+        start: cursor,
+        end,
+      });
+      cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+      guard += 1;
+    }
+    return periods;
+  }
+  if (granularity === 'week') {
+    let cursor = new Date(from);
+    let guard = 0;
+    while (cursor <= to && guard < 120) {
+      const end = new Date(Math.min(cursor.getTime() + 6 * PM_DAY_MS, to.getTime()));
+      periods.push({
+        key: `W-${cursor.toISOString().slice(0, 10)}`,
+        label: `${cursor.getUTCDate()} ${cursor.toLocaleDateString('id-ID', { month: 'short', timeZone: 'UTC' })}`,
+        start: cursor,
+        end,
+      });
+      cursor = new Date(cursor.getTime() + 7 * PM_DAY_MS);
+      guard += 1;
+    }
+    return periods;
+  }
+  let cursor = new Date(from);
+  let guard = 0;
+  while (cursor <= to && guard < 120) {
+    periods.push({
+      key: cursor.toISOString().slice(0, 10),
+      label: `${String(cursor.getUTCDate()).padStart(2, '0')} ${cursor.toLocaleDateString('id-ID', { month: 'short', timeZone: 'UTC' })}`,
+      start: new Date(cursor),
+      end: new Date(cursor),
+    });
+    cursor = new Date(cursor.getTime() + PM_DAY_MS);
+    guard += 1;
+  }
+  return periods;
+};
+
 router.get('/pm/schedules', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
-    const { customerId } = req.query;
+    const { customerId, assetId, q, active } = req.query;
     const where = {};
     applyCustomerFilter(where, scope, customerId);
+    if (assetId) where.assetId = String(assetId);
+    if (active === 'true' || active === 'false') where.isActive = active === 'true';
+    if (q) {
+      const term = String(q);
+      where.OR = [
+        { title: { contains: term, mode: 'insensitive' } },
+        { asset: { name: { contains: term, mode: 'insensitive' } } },
+        { asset: { assetCode: { contains: term, mode: 'insensitive' } } },
+        { asset: { brandModel: { contains: term, mode: 'insensitive' } } },
+      ];
+    }
 
     const list = await prisma.itOslPmSchedule.findMany({
       where,
-      include: { location: true, asset: true, customer: true, checkItems: true, _count: { select: { executions: true } } },
-      orderBy: { createdAt: 'desc' }
+      include: PM_SCHEDULE_INCLUDE,
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
     });
-    res.json(list);
+    res.json(list.map((schedule) => pmSerialize(schedule)));
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
+
+router.get('/pm/matrix', requirePermission('VIEW'), async (req, res) => {
+  try {
+    const scope = await getCustomerScope(req);
+    const { customerId, assetId } = req.query;
+    const today = pmToday();
+
+    const defaultFrom = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 2, 1));
+    const defaultTo = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 10, 0));
+    const from = pmDateOnly(req.query.from || defaultFrom);
+    const to = pmDateOnly(req.query.to || defaultTo);
+    if (!from || !to || from > to) return res.status(400).json({ message: 'Rentang tanggal tidak valid' });
+
+    const spanDays = Math.round((to - from) / PM_DAY_MS) + 1;
+    let granularity = String(req.query.granularity || 'auto').toLowerCase();
+    if (!['auto', 'day', 'week', 'month'].includes(granularity)) granularity = 'auto';
+    if (granularity === 'auto') granularity = spanDays <= 45 ? 'day' : spanDays <= 140 ? 'week' : 'month';
+    if (granularity === 'day' && spanDays > 62) {
+      return res.status(400).json({ message: 'Matrix harian maksimal 62 hari. Pilih rentang lebih pendek atau granularitas mingguan.' });
+    }
+
+    const where = {};
+    applyCustomerFilter(where, scope, customerId);
+    if (assetId) where.assetId = String(assetId);
+    if (String(req.query.includePaused || '') !== 'true') where.isActive = true;
+
+    const schedules = await prisma.itOslPmSchedule.findMany({
+      where,
+      include: PM_SCHEDULE_INCLUDE,
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
+    });
+    const scheduleIds = schedules.map((schedule) => schedule.id);
+
+    const executions = scheduleIds.length
+      ? await prisma.itOslPmExecution.findMany({
+          where: {
+            scheduleId: { in: scheduleIds },
+            executedAt: {
+              gte: new Date(from.getTime() - 400 * PM_DAY_MS),
+              lte: new Date(to.getTime() + 400 * PM_DAY_MS),
+            },
+          },
+          select: {
+            id: true,
+            scheduleId: true,
+            executedAt: true,
+            status: true,
+            executor: { select: { name: true } },
+          },
+          orderBy: { executedAt: 'asc' },
+        })
+      : [];
+
+    const execBySchedule = new Map();
+    for (const execution of executions) {
+      const bucket = execBySchedule.get(execution.scheduleId) || [];
+      bucket.push(execution);
+      execBySchedule.set(execution.scheduleId, bucket);
+    }
+
+    const periods = pmBuildPeriods(from, to, granularity);
+    const statusRank = { NONE: 0, DONE: 1, UPCOMING: 2, OVERDUE: 3, MISSED: 4 };
+    let totalDone = 0;
+    let totalMissed = 0;
+    let totalOverdue = 0;
+
+    const rows = schedules.map((schedule) => {
+      const config = pmConfigFrom(schedule);
+      const start = schedule.startDate || schedule.createdAt;
+      const scheduleExecutions = execBySchedule.get(schedule.id) || [];
+
+      // Jangan hitung occurrence sebelum jadwal ini dibuat (menghindari
+      // "missed" palsu saat startDate di-backdate ke awal bulan).
+      const createdAtDate = pmDateOnly(schedule.createdAt);
+      const scanFrom = new Date(Math.max(from.getTime(), createdAtDate.getTime()));
+
+      const occurrences = [];
+      let index = pmOccurrenceIndexFrom(start, config.unit, config.value, scanFrom);
+      let occ = pmOccurrenceAt(start, config.unit, config.value, index);
+      let guard = 0;
+      while (occ < scanFrom && guard < 2000) {
+        index += 1;
+        occ = pmOccurrenceAt(start, config.unit, config.value, index);
+        guard += 1;
+      }
+      while (occ <= to && occurrences.length < 1500 && guard < 4000) {
+        const next = pmOccurrenceAt(start, config.unit, config.value, index + 1);
+        const execution = scheduleExecutions.find((item) => item.executedAt >= occ && item.executedAt < next);
+        let status = 'UPCOMING';
+        if (execution) status = 'DONE';
+        else if (next <= today) status = 'MISSED';
+        else if (occ <= today) status = 'OVERDUE';
+        occurrences.push({
+          date: occ,
+          status,
+          execution: execution
+            ? {
+                id: execution.id,
+                executedAt: execution.executedAt,
+                executor: execution.executor?.name || null,
+                result: execution.status,
+              }
+            : null,
+        });
+        index += 1;
+        occ = next;
+        guard += 1;
+      }
+
+      const cells = periods.map((period) => {
+        const items = occurrences.filter((item) => item.date >= period.start && item.date <= period.end);
+        let status = 'NONE';
+        let done = 0;
+        for (const item of items) {
+          if (item.status === 'DONE') done += 1;
+          if (statusRank[item.status] > statusRank[status]) status = item.status;
+        }
+        totalDone += done;
+        totalMissed += items.filter((item) => item.status === 'MISSED').length;
+        totalOverdue += items.filter((item) => item.status === 'OVERDUE').length;
+        return { periodKey: period.key, due: items.length, done, status, items };
+      });
+
+      const nextDue = schedule.nextDueAt ? pmDateOnly(schedule.nextDueAt) : pmFirstOnOrAfter(config, start, today);
+      return {
+        scheduleId: schedule.id,
+        title: schedule.title,
+        assetId: schedule.assetId,
+        assetCode: schedule.asset?.assetCode || null,
+        assetName: schedule.asset?.name || null,
+        assetType: schedule.asset?.assetType || null,
+        locationName: schedule.asset?.location?.name || schedule.location?.name || null,
+        customerName: schedule.asset?.customer?.name || schedule.customer?.name || null,
+        intervalUnit: config.unit,
+        intervalValue: config.value,
+        intervalLabel: pmIntervalText(config.unit, config.value),
+        isActive: schedule.isActive,
+        priority: schedule.priority || 'MEDIUM',
+        nextDueAt: nextDue,
+        lastExecutedAt: schedule.lastExecutedAt || schedule.executions?.[0]?.executedAt || null,
+        status: pmScheduleStatus(schedule, new Date()),
+        cells,
+      };
+    });
+
+    const denominator = totalDone + totalMissed + totalOverdue;
+    res.json({
+      from,
+      to,
+      granularity,
+      periods,
+      rows,
+      summary: {
+        totalSchedules: rows.length,
+        activeSchedules: rows.filter((row) => row.isActive).length,
+        pausedSchedules: rows.filter((row) => !row.isActive).length,
+        overdue: rows.filter((row) => row.status === 'OVERDUE').length,
+        dueSoon: rows.filter((row) => row.status === 'DUE_SOON').length,
+        scheduled: rows.filter((row) => row.status === 'SCHEDULED').length,
+        done: totalDone,
+        missed: totalMissed,
+        complianceRate: denominator ? Math.round((totalDone / denominator) * 1000) / 10 : 0,
+      },
+    });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 router.post('/pm/schedules', requirePermission('PM_PLAN'), async (req, res) => {
   try {
-    const { title, description, frequency, locationId, assetId, customerId, checkItems } = req.body;
-    if (!title) return res.status(400).json({ message: 'title wajib' });
+    const body = req.body || {};
+    const title = String(body.title || '').trim();
+    if (!title) return res.status(400).json({ message: 'Judul jadwal wajib diisi' });
+
+    let unit = String(body.intervalUnit || '').toUpperCase();
+    if (!PM_INTERVAL_UNITS.includes(unit)) {
+      const legacy = String(body.frequency || 'WEEKLY').toUpperCase();
+      unit = legacy === 'DAILY' ? 'DAY' : legacy === 'MONTHLY' ? 'MONTH' : 'WEEK';
+    }
+    const value = Math.min(365, Math.max(1, Number(body.intervalValue) || 1));
+
+    const scope = await getCustomerScope(req);
+    let asset = null;
+    if (body.assetId) {
+      asset = await prisma.itOslAsset.findUnique({
+        where: { id: String(body.assetId) },
+        select: { id: true, name: true, customerId: true, locationId: true },
+      });
+      if (!asset) return res.status(404).json({ message: 'Aset tidak ditemukan' });
+      if (asset.customerId && !ticketScopeAllowed(scope, { customerId: asset.customerId })) {
+        return res.status(403).json({ message: 'Anda tidak memiliki akses ke aset customer ini' });
+      }
+    }
+
+    const startDate = pmDateOnly(body.startDate || new Date());
+    if (!startDate) return res.status(400).json({ message: 'Tanggal mulai tidak valid' });
+    const nextDueAt = pmFirstOnOrAfter({ unit, value }, startDate, pmToday());
+    const checkItems = pmSanitizeCheckItems(body.checkItems);
     const actor = req.itOslActor || {};
-    const s = await prisma.itOslPmSchedule.create({
+
+    const schedule = await prisma.itOslPmSchedule.create({
       data: {
-        title, description: description || null, frequency: frequency || 'WEEKLY',
-        locationId: locationId || null, assetId: assetId || null, customerId: customerId || null, createdBy: actor.id || null,
-        checkItems: checkItems && Array.isArray(checkItems) ? { create: checkItems.map((n,i)=>({ name: String(n.name||n), order: i })) } : undefined,
+        title,
+        description: body.description ? String(body.description) : null,
+        frequency: pmFrequencyToken(unit, value),
+        intervalUnit: unit,
+        intervalValue: value,
+        startDate,
+        nextDueAt,
+        priority: PM_PRIORITIES.includes(String(body.priority || '').toUpperCase())
+          ? String(body.priority).toUpperCase()
+          : 'MEDIUM',
+        customerId: asset ? asset.customerId : (body.customerId || null),
+        locationId: asset ? asset.locationId : (body.locationId || null),
+        assetId: asset ? asset.id : null,
+        isActive: body.isActive === undefined ? true : Boolean(body.isActive),
+        createdBy: actor.id || null,
+        checkItems: checkItems && checkItems.length ? { create: checkItems } : undefined,
       },
-      include: { checkItems: true, customer: true },
+      include: PM_SCHEDULE_INCLUDE,
     });
-    res.status(201).json(s);
+    await auditLog({ entityType: 'PM_SCHEDULE', entityId: schedule.id, action: 'CREATE', newValue: title, actorUserId: actor.id || null, req });
+    res.status(201).json(pmSerialize(schedule));
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
+
+router.put('/pm/schedules/:id', requirePermission('PM_PLAN'), async (req, res) => {
+  try {
+    const existing = await prisma.itOslPmSchedule.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ message: 'Jadwal PM tidak ditemukan' });
+
+    const scope = await getCustomerScope(req);
+    if (existing.customerId && !ticketScopeAllowed(scope, { customerId: existing.customerId })) {
+      return res.status(403).json({ message: 'Anda tidak memiliki akses ke jadwal PM customer ini' });
+    }
+
+    const body = req.body || {};
+    let asset = null;
+    if (body.assetId) {
+      asset = await prisma.itOslAsset.findUnique({
+        where: { id: String(body.assetId) },
+        select: { id: true, customerId: true, locationId: true },
+      });
+      if (!asset) return res.status(404).json({ message: 'Aset tidak ditemukan' });
+      if (asset.customerId && !ticketScopeAllowed(scope, { customerId: asset.customerId })) {
+        return res.status(403).json({ message: 'Anda tidak memiliki akses ke aset customer ini' });
+      }
+    }
+
+    let unit = String(existing.intervalUnit || 'WEEK').toUpperCase();
+    if (body.intervalUnit !== undefined) {
+      const nextUnit = String(body.intervalUnit).toUpperCase();
+      if (PM_INTERVAL_UNITS.includes(nextUnit)) unit = nextUnit;
+    }
+    let value = Math.max(1, Number(existing.intervalValue) || 1);
+    if (body.intervalValue !== undefined) value = Math.min(365, Math.max(1, Number(body.intervalValue) || 1));
+
+    const startDate = body.startDate !== undefined ? pmDateOnly(body.startDate) : pmDateOnly(existing.startDate);
+    if (!startDate) return res.status(400).json({ message: 'Tanggal mulai tidak valid' });
+    const nextDueAt = existing.lastExecutedAt
+      ? pmNextAfter({ unit, value }, startDate, new Date(existing.lastExecutedAt))
+      : pmFirstOnOrAfter({ unit, value }, startDate, pmToday());
+
+    const title = body.title !== undefined ? String(body.title || '').trim() : existing.title;
+    if (!title) return res.status(400).json({ message: 'Judul jadwal wajib diisi' });
+
+    const data = {
+      title,
+      description: body.description !== undefined
+        ? (body.description ? String(body.description) : null)
+        : existing.description,
+      frequency: pmFrequencyToken(unit, value),
+      intervalUnit: unit,
+      intervalValue: value,
+      startDate,
+      nextDueAt,
+      priority: body.priority !== undefined && PM_PRIORITIES.includes(String(body.priority).toUpperCase())
+        ? String(body.priority).toUpperCase()
+        : existing.priority,
+      customerId: body.assetId !== undefined
+        ? (asset ? asset.customerId : (body.customerId || null))
+        : (body.customerId !== undefined ? (body.customerId || null) : existing.customerId),
+      locationId: body.assetId !== undefined
+        ? (asset ? asset.locationId : (body.locationId || null))
+        : (body.locationId !== undefined ? (body.locationId || null) : existing.locationId),
+      assetId: body.assetId !== undefined ? (asset ? asset.id : null) : existing.assetId,
+      isActive: body.isActive !== undefined ? Boolean(body.isActive) : existing.isActive,
+    };
+
+    const checkItems = pmSanitizeCheckItems(body.checkItems);
+    const actor = req.itOslActor || {};
+    const updated = await prisma.$transaction(async (tx) => {
+      if (checkItems !== undefined) {
+        await tx.itOslPmCheckItem.deleteMany({ where: { scheduleId: existing.id } });
+      }
+      return tx.itOslPmSchedule.update({
+        where: { id: existing.id },
+        data: {
+          ...data,
+          checkItems: checkItems && checkItems.length ? { create: checkItems } : undefined,
+        },
+        include: PM_SCHEDULE_INCLUDE,
+      });
+    }, { timeout: 20000 });
+
+    await auditLog({ entityType: 'PM_SCHEDULE', entityId: updated.id, action: 'UPDATE', newValue: JSON.stringify({ title, unit, value }), actorUserId: actor.id || null, req });
+    res.json(pmSerialize(updated));
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+router.patch('/pm/schedules/:id/toggle', requirePermission('PM_PLAN'), async (req, res) => {
+  try {
+    const existing = await prisma.itOslPmSchedule.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ message: 'Jadwal PM tidak ditemukan' });
+    const scope = await getCustomerScope(req);
+    if (existing.customerId && !ticketScopeAllowed(scope, { customerId: existing.customerId })) {
+      return res.status(403).json({ message: 'Anda tidak memiliki akses ke jadwal PM customer ini' });
+    }
+    const updated = await prisma.itOslPmSchedule.update({
+      where: { id: existing.id },
+      data: { isActive: !existing.isActive },
+      include: PM_SCHEDULE_INCLUDE,
+    });
+    const actor = req.itOslActor || {};
+    await auditLog({ entityType: 'PM_SCHEDULE', entityId: updated.id, action: 'UPDATE', fieldName: 'isActive', newValue: String(updated.isActive), actorUserId: actor.id || null, req });
+    res.json(pmSerialize(updated));
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
+router.delete('/pm/schedules/:id', requirePermission('PM_PLAN'), async (req, res) => {
+  try {
+    const existing = await prisma.itOslPmSchedule.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ message: 'Jadwal PM tidak ditemukan' });
+    const scope = await getCustomerScope(req);
+    if (existing.customerId && !ticketScopeAllowed(scope, { customerId: existing.customerId })) {
+      return res.status(403).json({ message: 'Anda tidak memiliki akses ke jadwal PM customer ini' });
+    }
+    await prisma.itOslPmSchedule.delete({ where: { id: existing.id } });
+    const actor = req.itOslActor || {};
+    await auditLog({ entityType: 'PM_SCHEDULE', entityId: existing.id, action: 'DELETE', oldValue: existing.title, actorUserId: actor.id || null, req });
+    res.json({ ok: true });
+  } catch (e) { res.status(400).json({ message: e.message }); }
+});
+
 router.post('/pm/schedules/:id/execute', requirePermission('PM_EXECUTE'), async (req, res) => {
   try {
     const schedule = await prisma.itOslPmSchedule.findUnique({ where: { id: req.params.id } });
@@ -2319,34 +2856,45 @@ router.post('/pm/schedules/:id/execute', requirePermission('PM_EXECUTE'), async 
     }
     const actor = req.itOslActor || {};
     const { notes, items } = req.body; // items: [{checkItemId,name,result,notes}]
+    const executedAt = new Date();
     const exec = await prisma.itOslPmExecution.create({
       data: {
         scheduleId: schedule.id,
         executedBy: actor.id || null,
+        executedAt,
         notes: notes || null,
-        status: (items||[]).some(i=> i.result==='ISSUE') ? 'ISSUE_FOUND' : 'COMPLETED',
-        items: { create: (items||[]).map(it=> ({ checkItemId: it.checkItemId || null, name: it.name, result: it.result || 'NORMAL', notes: it.notes || null })) },
+        status: (items || []).some((item) => item.result === 'ISSUE') ? 'ISSUE_FOUND' : 'COMPLETED',
+        items: {
+          create: (items || []).map((item) => ({
+            checkItemId: item.checkItemId || null,
+            name: item.name,
+            result: item.result || 'NORMAL',
+            notes: item.notes || null,
+          })),
+        },
       },
       include: { items: true },
     });
+
     // auto-create incident tickets for ISSUE items
-    const issues = (items||[]).filter(i=> i.result==='ISSUE');
-    for (const iss of issues) {
+    const issues = (items || []).filter((item) => item.result === 'ISSUE');
+    for (const issue of issues) {
       const cat = await prisma.itOslCategory.findFirst({ where: { groupName: { contains: 'Infrastruktur', mode: 'insensitive' } } });
       if (!cat) continue;
       const locationId = schedule.locationId || (schedule.customerId
         ? (await prisma.itOslLocation.findFirst({ where: { customerId: schedule.customerId }, select: { id: true } }))?.id
         : null);
       if (!locationId) continue;
-      const ticketNumber = await prisma.$transaction(async (tx)=> generateTicketNumber(tx));
+      const ticketNumber = await prisma.$transaction(async (tx) => generateTicketNumber(tx));
       await prisma.itOslTicket.create({
         data: {
           ticketNumber,
           ticketType: 'PM',
-          summary: `PM Temuan: ${iss.name} — ${schedule.title}`,
+          summary: `PM Temuan: ${issue.name} — ${schedule.title}`,
           locationId,
           categoryId: cat.id,
           customerId: schedule.customerId || null,
+          assetId: schedule.assetId || null,
           severity: 'MEDIUM',
           status: 'NEW',
           createdBy: actor.id || null,
@@ -2354,12 +2902,22 @@ router.post('/pm/schedules/:id/execute', requirePermission('PM_EXECUTE'), async 
         },
       });
     }
-    res.status(201).json(exec);
+
+    const config = pmConfigFrom(schedule);
+    const nextDueAt = pmNextAfter(config, schedule.startDate || schedule.createdAt, pmToday());
+    await prisma.itOslPmSchedule.update({
+      where: { id: schedule.id },
+      data: { lastExecutedAt: executedAt, nextDueAt },
+    });
+
+    res.status(201).json({ ...exec, nextDueAt });
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
+
 router.get('/pm/executions', requirePermission('VIEW'), async (req, res) => {
   try {
     const scope = await getCustomerScope(req);
+    const { scheduleId, assetId } = req.query;
     const where = {};
     if (!scope.isGlobal) {
       const or = [];
@@ -2367,7 +2925,29 @@ router.get('/pm/executions', requirePermission('VIEW'), async (req, res) => {
       or.push({ customerId: null });
       where.schedule = { OR: or };
     }
-    const list = await prisma.itOslPmExecution.findMany({ where, include: { schedule: true, executor: { select: { id:true, name:true } }, items: true }, orderBy: { executedAt: 'desc' }, take: 100 });
+    if (scheduleId) {
+      where.scheduleId = String(scheduleId);
+    }
+    if (assetId) {
+      where.schedule = { ...(where.schedule || {}), assetId: String(assetId) };
+    }
+    const list = await prisma.itOslPmExecution.findMany({
+      where,
+      include: {
+        schedule: {
+          select: {
+            id: true,
+            title: true,
+            assetId: true,
+            asset: { select: { id: true, assetCode: true, name: true } },
+          },
+        },
+        executor: { select: { id: true, name: true } },
+        items: true,
+      },
+      orderBy: { executedAt: 'desc' },
+      take: 100,
+    });
     res.json(list);
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
