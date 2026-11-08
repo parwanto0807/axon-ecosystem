@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  History,
   Info,
   LayoutGrid,
   List,
@@ -17,6 +18,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Printer,
   RefreshCw,
   Search,
   Sparkles,
@@ -61,6 +63,15 @@ type ExecutionLite = {
   executedAt: string
   status: string
   executor?: { id: string; name: string } | null
+}
+
+type ExecutionRecord = {
+  id: string
+  executedAt: string
+  status: string
+  notes?: string | null
+  executor?: { id: string; name: string } | null
+  items: { id: string; name: string; result: string; notes?: string | null }[]
 }
 
 type Schedule = {
@@ -244,65 +255,153 @@ const presetList: { label: string; unit: Schedule["intervalUnit"]; value: number
   { label: "Tahunan", unit: "YEAR", value: 1 },
 ]
 
-const checklistTemplates: { match: string[]; items: string[] }[] = [
+const checklistTemplates: { key: string; label: string; match: string[]; items: string[] }[] = [
   {
+    key: "workstation",
+    label: "Workstation Lengkap (PC + Monitor + Keyboard + Mouse + Kelistrikan)",
+    match: ["workstation", "desktop", "pc", "komputer"],
+    items: [
+      "Buka panel casing; bersihkan debu kipas casing, heatsink CPU, kipas GPU, dan filter debu (air duster/kuas halus, tahan bilah kipas).",
+      "Repaste pasta termal CPU (dan GPU bila usia >2 tahun atau suhu mulai throttling).",
+      "Periksa kabel PSU, SATA/PCIe, dan soket RAM agar tidak kendor.",
+      "Cek kesehatan SSD/HDD via S.M.A.R.T. dan kapasitas penyimpanan.",
+      "Bersihkan file temp/cache dan periksa startup programs di Task Manager.",
+      "Update driver utama (GPU & chipset) serta patch OS.",
+      "Bersihkan layar monitor dengan microfiber + air distilasi/screen cleaner (hindari alkohol, aseton, amonia).",
+      "Bersihkan lubang ventilasi belakang monitor dan periksa kabel HDMI/DisplayPort serta adaptor daya.",
+      "Balik & tepuk keyboard perlahan; sapu sela switch dengan kuas/vacuum mini.",
+      "Deep clean keyboard: lepas keycaps, cuci dengan sabun ringan, keringkan sempurna sebelum dipasang.",
+      "Cek tombol keyboard yang tidak register/chattering; lumasi stabilizer bila rattling.",
+      "Bersihkan sensor optik mouse dengan cotton bud kering.",
+      "Bersihkan mouse skates/feet; ganti bila teflon sudah tipis atau tergores.",
+      "Bersihkan celah klik kiri/kanan dan scroll wheel untuk mencegah double-click/skipping.",
+      "Cuci mousepad kain dengan air hangat + sabun ringan, lalu keringkan.",
+      "Rapikan kabel (cable management) agar tidak ada tarikan berlebih pada port I/O.",
+      "Pastikan stopkontak, kabel ekstensi, dan UPS/stabilizer memiliki grounding baik dan koneksi kencang.",
+    ],
+  },
+  {
+    key: "pc",
+    label: "CPU / PC Tower (Hardware & OS)",
+    match: ["cpu", "pc", "komputer", "desktop", "tower", "workstation"],
+    items: [
+      "Buka panel casing; bersihkan debu kipas casing, heatsink CPU, kipas GPU, dan filter debu (air duster/kuas halus).",
+      "Tahan bilah kipas saat disemprot agar bantalan bearing tidak rusak.",
+      "Repaste pasta termal CPU (dan GPU bila usia >2 tahun atau suhu mulai throttling).",
+      "Periksa kabel daya PSU, SATA/PCIe, dan soket RAM agar tidak kendor.",
+      "Cek kesehatan SSD/HDD via S.M.A.R.T.",
+      "Bersihkan file temp/cache dan periksa startup programs via Task Manager.",
+      "Update driver utama (GPU & chipset) dan patch OS.",
+      "Cek suhu idle/load dan pastikan tidak ada throttling.",
+    ],
+  },
+  {
+    key: "monitor",
+    label: "Monitor",
+    match: ["monitor", "display", "layar"],
+    items: [
+      "Matikan monitor; bersihkan panel dengan microfiber + air distilasi/screen cleaner (hindari alkohol, aseton, amonia).",
+      "Bersihkan lubang ventilasi belakang monitor dari tumpukan debu.",
+      "Periksa kestabilan kabel display (HDMI/DisplayPort) dan colokan adaptor daya.",
+      "Cek tidak ada dead pixel, flicker, atau garis pada layar.",
+    ],
+  },
+  {
+    key: "keyboard",
+    label: "Keyboard",
+    match: ["keyboard", "papan ketik"],
+    items: [
+      "Balik dan tepuk perlahan untuk merontokkan remah; sapu sela switch dengan kuas/vacuum mini.",
+      "Deep clean: lepas keycaps dengan puller, cuci air sabun ringan, keringkan sebelum dipasang kembali.",
+      "Bersihkan plate/board dan pastikan tidak ada cairan atau debu yang tertinggal.",
+      "Cek tombol yang tidak register/chattering; lumasi stabilizer bila mulai rattling.",
+    ],
+  },
+  {
+    key: "mouse",
+    label: "Mouse & Mousepad",
+    match: ["mouse", "mousepad", "trackpad"],
+    items: [
+      "Bersihkan sensor optik di bagian bawah dengan cotton bud kering.",
+      "Bersihkan kotoran di pinggiran mouse skates/feet; ganti bila teflon sudah tipis/tergores.",
+      "Bersihkan celah klik kiri/kanan dan scroll wheel dari debu/minyak tangan.",
+      "Cuci mousepad kain dengan air hangat + sabun, lalu angin-anginkan sampai kering.",
+    ],
+  },
+  {
+    key: "electrical",
+    label: "Kelistrikan & Manajemen Kabel",
+    match: ["listrik", "kelistrikan", "ups", "stabilizer", "kabel", "power"],
+    items: [
+      "Rapikan kabel kusut (cable management) untuk mencegah tarikan fisik pada port I/O.",
+      "Pastikan stopkontak/kabel ekstensi memiliki grounding baik dan koneksi kencang.",
+      "Periksa UPS/stabilizer: indikator, baterai, dan suara mendesis/berdengung.",
+      "Pastikan tidak ada kabel terjepit, tertekuk berat, atau menyentuh area panas.",
+    ],
+  },
+  {
+    key: "printer",
+    label: "Printer (Inkjet / Laser / Multifungsi)",
+    match: ["printer", "scanner", "plotter", "multifungsi"],
+    items: [
+      "Bersihkan debu bagian luar, ventilasi, dan area sekitar printer.",
+      "Bersihkan roller paper feed & separation pad dengan kain lembut sedikit lembap.",
+      "Bersihkan platen glass / scanner glass (printer multifungsi).",
+      "Cek & bersihkan printhead (inkjet) atau fuser/transfer roller (laser).",
+      "Cek level tinta/toner, waste toner, dan masa pakai drum.",
+      "Bersihkan jalur kertas dari serpihan, staples, atau sisa paper jam.",
+      "Test print & periksa kualitas (streak, banding, smudge, warna).",
+      "Cek koneksi USB/LAN/Wi-Fi dan status driver printer.",
+      "Jalankan printhead alignment/calibration dan cek error log.",
+      "Verifikasi hasil scan/fotokopi (multifungsi) dan bersihkan roller ADF.",
+    ],
+  },
+  {
+    key: "cctv",
+    label: "CCTV / NVR",
     match: ["cctv", "kamera", "nvr", "dvr"],
     items: [
-      "Cek rekaman 7 hari terakhir",
-      "Bersihkan lensa & housing kamera",
-      "Cek kesehatan HDD/NVR",
-      "Cek konektivitas & kabel kamera",
-      "Cek adaptor/PoE dan suhu perangkat",
+      "Cek rekaman 7 hari terakhir.",
+      "Bersihkan lensa & housing kamera.",
+      "Cek kesehatan HDD/NVR.",
+      "Cek konektivitas & kabel kamera.",
+      "Cek adaptor/PoE dan suhu perangkat.",
     ],
   },
   {
-    match: ["pc", "komputer", "laptop", "desktop", "workstation"],
-    items: [
-      "Bersihkan debu CPU, kipas & heatsink",
-      "Cek suhu dan performa sistem",
-      "Cek kesehatan disk (SMART)",
-      "Update OS, driver & antivirus",
-      "Verifikasi backup data penting",
-    ],
-  },
-  {
-    match: ["printer", "scanner", "plotter"],
-    items: [
-      "Test print & scan",
-      "Cek level tinta/toner",
-      "Bersihkan roller & jalur kertas",
-      "Cek koneksi jaringan/USB",
-      "Cek kualitas hasil cetak",
-    ],
-  },
-  {
-    match: ["router", "switch", "access point", "ap", "firewall", "jaringan", "network"],
-    items: [
-      "Cek konektivitas & latency",
-      "Cek suhu dan beban perangkat",
-      "Periksa log error / packet loss",
-      "Cek firmware & konfigurasi backup",
-      "Periksa kabel, konektor & grounding",
-    ],
-  },
-  {
+    key: "server",
+    label: "Server / NAS / Storage",
     match: ["server", "nas", "storage"],
     items: [
-      "Cek suhu ruang server & pendingin",
-      "Cek status RAID/disk & kapasitas",
-      "Cek log sistem & service kritis",
-      "Verifikasi backup terjadwal",
-      "Cek UPS, baterai & distribusi daya",
+      "Cek suhu ruang server & pendingin.",
+      "Cek status RAID/disk & kapasitas.",
+      "Cek log sistem & service kritis.",
+      "Verifikasi backup terjadwal.",
+      "Cek UPS, baterai & distribusi daya.",
     ],
   },
   {
+    key: "network",
+    label: "Jaringan (Router / Switch / AP)",
+    match: ["router", "switch", "access point", "ap", "firewall", "jaringan", "network"],
+    items: [
+      "Cek konektivitas & latency.",
+      "Cek suhu dan beban perangkat.",
+      "Periksa log error / packet loss.",
+      "Cek firmware & konfigurasi backup.",
+      "Periksa kabel, konektor & grounding.",
+    ],
+  },
+  {
+    key: "ac",
+    label: "AC / Pendingin Ruangan",
     match: ["ac", "pendingin", "hvac"],
     items: [
-      "Cek suhu & aliran udara",
-      "Bersihkan filter udara",
-      "Cek drainase & kebocoran",
-      "Cek tekanan freon",
-      "Cek suara/vibrasi kompresor",
+      "Cek suhu & aliran udara.",
+      "Bersihkan filter udara.",
+      "Cek drainase & kebocoran.",
+      "Cek tekanan freon.",
+      "Cek suara/vibrasi kompresor.",
     ],
   },
 ]
@@ -366,6 +465,7 @@ function ItOslPmContent() {
   const [editorSaving, setEditorSaving] = useState(false)
   const [editorError, setEditorError] = useState("")
   const [assetSearch, setAssetSearch] = useState("")
+  const [templateKey, setTemplateKey] = useState("")
 
   const [execTarget, setExecTarget] = useState<Schedule | null>(null)
   const [execItems, setExecItems] = useState<{ checkItemId: string | null; name: string; result: "NORMAL" | "ATTENTION" | "ISSUE"; notes?: string }[]>([])
@@ -374,6 +474,9 @@ function ItOslPmContent() {
 
   const [cellDetail, setCellDetail] = useState<{ row: MatrixRow; cell: MatrixCell } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Schedule | null>(null)
+  const [historyTarget, setHistoryTarget] = useState<Schedule | null>(null)
+  const [historyRecords, setHistoryRecords] = useState<ExecutionRecord[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [toast, setToast] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null)
 
   const notify = useCallback((type: "success" | "error" | "info", message: string) => {
@@ -503,6 +606,7 @@ function ItOslPmContent() {
   const openCreate = () => {
     setEditorError("")
     setAssetSearch("")
+    setTemplateKey("")
     setEditor({
       mode: "create",
       title: "",
@@ -520,6 +624,7 @@ function ItOslPmContent() {
   const openEdit = (schedule: Schedule) => {
     setEditorError("")
     setAssetSearch("")
+    setTemplateKey("")
     setEditor({
       mode: "edit",
       id: schedule.id,
@@ -554,7 +659,31 @@ function ItOslPmContent() {
     if (!editor) return
     const asset = assets.find((item) => item.id === assetId)
     const autoTitle = asset && (!editor.title.trim() || editor.title.startsWith("PM Rutin")) ? `PM Rutin — ${asset.name}` : editor.title
+    const suggested = templateFor(asset)
+    if (suggested) setTemplateKey(suggested.key)
     setEditor({ ...editor, assetId, title: autoTitle })
+  }
+
+  const suggestedTemplate = selectedAsset ? templateFor(selectedAsset) : null
+
+  const appendTemplate = (key: string) => {
+    if (!editor || !key) return
+    const template = checklistTemplates.find((item) => item.key === key)
+    if (!template) return
+    const existing = new Set(
+      editor.itemsText
+        .split("\n")
+        .map((line) => line.trim().toLowerCase())
+        .filter(Boolean)
+    )
+    const additions = template.items.filter((item) => !existing.has(item.toLowerCase()))
+    if (additions.length === 0) {
+      notify("info", `Semua item template ${template.label} sudah ada di checklist.`)
+      return
+    }
+    const nextText = [editor.itemsText.trim(), ...additions].filter(Boolean).join("\n")
+    setEditor({ ...editor, itemsText: nextText })
+    notify("success", `${template.label}: ${additions.length} item ditambahkan ke checklist.`)
   }
 
   const saveEditor = async () => {
@@ -676,6 +805,7 @@ function ItOslPmContent() {
       )
       setExecTarget(null)
       refreshAll()
+      if (execTarget) openHistory(execTarget)
     } catch (e) {
       notify("error", e instanceof Error ? e.message : "Gagal menyimpan eksekusi")
     } finally {
@@ -684,6 +814,86 @@ function ItOslPmContent() {
   }
 
   const scheduleById = (id: string) => schedules.find((schedule) => schedule.id === id)
+
+  const openHistory = async (schedule: Schedule) => {
+    setHistoryTarget(schedule)
+    setHistoryLoading(true)
+    setHistoryRecords([])
+    try {
+      const data = await apiGet(`/api/it-osl/pm/executions?scheduleId=${schedule.id}`)
+      setHistoryRecords(Array.isArray(data) ? data : [])
+    } catch (e) {
+      notify("error", e instanceof Error ? e.message : "Gagal memuat riwayat eksekusi")
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const resultLabel = (value: string) =>
+    value === "ISSUE" ? "Bermasalah" : value === "ATTENTION" ? "Perhatian" : "Normal"
+
+  const escapeHtml = (value: unknown) =>
+    String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char] || char))
+
+  const printExecution = (record: ExecutionRecord) => {
+    const schedule = historyTarget
+    if (!schedule) return
+    const popup = window.open("", "_blank", "width=920,height=1000")
+    if (!popup) {
+      notify("error", "Popup diblokir browser. Izinkan popup untuk mencetak laporan.")
+      return
+    }
+    const assetLine = [schedule.asset?.assetCode, schedule.asset?.name].filter(Boolean).join(" — ") || "—"
+    const rows = record.items
+      .map(
+        (item, index) =>
+          `<tr><td class="c">${index + 1}</td><td>${escapeHtml(item.name)}</td><td class="c">${escapeHtml(resultLabel(item.result))}</td><td>${escapeHtml(item.notes || "-")}</td></tr>`
+      )
+      .join("")
+    const html = `<!doctype html>
+<html><head><meta charset="utf-8"><title>Laporan PM ${escapeHtml(schedule.title)}</title>
+<style>
+  *{box-sizing:border-box} body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:32px;font-size:12px}
+  h1{font-size:18px;margin:0 0 2px} .muted{color:#64748b} .head{display:flex;justify-content:space-between;border-bottom:2px solid #0f172a;padding-bottom:10px;margin-bottom:14px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-bottom:14px}
+  .grid div{display:flex;gap:6px} .k{width:110px;color:#64748b} .v{font-weight:600}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{border:1px solid #cbd5e1;padding:6px 7px;vertical-align:top;text-align:left}
+  th{background:#f1f5f9;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#334155}
+  .c{text-align:center;white-space:nowrap} .notes{margin-top:12px} .sign{display:flex;justify-content:space-between;margin-top:48px}
+  .sign div{width:30%;text-align:center} .line{border-top:1px solid #0f172a;margin-top:56px;padding-top:4px}
+</style></head>
+<body>
+  <div class="head">
+    <div><h1>LAPORAN PREVENTIVE MAINTENANCE</h1><div class="muted">Hasil pemeriksaan &amp; uraian perbaikan</div></div>
+    <div class="muted" style="text-align:right">${escapeHtml(record.id)}<br>${escapeHtml(fmtDateTime(record.executedAt))}</div>
+  </div>
+  <div class="grid">
+    <div><span class="k">Aset</span><span class="v">${escapeHtml(assetLine)}</span></div>
+    <div><span class="k">Jadwal</span><span class="v">${escapeHtml(schedule.title)}</span></div>
+    <div><span class="k">Lokasi</span><span class="v">${escapeHtml(schedule.asset?.location?.name || schedule.location?.name || "-")}</span></div>
+    <div><span class="k">Customer</span><span class="v">${escapeHtml(schedule.asset?.customer?.name || schedule.customer?.name || "-")}</span></div>
+    <div><span class="k">Interval</span><span class="v">${escapeHtml(schedule.intervalLabel || fmtInterval(schedule.intervalUnit || "MONTH", schedule.intervalValue || 1))}</span></div>
+    <div><span class="k">Teknisi</span><span class="v">${escapeHtml(record.executor?.name || "-")}</span></div>
+    <div><span class="k">Status</span><span class="v">${record.status === "ISSUE_FOUND" ? "Ada temuan" : "Selesai"}</span></div>
+  </div>
+  <table>
+    <thead><tr><th style="width:34px">No</th><th>Item Pemeriksaan</th><th style="width:96px">Hasil</th><th style="width:32%">Uraian Perbaikan / Temuan</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="4" class="c muted">Tidak ada item checklist</td></tr>'}</tbody>
+  </table>
+  <div class="notes"><strong>Catatan hasil:</strong><br>${escapeHtml(record.notes || "-")}</div>
+  <div class="sign">
+    <div><div>Teknisi</div><div class="line">${escapeHtml(record.executor?.name || "( ____________________ )")}</div></div>
+    <div><div>PIC / Customer</div><div class="line">( ____________________ )</div></div>
+    <div><div>Supervisor</div><div class="line">( ____________________ )</div></div>
+  </div>
+</body></html>`
+    popup.document.open()
+    popup.document.write(html)
+    popup.document.close()
+    popup.focus()
+    setTimeout(() => popup.print(), 350)
+  }
 
   /* ── render ── */
 
@@ -869,6 +1079,7 @@ function ItOslPmContent() {
           canPlan={canPlan}
           canExecute={canExecute}
           onExecute={startExecution}
+          onHistory={openHistory}
           onEdit={openEdit}
           onToggle={toggleSchedule}
           onDelete={(schedule) => setConfirmDelete(schedule)}
@@ -1072,23 +1283,52 @@ function ItOslPmContent() {
             </div>
 
             <div>
-              <div className="flex items-center justify-between gap-2">
-                <Label>Checklist pemeriksaan (1 baris 1 item)</Label>
-                {templateFor(selectedAsset) && (
-                  <button
-                    onClick={() => setEditor({ ...editor, itemsText: templateFor(selectedAsset)!.items.join("\n") })}
-                    className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700"
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0">
+                  <Label>Checklist pemeriksaan (1 baris 1 item)</Label>
+                  {suggestedTemplate && (
+                    <button
+                      onClick={() => {
+                        setTemplateKey(suggestedTemplate.key)
+                        appendTemplate(suggestedTemplate.key)
+                      }}
+                      className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 hover:text-indigo-700"
+                    >
+                      <Sparkles size={11} /> Saran untuk aset ini: {suggestedTemplate.label}
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={templateKey}
+                    onChange={(event) => setTemplateKey(event.target.value)}
+                    className="max-w-[240px] px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                   >
-                    <Sparkles size={12} /> Gunakan template
+                    <option value="">Pilih template…</option>
+                    {checklistTemplates.map((template) => (
+                      <option key={template.key} value={template.key}>
+                        {template.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => appendTemplate(templateKey)}
+                    disabled={!templateKey}
+                    className="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-[10.5px] font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-40"
+                  >
+                    <Plus size={12} /> Tambahkan
                   </button>
-                )}
+                </div>
               </div>
               <textarea
                 value={editor.itemsText}
                 onChange={(event) => setEditor({ ...editor, itemsText: event.target.value })}
                 placeholder={"Cek suhu & kipas\nCek kesehatan disk\nVerifikasi backup"}
-                className={`${inputClass} min-h-[110px] font-mono text-[11px]`}
+                className={`${inputClass} mt-2 min-h-[110px] font-mono text-[11px]`}
               />
+              <p className="mt-1 text-[10px] text-slate-400">
+                Template bisa digabung (mis. Workstation + Printer). Item yang sudah ada tidak diduplikasi.
+              </p>
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
@@ -1163,6 +1403,18 @@ function ItOslPmContent() {
                         </button>
                       ))}
                     </div>
+                    <input
+                      value={item.notes || ""}
+                      onChange={(event) =>
+                        setExecItems((prev) =>
+                          prev.map((entry, idx) =>
+                            idx === index ? { ...entry, notes: event.target.value } : entry
+                          )
+                        )
+                      }
+                      placeholder="Uraian perbaikan / temuan untuk item ini (opsional)…"
+                      className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                    />
                   </div>
                 ))}
               </div>
@@ -1241,6 +1493,17 @@ function ItOslPmContent() {
 
             <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
               <button
+                onClick={() => {
+                  const schedule = scheduleById(cellDetail.row.scheduleId)
+                  setCellDetail(null)
+                  if (schedule) openHistory(schedule)
+                  else notify("info", "Muat ulang daftar jadwal untuk melihat riwayat.")
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+              >
+                <History size={13} /> Riwayat
+              </button>
+              <button
                 onClick={() => setCellDetail(null)}
                 className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
               >
@@ -1257,6 +1520,135 @@ function ItOslPmContent() {
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/25"
                 >
                   <Play size={13} /> Eksekusi
+                </button>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── history / work result modal ── */}
+      {historyTarget && (
+        <Modal
+          onClose={() => setHistoryTarget(null)}
+          title="Hasil Pekerjaan PM"
+          subtitle={`${historyTarget.asset?.assetCode || "Tanpa aset"} · ${historyTarget.title}`}
+        >
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+              <span>{historyTarget.intervalLabel || fmtInterval(historyTarget.intervalUnit || "MONTH", historyTarget.intervalValue || 1)}</span>
+              <span>·</span>
+              <span>Jatuh tempo {fmtDate(historyTarget.nextDueAt)}</span>
+              <span>·</span>
+              <span>{historyRecords.length} riwayat eksekusi</span>
+            </div>
+
+            {historyLoading ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400">
+                <Loader2 size={18} className="animate-spin text-indigo-500" />
+                <span className="text-xs font-semibold">Memuat riwayat…</span>
+              </div>
+            ) : historyRecords.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 px-4 py-10 text-center text-xs text-slate-500 dark:border-slate-700">
+                Belum ada hasil pekerjaan untuk jadwal ini.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {historyRecords.map((record) => (
+                  <div key={record.id} className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-800/40">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${
+                            record.status === "ISSUE_FOUND"
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+                              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+                          }`}
+                        >
+                          {record.status === "ISSUE_FOUND" ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
+                        </span>
+                        <div>
+                          <p className="text-[11.5px] font-bold text-slate-800 dark:text-slate-100">{fmtDateTime(record.executedAt)}</p>
+                          <p className="text-[10px] text-slate-500">oleh {record.executor?.name || "—"}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold ring-1 ring-inset ${
+                            record.status === "ISSUE_FOUND"
+                              ? "bg-amber-50 text-amber-700 ring-amber-200"
+                              : "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                          }`}
+                        >
+                          {record.status === "ISSUE_FOUND" ? "Ada temuan" : "Selesai"}
+                        </span>
+                        <button
+                          onClick={() => printExecution(record)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                        >
+                          <Printer size={11} /> Cetak
+                        </button>
+                      </div>
+                    </div>
+
+                    {record.notes && (
+                      <p className="border-b border-slate-100 px-3 py-2 text-[11px] text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                        <span className="font-semibold">Catatan:</span> {record.notes}
+                      </p>
+                    )}
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[560px] text-left">
+                        <thead>
+                          <tr className="bg-white dark:bg-slate-900">
+                            {["No", "Item Pemeriksaan", "Hasil", "Uraian Perbaikan / Temuan"].map((header) => (
+                              <th key={header} className="px-3 py-2 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                                {header}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {record.items.map((item, index) => (
+                            <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800">
+                              <td className="px-3 py-2 text-[10px] text-slate-400">{index + 1}</td>
+                              <td className="px-3 py-2 text-[11px] text-slate-700 dark:text-slate-200">{item.name}</td>
+                              <td className="px-3 py-2"><ResultBadge result={item.result} /></td>
+                              <td className="px-3 py-2 text-[10.5px] text-slate-500 dark:text-slate-400">{item.notes || "—"}</td>
+                            </tr>
+                          ))}
+                          {record.items.length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="px-3 py-6 text-center text-[11px] text-slate-400">
+                                Tidak ada item checklist pada eksekusi ini.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+              <button
+                onClick={() => setHistoryTarget(null)}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+              >
+                Tutup
+              </button>
+              {canExecute && (
+                <button
+                  onClick={() => {
+                    const schedule = historyTarget
+                    setHistoryTarget(null)
+                    if (schedule) startExecution(schedule)
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/25"
+                >
+                  <Play size={13} /> Eksekusi Lagi
                 </button>
               )}
             </div>
@@ -1509,6 +1901,7 @@ function ListView({
   canPlan,
   canExecute,
   onExecute,
+  onHistory,
   onEdit,
   onToggle,
   onDelete,
@@ -1519,6 +1912,7 @@ function ListView({
   canPlan: boolean
   canExecute: boolean
   onExecute: (schedule: Schedule) => void
+  onHistory: (schedule: Schedule) => void
   onEdit: (schedule: Schedule) => void
   onToggle: (schedule: Schedule) => void
   onDelete: (schedule: Schedule) => void
@@ -1600,6 +1994,9 @@ function ListView({
                 <td className="px-3 py-2.5 text-[11px] text-slate-500">{schedule._count?.executions ?? 0}x</td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center justify-end gap-1">
+                    <IconButton title="Riwayat hasil" onClick={() => onHistory(schedule)}>
+                      <History size={13} />
+                    </IconButton>
                     {canExecute && (
                       <IconButton title="Eksekusi" onClick={() => onExecute(schedule)} disabled={!schedule.isActive}>
                         <Play size={13} />
@@ -1653,6 +2050,12 @@ function ListView({
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
+              <button
+                onClick={() => onHistory(schedule)}
+                className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10.5px] font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300"
+              >
+                <History size={12} /> Riwayat
+              </button>
               {canExecute && (
                 <button
                   onClick={() => onExecute(schedule)}
@@ -1759,6 +2162,20 @@ function Legend({ tone, label }: { tone: string; label: string }) {
     <span className="inline-flex items-center gap-1.5">
       <span className={`h-3 w-3 rounded-sm ring-1 ring-inset ${tone}`} />
       {label}
+    </span>
+  )
+}
+
+function ResultBadge({ result }: { result: string }) {
+  const map = {
+    NORMAL: { label: "Normal", cls: "bg-emerald-50 text-emerald-700 ring-emerald-200" },
+    ATTENTION: { label: "Perhatian", cls: "bg-amber-50 text-amber-700 ring-amber-200" },
+    ISSUE: { label: "Bermasalah", cls: "bg-rose-50 text-rose-700 ring-rose-200" },
+  } as const
+  const meta = (map as Record<string, { label: string; cls: string }>)[result] || map.NORMAL
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold ring-1 ring-inset ${meta.cls}`}>
+      {meta.label}
     </span>
   )
 }
