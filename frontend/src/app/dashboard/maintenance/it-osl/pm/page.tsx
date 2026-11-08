@@ -208,6 +208,21 @@ const statusMeta: Record<PmStatus, { label: string; dot: string; chip: string }>
   PAUSED: { label: "Pause", dot: "bg-slate-400", chip: "bg-slate-100 text-slate-600 ring-slate-200" },
 }
 
+const safeStatus = (value: unknown, isActive?: boolean): PmStatus => {
+  if (value === "OVERDUE" || value === "DUE_SOON" || value === "SCHEDULED" || value === "PAUSED") return value
+  return isActive === false ? "PAUSED" : "SCHEDULED"
+}
+
+const safeCellStatus = (value: unknown): MatrixCell["status"] => {
+  if (value === "DONE" || value === "UPCOMING" || value === "OVERDUE" || value === "MISSED" || value === "NONE") {
+    return value
+  }
+  return "NONE"
+}
+
+const intervalText = (schedule: Schedule) =>
+  schedule.intervalLabel || fmtInterval(schedule.intervalUnit || "MONTH", schedule.intervalValue || 1)
+
 const cellTone: Record<MatrixCell["status"], string> = {
   NONE: "bg-slate-50 text-slate-300 dark:bg-slate-800/40 dark:text-slate-600",
   DONE: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20",
@@ -505,7 +520,7 @@ function ItOslPmContent() {
       startDate: schedule.startDate ? toIsoDate(new Date(schedule.startDate)) : todayInput(),
       priority: schedule.priority || "MEDIUM",
       description: schedule.description || "",
-      itemsText: schedule.checkItems.map((item) => item.name).join("\n"),
+      itemsText: (schedule.checkItems || []).map((item) => item.name).join("\n"),
       isActive: schedule.isActive,
     })
   }
@@ -622,7 +637,7 @@ function ItOslPmContent() {
     setExecTarget(schedule)
     setExecNotes("")
     setExecItems(
-      schedule.checkItems.map((item) => ({
+      (schedule.checkItems || []).map((item) => ({
         checkItemId: item.id,
         name: item.name,
         result: "NORMAL",
@@ -1090,7 +1105,7 @@ function ItOslPmContent() {
                 <CalendarDays size={12} /> Due {fmtDate(execTarget.nextDueAt)}
               </span>
               <span className="inline-flex items-center gap-1">
-                <Wrench size={12} /> {execTarget.intervalLabel}
+                <Wrench size={12} /> {execTarget.intervalLabel || fmtInterval(execTarget.intervalUnit || "MONTH", execTarget.intervalValue || 1)}
               </span>
             </div>
 
@@ -1173,7 +1188,7 @@ function ItOslPmContent() {
         >
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-              <span>{cellDetail.row.intervalLabel}</span>
+              <span>{cellDetail.row.intervalLabel || fmtInterval(cellDetail.row.intervalUnit || "MONTH", cellDetail.row.intervalValue || 1)}</span>
               <span>·</span>
               <span>{cellDetail.cell.due} jadwal pada periode ini</span>
               <span>·</span>
@@ -1402,7 +1417,7 @@ function MatrixView({
               <tr key={row.scheduleId} className={rowIndex % 2 ? "bg-slate-50/40 dark:bg-slate-800/20" : ""}>
                 <td className="sticky left-0 z-10 bg-white px-3 py-2.5 border-b border-slate-100 dark:border-slate-800 dark:bg-slate-900">
                   <div className="flex items-start gap-2">
-                    <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${statusMeta[row.status].dot}`} />
+                    <span className={`mt-1 h-2 w-2 rounded-full shrink-0 ${statusMeta[safeStatus(row.status, row.isActive)].dot}`} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-[10px] text-slate-400 truncate">
@@ -1425,7 +1440,7 @@ function MatrixView({
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[9.5px] text-slate-400">
                         <span>{row.locationName || "Tanpa lokasi"}</span>
                         <span>·</span>
-                        <span className={row.status === "OVERDUE" ? "text-rose-600 font-bold" : ""}>
+                        <span className={safeStatus(row.status, row.isActive) === "OVERDUE" ? "text-rose-600 font-bold" : ""}>
                           Due {fmtDate(row.nextDueAt, false)}
                         </span>
                       </div>
@@ -1437,7 +1452,7 @@ function MatrixView({
                     <button
                       onClick={() => cell.due > 0 && onOpenCell(row, cell)}
                       disabled={cell.due === 0}
-                      className={`w-full min-w-[48px] h-9 rounded-lg text-[10px] font-bold transition ${cellTone[cell.status]} ${
+                      className={`w-full min-w-[48px] h-9 rounded-lg text-[10px] font-bold transition ${cellTone[safeCellStatus(cell.status)]} ${
                         cell.due === 0 ? "cursor-default" : "cursor-pointer"
                       }`}
                       title={
@@ -1538,7 +1553,7 @@ function ListView({
               <tr key={schedule.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 dark:border-slate-800 dark:hover:bg-slate-800/30">
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-2">
-                    <span className={`h-2 w-2 rounded-full shrink-0 ${statusMeta[schedule.status].dot}`} />
+                    <span className={`h-2 w-2 rounded-full shrink-0 ${statusMeta[safeStatus(schedule.status, schedule.isActive)].dot}`} />
                     <div className="min-w-0">
                       <p className="truncate text-xs font-semibold text-slate-900 dark:text-white">{schedule.title}</p>
                       <p className="text-[10px] text-slate-500">
@@ -1549,7 +1564,7 @@ function ListView({
                     </div>
                   </div>
                 </td>
-                <td className="px-3 py-2.5 text-[11px] text-slate-600 dark:text-slate-300">{schedule.intervalLabel}</td>
+                <td className="px-3 py-2.5 text-[11px] text-slate-600 dark:text-slate-300">{intervalText(schedule)}</td>
                 <td className="px-3 py-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
                   {fmtDate(schedule.nextDueAt)}
                 </td>
@@ -1558,9 +1573,9 @@ function ListView({
                 </td>
                 <td className="px-3 py-2.5">
                   <span
-                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9.5px] font-bold ring-1 ring-inset ${statusMeta[schedule.status].chip}`}
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9.5px] font-bold ring-1 ring-inset ${statusMeta[safeStatus(schedule.status, schedule.isActive)].chip}`}
                   >
-                    {statusMeta[schedule.status].label}
+                    {statusMeta[safeStatus(schedule.status, schedule.isActive)].label}
                   </span>
                 </td>
                 <td className="px-3 py-2.5 text-[11px] text-slate-500">{schedule._count?.executions ?? 0}x</td>
@@ -1604,14 +1619,14 @@ function ListView({
                   {schedule.asset?.name ? ` · ${schedule.asset.name}` : ""}
                 </p>
               </div>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ring-1 ring-inset ${statusMeta[schedule.status].chip}`}>
-                {statusMeta[schedule.status].label}
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ring-1 ring-inset ${statusMeta[safeStatus(schedule.status, schedule.isActive)].chip}`}>
+                {statusMeta[safeStatus(schedule.status, schedule.isActive)].label}
               </span>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-[10.5px]">
               <div className="rounded-lg bg-slate-50 px-2 py-1.5 dark:bg-slate-800/50">
                 <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Interval</p>
-                <p className="text-slate-700 dark:text-slate-200">{schedule.intervalLabel}</p>
+                <p className="text-slate-700 dark:text-slate-200">{intervalText(schedule)}</p>
               </div>
               <div className="rounded-lg bg-slate-50 px-2 py-1.5 dark:bg-slate-800/50">
                 <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Jatuh tempo</p>
@@ -1737,8 +1752,8 @@ function OccurrenceBadge({ status }: { status: MatrixItem["status"] }) {
     MISSED: { label: "Terlewat", cls: "bg-rose-50 text-rose-700 ring-rose-200" },
   } as const
   return (
-    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ring-1 ring-inset ${map[status].cls}`}>
-      {map[status].label}
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold ring-1 ring-inset ${(map[status] || map.UPCOMING).cls}`}>
+      {(map[status] || map.UPCOMING).label}
     </span>
   )
 }
