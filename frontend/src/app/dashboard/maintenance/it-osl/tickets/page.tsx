@@ -12,6 +12,7 @@ import {
   Printer, FileText
 } from "lucide-react"
 import { TicketPrRecommendationModal, TicketForPr } from "@/components/it-osl/TicketPrRecommendationModal"
+import { TicketReportModal } from "@/components/it-osl/TicketReportModal"
 import { useSession } from "next-auth/react"
 import { ItOslAccessGuard } from "@/components/it-osl/ItOslAccessGuard"
 import { ItOslNav } from "@/components/it-osl/ItOslNav"
@@ -20,6 +21,13 @@ import { useSearchParams } from "next/navigation"
 import { canItOsl } from "@/lib/itOslPermissions"
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5003"
+
+// Saat dev lokal, file foto tiket lama hanya tersimpan di server production
+// (database remote dipakai bersama). Origin cadangan ini dipakai generator PDF
+// agar lampiran foto tetap bisa dimuat.
+const ASSET_FALLBACK_BASE =
+  process.env.NEXT_PUBLIC_ASSET_FALLBACK_URL ||
+  (/localhost|127\.0\.0\.1/i.test(API) ? "https://axon-ecosystem.id" : "")
 
 type CustomerOpt = {
   id: string
@@ -220,10 +228,17 @@ function ItOslTicketsContent() {
   const [detailId, setDetailId] = useState<string | null>(null)
   const [prTicket, setPrTicket] = useState<TicketForPr | null>(null)
   const [showPrModal, setShowPrModal] = useState(false)
+  const [reportTicket, setReportTicket] = useState<Ticket | null>(null)
+  const [showReportModal, setShowReportModal] = useState(false)
 
   const openPrRecommendation = (t: Ticket | TicketDetail) => {
     setPrTicket(t as TicketForPr)
     setShowPrModal(true)
+  }
+
+  const openTicketReport = (t: Ticket | TicketDetail) => {
+    setReportTicket(t as Ticket)
+    setShowReportModal(true)
   }
   const [detail, setDetail] = useState<TicketDetail | null>(null)
   const detailStatusMeta = detail ? (STATUS_META[detail.status] || STATUS_META.NEW) : STATUS_META.NEW
@@ -1369,6 +1384,15 @@ function ItOslTicketsContent() {
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
+                        onClick={(e)=> { e.stopPropagation(); openTicketReport(t); }}
+                        className="px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 font-bold text-[10px] active:scale-95 transition flex items-center gap-1"
+                        title="Unduh Laporan Ringkasan Tiket (PDF)"
+                      >
+                        <FileText size={11} />
+                        <span>PDF</span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={(e)=> { e.stopPropagation(); openPrRecommendation(t); }}
                         className="px-2 py-1 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 font-bold text-[10px] active:scale-95 transition flex items-center gap-1"
                         title="Cetak Surat Rekomendasi Pembelian (PR)"
@@ -1592,6 +1616,15 @@ function ItOslTicketsContent() {
 
                             <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); openTicketReport(t); }}
+                                  className="px-2 py-1 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] shadow-2xs active:scale-95 transition flex items-center gap-1"
+                                  title="Unduh Laporan Ringkasan Tiket (PDF)"
+                                >
+                                  <FileText size={12} />
+                                  <span className="hidden xl:inline">Laporan</span>
+                                </button>
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); openPrRecommendation(t); }}
@@ -2153,6 +2186,15 @@ function ItOslTicketsContent() {
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
+                      onClick={() => openTicketReport(detail)}
+                      className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs"
+                      title="Unduh Laporan Ringkasan Tiket (PDF A4)"
+                    >
+                      <FileText size={14} />
+                      <span className="hidden sm:inline">Laporan PDF</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => openPrRecommendation(detail)}
                       className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs"
                       title="Cetak Surat Rekomendasi Pembelian (PR - 1/2 A4 Dot Matrix)"
@@ -2642,6 +2684,18 @@ function ItOslTicketsContent() {
         onClose={() => { setShowPrModal(false); setPrTicket(null); }}
         ticket={prTicket}
         currentUserName={currentUserName}
+      />
+
+      {/* ── MODAL LAPORAN RINGKASAN TIKET (PDF A4) ── */}
+      <TicketReportModal
+        isOpen={showReportModal}
+        onClose={() => { setShowReportModal(false); setReportTicket(null); }}
+        ticket={reportTicket}
+        apiBaseUrl={API}
+        fallbackApiBaseUrl={ASSET_FALLBACK_BASE}
+        authHeaders={getAuthHeaders()}
+        currentUserName={currentUserName}
+        initialDetail={detail && reportTicket && detail.id === reportTicket.id ? detail : null}
       />
 
       {/* Mobile Floating Action Button (FAB) */}
