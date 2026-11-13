@@ -1,11 +1,23 @@
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
-  Printer, FileText, CheckCircle2, AlertTriangle, Plus, 
-  Trash2, Copy, Check, X, Building2, User, Wrench, 
-  Sparkles, ShieldCheck, ArrowRight, RefreshCw, Edit3, Eye
+import {
+  Printer,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  Plus,
+  Trash2,
+  Copy,
+  Check,
+  X,
+  Building2,
+  User,
+  Wrench,
+  ShieldCheck,
+  Edit3,
+  Eye,
 } from "lucide-react"
 
 export type PrPartItem = {
@@ -50,15 +62,23 @@ export function TicketPrRecommendationModal({
   isOpen,
   onClose,
   ticket,
-  currentUserName
+  currentUserName,
 }: TicketPrRecommendationModalProps) {
   const [activeTab, setActiveTab] = useState<"preview" | "edit">("preview")
   const [copied, setCopied] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   // Master Company
   const [companyName, setCompanyName] = useState("PT. INTECH MITRA ABADI")
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null)
+  const [companyAddress, setCompanyAddress] = useState<string | null>(null)
+  const [companyContact, setCompanyContact] = useState<string | null>(null)
 
-  // Load master company name if available from API
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Load master company profile & logo
   useEffect(() => {
     const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5003"
     fetch(`${API}/api/company`, {
@@ -66,10 +86,31 @@ export function TicketPrRecommendationModal({
         "x-user-role": "SUPER_ADMIN",
       },
     })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data && (data.legalName || data.name)) {
-          setCompanyName(data.legalName || data.name)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) {
+          if (data.legalName || data.name) {
+            setCompanyName(data.legalName || data.name)
+          }
+          if (data.logo) {
+            const fullLogo =
+              data.logo.startsWith("http") || data.logo.startsWith("data:")
+                ? data.logo
+                : `${API}${data.logo}`
+            setCompanyLogo(fullLogo)
+          }
+          if (data.address) {
+            const city = data.city ? `, ${data.city}` : ""
+            setCompanyAddress(`${data.address}${city}`)
+          }
+          if (data.phone || data.email || data.website) {
+            const parts = [
+              data.phone ? `Telp: ${data.phone}` : null,
+              data.email ? `Email: ${data.email}` : null,
+              data.website ? data.website : null,
+            ].filter(Boolean)
+            setCompanyContact(parts.join(" • "))
+          }
         }
       })
       .catch(() => {})
@@ -79,7 +120,7 @@ export function TicketPrRecommendationModal({
   const [docNumber, setDocNumber] = useState("")
   const [docDate, setDocDate] = useState("")
   const [urgency, setUrgency] = useState<"NORMAL" | "SEGERA (URGENT)" | "KRITIS (CRITICAL)">("SEGERA (URGENT)")
-  
+
   // Entity info
   const [customerName, setCustomerName] = useState("")
   const [locationName, setLocationName] = useState("")
@@ -100,8 +141,12 @@ export function TicketPrRecommendationModal({
   // Recommended Parts
   const [parts, setParts] = useState<PrPartItem[]>([])
 
-  // Initialize or re-populate when ticket changes
-  useEffect(() => {
+  // Draft persistence state
+  const [hasDraft, setHasDraft] = useState(false)
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // Reset to default ticket values
+  const resetToTicketDefaults = () => {
     if (!ticket) return
 
     const now = new Date()
@@ -110,14 +155,12 @@ export function TicketPrRecommendationModal({
     const yyyy = now.getFullYear()
     const todayFormatted = `${dd}/${mm}/${yyyy}`
 
-    // Clean ticket code for doc number: PR-REC/IT/202611/0002
     const cleanNum = ticket.ticketNumber?.replace(/[^0-9]/g, "") || "0001"
     const recNumber = `REC-PR/IT/${yyyy}${mm}/${cleanNum.slice(-4) || "0001"}`
-    
+
     setDocNumber(recNumber)
     setDocDate(todayFormatted)
 
-    // Set Urgency based on ticket severity
     if (ticket.severity === "CRITICAL") {
       setUrgency("KRITIS (CRITICAL)")
     } else if (ticket.severity === "MEDIUM" || ticket.severity === "HIGH") {
@@ -131,16 +174,15 @@ export function TicketPrRecommendationModal({
     setRequesterName(ticket.reporterName || ticket.pic?.name || "User Pemohon")
     setAssetInfo(ticket.asset?.name || "Perangkat IT")
     setAssetCode(ticket.asset?.assetCode || "-")
-    setTechnicianName(ticket.assignedUser?.name || currentUserName || "Teknisi IT")
+    setTechnicianName(ticket.assignedUser?.name || currentUserName || "Administrator IT")
 
     setProblemSummary(ticket.summary || "")
 
-    // Derive Analysis & Root Cause
     let derivedAnalysis = ticket.rootCause || ""
     if (!derivedAnalysis && ticket.workItems) {
-      const analisaItems = ticket.workItems.filter(w => w.phase === "ANALISA")
+      const analisaItems = ticket.workItems.filter((w) => w.phase === "ANALISA")
       if (analisaItems.length > 0) {
-        derivedAnalysis = analisaItems.map(w => w.description).join("; ")
+        derivedAnalysis = analisaItems.map((w) => w.description).join("; ")
       }
     }
     if (!derivedAnalysis) {
@@ -148,38 +190,44 @@ export function TicketPrRecommendationModal({
     }
     setAnalysisText(derivedAnalysis)
 
-    // Derive Work Done
     let derivedWork = ticket.correctiveAction || ""
     if (!derivedWork && ticket.workItems) {
-      const pengerjaanItems = ticket.workItems.filter(w => w.phase === "PENGERJAAN" || w.phase === "HASIL")
+      const pengerjaanItems = ticket.workItems.filter(
+        (w) => w.phase === "PENGERJAAN" || w.phase === "HASIL"
+      )
       if (pengerjaanItems.length > 0) {
-        derivedWork = pengerjaanItems.map(w => w.description).join("; ")
+        derivedWork = pengerjaanItems.map((w) => w.description).join("; ")
       }
     }
     if (!derivedWork) {
-      derivedWork = "Telah dilakukan pemeriksaan menyeluruh, pembersihan konektor, pengetesan voltase/tegangan, serta isolasi kerusakan pada unit."
+      derivedWork =
+        "Telah dilakukan pemeriksaan menyeluruh, pengecekan voltase, dan isolasi kerusakan pada unit."
     }
     setWorkDoneText(derivedWork)
 
-    setJustificationText("Komponen lama mengalami kerusakan permanen / tidak layak pakai dan tidak dapat diservis. Penggantian part baru sangat diperlukan agar perangkat dapat segera beroperasi normal kembali tanpa menghambat alur kerja.")
-    setNotesToPurchasing("Mohon diprioritaskan pengadaannya sesuai spesifikasi teknis terlampir guna meminimalkan downtime operasional.")
+    setJustificationText(
+      "Komponen lama mengalami kerusakan permanen / tidak layak pakai. Penggantian part baru sangat diperlukan agar perangkat segera beroperasi normal tanpa menghambat proses kerja."
+    )
+    setNotesToPurchasing(
+      "Mohon diprioritaskan pengadaannya sesuai spesifikasi teknis terlampir guna meminimalkan downtime operasional."
+    )
 
-    // Initial Parts
     if (ticket.parts && ticket.parts.length > 0) {
-      setParts(ticket.parts.map((p, idx) => ({
-        id: String(idx + 1),
-        name: p.partName,
-        spec: "Sesuai standar pabrikan / kompatibel",
-        qty: p.quantity || 1,
-        unit: p.unit || "Pcs",
-        estPrice: "",
-        urgency: "Segera"
-      })))
+      setParts(
+        ticket.parts.map((p, idx) => ({
+          id: String(idx + 1),
+          name: p.partName,
+          spec: "Sesuai standar pabrikan / kompatibel",
+          qty: p.quantity || 1,
+          unit: p.unit || "Pcs",
+          estPrice: "",
+          urgency: "Segera",
+        }))
+      )
     } else {
-      // Default 1 smart item based on category or summary
       const lowerSum = (ticket.summary || "").toLowerCase()
-      let initialPartName = "Komponen / Sparepart Pengganti"
-      let initialSpec = "Kompatibel dengan unit " + (ticket.asset?.name || "")
+      let initialPartName = "Kabel LAN Cat 6"
+      let initialSpec = "Kabel LAN Belden/Ugreen/AMP High Speed"
 
       if (lowerSum.includes("ssd") || lowerSum.includes("harddisk") || lowerSum.includes("hdd")) {
         initialPartName = "SSD Internal 512GB NVMe / SATA"
@@ -201,17 +249,117 @@ export function TicketPrRecommendationModal({
           name: initialPartName,
           spec: initialSpec,
           qty: 1,
-          unit: "Pcs",
+          unit: "Roll",
           estPrice: "",
-          urgency: "Segera"
-        }
+          urgency: "Segera",
+        },
       ])
     }
+  }
+
+  // Initialize or restore draft when ticket changes
+  useEffect(() => {
+    if (!ticket) return
+
+    const draftKey = `it_osl_pr_draft_${ticket.id}`
+    try {
+      const saved = localStorage.getItem(draftKey)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed && typeof parsed === "object") {
+          if (parsed.docNumber) setDocNumber(parsed.docNumber)
+          if (parsed.docDate) setDocDate(parsed.docDate)
+          if (parsed.urgency) setUrgency(parsed.urgency)
+          if (parsed.customerName) setCustomerName(parsed.customerName)
+          if (parsed.locationName) setLocationName(parsed.locationName)
+          if (parsed.requesterName) setRequesterName(parsed.requesterName)
+          if (parsed.assetInfo) setAssetInfo(parsed.assetInfo)
+          if (parsed.assetCode) setAssetCode(parsed.assetCode)
+          if (parsed.technicianName) setTechnicianName(parsed.technicianName)
+          if (parsed.supervisorName) setSupervisorName(parsed.supervisorName)
+          if (parsed.purchasingName) setPurchasingName(parsed.purchasingName)
+          if (parsed.problemSummary !== undefined) setProblemSummary(parsed.problemSummary)
+          if (parsed.analysisText !== undefined) setAnalysisText(parsed.analysisText)
+          if (parsed.workDoneText !== undefined) setWorkDoneText(parsed.workDoneText)
+          if (parsed.justificationText !== undefined) setJustificationText(parsed.justificationText)
+          if (parsed.notesToPurchasing !== undefined) setNotesToPurchasing(parsed.notesToPurchasing)
+          if (Array.isArray(parsed.parts) && parsed.parts.length > 0) setParts(parsed.parts)
+          setHasDraft(true)
+          setIsInitialized(true)
+          return
+        }
+      }
+    } catch (_) {}
+
+    resetToTicketDefaults()
+    setIsInitialized(true)
   }, [ticket, currentUserName])
 
-  // Add Part Row
+  // Auto-save typed draft to localStorage so user work is NEVER lost
+  useEffect(() => {
+    if (!ticket || !isInitialized) return
+    const draftKey = `it_osl_pr_draft_${ticket.id}`
+    const payload = {
+      docNumber,
+      docDate,
+      urgency,
+      customerName,
+      locationName,
+      requesterName,
+      assetInfo,
+      assetCode,
+      technicianName,
+      supervisorName,
+      purchasingName,
+      problemSummary,
+      analysisText,
+      workDoneText,
+      justificationText,
+      notesToPurchasing,
+      parts,
+      updatedAt: Date.now(),
+    }
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(payload))
+      setHasDraft(true)
+    } catch (_) {}
+  }, [
+    ticket,
+    isInitialized,
+    docNumber,
+    docDate,
+    urgency,
+    customerName,
+    locationName,
+    requesterName,
+    assetInfo,
+    assetCode,
+    technicianName,
+    supervisorName,
+    purchasingName,
+    problemSummary,
+    analysisText,
+    workDoneText,
+    justificationText,
+    notesToPurchasing,
+    parts,
+  ])
+
+  // Reset draft to ticket defaults
+  const handleResetDraft = () => {
+    if (confirm("Reset seluruh data rekomendasi PR ke data awal tiket? Ketikan draft Anda pada tiket ini akan dihapus.")) {
+      if (ticket) {
+        try {
+          localStorage.removeItem(`it_osl_pr_draft_${ticket.id}`)
+        } catch (_) {}
+      }
+      setHasDraft(false)
+      resetToTicketDefaults()
+    }
+  }
+
   const handleAddPart = () => {
-    setParts(prev => [
+    setParts((prev) => [
       ...prev,
       {
         id: String(Date.now()),
@@ -220,52 +368,54 @@ export function TicketPrRecommendationModal({
         qty: 1,
         unit: "Pcs",
         estPrice: "",
-        urgency: "Segera"
-      }
+        urgency: "Segera",
+      },
     ])
   }
 
-  // Update Part Row
   const handleUpdatePart = (id: string, field: keyof PrPartItem, value: any) => {
-    setParts(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p))
+    setParts((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, [field]: value } : p))
+    )
   }
 
-  // Remove Part Row
   const handleRemovePart = (id: string) => {
     if (parts.length <= 1) {
       alert("Minimal 1 part yang direkomendasikan.")
       return
     }
-    setParts(prev => prev.filter(p => p.id !== id))
+    setParts((prev) => prev.filter((p) => p.id !== id))
   }
 
-  // Copy Plaintext for WhatsApp / Telegram Purchasing
   const handleCopyText = () => {
     const lines = [
-      `*SURAT REKOMENDASI PEMBELIAN (PR) - ${companyName}*`,
+      `*SURAT REKOMENDASI PENGADAAN (PR) - ${companyName}*`,
       `No. Dokumen: ${docNumber}`,
       `Ref. Tiket : ${ticket?.ticketNumber || "-"}`,
       `Tanggal    : ${docDate}`,
       `Sifat      : ${urgency}`,
       `---------------------------------------`,
-      `*I. DATA UNIT & PEMOHON*`,
-      `• Unit/Customer: ${customerName}`,
-      `• Lokasi       : ${locationName}`,
-      `• Pemohon/PIC  : ${requesterName}`,
-      `• Perangkat    : ${assetInfo} (${assetCode})`,
-      `• Teknisi IT   : ${technicianName}`,
+      `*I. DATA PERANGKAT & PEMOHON*`,
+      `• Unit/Customer : ${customerName}`,
+      `• Lokasi        : ${locationName}`,
+      `• Pemohon/PIC   : ${requesterName}`,
+      `• Perangkat/Aset: ${assetInfo} (${assetCode})`,
+      `• Teknisi IT    : ${technicianName}`,
       `---------------------------------------`,
       `*II. ANALISA & TINDAKAN*`,
-      `• Uraian/Gejala: ${problemSummary}`,
-      `• Hasil Analisa: ${analysisText}`,
-      `• Tindakan Sdh : ${workDoneText}`,
-      `• Justifikasi  : ${justificationText}`,
+      `• Uraian Masalah: ${problemSummary}`,
+      `• Hasil Analisa : ${analysisText}`,
+      `• Tindakan Sdh  : ${workDoneText}`,
+      `• Justifikasi   : ${justificationText}`,
       `---------------------------------------`,
       `*III. DAFTAR PART DIREKOMENDASIKAN*`,
-      ...parts.map((p, i) => `${i + 1}. ${p.name} [${p.spec || "-"}] - ${p.qty} ${p.unit} ${p.estPrice ? `(Est: ${p.estPrice})` : ""}`),
+      ...parts.map(
+        (p, i) =>
+          `${i + 1}. ${p.name} [${p.spec || "-"}] - ${p.qty} ${p.unit} ${p.estPrice ? `(Est: ${p.estPrice})` : ""}`
+      ),
       `---------------------------------------`,
       `Catatan: ${notesToPurchasing || "-"}`,
-      `Dibuat: ${technicianName} | Menyetujui: ${supervisorName}`
+      `Dibuat: ${technicianName} | Menyetujui: ${supervisorName}`,
     ]
 
     navigator.clipboard.writeText(lines.join("\n"))
@@ -273,54 +423,413 @@ export function TicketPrRecommendationModal({
     setTimeout(() => setCopied(false), 2500)
   }
 
-  // Print function
   const handlePrint = () => {
-    window.print()
+    const printArea = document.getElementById("printable-pr-recommendation")
+    if (!printArea) {
+      window.print()
+      return
+    }
+
+    // Collect all stylesheets and style tags to preserve identical styles
+    const styles = Array.from(document.querySelectorAll("link[rel='stylesheet'], style"))
+      .map((node) => node.outerHTML)
+      .join("\n")
+
+    const existingIframe = document.getElementById("pr-print-iframe")
+    if (existingIframe) {
+      existingIframe.remove()
+    }
+
+    const iframe = document.createElement("iframe")
+    iframe.id = "pr-print-iframe"
+    iframe.style.position = "fixed"
+    iframe.style.left = "-9999px"
+    iframe.style.top = "-9999px"
+    iframe.style.width = "210mm"
+    iframe.style.height = "148.5mm"
+    iframe.style.border = "none"
+    document.body.appendChild(iframe)
+
+    const doc = iframe.contentWindow?.document
+    if (!doc) {
+      window.print()
+      return
+    }
+
+    doc.open()
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Surat Rekomendasi PR - ${companyName}</title>
+          ${styles}
+          <style>
+            @page {
+              size: 210mm 148.5mm !important;
+              margin: 3mm 4mm !important;
+            }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+              color: #000000 !important;
+              width: 100% !important;
+              max-width: 210mm !important;
+              box-sizing: border-box !important;
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            }
+            body, body * {
+              visibility: visible !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          </style>
+        </head>
+        <body class="bg-white text-slate-950 p-1">
+          ${printArea.innerHTML}
+        </body>
+      </html>
+    `)
+    doc.close()
+
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus()
+        iframe.contentWindow?.print()
+      } catch (e) {
+        console.error("Print iframe fallback:", e)
+        window.print()
+      } finally {
+        setTimeout(() => {
+          iframe.remove()
+        }, 120000)
+      }
+    }, 350)
   }
 
   if (!isOpen || !ticket) return null
 
+  // Reusable Modern 1/2 A4 Document Content
+  const renderDocumentContent = (isPrintVersion: boolean = false) => {
+    return (
+      <div className="w-full text-slate-950 font-sans text-[9px] leading-tight select-text">
+        {/* Kop Dokumen Resmi PT. INTECH MITRA ABADI */}
+        <div className="pb-1.5 mb-1.5 border-b-2 border-slate-900">
+          <div className="flex items-center justify-between gap-3">
+            {/* Logo + Identity */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              {companyLogo ? (
+                <div className="h-11 w-11 shrink-0 flex items-center justify-center p-0.5 border border-slate-300 rounded-lg bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={companyLogo}
+                    alt={companyName}
+                    className="h-full w-full object-contain"
+                    onError={() => setCompanyLogo(null)}
+                  />
+                </div>
+              ) : (
+                <div className="h-11 w-11 rounded-lg bg-slate-900 text-white flex flex-col items-center justify-center shrink-0 border border-slate-800">
+                  <Building2 size={16} className="text-indigo-400" />
+                  <span className="text-[7.5px] font-black tracking-widest uppercase text-slate-200">
+                    IMA
+                  </span>
+                </div>
+              )}
+
+              <div className="space-y-0.5 min-w-0">
+                <h2
+                  className="font-black text-[13px] sm:text-[14px] uppercase tracking-wider text-slate-950 leading-none"
+                  style={{
+                    fontFamily: "'Montserrat', 'Arial Black', 'Helvetica Neue', Arial, sans-serif",
+                    fontWeight: 900,
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  {companyName}
+                </h2>
+                <div className="flex items-center gap-1.5 text-[8.5px] font-bold text-slate-800 uppercase tracking-tight">
+                  <span>DIVISI IT-OSL & TECHNICAL SUPPORT SERVICES</span>
+                </div>
+                <p className="text-[7.5px] text-slate-500 leading-none truncate">
+                  {companyAddress || "IT Infrastructure, Asset Maintenance & Technical Operations Support"}
+                </p>
+                {companyContact && (
+                  <p className="text-[7.5px] text-slate-500 font-mono leading-none truncate">
+                    {companyContact}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Official Document Control Box */}
+            <div className="border border-slate-900 rounded p-1.5 text-[8px] font-mono leading-tight bg-slate-50 shrink-0 w-72 text-left">
+              <div className="font-bold border-b border-slate-400 pb-0.5 mb-1 text-center bg-slate-900 text-white -mx-1.5 -mt-1.5 p-0.5 text-[8.5px] uppercase tracking-wider">
+                SURAT REKOMENDASI PENGADAAN (PR)
+              </div>
+              <div className="grid grid-cols-[85px_1fr] gap-x-2 gap-y-0.5 items-center">
+                <span className="text-slate-500">No. Dokumen:</span>
+                <strong className="text-slate-950 text-right whitespace-nowrap font-bold">{docNumber}</strong>
+                <span className="text-slate-500">Ref. Tiket:</span>
+                <strong className="text-indigo-950 text-right whitespace-nowrap font-bold">{ticket.ticketNumber}</strong>
+                <span className="text-slate-500">Tanggal:</span>
+                <span className="text-slate-900 text-right font-medium whitespace-nowrap">{docDate}</span>
+                <span className="text-slate-500">Sifat Urgensi:</span>
+                <span className="text-right">
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase inline-block border ${
+                      urgency.includes("KRITIS")
+                        ? "bg-rose-50 text-rose-900 border-rose-400"
+                        : urgency.includes("SEGERA")
+                        ? "bg-amber-50 text-amber-900 border-amber-400"
+                        : "bg-slate-50 text-slate-900 border-slate-300"
+                    }`}
+                  >
+                    {urgency.split(" ")[0]}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-1 border-b border-slate-400"></div>
+        </div>
+
+        {/* Kepada & Perihal Strip */}
+        <div className="bg-slate-100 border border-slate-300 rounded px-2 py-1 mb-1.5 flex items-center justify-between font-bold text-[8.5px] uppercase tracking-tight text-slate-800">
+          <div>KEPADA YTH: BAGIAN PURCHASING / PENGADAAN BARANG</div>
+          <div className="text-indigo-950">PERIHAL: PERMOHONAN PENGADAAN PART / UNIT PERANGKAT IT</div>
+        </div>
+
+        {/* Section I: Data Perangkat & Pemohon */}
+        <div className="mb-1.5 border border-slate-300 rounded p-1.5 bg-slate-50/50">
+          <div className="font-bold uppercase tracking-wider text-[8.5px] text-slate-800 border-b border-slate-200 pb-0.5 mb-1">
+            I. DATA PERANGKAT & PEMOHON
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[8.5px]">
+            <div className="flex">
+              <span className="text-slate-500 w-28 shrink-0">• Customer / Divisi</span>
+              <span className="mr-1">:</span>
+              <strong className="text-slate-950 truncate">{customerName}</strong>
+            </div>
+            <div className="flex">
+              <span className="text-slate-500 w-28 shrink-0">• Perangkat / Aset</span>
+              <span className="mr-1">:</span>
+              <strong className="text-slate-950 truncate">{assetInfo}</strong>
+            </div>
+            <div className="flex">
+              <span className="text-slate-500 w-28 shrink-0">• Lokasi / Ruangan</span>
+              <span className="mr-1">:</span>
+              <span className="text-slate-800 truncate">{locationName}</span>
+            </div>
+            <div className="flex">
+              <span className="text-slate-500 w-28 shrink-0">• Kode Aset / SN</span>
+              <span className="mr-1">:</span>
+              <strong className="font-mono text-slate-950">{assetCode}</strong>
+            </div>
+            <div className="flex">
+              <span className="text-slate-500 w-28 shrink-0">• Pemohon / PIC</span>
+              <span className="mr-1">:</span>
+              <strong className="text-slate-950 truncate">{requesterName}</strong>
+            </div>
+            <div className="flex">
+              <span className="text-slate-500 w-28 shrink-0">• Teknisi Pemeriksa</span>
+              <span className="mr-1">:</span>
+              <strong className="text-slate-950 truncate">{technicianName}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Section II: Hasil Analisa & Tindakan */}
+        <div className="mb-1.5 border border-slate-300 rounded p-1.5 bg-slate-50/50">
+          <div className="font-bold uppercase tracking-wider text-[8.5px] text-slate-800 border-b border-slate-200 pb-0.5 mb-1">
+            II. HASIL ANALISA KERUSAKAN & TINDAKAN PEKERJAAN
+          </div>
+          <div className="space-y-0.5 text-[8.5px]">
+            <div className="flex items-start">
+              <span className="text-slate-600 font-bold w-36 shrink-0">• Gejala / Uraian Masalah</span>
+              <span className="mr-1">:</span>
+              <span className="text-slate-900 font-medium leading-tight">{problemSummary || "-"}</span>
+            </div>
+            <div className="flex items-start">
+              <span className="text-slate-600 font-bold w-36 shrink-0">• Hasil Analisa Kerusakan</span>
+              <span className="mr-1">:</span>
+              <span className="text-slate-900 leading-tight">{analysisText || "-"}</span>
+            </div>
+            <div className="flex items-start">
+              <span className="text-slate-600 font-bold w-36 shrink-0">• Tindakan yang Dilakukan</span>
+              <span className="mr-1">:</span>
+              <span className="text-slate-900 leading-tight">{workDoneText || "-"}</span>
+            </div>
+            <div className="flex items-start">
+              <span className="text-slate-600 font-bold w-36 shrink-0">• Justifikasi Pengadaan</span>
+              <span className="mr-1">:</span>
+              <span className="text-slate-900 leading-tight">{justificationText || "-"}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Section III: Daftar Part Direkomendasikan */}
+        <div className="mb-1.5">
+          <div className="font-bold uppercase tracking-wider text-[8.5px] text-slate-800 mb-0.5">
+            III. DAFTAR PART / BARANG YANG DIREKOMENDASIKAN (PR)
+          </div>
+          <div className="border border-slate-400 overflow-hidden rounded-xs">
+            <table className="w-full table-fixed border-collapse text-[8.5px]">
+              <thead>
+                <tr className="bg-slate-100 border-b border-slate-400 font-bold text-slate-800 uppercase text-[8px]">
+                  <th className="border-r border-slate-400 p-1 text-center w-[5%]">NO</th>
+                  <th className="border-r border-slate-400 p-1 text-left w-[44%]">NAMA PART & SPESIFIKASI TEKNIS</th>
+                  <th className="border-r border-slate-400 p-1 text-center w-[8%]">QTY</th>
+                  <th className="border-r border-slate-400 p-1 text-center w-[10%]">SATUAN</th>
+                  <th className="border-r border-slate-400 p-1 text-right w-[18%]">EST. HARGA</th>
+                  <th className="p-1 text-center w-[15%]">URGENSI</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-300">
+                {parts.map((p, idx) => (
+                  <tr key={p.id} className="hover:bg-slate-50/50">
+                    <td className="border-r border-slate-300 p-1 text-center font-bold text-slate-600">{idx + 1}</td>
+                    <td className="border-r border-slate-300 p-1 leading-tight overflow-hidden">
+                      <div className="font-bold text-slate-950 truncate">{p.name || "-"}</div>
+                      {p.spec && <div className="text-[7.5px] text-slate-500 italic truncate">{p.spec}</div>}
+                    </td>
+                    <td className="border-r border-slate-300 p-1 text-center font-bold text-slate-950">{p.qty}</td>
+                    <td className="border-r border-slate-300 p-1 text-center text-slate-700">{p.unit}</td>
+                    <td className="border-r border-slate-300 p-1 text-right font-mono text-slate-900">{p.estPrice || "-"}</td>
+                    <td className="p-1 text-center whitespace-nowrap">
+                      <span className="px-1.5 py-0.2 rounded text-[7.5px] font-bold uppercase inline-block border bg-amber-50 text-amber-900 border-amber-300">
+                        {p.urgency}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {notesToPurchasing && (
+            <div className="text-[7.5px] text-slate-500 italic mt-0.5">
+              * Catatan Purchasing: {notesToPurchasing}
+            </div>
+          )}
+        </div>
+
+        {/* Section IV: Lembar Otorisasi & Tanda Tangan */}
+        <div className="pt-1">
+          <div className="font-bold uppercase tracking-wider text-[8.5px] text-slate-800 mb-1">
+            IV. LEMBAR PERSETUJUAN & OTORISASI DOKUMEN
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-center text-[8.5px]">
+            {/* Kolom 1: IT Support */}
+            <div className="border border-slate-400 rounded p-2 flex flex-col justify-between h-28 bg-white">
+              <span className="font-bold text-slate-800">Dibuat Oleh (IT Support):</span>
+              <div className="flex-1 min-h-[44px] flex items-center justify-center">
+                {/* Ruang tanda tangan / stempel basah */}
+              </div>
+              <div className="space-y-0.5">
+                <div className="w-36 mx-auto border-b border-slate-900 mb-1"></div>
+                <strong className="text-slate-950 block font-bold text-[8.5px] uppercase truncate">
+                  ( {technicianName} )
+                </strong>
+                <span className="text-[7.5px] text-slate-500">Tgl: {docDate}</span>
+              </div>
+            </div>
+
+            {/* Kolom 2: IT Supervisor */}
+            <div className="border border-slate-400 rounded p-2 flex flex-col justify-between h-28 bg-white">
+              <span className="font-bold text-slate-800">Menyetujui (IT Supervisor):</span>
+              <div className="flex-1 min-h-[44px] flex items-center justify-center">
+                {/* Ruang tanda tangan / stempel basah */}
+              </div>
+              <div className="space-y-0.5">
+                <div className="w-36 mx-auto border-b border-slate-900 mb-1"></div>
+                <strong className="text-slate-950 block font-bold text-[8.5px] uppercase">
+                  ( {supervisorName} )
+                </strong>
+                <span className="text-[7.5px] text-slate-500">Tgl: ..... / ..... / 2026</span>
+              </div>
+            </div>
+
+            {/* Kolom 3: Purchasing */}
+            <div className="border border-slate-400 rounded p-2 flex flex-col justify-between h-28 bg-white">
+              <span className="font-bold text-slate-800">Diterima (Purchasing):</span>
+              <div className="flex-1 min-h-[44px] flex items-center justify-center">
+                {/* Ruang tanda tangan / stempel basah */}
+              </div>
+              <div className="space-y-0.5">
+                <div className="w-36 mx-auto border-b border-slate-900 mb-1"></div>
+                <strong className="text-slate-950 block font-bold text-[8.5px] uppercase truncate">
+                  ( {purchasingName} )
+                </strong>
+                <span className="text-[7.5px] text-slate-500">Tgl: ..... / ..... / 2026</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[220] flex items-center justify-center p-2 sm:p-4 bg-black/60 overflow-y-auto" onClick={onClose}>
-        
+      <div
+        key="pr-recommendation-modal-root"
+        className="fixed inset-0 z-[220] flex items-center justify-center p-2 sm:p-4 bg-black/70 overflow-y-auto no-print print:hidden"
+      >
         {/* MODAL WRAPPER (Hidden on print) */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.96, y: 10 }}
+          initial={{ opacity: 0, scale: 0.98, y: 6 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 10 }}
-          transition={{ duration: 0.15, ease: "easeOut" }}
-          onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl flex flex-col max-h-[94vh] overflow-hidden no-print"
+          exit={{ opacity: 0, scale: 0.98, y: 6 }}
+          transition={{ duration: 0.12 }}
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white rounded-2xl shadow-2xl border border-slate-300 w-full max-w-5xl flex flex-col max-h-[95vh] overflow-hidden no-print"
         >
           {/* Top Bar Navigation */}
-          <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+          <div className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shrink-0 shadow-sm">
                 <Printer size={16} />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-black text-sm text-white tracking-tight truncate">Surat Rekomendasi Pembelian (PR)</h3>
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
-                    1/2 A4 Dot Matrix
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-sm text-white tracking-tight">
+                    Surat Rekomendasi Pengadaan Part (PR)
+                  </h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 whitespace-nowrap">
+                    Standar 1/2 A4 (A5 Landscape)
                   </span>
+                  {hasDraft && (
+                    <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-mono">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>Draft Tersimpan</span>
+                      <button
+                        type="button"
+                        onClick={handleResetDraft}
+                        className="ml-1 text-slate-400 hover:text-white underline cursor-pointer"
+                        title="Kembalikan data ke awal tiket"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-400 truncate">
-                  Dokumen rekomendasi teknis & pengadaan part untuk bagian Purchasing
+                  Dokumen rekomendasi teknis & pengajuan Purchase Request untuk tim Purchasing
                 </p>
               </div>
             </div>
 
             {/* Actions */}
             <div className="flex items-center gap-2 shrink-0">
-              {/* Tab Switcher */}
               <div className="flex items-center bg-slate-800 p-0.5 rounded-xl border border-slate-700 text-xs">
                 <button
                   type="button"
                   onClick={() => setActiveTab("preview")}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition ${
-                    activeTab === "preview" 
-                      ? "bg-indigo-600 text-white shadow-xs" 
+                    activeTab === "preview"
+                      ? "bg-indigo-600 text-white shadow-xs"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -331,8 +840,8 @@ export function TicketPrRecommendationModal({
                   type="button"
                   onClick={() => setActiveTab("edit")}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition ${
-                    activeTab === "edit" 
-                      ? "bg-indigo-600 text-white shadow-xs" 
+                    activeTab === "edit"
+                      ? "bg-indigo-600 text-white shadow-xs"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -354,24 +863,27 @@ export function TicketPrRecommendationModal({
 
           {/* Body Content */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100">
-
-            {/* TAB 1: PREVIEW MODE (Ready to print on dotmatrix 1/2 A4) */}
+            {/* TAB 1: PREVIEW MODE (1/2 A4 Landscape: 210 x 148.5 mm) */}
             {activeTab === "preview" && (
               <div className="space-y-4">
                 {/* Print Control Strip */}
-                <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs text-slate-700">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>Format: <strong>1/2 A4 Landscape (210 × 148 mm)</strong></span>
+                    <span>
+                      Format Cetak: <strong>1/2 A4 (A5 Landscape: 210 × 148.5 mm)</strong>
+                    </span>
                     <span className="text-slate-300">•</span>
-                    <span className="font-mono text-[11px] text-slate-500">Font: Monospace murni (Tinta tajam, anti-smudge)</span>
+                    <span className="font-mono text-[11px] text-slate-500">
+                      Tepat 1 Halaman (Zero Overflow)
+                    </span>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={handleCopyText}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition active:scale-95 shadow-xs"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition active:scale-95 shadow-xs"
                     >
                       {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
                       <span>{copied ? "Tersalin ke Clipboard" : "Salin Format WA"}</span>
@@ -380,133 +892,18 @@ export function TicketPrRecommendationModal({
                     <button
                       type="button"
                       onClick={handlePrint}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black transition active:scale-95 shadow-md shadow-indigo-600/30"
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black transition active:scale-95 shadow-md shadow-indigo-600/30"
                     >
                       <Printer size={15} />
-                      <span>Cetak Dot Matrix / PDF</span>
+                      <span>Cetak 1/2 A4 / PDF</span>
                     </button>
                   </div>
                 </div>
 
-                {/* VISUAL PAPER PREVIEW CONTAINER */}
+                {/* VISUAL PAPER PREVIEW CONTAINER (210mm x 148.5mm aspect) */}
                 <div className="overflow-x-auto flex justify-center py-2">
-                  <div className="bg-white border-2 border-slate-400 p-4 sm:p-5 shadow-xl w-[210mm] min-h-[148mm] max-w-[210mm] text-black font-mono text-[10px] leading-tight select-text">
-                    
-                    {/* Header Dot Matrix */}
-                    <div className="border-b-2 border-black pb-1.5 mb-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-black text-xs tracking-wider">{companyName}</div>
-                          <div className="text-[9px] font-bold">DIVISI IT-OSL & TECHNICAL SUPPORT SERVICES</div>
-                          <div className="text-[8px] text-slate-600">Ecosystem Maintenance • IT Assets • Network Infrastructure</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-black text-xs">SURAT REKOMENDASI PENGADAAN (PR)</div>
-                          <div className="text-[9px]">No. Dok: <strong>{docNumber}</strong></div>
-                          <div className="text-[9px]">Ref. Tiket: <strong>{ticket.ticketNumber}</strong> | Tgl: <strong>{docDate}</strong></div>
-                          <div className="text-[9px]">Sifat: <strong className="border border-black px-1 uppercase">{urgency}</strong></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-[9px] font-bold mb-2 pb-1 border-b border-black flex justify-between">
-                      <div>KEPADA YTH: BAGIAN PURCHASING / PENGADAAN BARANG</div>
-                      <div>PERIHAL: PERMOHONAN PENGADAAN PART / UNIT PERANGKAT IT</div>
-                    </div>
-
-                    {/* Section I: Unit & Pemohon */}
-                    <div className="mb-2 pb-1 border-b border-dashed border-black">
-                      <div className="font-bold underline text-[9px] mb-1">I. DATA PERANGKAT & PEMOHON</div>
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[9px]">
-                        <div>• Customer / Divisi : <strong>{customerName}</strong></div>
-                        <div>• Perangkat / Aset  : <strong>{assetInfo}</strong></div>
-                        <div>• Lokasi / Ruangan  : {locationName}</div>
-                        <div>• Kode Aset / SN    : <strong>{assetCode}</strong></div>
-                        <div>• Pemohon / PIC     : {requesterName}</div>
-                        <div>• Teknisi Pemeriksa : <strong>{technicianName}</strong></div>
-                      </div>
-                    </div>
-
-                    {/* Section II: Analisa & Tindakan */}
-                    <div className="mb-2 pb-1 border-b border-dashed border-black">
-                      <div className="font-bold underline text-[9px] mb-1">II. HASIL ANALISA KERUSAKAN & TINDAKAN PEKERJAAN</div>
-                      <div className="space-y-0.5 text-[9px]">
-                        <div>• <strong>Gejala / Uraian Masalah :</strong> {problemSummary}</div>
-                        <div>• <strong>Hasil Analisa Teknis    :</strong> {analysisText}</div>
-                        <div>• <strong>Tindakan yang Dilakukan :</strong> {workDoneText}</div>
-                        <div>• <strong>Justifikasi Pengadaan   :</strong> {justificationText}</div>
-                      </div>
-                    </div>
-
-                    {/* Section III: Tabel Part */}
-                    <div className="mb-2 pb-1 border-b border-black">
-                      <div className="font-bold underline text-[9px] mb-1">III. DAFTAR PART / BARANG YANG DIREKOMENDASIKAN (PR)</div>
-                      
-                      <table className="w-full text-left border-collapse border border-black text-[9px]">
-                        <thead>
-                          <tr className="border-b border-black bg-slate-50">
-                            <th className="border-r border-black p-1 text-center w-6 font-bold">NO</th>
-                            <th className="border-r border-black p-1 font-bold">NAMA PART & SPESIFIKASI TEKNIS</th>
-                            <th className="border-r border-black p-1 text-center w-12 font-bold">QTY</th>
-                            <th className="border-r border-black p-1 text-center w-14 font-bold">SATUAN</th>
-                            <th className="border-r border-black p-1 text-right w-24 font-bold">EST. HARGA</th>
-                            <th className="p-1 text-center w-20 font-bold">URGENSI</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {parts.map((p, idx) => (
-                            <tr key={p.id} className="border-b border-black">
-                              <td className="border-r border-black p-1 text-center font-bold">{idx + 1}</td>
-                              <td className="border-r border-black p-1">
-                                <div className="font-bold">{p.name || "-"}</div>
-                                {p.spec && <div className="text-[8px] text-slate-700 italic">{p.spec}</div>}
-                              </td>
-                              <td className="border-r border-black p-1 text-center font-bold">{p.qty}</td>
-                              <td className="border-r border-black p-1 text-center">{p.unit}</td>
-                              <td className="border-r border-black p-1 text-right">{p.estPrice || "-"}</td>
-                              <td className="p-1 text-center font-bold">{p.urgency}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-
-                      {notesToPurchasing && (
-                        <div className="text-[8px] mt-1 italic">
-                          * Catatan Khusus Purchasing: {notesToPurchasing}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Section IV: Tanda Tangan */}
-                    <div>
-                      <div className="font-bold text-[9px] mb-1">IV. LEMBAR PERSETUJUAN & OTORISASI DOKUMEN</div>
-                      <div className="grid grid-cols-3 gap-2 text-center text-[9px]">
-                        <div className="border border-black p-1 flex flex-col justify-between h-18">
-                          <div>Dibuat Oleh (IT Support)</div>
-                          <div>
-                            <div className="font-bold underline">({technicianName})</div>
-                            <div className="text-[8px]">Tgl: {docDate}</div>
-                          </div>
-                        </div>
-
-                        <div className="border border-black p-1 flex flex-col justify-between h-18">
-                          <div>Menyetujui (IT Supervisor)</div>
-                          <div>
-                            <div className="font-bold underline">({supervisorName})</div>
-                            <div className="text-[8px]">Tgl: ...../...../2026</div>
-                          </div>
-                        </div>
-
-                        <div className="border border-black p-1 flex flex-col justify-between h-18">
-                          <div>Diterima (Purchasing)</div>
-                          <div>
-                            <div className="font-bold underline">({purchasingName})</div>
-                            <div className="text-[8px]">Tgl: ...../...../2026</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
+                  <div className="bg-white border border-slate-300 shadow-xl rounded-xl p-5 sm:p-6 w-[210mm] max-w-[210mm] min-h-[148.5mm] overflow-hidden flex flex-col justify-between">
+                    {renderDocumentContent(false)}
                   </div>
                 </div>
               </div>
@@ -515,7 +912,6 @@ export function TicketPrRecommendationModal({
             {/* TAB 2: EDIT MODE */}
             {activeTab === "edit" && (
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-6">
-                
                 {/* Meta Header Inputs */}
                 <div>
                   <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -524,28 +920,34 @@ export function TicketPrRecommendationModal({
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Nomor Rekomendasi (PR)</label>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Nomor Rekomendasi (PR)
+                      </label>
                       <input
                         type="text"
                         value={docNumber}
-                        onChange={e => setDocNumber(e.target.value)}
+                        onChange={(e) => setDocNumber(e.target.value)}
                         className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Tanggal Dokumen</label>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Tanggal Dokumen
+                      </label>
                       <input
                         type="text"
                         value={docDate}
-                        onChange={e => setDocDate(e.target.value)}
+                        onChange={(e) => setDocDate(e.target.value)}
                         className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Tingkat Urgensi</label>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Tingkat Urgensi
+                      </label>
                       <select
                         value={urgency}
-                        onChange={e => setUrgency(e.target.value as any)}
+                        onChange={(e) => setUrgency(e.target.value as any)}
                         className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="NORMAL">NORMAL</option>
@@ -556,196 +958,141 @@ export function TicketPrRecommendationModal({
                   </div>
                 </div>
 
-                {/* Entity & Location Data */}
-                <div className="border-t border-slate-100 pt-5">
-                  <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <Building2 size={15} className="text-indigo-600" />
-                    <span>2. Unit, Aset & Personil Terkait</span>
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Customer / Klien</label>
-                      <input
-                        type="text"
-                        value={customerName}
-                        onChange={e => setCustomerName(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Lokasi / Ruangan</label>
-                      <input
-                        type="text"
-                        value={locationName}
-                        onChange={e => setLocationName(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Pemohon / PIC Unit</label>
-                      <input
-                        type="text"
-                        value={requesterName}
-                        onChange={e => setRequesterName(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Nama Perangkat / Aset</label>
-                      <input
-                        type="text"
-                        value={assetInfo}
-                        onChange={e => setAssetInfo(e.target.value)}
-                        className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Kode Aset / Serial Number</label>
-                      <input
-                        type="text"
-                        value={assetCode}
-                        onChange={e => setAssetCode(e.target.value)}
-                        className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Teknisi Pemeriksa</label>
-                      <input
-                        type="text"
-                        value={technicianName}
-                        onChange={e => setTechnicianName(e.target.value)}
-                        className="w-full px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Analysis & Work Done */}
-                <div className="border-t border-slate-100 pt-5">
+                {/* Technical Analysis Inputs */}
+                <div className="border-t border-slate-100 pt-4">
                   <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <Wrench size={15} className="text-indigo-600" />
-                    <span>3. Hasil Analisa, Tindakan & Justifikasi Pengadaan</span>
+                    <span>2. Hasil Analisa Teknis & Tindakan</span>
                   </h4>
                   <div className="space-y-3">
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Gejala / Uraian Masalah Awal</label>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Uraian Masalah / Gejala
+                      </label>
                       <input
                         type="text"
                         value={problemSummary}
-                        onChange={e => setProblemSummary(e.target.value)}
+                        onChange={(e) => setProblemSummary(e.target.value)}
                         className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Hasil Diagnosa & Analisa Teknis</label>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Hasil Analisa Teknis (Root Cause)
+                      </label>
                       <textarea
                         rows={2}
                         value={analysisText}
-                        onChange={e => setAnalysisText(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        onChange={(e) => setAnalysisText(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Tindakan Troubleshooting yang Telah Dilakukan</label>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Tindakan yang Telah Dilakukan
+                      </label>
                       <textarea
                         rows={2}
                         value={workDoneText}
-                        onChange={e => setWorkDoneText(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        onChange={(e) => setWorkDoneText(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Alasan / Justifikasi Kebutuhan Pembelian Part Baru</label>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Justifikasi Kebutuhan Pengadaan
+                      </label>
                       <textarea
                         rows={2}
                         value={justificationText}
-                        onChange={e => setJustificationText(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        onChange={(e) => setJustificationText(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Parts Table Editing */}
-                <div className="border-t border-slate-100 pt-5">
+                {/* Recommended Parts Table */}
+                <div className="border-t border-slate-100 pt-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                      <Sparkles size={15} className="text-indigo-600" />
-                      <span>4. Daftar Part / Komponen yang Dibutuhkan</span>
+                      <ShieldCheck size={15} className="text-indigo-600" />
+                      <span>3. Daftar Part / Barang yang Direkomendasikan</span>
                     </h4>
                     <button
                       type="button"
                       onClick={handleAddPart}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition active:scale-95"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition"
                     >
-                      <Plus size={14} />
-                      <span>Tambah Part</span>
+                      <Plus size={13} />
+                      <span>Tambah Baris Part</span>
                     </button>
                   </div>
 
                   <div className="space-y-2">
                     {parts.map((p, idx) => (
-                      <div key={p.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-12 gap-2 items-center">
+                      <div
+                        key={p.id}
+                        className="p-3 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-12 gap-2 items-center"
+                      >
                         <div className="col-span-1 text-center font-bold text-xs text-slate-500">
                           #{idx + 1}
                         </div>
                         <div className="col-span-4">
                           <input
                             type="text"
-                            placeholder="Nama Part (misal: SSD NVMe 512GB)"
+                            placeholder="Nama Part..."
                             value={p.name}
-                            onChange={e => handleUpdatePart(p.id, "name", e.target.value)}
+                            onChange={(e) => handleUpdatePart(p.id, "name", e.target.value)}
                             className="w-full px-2.5 py-1.5 text-xs font-bold rounded-lg border border-slate-300 bg-white"
                           />
                         </div>
                         <div className="col-span-3">
                           <input
                             type="text"
-                            placeholder="Spesifikasi teknis / merk"
+                            placeholder="Spek Teknis..."
                             value={p.spec}
-                            onChange={e => handleUpdatePart(p.id, "spec", e.target.value)}
+                            onChange={(e) => handleUpdatePart(p.id, "spec", e.target.value)}
                             className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
                           />
                         </div>
                         <div className="col-span-1">
                           <input
                             type="number"
-                            min="1"
+                            min={1}
                             value={p.qty}
-                            onChange={e => handleUpdatePart(p.id, "qty", parseInt(e.target.value) || 1)}
-                            className="w-full px-2 py-1.5 text-xs font-bold text-center rounded-lg border border-slate-300 bg-white"
+                            onChange={(e) =>
+                              handleUpdatePart(p.id, "qty", parseInt(e.target.value) || 1)
+                            }
+                            className="w-full px-2 py-1.5 text-xs text-center font-bold rounded-lg border border-slate-300 bg-white"
                           />
-                        </div>
-                        <div className="col-span-1">
-                          <select
-                            value={p.unit}
-                            onChange={e => handleUpdatePart(p.id, "unit", e.target.value)}
-                            className="w-full px-1.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
-                          >
-                            <option value="Pcs">Pcs</option>
-                            <option value="Unit">Unit</option>
-                            <option value="Set">Set</option>
-                            <option value="Roll">Roll</option>
-                            <option value="Pack">Pack</option>
-                          </select>
                         </div>
                         <div className="col-span-1">
                           <input
                             type="text"
-                            placeholder="Est. Rp"
+                            placeholder="Pcs"
+                            value={p.unit}
+                            onChange={(e) => handleUpdatePart(p.id, "unit", e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs text-center rounded-lg border border-slate-300 bg-white"
+                          />
+                        </div>
+                        <div className="col-span-1">
+                          <input
+                            type="text"
+                            placeholder="Est. Harga"
                             value={p.estPrice}
-                            onChange={e => handleUpdatePart(p.id, "estPrice", e.target.value)}
-                            className="w-full px-2 py-1.5 text-xs rounded-lg border border-slate-300 bg-white"
+                            onChange={(e) => handleUpdatePart(p.id, "estPrice", e.target.value)}
+                            className="w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg border border-slate-300 bg-white"
                           />
                         </div>
                         <div className="col-span-1 text-center">
                           <button
                             type="button"
                             onClick={() => handleRemovePart(p.id)}
-                            className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 transition"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
                             title="Hapus Baris"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </div>
@@ -753,38 +1100,68 @@ export function TicketPrRecommendationModal({
                   </div>
 
                   <div className="mt-3">
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Catatan Tambahan untuk Purchasing</label>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Catatan Tambahan untuk Tim Purchasing
+                    </label>
                     <input
                       type="text"
-                      placeholder="Contoh: Mohon merk original garansi resmi min 1 tahun"
                       value={notesToPurchasing}
-                      onChange={e => setNotesToPurchasing(e.target.value)}
+                      onChange={(e) => setNotesToPurchasing(e.target.value)}
                       className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                 </div>
 
-                {/* Bottom Trigger to Preview */}
-                <div className="pt-4 border-t border-slate-200 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("preview")}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition shadow-md shadow-indigo-600/30"
-                  >
-                    <span>Selesai & Lihat Preview Cetak</span>
-                    <ArrowRight size={14} />
-                  </button>
+                {/* Signer Names */}
+                <div className="border-t border-slate-100 pt-4">
+                  <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <User size={15} className="text-indigo-600" />
+                    <span>4. Personil Otorisasi & Tanda Tangan</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Dibuat Oleh (Teknisi IT)
+                      </label>
+                      <input
+                        type="text"
+                        value={technicianName}
+                        onChange={(e) => setTechnicianName(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Menyetujui (IT Supervisor / Head)
+                      </label>
+                      <input
+                        type="text"
+                        value={supervisorName}
+                        onChange={(e) => setSupervisorName(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Diterima Oleh (Purchasing)
+                      </label>
+                      <input
+                        type="text"
+                        value={purchasingName}
+                        onChange={(e) => setPurchasingName(e.target.value)}
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300"
+                      />
+                    </div>
+                  </div>
                 </div>
-
               </div>
             )}
-
           </div>
 
           {/* Modal Footer */}
           <div className="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-between text-xs shrink-0">
-            <span className="text-slate-500 font-mono text-[11px]">
-              Tip: Tekan tombol <strong>Cetak Dot Matrix</strong> lalu pilih printer Epson atau "Save as PDF" ukuran 1/2 A4.
+            <span className="text-slate-500 text-[11px]">
+              Format cetak resmi: <strong>1/2 A4 (A5 Landscape)</strong> untuk efisiensi kertas & printer dotmatrix.
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -800,140 +1177,32 @@ export function TicketPrRecommendationModal({
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-black transition active:scale-95 shadow-xs"
               >
                 <Printer size={15} />
-                <span>Cetak 1/2 A4</span>
+                <span>Cetak 1/2 A4 / PDF</span>
               </button>
             </div>
           </div>
         </motion.div>
 
-        {/* PRINTABLE ELEMENT (Only visible when printing via @media print) */}
-        <div id="printable-pr-recommendation" className="hidden print:block font-mono text-[10px] leading-tight text-black bg-white">
-          <style jsx global>{`
-            @page {
-              size: 210mm 148.5mm;
-              margin: 4mm 6mm;
-            }
-          `}</style>
-
-          {/* Kop Dokumen */}
-          <div className="border-b-2 border-black pb-1 mb-1.5">
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="font-black text-[12px] tracking-wider">{companyName}</div>
-                <div className="text-[9px] font-bold">DIVISI IT-OSL & TECHNICAL SUPPORT SERVICES</div>
-                <div className="text-[8px]">Ecosystem Maintenance • IT Assets • Infrastructure</div>
-              </div>
-              <div className="text-right">
-                <div className="font-black text-[12px]">SURAT REKOMENDASI PENGADAAN (PR)</div>
-                <div className="text-[9px]">No. Dok: <strong>{docNumber}</strong></div>
-                <div className="text-[9px]">Ref. Tiket: <strong>{ticket.ticketNumber}</strong> | Tgl: <strong>{docDate}</strong></div>
-                <div className="text-[9px]">Sifat: <strong className="border border-black px-1 uppercase">{urgency}</strong></div>
-              </div>
-            </div>
+        {/* PRINTABLE ELEMENT (Used by iframe print and print media) */}
+        <div
+          id="printable-pr-recommendation"
+          className="hidden print:block text-slate-950 font-sans bg-white"
+        >
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
+                @page {
+                  size: 210mm 148.5mm !important;
+                  margin: 3mm 4mm !important;
+                }
+              `,
+            }}
+          />
+          <div className="w-full bg-white text-black p-0 m-0">
+            {renderDocumentContent(true)}
           </div>
-
-          <div className="text-[9px] font-bold mb-1.5 pb-0.5 border-b border-black flex justify-between">
-            <div>KEPADA YTH: BAGIAN PURCHASING / PENGADAAN BARANG</div>
-            <div>PERIHAL: PERMOHONAN PENGADAAN PART / UNIT PERANGKAT IT</div>
-          </div>
-
-          {/* I. Data Unit */}
-          <div className="mb-1.5 pb-1 border-b border-dashed border-black">
-            <div className="font-bold underline text-[9px] mb-0.5">I. DATA PERANGKAT & PEMOHON</div>
-            <div className="grid grid-cols-2 gap-x-4 text-[9px]">
-              <div>• Customer / Divisi : <strong>{customerName}</strong></div>
-              <div>• Perangkat / Aset  : <strong>{assetInfo}</strong></div>
-              <div>• Lokasi / Ruangan  : {locationName}</div>
-              <div>• Kode Aset / SN    : <strong>{assetCode}</strong></div>
-              <div>• Pemohon / PIC     : {requesterName}</div>
-              <div>• Teknisi Pemeriksa : <strong>{technicianName}</strong></div>
-            </div>
-          </div>
-
-          {/* II. Analisa & Tindakan */}
-          <div className="mb-1.5 pb-1 border-b border-dashed border-black">
-            <div className="font-bold underline text-[9px] mb-0.5">II. HASIL ANALISA KERUSAKAN & TINDAKAN PEKERJAAN</div>
-            <div className="space-y-0.5 text-[9px]">
-              <div>• <strong>Gejala / Uraian Masalah :</strong> {problemSummary}</div>
-              <div>• <strong>Hasil Analisa Teknis    :</strong> {analysisText}</div>
-              <div>• <strong>Tindakan yang Dilakukan :</strong> {workDoneText}</div>
-              <div>• <strong>Justifikasi Pengadaan   :</strong> {justificationText}</div>
-            </div>
-          </div>
-
-          {/* III. Part List */}
-          <div className="mb-1.5 pb-1 border-b border-black">
-            <div className="font-bold underline text-[9px] mb-0.5">III. DAFTAR PART / BARANG YANG DIREKOMENDASIKAN (PR)</div>
-            
-            <table className="w-full text-left border-collapse border border-black text-[9px]">
-              <thead>
-                <tr className="border-b border-black bg-slate-50">
-                  <th className="border-r border-black p-0.5 text-center w-6 font-bold">NO</th>
-                  <th className="border-r border-black p-0.5 font-bold">NAMA PART & SPESIFIKASI TEKNIS</th>
-                  <th className="border-r border-black p-0.5 text-center w-10 font-bold">QTY</th>
-                  <th className="border-r border-black p-0.5 text-center w-14 font-bold">SATUAN</th>
-                  <th className="border-r border-black p-0.5 text-right w-24 font-bold">EST. HARGA</th>
-                  <th className="p-0.5 text-center w-20 font-bold">URGENSI</th>
-                </tr>
-              </thead>
-              <tbody>
-                {parts.map((p, idx) => (
-                  <tr key={p.id} className="border-b border-black">
-                    <td className="border-r border-black p-0.5 text-center font-bold">{idx + 1}</td>
-                    <td className="border-r border-black p-0.5">
-                      <div className="font-bold">{p.name || "-"}</div>
-                      {p.spec && <div className="text-[8px] italic">{p.spec}</div>}
-                    </td>
-                    <td className="border-r border-black p-0.5 text-center font-bold">{p.qty}</td>
-                    <td className="border-r border-black p-0.5 text-center">{p.unit}</td>
-                    <td className="border-r border-black p-0.5 text-right">{p.estPrice || "-"}</td>
-                    <td className="p-0.5 text-center font-bold">{p.urgency}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {notesToPurchasing && (
-              <div className="text-[8px] mt-0.5 italic">
-                * Catatan Purchasing: {notesToPurchasing}
-              </div>
-            )}
-          </div>
-
-          {/* IV. Lembar Pengesahan */}
-          <div>
-            <div className="font-bold text-[9px] mb-0.5">IV. LEMBAR PERSETUJUAN & OTORISASI DOKUMEN</div>
-            <div className="grid grid-cols-3 gap-2 text-center text-[9px]">
-              <div className="border border-black p-1 flex flex-col justify-between h-16">
-                <div>Dibuat Oleh (IT Support)</div>
-                <div>
-                  <div className="font-bold underline">({technicianName})</div>
-                  <div className="text-[8px]">Tgl: {docDate}</div>
-                </div>
-              </div>
-
-              <div className="border border-black p-1 flex flex-col justify-between h-16">
-                <div>Menyetujui (IT Supervisor)</div>
-                <div>
-                  <div className="font-bold underline">({supervisorName})</div>
-                  <div className="text-[8px]">Tgl: ...../...../2026</div>
-                </div>
-              </div>
-
-              <div className="border border-black p-1 flex flex-col justify-between h-16">
-                <div>Diterima (Purchasing)</div>
-                <div>
-                  <div className="font-bold underline">({purchasingName})</div>
-                  <div className="text-[8px]">Tgl: ...../...../2026</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
         </div>
-
       </div>
     </AnimatePresence>
   )
 }
-

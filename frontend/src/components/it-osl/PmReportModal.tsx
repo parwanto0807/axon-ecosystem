@@ -178,7 +178,6 @@ export function PmReportModal({
     <AnimatePresence>
       <div
         className="fixed inset-0 z-[230] flex items-center justify-center p-2 sm:p-4 bg-black/70 overflow-y-auto"
-        onClick={onClose}
       >
         {/* MODAL WRAPPER (Screen only, hidden on print) */}
         <motion.div
@@ -270,7 +269,14 @@ export function PmReportModal({
                       )}
 
                       <div className="space-y-0.5 min-w-0">
-                        <h2 className="font-black text-xl sm:text-2xl tracking-wide text-slate-950 uppercase font-serif leading-tight">
+                        <h2
+                          className="font-black text-xl sm:text-2xl uppercase tracking-wider text-slate-950 leading-tight"
+                          style={{
+                            fontFamily: "'Montserrat', 'Arial Black', 'Helvetica Neue', Arial, sans-serif",
+                            fontWeight: 900,
+                            letterSpacing: "0.06em",
+                          }}
+                        >
                           {activeCompany}
                         </h2>
                         <div className="flex items-center gap-2 flex-wrap">
@@ -603,7 +609,14 @@ export function PmReportModal({
                   </div>
                 )}
                 <div className="space-y-0.5 min-w-0">
-                  <h2 className="font-black text-base tracking-wider text-slate-950 uppercase font-serif leading-tight">
+                  <h2
+                    className="font-black text-base uppercase tracking-wider text-slate-950 leading-tight"
+                    style={{
+                      fontFamily: "'Montserrat', 'Arial Black', 'Helvetica Neue', Arial, sans-serif",
+                      fontWeight: 900,
+                      letterSpacing: "0.06em",
+                    }}
+                  >
                     {activeCompany}
                   </h2>
                   <p className="text-[9.5px] font-bold text-slate-900 uppercase">
