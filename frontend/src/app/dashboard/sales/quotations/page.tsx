@@ -158,7 +158,7 @@ export default function QuotationsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900">
-                            // SALES
+                            {"// SALES"}
                         </span>
                         <h1 className="text-sm lg:text-base font-bold text-slate-900 dark:text-white tracking-tight">Penawaran Harga</h1>
                         <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">[{quotations.length} RECORDS]</span>

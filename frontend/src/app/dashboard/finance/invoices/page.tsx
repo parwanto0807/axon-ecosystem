@@ -381,7 +381,7 @@ export default function InvoicesPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         <span className="rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-emerald-600 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-400">
-                            // FINANCE
+                            {"// FINANCE"}
                         </span>
                         <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white lg:text-base">Invoice / Penagihan</h1>
                         <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">[{invoices.length} RECORDS]</span>

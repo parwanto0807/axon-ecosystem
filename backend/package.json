@@ -23,7 +23,7 @@
     "next-auth": "^4.24.15",
     "node-cron": "^4.2.1",
     "node-routeros": "^1.6.8",
-    "nodemailer": "^10.3.1",
+    "nodemailer": "^7.0.7",
     "pdfkit": "^0.20.2",
     "prisma": "^6.19.2",
     "sharp": "^0.35.3"

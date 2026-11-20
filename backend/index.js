@@ -23,6 +23,7 @@ const { postJournalFromSystemKey } = require('./utils/accountingUtils');
 const PORT = process.env.PORT || 5003;
 const { encrypt, decrypt } = require('./utils/encryption');
 const { testMikrotikConnection } = require('./utils/mikrotik');
+const { recordInvoicePayment, INVOICE_INCLUDE: INV_INCLUDE } = require('./utils/invoicePayments');
 
 // Global memory for traffic calculation
 let lastTrafficStats = {};
@@ -253,11 +254,19 @@ async function requireApiAuth(req, res, next) {
   }
 }
 
+// Integrasi server-to-server (mobile app). Wajib di-mount sebelum guard
+// session NextAuth karena autentikasinya memakai API key sendiri.
+const createIntegrationRouter = require('./routes/integration');
+app.use('/api/integration', createIntegrationRouter(prisma));
+
 app.use('/api', requireApiAuth);
 
 console.log(
   `[AuthGuard] enabled (secret: ${process.env.NEXTAUTH_SECRET ? 'set' : 'MISSING'}) ` +
   `— frontend session fallback: ${FRONTEND_INTERNAL_URLS.join(', ')}`
+);
+console.log(
+  `[Integration] mobile API ${process.env.MOBILE_INTEGRATION_API_KEY ? 'enabled (MOBILE_INTEGRATION_API_KEY set)' : 'waiting for SubApp API key (MOBILE_INTEGRATION_API_KEY not set)'}`
 );
 
 const itOslRouter = require('./routes/it-osl');
@@ -3877,18 +3886,6 @@ const generateInvoiceNumber = async () => {
   return `INV-${year}-${String(count + 1).padStart(4, '0')}`;
 };
 
-const INV_INCLUDE = {
-  customer: true,
-  project: true,
-  salesOrder: true,
-  deliveryOrder: true,
-  bast: true,
-  contract: true,
-  bankAccount: true,
-  items: { orderBy: { no: 'asc' } },
-  payments: { orderBy: { date: 'asc' } }
-};
-
 app.get('/api/invoices', async (req, res) => {
   try {
     const { status, projectId, customerId } = req.query;
@@ -4173,117 +4170,14 @@ app.patch('/api/invoices/:id/post', async (req, res) => {
 
 app.patch('/api/invoices/:id/pay', async (req, res) => {
   try {
-    const { id } = req.params;
     const { bankAccountId, amount } = req.body;
-
-    const inv = await prisma.$transaction(async (tx) => {
-      // 1. Get the invoice and ensure it can be paid
-      const invoice = await tx.invoice.findUnique({
-        where: { id },
-        include: { ...INV_INCLUDE, payments: true }
-      });
-
-      if (!invoice) throw new Error('Invoice not found');
-      if (invoice.status === 'PAID') throw new Error('Invoice already fully paid');
-
-      const currentPaid = invoice.payments ? invoice.payments.reduce((sum, p) => sum + p.amount, 0) : 0;
-      const paymentAmount = amount ? Number(amount) : (invoice.grandTotal - currentPaid);
-
-      if (paymentAmount <= 0) throw new Error('Payment amount must be greater than 0');
-
-      const totalPaid = currentPaid + paymentAmount;
-      const newStatus = totalPaid >= invoice.grandTotal ? 'PAID' : 'PARTIAL';
-
-      // 2. Resolve Bank and AR Accounts
-      let targetCoaId = null;
-      if (bankAccountId) {
-        const bank = await tx.bankAccount.findUnique({
-          where: { id: bankAccountId },
-          include: { coa: true }
-        });
-        if (bank?.coaId) {
-          targetCoaId = bank.coaId;
-        }
-      }
-
-      // If no bank provided or bank has no COA, fallback to system CASH account
-      if (!targetCoaId) {
-        const cashAcc = await tx.systemAccount.findUnique({
-          where: { key: 'CASH' },
-          include: { coa: true }
-        });
-        if (!cashAcc) throw new Error('CASH system account not mapped and no bank provided');
-        targetCoaId = cashAcc.coaId;
-      }
-
-      const arAcc = await tx.systemAccount.findUnique({
-        where: { key: 'ACCOUNTS_RECEIVABLE' },
-        include: { coa: true }
-      });
-      if (!arAcc) throw new Error('AR system account not mapped');
-
-      // 3. Create InvoicePayment and Update Invoice Status
-      const result = await tx.invoice.update({
-        where: { id },
-        data: { 
-          status: newStatus,
-          bankAccountId: bankAccountId || invoice.bankAccountId 
-        },
-        include: { ...INV_INCLUDE, payments: true }
-      });
-
-      await advanceSalesOrderStatus(tx, result.salesOrderId, newStatus === 'PAID' ? 'PAID' : 'PARTIAL');
-      await advanceDeliveryOrderStatus(tx, await resolveDeliveryOrder(tx, result.salesOrderId, result.deliveryOrderId), newStatus === 'PAID' ? 'PAID' : 'INVOICED');
-
-      const paymentRecord = await tx.invoicePayment.create({
-        data: {
-          invoiceId: id,
-          amount: paymentAmount,
-          date: new Date(),
-          paymentMethod: 'TRANSFER',
-          status: 'SUCCESS',
-          notes: `Ref: PAY-${result.number}-${result.payments.length + 1}`
-        }
-      });
-
-      // 4. Create Journal Entry
-      const journalItems = [
-        {
-          coaId: targetCoaId,
-          description: `Penerimaan Pembayaran (${newStatus}): ${result.number} - ${result.customer?.name || ''}`,
-          debit: paymentAmount,
-          credit: 0
-        },
-        {
-          coaId: arAcc.coaId,
-          description: `Pelunasan Piutang (${newStatus}): ${result.number}`,
-          debit: 0,
-          credit: paymentAmount
-        }
-      ];
-
-      const lastJE = await tx.journalEntry.findFirst({
-        where: { number: { startsWith: `JV-${new Date().getFullYear()}-` } },
-        orderBy: { number: 'desc' }
-      });
-      const nextNum = lastJE ? parseInt(lastJE.number.split('-')[2] || '0') + 1 : 1;
-      const jvNumber = `JV-${new Date().getFullYear()}-${nextNum.toString().padStart(4, '0')}`;
-
-      await tx.journalEntry.create({
-        data: {
-          number: jvNumber,
-          date: new Date(),
-          description: `Payment for Invoice: ${result.number}`,
-          reference: result.number,
-          type: 'RECEIPT',
-          items: { create: journalItems }
-        }
-      });
-
-      return result;
-    }, { timeout: 20000 });
-
-    res.json(inv);
+    const result = await recordInvoicePayment(prisma, {
+      invoiceId: req.params.id,
+      amount,
+      bankAccountId,
+      allowOverpayment: true
+    });
+    res.json(result.invoice);
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 

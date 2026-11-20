@@ -763,7 +763,7 @@ function SidebarContent({
                         !isCollapsed && (
                             <div key={item.id} className="px-2 pt-2.5 pb-0.5 mt-0.5 first:mt-0 first:pt-0.5 border-t first:border-t-0 border-slate-800/60">
                                 <span className="text-[8.5px] font-mono tracking-widest text-slate-400 uppercase">
-                                    // {item.label}
+                                    {"// "}{item.label}
                                 </span>
                             </div>
                         )

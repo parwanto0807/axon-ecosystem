@@ -277,7 +277,7 @@ const DashboardCard = ({ title, value, icon: Icon, description, trend, trendType
     <div className="card-engine rounded-md p-3 bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 shadow-2xs flex flex-col justify-between">
       <div className="flex items-center justify-between mb-2">
         <span className="font-mono text-[9px] font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-          // {title}
+          {"// "}{title}
         </span>
         <div className="w-6 h-6 rounded bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center text-slate-600 dark:text-slate-300">
           <Icon className="h-3 w-3" strokeWidth={2} />
@@ -713,7 +713,7 @@ export default function DashboardPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 mb-1.5 border-b border-slate-100 dark:border-slate-800/80">
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-mono text-[9px] font-bold text-slate-400 dark:text-slate-500">// METRIC-01</span>
+                <span className="font-mono text-[9px] font-bold text-slate-400 dark:text-slate-500">{"// METRIC-01"}</span>
                 <h3 className="text-xs font-bold tracking-tight text-slate-900 dark:text-white uppercase font-mono">
                   {t.salesPerformance}
                 </h3>
@@ -743,7 +743,7 @@ export default function DashboardPage() {
         <div className="rounded-md bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
           <div className="pb-2 mb-1.5 border-b border-slate-100 dark:border-slate-800/80">
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[9px] font-bold text-slate-400 dark:text-slate-500">// ALLOC-01</span>
+              <span className="font-mono text-[9px] font-bold text-slate-400 dark:text-slate-500">{"// ALLOC-01"}</span>
               <h3 className="text-xs font-bold tracking-tight text-slate-900 dark:text-white uppercase font-mono">
                 {t.expenseAllocation}
               </h3>
@@ -790,7 +790,7 @@ export default function DashboardPage() {
         <div className="rounded-md bg-white dark:bg-[#0b0f17] border border-slate-200 dark:border-slate-800 p-3 shadow-2xs flex flex-col justify-between">
           <div className="pb-2 mb-1.5 border-b border-slate-100 dark:border-slate-800/80">
             <div className="flex items-center gap-1.5">
-              <span className="font-mono text-[9px] font-bold text-slate-400 dark:text-slate-500">// REVENUE-02</span>
+              <span className="font-mono text-[9px] font-bold text-slate-400 dark:text-slate-500">{"// REVENUE-02"}</span>
               <h3 className="text-xs font-bold tracking-tight text-slate-900 dark:text-white uppercase font-mono">
                 {t.salesByCategory}
               </h3>

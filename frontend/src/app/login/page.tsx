@@ -174,7 +174,7 @@ export default function LoginPage() {
                     {/* Header */}
                     <div className="mb-5">
                         <span className="font-mono text-[9px] font-bold text-blue-600 dark:text-blue-400 tracking-widest uppercase">
-                            // AUTHENTICATION
+                            {"// AUTHENTICATION"}
                         </span>
                         <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white mt-0.5">
                             Operator Sign In
